@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../main/home_screen.dart';
 import '../../main/inbox_screen.dart';
+import '../../main/today_screen.dart';
+import '../../main/upcoming_screen.dart';
 
 class SidebarComponent extends StatelessWidget {
   const SidebarComponent({super.key});
@@ -70,6 +72,30 @@ class SidebarComponent extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const InboxScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.today, color: Colors.deepPurple),
+            title: const Text('Today'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TodayScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.schedule, color: Colors.deepPurple),
+            title: const Text('Upcoming'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const UpcomingScreen()),
               );
             },
           ),
