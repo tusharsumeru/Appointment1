@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppointmentScheduleForm extends StatefulWidget {
-  final String appointmentId;
-  final String appointmentName;
+  final Map<String, dynamic> appointment;
   final VoidCallback? onSave;
   final VoidCallback? onClose;
 
   const AppointmentScheduleForm({
     Key? key,
-    required this.appointmentId,
-    required this.appointmentName,
+    required this.appointment,
     this.onSave,
     this.onClose,
   }) : super(key: key);
@@ -107,6 +105,16 @@ class _AppointmentScheduleFormState extends State<AppointmentScheduleForm> {
     }
   }
 
+  String _getAppointmentName() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getAppointmentId() {
+    return widget.appointment['appointmentId']?.toString() ?? 
+           widget.appointment['_id']?.toString() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -130,11 +138,25 @@ class _AppointmentScheduleFormState extends State<AppointmentScheduleForm> {
               children: [
                 const Icon(Icons.schedule, color: Colors.orange, size: 24),
                 const SizedBox(width: 12),
-                const Text(
-                  'Schedule Appointment',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Schedule Appointment',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        _getAppointmentName(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -432,6 +454,7 @@ class _AppointmentScheduleFormState extends State<AppointmentScheduleForm> {
                           child: ElevatedButton(
                             onPressed: () {
                               widget.onClose?.call();
+                              Navigator.of(context).pop();
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,

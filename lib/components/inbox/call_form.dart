@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 
 class CallForm extends StatefulWidget {
-  final String appointmentId;
-  final String appointmentName;
-  final String phoneNumber;
+  final Map<String, dynamic> appointment;
   final VoidCallback? onCall;
   final VoidCallback? onClose;
 
   const CallForm({
     Key? key,
-    required this.appointmentId,
-    required this.appointmentName,
-    required this.phoneNumber,
+    required this.appointment,
     this.onCall,
     this.onClose,
   }) : super(key: key);
@@ -21,6 +17,23 @@ class CallForm extends StatefulWidget {
 }
 
 class _CallFormState extends State<CallForm> {
+  String _getAppointmentName() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getPhoneNumber() {
+    final phoneData = widget.appointment['phoneNumber'];
+    if (phoneData is Map<String, dynamic>) {
+      final countryCode = phoneData['countryCode']?.toString() ?? '';
+      final number = phoneData['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode $number';
+      }
+    }
+    return phoneData?.toString() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -56,11 +69,25 @@ class _CallFormState extends State<CallForm> {
                   size: 18,
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'Call Options',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Call Options',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _getAppointmentName(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -86,8 +113,8 @@ class _CallFormState extends State<CallForm> {
                       size: 20,
                     ),
                   ),
-                  title: Text('Call ${widget.appointmentName}'),
-                  subtitle: Text(widget.phoneNumber),
+                  title: Text('Call ${_getAppointmentName()}'),
+                  subtitle: Text(_getPhoneNumber()),
                   trailing: Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -111,6 +138,7 @@ class _CallFormState extends State<CallForm> {
                   child: TextButton(
                     onPressed: () {
                       widget.onClose?.call();
+                      Navigator.pop(context);
                     },
                     child: const Text('Cancel'),
                   ),

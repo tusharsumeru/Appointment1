@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../models/appointment.dart';
 
 class AssignForm extends StatefulWidget {
-  final String appointmentId;
-  final String appointmentName;
-  final List<Assignee> availableAssignees;
+  final Map<String, dynamic> appointment;
   final Function(String)? onAssignTo;
   final VoidCallback? onClose;
 
   const AssignForm({
     Key? key,
-    required this.appointmentId,
-    required this.appointmentName,
-    required this.availableAssignees,
+    required this.appointment,
     this.onAssignTo,
     this.onClose,
   }) : super(key: key);
@@ -22,6 +17,33 @@ class AssignForm extends StatefulWidget {
 }
 
 class _AssignFormState extends State<AssignForm> {
+  // Sample assignees - in real app, this would come from API
+  final List<Map<String, dynamic>> _availableAssignees = [
+    {'id': '1', 'name': 'Meera Prashanth', 'email': 'secratary2@sumerudigital.com'},
+    {'id': '2', 'name': 'Vishal Merani', 'email': 'secratary@sumerudigital.com'},
+    {'id': '3', 'name': 'KK Secretary', 'email': 'kk@sumerudigital.com'},
+    {'id': '4', 'name': 'Admin Team', 'email': 'admin@sumerudigital.com'},
+  ];
+
+  String _getAppointmentName() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getAppointmentId() {
+    return widget.appointment['appointmentId']?.toString() ?? 
+           widget.appointment['_id']?.toString() ?? '';
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '';
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -57,11 +79,25 @@ class _AssignFormState extends State<AssignForm> {
                   size: 18,
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'Assign to Team',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Assign to Team',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _getAppointmentName(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -71,7 +107,7 @@ class _AssignFormState extends State<AssignForm> {
           // Content - Compact list
           Column(
             mainAxisSize: MainAxisSize.min,
-            children: widget.availableAssignees.map((assignee) {
+            children: _availableAssignees.map((assignee) {
               return ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -79,7 +115,7 @@ class _AssignFormState extends State<AssignForm> {
                   radius: 16,
                   backgroundColor: Colors.indigo[100],
                   child: Text(
-                    assignee.initials,
+                    _getInitials(assignee['name']),
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -88,8 +124,12 @@ class _AssignFormState extends State<AssignForm> {
                   ),
                 ),
                 title: Text(
-                  assignee.name,
+                  assignee['name'],
                   style: const TextStyle(fontSize: 14),
+                ),
+                subtitle: Text(
+                  assignee['email'],
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 trailing: Icon(
                   Icons.arrow_forward_ios,
@@ -97,7 +137,7 @@ class _AssignFormState extends State<AssignForm> {
                   color: Colors.grey[400],
                 ),
                 onTap: () {
-                  widget.onAssignTo?.call('${widget.appointmentId}|${assignee.id}|${assignee.name}');
+                  widget.onAssignTo?.call('${_getAppointmentId()}|${assignee['id']}|${assignee['name']}');
                   Navigator.pop(context);
                 },
               );
@@ -113,6 +153,7 @@ class _AssignFormState extends State<AssignForm> {
                   child: TextButton(
                     onPressed: () {
                       widget.onClose?.call();
+                      Navigator.pop(context);
                     },
                     child: const Text('Cancel'),
                   ),

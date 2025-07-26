@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 
 class StarForm extends StatefulWidget {
-  final String appointmentId;
-  final String appointmentName;
-  final bool isStarred;
-  final Function(bool)? onStarToggle;
+  final Map<String, dynamic> appointment;
+  final VoidCallback? onStar;
   final VoidCallback? onClose;
 
   const StarForm({
     Key? key,
-    required this.appointmentId,
-    required this.appointmentName,
-    required this.isStarred,
-    this.onStarToggle,
+    required this.appointment,
+    this.onStar,
     this.onClose,
   }) : super(key: key);
 
@@ -21,8 +17,24 @@ class StarForm extends StatefulWidget {
 }
 
 class _StarFormState extends State<StarForm> {
+  String _getAppointmentName() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getAppointmentId() {
+    return widget.appointment['appointmentId']?.toString() ?? 
+           widget.appointment['_id']?.toString() ?? '';
+  }
+
+  bool _isStarred() {
+    return widget.appointment['starred'] == true;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isStarred = _isStarred();
+    
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -51,16 +63,30 @@ class _StarFormState extends State<StarForm> {
             child: Row(
               children: [
                 Icon(
-                  widget.isStarred ? Icons.star : Icons.star_border,
-                  color: widget.isStarred ? Colors.amber[600] : Colors.grey[600],
+                  isStarred ? Icons.star : Icons.star_border,
+                  color: isStarred ? Colors.amber : Colors.grey[600],
                   size: 18,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  widget.isStarred ? 'Remove from Favorites' : 'Add to Favorites',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isStarred ? 'Remove from Starred' : 'Add to Starred',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _getAppointmentName(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -77,24 +103,24 @@ class _StarFormState extends State<StarForm> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: (widget.isStarred ? Colors.amber : Colors.grey).withOpacity(0.1),
+                      color: isStarred ? Colors.amber.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      widget.isStarred ? Icons.star : Icons.star_border,
-                      color: widget.isStarred ? Colors.amber : Colors.grey,
+                      isStarred ? Icons.star : Icons.star_border,
+                      color: isStarred ? Colors.amber : Colors.grey,
                       size: 20,
                     ),
                   ),
-                  title: Text(widget.isStarred ? 'Remove from Favorites' : 'Add to Favorites'),
-                  subtitle: Text('${widget.appointmentName}'),
+                  title: Text(isStarred ? 'Remove from Starred' : 'Add to Starred'),
+                  subtitle: Text('${_getAppointmentName()} - ${_getAppointmentId()}'),
                   trailing: Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
                     color: Colors.grey[400],
                   ),
                   onTap: () {
-                    widget.onStarToggle?.call(!widget.isStarred);
+                    widget.onStar?.call();
                     Navigator.pop(context);
                   },
                 ),
@@ -111,6 +137,7 @@ class _StarFormState extends State<StarForm> {
                   child: TextButton(
                     onPressed: () {
                       widget.onClose?.call();
+                      Navigator.pop(context);
                     },
                     child: const Text('Cancel'),
                   ),

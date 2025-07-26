@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 class DeleteForm extends StatefulWidget {
-  final String appointmentId;
-  final String appointmentName;
+  final Map<String, dynamic> appointment;
   final VoidCallback? onDelete;
   final VoidCallback? onClose;
 
   const DeleteForm({
     Key? key,
-    required this.appointmentId,
-    required this.appointmentName,
+    required this.appointment,
     this.onDelete,
     this.onClose,
   }) : super(key: key);
@@ -19,6 +17,16 @@ class DeleteForm extends StatefulWidget {
 }
 
 class _DeleteFormState extends State<DeleteForm> {
+  String _getAppointmentName() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getAppointmentId() {
+    return widget.appointment['appointmentId']?.toString() ?? 
+           widget.appointment['_id']?.toString() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -49,16 +57,30 @@ class _DeleteFormState extends State<DeleteForm> {
             child: Row(
               children: [
                 Icon(
-                  Icons.delete_outline,
+                  Icons.delete_forever,
                   color: Colors.red[600],
                   size: 18,
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'Delete Appointment',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Delete Appointment',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _getAppointmentName(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -70,79 +92,128 @@ class _DeleteFormState extends State<DeleteForm> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // Warning message
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.05),
+                    color: Colors.red[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    border: Border.all(color: Colors.red[200]!),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.warning,
-                        color: Colors.red[600],
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
+                      Icon(Icons.warning, color: Colors.red[600], size: 20),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Are you sure?',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'This will permanently delete "${widget.appointmentName}" and cannot be undone.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Are you sure you want to delete this appointment? This action cannot be undone.',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                
+                const SizedBox(height: 16),
+                
+                // Appointment details
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Appointment Details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildDetailRow('Name', _getAppointmentName()),
+                      _buildDetailRow('ID', _getAppointmentId()),
+                      _buildDetailRow('Email', widget.appointment['email']?.toString() ?? 'N/A'),
+                      _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'N/A'),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.onClose?.call();
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.onDelete?.call();
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Delete'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      widget.onClose?.call();
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      widget.onDelete?.call();
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Delete'),
-                  ),
-                ),
-              ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black87,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

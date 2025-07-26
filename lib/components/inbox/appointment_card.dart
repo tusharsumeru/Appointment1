@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/appointment.dart';
+import 'appointment_detail_page.dart';
 import 'appointment_schedule_form.dart';
 import 'email_form.dart';
 import 'darshan_line_form.dart';
@@ -10,13 +10,8 @@ import 'star_form.dart';
 import 'delete_form.dart';
 
 class AppointmentCard extends StatefulWidget {
-  final Appointment appointment;
+  final Map<String, dynamic> appointment;
   final VoidCallback? onTap;
-  final Function(String)? onStatusChange;
-  final Function(String)? onEmail;
-  final Function(String)? onDarshanLineChange;
-  final Function(String)? onBackstageChange;
-  final Function(String)? onAssignTo;
   final Function(bool)? onStarToggle;
   final VoidCallback? onDelete;
 
@@ -24,11 +19,6 @@ class AppointmentCard extends StatefulWidget {
     super.key,
     required this.appointment,
     this.onTap,
-    this.onStatusChange,
-    this.onEmail,
-    this.onDarshanLineChange,
-    this.onBackstageChange,
-    this.onAssignTo,
     this.onStarToggle,
     this.onDelete,
   });
@@ -38,126 +28,281 @@ class AppointmentCard extends StatefulWidget {
 }
 
 class _AppointmentCardState extends State<AppointmentCard> {
+  @override
+  Widget build(BuildContext context) {
+    // Extract only essential data
+    final String id = widget.appointment['_id']?.toString() ?? '';
+    final String createdByName = _getCreatedByName();
+    final String createdByDesignation = _getCreatedByDesignation();
+    final String createdByImage = _getCreatedByImage();
+    final String createdAt = _getCreatedAt();
+    final String preferredDateRange = _getPreferredDateRange();
+    final int attendeeCount = _getAttendeeCount();
+    final bool isStarred = widget.appointment['starred'] == true;
 
-    void _showActionBottomSheet(String actionType) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: widget.onTap ?? () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppointmentDetailPage(appointment: widget.appointment),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with created by info
+              Row(
+                children: [
+                  // Created by Avatar
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundImage: NetworkImage(createdByImage),
+                    onBackgroundImageError: (exception, stackTrace) {
+                      // Handle image loading error
+                    },
+                    child: createdByImage.isEmpty
+                        ? const Icon(Icons.person, size: 30, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Created by name and designation
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          createdByName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (createdByDesignation.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            createdByDesignation,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (createdAt.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Created: $createdAt',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  
+                  // Star button
+                  IconButton(
+                    onPressed: () {
+                      widget.onStarToggle?.call(!isStarred);
+                    },
+                    icon: Icon(
+                      isStarred ? Icons.star : Icons.star_border,
+                      color: isStarred ? Colors.amber : Colors.grey,
+                      size: 24,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            
-
-            
-            // Content based on action type
-            Expanded(
-              child: _buildActionContent(actionType),
-            ),
-            
-            const SizedBox(height: 16),
-          ],
+              
+              const SizedBox(height: 12),
+              
+              // Essential details only
+              if (preferredDateRange.isNotEmpty) ...[
+                _buildDetailRow('Preferred Dates', preferredDateRange),
+                const SizedBox(height: 4),
+              ],
+              if (attendeeCount > 0) ...[
+                _buildDetailRow('Attendees', '$attendeeCount person${attendeeCount > 1 ? 's' : ''}'),
+                const SizedBox(height: 4),
+              ],
+              if (_getAssignedSecretary().isNotEmpty) ...[
+                _buildDetailRow('Assigned To', _getAssignedSecretary()),
+                const SizedBox(height: 4),
+              ],
+              
+              const SizedBox(height: 12),
+              
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildActionButton(
+                    icon: Icons.schedule,
+                    label: 'Reminder',
+                    color: Colors.blue,
+                    onTap: () => _showActionBottomSheet(context, 'reminder'),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.email,
+                    label: 'Email',
+                    color: Colors.green,
+                    onTap: () => _showActionBottomSheet(context, 'email'),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.queue,
+                    label: 'Darshan',
+                    color: Colors.orange,
+                    onTap: () => _showActionBottomSheet(context, 'darshan'),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.call,
+                    label: 'Call',
+                    color: Colors.purple,
+                    onTap: () => _showActionBottomSheet(context, 'call'),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.assignment_ind,
+                    label: 'Assign',
+                    color: Colors.teal,
+                    onTap: () => _showActionBottomSheet(context, 'assign'),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.delete,
+                    label: 'Delete',
+                    color: Colors.red,
+                    onTap: () => _showActionBottomSheet(context, 'delete'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  IconData _getActionIcon(String actionType) {
-    switch (actionType) {
-      case 'reminder':
-        return Icons.notifications_active;
-      case 'email':
-        return Icons.email_outlined;
-      case 'darshan':
-        return Icons.queue;
-      case 'call':
-        return Icons.phone;
-      case 'assign':
-        return Icons.group_add;
-      case 'star':
-        return Icons.star;
-      case 'delete':
-        return Icons.delete_outline;
-      default:
-        return Icons.info;
-    }
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.black87,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 
-  Color _getActionColor(String actionType) {
-    switch (actionType) {
-      case 'reminder':
-        return Colors.orange;
-      case 'email':
-        return Colors.blue;
-      case 'darshan':
-        return Colors.purple;
-      case 'call':
-        return Colors.green;
-      case 'assign':
-        return Colors.indigo;
-      case 'star':
-        return widget.appointment.isStarred ? Colors.amber : Colors.grey;
-      case 'delete':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  String _getActionTitle(String actionType) {
-    switch (actionType) {
-      case 'reminder':
-        return 'Set Reminder';
-      case 'email':
-        return 'Send Email';
-      case 'darshan':
-        return 'Move to Line';
-      case 'call':
-        return 'Call Options';
-      case 'assign':
-        return 'Assign to Team';
-      case 'star':
-        return widget.appointment.isStarred ? 'Remove from Favorites' : 'Add to Favorites';
-      case 'delete':
-        return 'Delete Appointment';
-      default:
-        return 'Action';
+  String _formatPhoneNumber(dynamic phoneData) {
+    if (phoneData is Map<String, dynamic>) {
+      final countryCode = phoneData['countryCode']?.toString() ?? '';
+      final number = phoneData['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode $number';
+      }
     }
+    return phoneData?.toString() ?? '';
   }
 
-  Widget _buildActionContent(String actionType) {
-    switch (actionType) {
+  int _getAttendeeCount() {
+    final accompanyUsers = widget.appointment['accompanyUsers'];
+    if (accompanyUsers is Map<String, dynamic>) {
+      return accompanyUsers['numberOfUsers'] ?? 1;
+    }
+    return 1;
+  }
+
+  void _showActionBottomSheet(BuildContext context, String action) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildActionContent(action),
+    );
+  }
+
+  Widget _buildActionContent(String action) {
+    switch (action) {
       case 'reminder':
         return _buildReminderContent();
       case 'email':
         return _buildEmailContent();
+      case 'darshan':
+        return _buildDarshanLineContent();
       case 'call':
         return _buildCallContent();
       case 'assign':
         return _buildAssignContent();
-      case 'star':
-        return _buildStarContent();
       case 'delete':
         return _buildDeleteContent();
       default:
@@ -166,673 +311,241 @@ class _AppointmentCardState extends State<AppointmentCard> {
   }
 
   Widget _buildReminderContent() {
-    return AppointmentScheduleForm(
-      appointmentId: widget.appointment.id,
-      appointmentName: widget.appointment.name,
-      onSave: () {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Appointment scheduled for ${widget.appointment.name}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      },
-      onClose: () {
-        // Close the bottom sheet
-        Navigator.pop(context);
-      },
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Set Reminder'),
+          Expanded(child: ReminderForm(appointment: widget.appointment)),
+        ],
+      ),
     );
   }
-
-
 
   Widget _buildEmailContent() {
-    return EmailForm(
-      appointmentId: widget.appointment.id,
-      appointmentName: widget.appointment.name,
-      appointeeEmail: 'bishnupriyatripathy1997@gmail.com', // This should come from appointment data
-      onSend: () {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Email sent for ${widget.appointment.name}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      },
-      onClose: () {
-        Navigator.pop(context);
-      },
-    );
-  }
-
-  void _showReminderOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ReminderForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        onSave: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Appointment scheduled for ${widget.appointment.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Send Email'),
+          Expanded(child: EmailForm(appointment: widget.appointment)),
+        ],
       ),
     );
   }
 
-  void _showEmailOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => EmailForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        appointeeEmail: 'bishnupriyatripathy1997@gmail.com',
-        onSend: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Email sent for ${widget.appointment.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
+  Widget _buildDarshanLineContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
-  }
-
-  void _showDarshanLineOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DarshanLineForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        onDarshanLineChange: (value) {
-          Navigator.pop(context);
-          widget.onDarshanLineChange?.call(value);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Moved ${widget.appointment.name} to $value'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onBackstageChange: (value) {
-          Navigator.pop(context);
-          widget.onBackstageChange?.call(value);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Moved ${widget.appointment.name} to $value'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _showCallOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => CallForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        phoneNumber: widget.appointment.phoneNumber,
-        onCall: () {
-          // Handle call action
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Calling ${widget.appointment.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _showAssignOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AssignForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        availableAssignees: widget.appointment.availableAssignees,
-        onAssignTo: (value) {
-          widget.onAssignTo?.call(value);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Assigned ${widget.appointment.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _showStarOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StarForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        isStarred: widget.appointment.isStarred,
-        onStarToggle: (value) {
-          widget.onStarToggle?.call(value);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.appointment.isStarred 
-                ? 'Removed from favorites' 
-                : 'Added to favorites'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _showDeleteOptions() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DeleteForm(
-        appointmentId: widget.appointment.id,
-        appointmentName: widget.appointment.name,
-        onDelete: () {
-          widget.onDelete?.call();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Deleted ${widget.appointment.name}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
-        onClose: () {
-          Navigator.pop(context);
-        },
+      child: Column(
+        children: [
+          _buildActionHeader('Darshan Line'),
+          Expanded(child: DarshanLineForm(appointment: widget.appointment)),
+        ],
       ),
     );
   }
 
   Widget _buildCallContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.phone, color: Colors.green),
-            title: Text('Call ${widget.appointment.name}'),
-            subtitle: Text(widget.appointment.phoneNumber),
-            onTap: () {
-              Navigator.pop(context);
-              // Handle call action
-            },
-          ),
+          _buildActionHeader('Make Call'),
+          Expanded(child: CallForm(appointment: widget.appointment)),
         ],
       ),
     );
   }
 
   Widget _buildAssignContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: widget.appointment.availableAssignees.map((assignee) {
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.indigo[100],
-              child: Text(
-                assignee.initials,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.indigo,
-                ),
-              ),
-            ),
-            title: Text(assignee.name),
-            onTap: () {
-              Navigator.pop(context);
-              widget.onAssignTo?.call('${widget.appointment.id}|${assignee.id}|${assignee.name}');
-            },
-          );
-        }).toList(),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
-  }
-
-  Widget _buildStarContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          ListTile(
-            leading: Icon(
-              widget.appointment.isStarred ? Icons.star : Icons.star_border,
-              color: widget.appointment.isStarred ? Colors.amber : Colors.grey,
-            ),
-            title: Text(widget.appointment.isStarred ? 'Remove from Favorites' : 'Add to Favorites'),
-            onTap: () {
-              Navigator.pop(context);
-              widget.onStarToggle?.call(!widget.appointment.isStarred);
-            },
-          ),
+          _buildActionHeader('Assign Appointment'),
+          Expanded(child: AssignForm(appointment: widget.appointment)),
         ],
       ),
     );
   }
 
   Widget _buildDeleteContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.warning, color: Colors.red),
-            title: const Text('Delete Appointment'),
-            subtitle: Text('This action cannot be undone'),
-            onTap: () {
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete Appointment'),
-                    ],
-                  ),
-                  content: Text('Are you sure you want to delete this appointment for ${widget.appointment.name}? This action cannot be undone.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onDelete?.call();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
-              );
-            },
+          _buildActionHeader('Delete Appointment'),
+          Expanded(child: DeleteForm(
+            appointment: widget.appointment,
+            onDelete: widget.onDelete,
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _getActionIcon(title),
+            color: _getActionColor(title),
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required String tooltip,
-    required String actionType,
-  }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Center(
-        child: IconButton(
-          onPressed: () => _showActionBottomSheet(actionType),
-          icon: Icon(icon, color: color, size: 20),
-          tooltip: tooltip,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-        ),
-      ),
-    );
+  IconData _getActionIcon(String action) {
+    switch (action.toLowerCase()) {
+      case 'set reminder':
+        return Icons.schedule;
+      case 'send email':
+        return Icons.email;
+      case 'darshan line':
+        return Icons.queue;
+      case 'make call':
+        return Icons.call;
+      case 'assign appointment':
+        return Icons.assignment_ind;
+      case 'delete appointment':
+        return Icons.delete;
+      default:
+        return Icons.info;
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top: Image + Name
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Avatar
-                  Container(
-                    width: 60,
-                    height: 60,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.red, width: 2),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: Image.network(
-                        widget.appointment.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.person, size: 30),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  
-                  // Name and Role
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Name
-                        Text(
-                          widget.appointment.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        
-                        // Role
-                        Text(
-                          widget.appointment.role,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Middle: Number of people (left) + Date & Time (right)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Left: Number of people and assignment
-                  Row(
-                    children: [
-                      const Icon(Icons.people, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.appointment.attendeeCount}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          widget.appointment.assignedTo,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  // Right: Date & Time
-                  Text(
-                    '${widget.appointment.date} ${widget.appointment.time}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 8),
-              
-              // Date Range
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      widget.appointment.dateRange,
-                      style: const TextStyle(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Action buttons at bottom - left to right
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Status/Reminder button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showReminderOptions(),
-                          icon: const Icon(Icons.notifications_active, color: Colors.orange, size: 20),
-                          tooltip: 'Set Reminder',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Email button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showEmailOptions(),
-                          icon: const Icon(Icons.email_outlined, color: Colors.blue, size: 20),
-                          tooltip: 'Send Email',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Darshan line button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showDarshanLineOptions(),
-                          icon: const Icon(Icons.queue, color: Colors.purple, size: 20),
-                          tooltip: 'Move to Line',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Call button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showCallOptions(),
-                          icon: const Icon(Icons.phone, color: Colors.green, size: 20),
-                          tooltip: 'Call',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Assign button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showAssignOptions(),
-                          icon: const Icon(Icons.group_add, color: Colors.indigo, size: 20),
-                          tooltip: 'Assign to Team',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Star/Favorite button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showStarOptions(),
-                          icon: Icon(
-                            widget.appointment.isStarred ? Icons.star : Icons.star_border,
-                            color: widget.appointment.isStarred ? Colors.amber : Colors.grey,
-                            size: 20
-                          ),
-                          tooltip: widget.appointment.isStarred ? 'Remove from Favorites' : 'Add to Favorites',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                    
-                    // Delete button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => _showDeleteOptions(),
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                          tooltip: 'Delete Appointment',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Color _getActionColor(String action) {
+    switch (action.toLowerCase()) {
+      case 'set reminder':
+        return Colors.blue;
+      case 'send email':
+        return Colors.green;
+      case 'darshan line':
+        return Colors.orange;
+      case 'make call':
+        return Colors.purple;
+      case 'assign appointment':
+        return Colors.teal;
+      case 'delete appointment':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // New methods to get new fields
+  String _getCreatedByName() {
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      return createdBy['fullName']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  String _getCreatedByDesignation() {
+    // Use the main appointment's user designation since createdBy doesn't have this field
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['userCurrentCompany']?.toString() ?? '';
+  }
+
+  String _getCreatedByImage() {
+    // Use the main appointment's profilePhoto since createdBy doesn't have this field
+    return widget.appointment['profilePhoto']?.toString() ?? 
+           'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
+  }
+
+  String _getCreatedAt() {
+    final createdAt = widget.appointment['createdAt'];
+    if (createdAt is String) {
+      final date = DateTime.tryParse(createdAt);
+      if (date != null) {
+        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      }
+    }
+    return '';
+  }
+
+  String _getPreferredDateRange() {
+    final preferredDateRange = widget.appointment['preferredDateRange'];
+    if (preferredDateRange is Map<String, dynamic>) {
+      final fromDate = preferredDateRange['fromDate']?.toString() ?? '';
+      final toDate = preferredDateRange['toDate']?.toString() ?? '';
+      if (fromDate.isNotEmpty && toDate.isNotEmpty) {
+        // Format dates for display in one line
+        final from = DateTime.tryParse(fromDate);
+        final to = DateTime.tryParse(toDate);
+        if (from != null && to != null) {
+          return '${from.day}/${from.month}/${from.year} to ${to.day}/${to.month}/${to.year}';
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getAssignedSecretary() {
+    final assignedSecretary = widget.appointment['assignedSecretary'];
+    if (assignedSecretary is Map<String, dynamic>) {
+      return assignedSecretary['fullName']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 } 
