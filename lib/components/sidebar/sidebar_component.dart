@@ -3,6 +3,10 @@ import '../../main/home_screen.dart';
 import '../../main/inbox_screen.dart';
 import '../../main/today_screen.dart';
 import '../../main/upcoming_screen.dart';
+import '../../main/dashboard_screen.dart';
+import '../../main/quick_darshan_line_screen.dart';
+import '../../main/bulk_email_sms_screen.dart';
+import '../../main/upload_offline_appointment_screen.dart';
 
 class SidebarComponent extends StatelessWidget {
   const SidebarComponent({super.key});
@@ -50,6 +54,8 @@ class SidebarComponent extends StatelessWidget {
               ],
             ),
           ),
+          
+        
           
           // Navigation Items
           ListTile(
@@ -99,7 +105,54 @@ class SidebarComponent extends StatelessWidget {
               );
             },
           ),
-          
+          // Quick Darshan Line Navigation Item
+          ListTile(
+            leading: const Icon(Icons.queue, color: Colors.deepPurple),
+            title: const Text('Quick Darshan Line'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const QuickDarshanLineScreen()),
+              );
+            },
+          ),
+          // Send Bulk Email & SMS Navigation Item
+          ListTile(
+            leading: const Icon(Icons.email, color: Colors.deepPurple),
+            title: const Text('Send Bulk Email & SMS'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const BulkEmailSmsScreen()),
+              );
+            },
+          ),
+          // Upload Offline Appointment Navigation Item
+          ListTile(
+            leading: const Icon(Icons.upload_file, color: Colors.deepPurple),
+            title: const Text('Upload Offline Appointment'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const UploadOfflineAppointmentScreen()),
+              );
+            },
+          ),
+          // Dashboard Navigation Item
+          ListTile(
+            leading: const Icon(Icons.dashboard, color: Colors.deepPurple),
+            title: const Text('Dashboard'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const DashboardScreen()),
+              );
+            },
+          ),
           const Divider(),
           
           // Settings and other options
