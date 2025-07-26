@@ -3,14 +3,22 @@ import '../components/sidebar/sidebar_component.dart';
 import '../components/today/today_card_component.dart';
 
 class TodayScreen extends StatefulWidget {
-  const TodayScreen({super.key});
+  final DateTime? selectedDate;
+  
+  const TodayScreen({super.key, this.selectedDate});
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
 }
 
 class _TodayScreenState extends State<TodayScreen> {
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.selectedDate ?? DateTime.now();
+  }
 
   String _getFormattedDate(DateTime date) {
     final months = [
