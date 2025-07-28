@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/today/today_card_component.dart';
+import '../action/action.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -11,6 +12,72 @@ class TodayScreen extends StatefulWidget {
 
 class _TodayScreenState extends State<TodayScreen> {
   DateTime _selectedDate = DateTime.now();
+  List<Map<String, dynamic>> _todayAppointments = [];
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTodayAppointments();
+  }
+
+  Future<void> _fetchTodayAppointments() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Print API call details
+      print('🚀 Fetching Today\'s Appointments');
+      print('API: https://f5c9f6886eb2.ngrok-free.app/api/v3/appointment/appointments/status?today=true');
+      print('---');
+      
+      final result = await ActionService.getAppointmentsWithFilters(
+        today: true,
+        sortBy: 'scheduledTime', // Sort by scheduled time
+        sortOrder: 'asc', // Ascending order (earliest first)
+      );
+      
+      // Print API response details
+      print('📡 Today API Response:');
+      print('Success: ${result['success']}');
+      print('Status Code: ${result['statusCode']}');
+      print('Message: ${result['message']}');
+      print('Data Count: ${(result['data'] as List?)?.length ?? 0}');
+      print('---');
+      
+      if (result['success']) {
+        final List<dynamic> appointmentsData = result['data'] ?? [];
+        
+        if (appointmentsData.isNotEmpty) {
+          // Sort appointments by scheduled time
+          final sortedAppointments = appointmentsData.cast<Map<String, dynamic>>();
+          sortedAppointments.sort((a, b) {
+            final timeA = a['scheduledTime']?.toString() ?? '';
+            final timeB = b['scheduledTime']?.toString() ?? '';
+            return timeA.compareTo(timeB);
+          });
+          
+          _todayAppointments = sortedAppointments;
+        } else {
+          _todayAppointments = [];
+        }
+        _error = null;
+      } else {
+        _error = result['message'] ?? 'Failed to fetch today\'s appointments';
+        _todayAppointments = [];
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _todayAppointments = [];
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   String _getFormattedDate(DateTime date) {
     final months = [
@@ -133,7 +200,7 @@ class _TodayScreenState extends State<TodayScreen> {
             ),
             
             // Today card component
-            const Expanded(
+            Expanded(
               child: TodayCardComponent(),
             ),
           ],

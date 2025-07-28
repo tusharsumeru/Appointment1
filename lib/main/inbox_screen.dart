@@ -3,6 +3,7 @@ import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/gear_filter_component.dart';
 import '../components/inbox/appointment_card.dart';
 import '../action/action.dart';
+import '../action/storage_service.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -19,20 +20,35 @@ class _InboxScreenState extends State<InboxScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch appointments when screen initializes
+    // Load appointments when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchAppointments();
     });
   }
 
-  Future<void> _fetchAppointments() async {
+  Future<void> _loadAppointments() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final result = await ActionService.getAppointmentsForSecretary();
+      // Always fetch fresh data from API
+      await _fetchAppointmentsFromAPI();
+    } catch (error) {
+      print('Error loading appointments: $error');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAppointmentsFromAPI() async {
+    try {
+      final result = await ActionService.getAppointmentsForSecretary(
+        status: 'pending',
+        screen: 'inbox',
+      );
       
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
@@ -57,13 +73,66 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  void _toggleStar(String appointmentId) {
+  // This method is called when refresh button is clicked
+  Future<void> _fetchAppointments() async {
     setState(() {
-      final index = _appointments.indexWhere((appointment) => appointment['_id'] == appointmentId);
-      if (index != -1) {
-        _appointments[index]['isStarred'] = !(_appointments[index]['isStarred'] == true);
-      }
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final result = await ActionService.getAppointmentsForSecretary(
+        status: 'pending',
+        screen: 'inbox',
+      );
+      
+      if (result['success']) {
+        final List<dynamic> appointmentsData = result['data'] ?? [];
+        
+        if (appointmentsData.isNotEmpty) {
+          _appointments = appointmentsData.cast<Map<String, dynamic>>();
+        } else {
+          _appointments = [];
+        }
+        _error = null;
+      } else {
+        _error = result['message'] ?? 'Failed to fetch appointments';
+        _appointments = [];
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _appointments = [];
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleStar(String appointmentId) async {
+    // Call the API to update starred status
+    final result = await ActionService.updateStarred(appointmentId);
+    
+    if (result['success']) {
+      setState(() {
+        final index = _appointments.indexWhere((appointment) => appointment['_id'] == appointmentId);
+        if (index != -1) {
+          // Update the starred status based on API response
+          final newStarredStatus = result['data']?['starred'] ?? false;
+          _appointments[index]['starred'] = newStarredStatus;
+        }
+      });
+    } else {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to update starred status'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _deleteAppointment(String appointmentId) {
@@ -223,21 +292,25 @@ class _InboxScreenState extends State<InboxScreen> {
             final appointment = _appointments[index];
             return AppointmentCard(
               appointment: appointment,
-              onStarToggle: (isStarred) {
-                _toggleStar(appointment['_id']?.toString() ?? '');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isStarred ? 'Added to favorites' : 'Removed from favorites'),
-                    backgroundColor: Colors.green,
-                    action: SnackBarAction(
-                      label: 'Undo',
-                      textColor: Colors.white,
-                      onPressed: () {
-                        _toggleStar(appointment['_id']?.toString() ?? '');
-                      },
+              onStarToggle: (isStarred) async {
+                final appointmentId = appointment['appointmentId']?.toString() ?? 
+                                    appointment['_id']?.toString() ?? '';
+                await _toggleStar(appointmentId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isStarred ? 'Added to favorites' : 'Removed from favorites'),
+                      backgroundColor: Colors.green,
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        textColor: Colors.white,
+                        onPressed: () async {
+                          await _toggleStar(appointmentId);
+                        },
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               },
               onDelete: () {
                 _deleteAppointment(appointment['_id']?.toString() ?? '');

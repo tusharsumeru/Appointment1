@@ -29,9 +29,38 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
   Future<void> _loadUserData() async {
     try {
+      // First, try to get user data from local storage
+      final cachedUserData = await StorageService.getUserData();
+      
+      if (cachedUserData != null) {
+        // Use cached data immediately
+        setState(() {
+          _userData = cachedUserData;
+          _isLoading = false;
+        });
+        
+        // Optionally refresh in background (optional - you can remove this if you want to keep cached data)
+        // _refreshUserDataInBackground();
+      } else {
+        // No cached data, fetch from API
+        await _fetchUserDataFromAPI();
+      }
+    } catch (error) {
+      print('Error loading user data: $error');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchUserDataFromAPI() async {
+    try {
       final result = await ActionService.getCurrentUser();
       
       if (result['success']) {
+        // Save to local storage for future use
+        await StorageService.saveUserData(result['data']);
+        
         setState(() {
           _userData = result['data'];
           _isLoading = false;
@@ -54,12 +83,29 @@ class _SidebarComponentState extends State<SidebarComponent> {
         }
       }
     } catch (error) {
-      print('Error loading user data: $error');
+      print('Error fetching user data from API: $error');
       setState(() {
         _isLoading = false;
       });
     }
   }
+
+  // Optional: Refresh user data in background (uncomment if you want to keep data fresh)
+  // Future<void> _refreshUserDataInBackground() async {
+  //   try {
+  //     final result = await ActionService.getCurrentUser();
+  //     if (result['success']) {
+  //       await StorageService.saveUserData(result['data']);
+  //       if (mounted) {
+  //         setState(() {
+  //           _userData = result['data'];
+  //         });
+  //       }
+  //     }
+  //   } catch (error) {
+  //     print('Error refreshing user data: $error');
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

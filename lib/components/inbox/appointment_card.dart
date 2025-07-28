@@ -8,6 +8,7 @@ import 'call_form.dart';
 import 'assign_form.dart';
 import 'star_form.dart';
 import 'delete_form.dart';
+import '../../action/action.dart';
 
 class AppointmentCard extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -31,7 +32,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
   @override
   Widget build(BuildContext context) {
     // Extract only essential data
-    final String id = widget.appointment['_id']?.toString() ?? '';
+    final String id = widget.appointment['appointmentId']?.toString() ?? 
+                     widget.appointment['_id']?.toString() ?? '';
     final String createdByName = _getCreatedByName();
     final String createdByDesignation = _getCreatedByDesignation();
     final String createdByImage = _getCreatedByImage();
@@ -122,8 +124,47 @@ class _AppointmentCardState extends State<AppointmentCard> {
                   
                   // Star button
                   IconButton(
-                    onPressed: () {
-                      widget.onStarToggle?.call(!isStarred);
+                    onPressed: () async {
+                      // Show loading indicator
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Updating starred status...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
+                      
+                      // Call the API to update starred status
+                      final result = await ActionService.updateStarred(id);
+                      
+                      if (result['success']) {
+                        // Update local state and notify parent
+                        final newStarredStatus = result['data']?['starred'] ?? !isStarred;
+                        widget.onStarToggle?.call(newStarredStatus);
+                        
+                        // Show success message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(newStarredStatus ? 'Added to favorites' : 'Removed from favorites'),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } else {
+                        // Show error message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Failed to update starred status'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
                     },
                     icon: Icon(
                       isStarred ? Icons.star : Icons.star_border,
@@ -158,38 +199,38 @@ class _AppointmentCardState extends State<AppointmentCard> {
                 children: [
                   _buildActionButton(
                     icon: Icons.schedule,
-                    label: 'Reminder',
-                    color: Colors.blue,
+                    label: 'Schedule',
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'reminder'),
                   ),
                   _buildActionButton(
                     icon: Icons.email,
                     label: 'Email',
-                    color: Colors.green,
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'email'),
                   ),
                   _buildActionButton(
                     icon: Icons.queue,
                     label: 'Darshan',
-                    color: Colors.orange,
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'darshan'),
                   ),
                   _buildActionButton(
                     icon: Icons.call,
                     label: 'Call',
-                    color: Colors.purple,
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'call'),
                   ),
                   _buildActionButton(
                     icon: Icons.assignment_ind,
                     label: 'Assign',
-                    color: Colors.teal,
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'assign'),
                   ),
                   _buildActionButton(
                     icon: Icons.delete,
                     label: 'Delete',
-                    color: Colors.red,
+                    color: Colors.black,
                     onTap: () => _showActionBottomSheet(context, 'delete'),
                   ),
                 ],
@@ -312,14 +353,14 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Widget _buildReminderContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
-          _buildActionHeader('Set Reminder'),
+          _buildActionHeader('Schedule Appointment'),
           Expanded(child: ReminderForm(appointment: widget.appointment)),
         ],
       ),
@@ -328,7 +369,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Widget _buildEmailContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -360,7 +401,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Widget _buildCallContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.4,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -376,7 +417,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Widget _buildAssignContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.6,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -392,7 +433,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Widget _buildDeleteContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.5,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -443,6 +484,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   IconData _getActionIcon(String action) {
     switch (action.toLowerCase()) {
+      case 'schedule':
+        return Icons.schedule;
       case 'set reminder':
         return Icons.schedule;
       case 'send email':
@@ -462,20 +505,22 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   Color _getActionColor(String action) {
     switch (action.toLowerCase()) {
+      case 'schedule':
+        return Colors.black;
       case 'set reminder':
-        return Colors.blue;
+        return Colors.black;
       case 'send email':
-        return Colors.green;
+        return Colors.black;
       case 'darshan line':
-        return Colors.orange;
+        return Colors.black;
       case 'make call':
-        return Colors.purple;
+        return Colors.black;
       case 'assign appointment':
-        return Colors.teal;
+        return Colors.black;
       case 'delete appointment':
-        return Colors.red;
+        return Colors.black;
       default:
-        return Colors.grey;
+        return Colors.black;
     }
   }
 

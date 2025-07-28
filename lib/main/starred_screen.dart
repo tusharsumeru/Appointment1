@@ -28,15 +28,18 @@ class _StarredScreenState extends State<StarredScreen> {
     });
 
     try {
-      final result = await ActionService.getAppointmentsForSecretary();
+      final result = await ActionService.getAppointmentsForSecretary(
+        starred: true,
+      );
       
       if (result['success']) {
-        final List<dynamic> allAppointments = result['data'] ?? [];
-        // Filter starred appointments
-        _appointments = allAppointments
-            .cast<Map<String, dynamic>>()
-            .where((appointment) => appointment['isStarred'] == true)
-            .toList();
+        final List<dynamic> appointmentsData = result['data'] ?? [];
+        
+        if (appointmentsData.isNotEmpty) {
+          _appointments = appointmentsData.cast<Map<String, dynamic>>();
+        } else {
+          _appointments = [];
+        }
         _error = null;
       } else {
         _error = result['message'] ?? 'Failed to fetch appointments';
@@ -52,17 +55,35 @@ class _StarredScreenState extends State<StarredScreen> {
     }
   }
 
-  void _toggleStar(String appointmentId) {
-    setState(() {
-      final index = _appointments.indexWhere((appointment) => appointment['_id'] == appointmentId);
-      if (index != -1) {
-        _appointments[index]['isStarred'] = !(_appointments[index]['isStarred'] == true);
-        // Remove from starred list if unstarred
-        if (!(_appointments[index]['isStarred'] == true)) {
-          _appointments.removeAt(index);
+  Future<void> _toggleStar(String appointmentId) async {
+    // Call the API to update starred status
+    final result = await ActionService.updateStarred(appointmentId);
+    
+    if (result['success']) {
+      setState(() {
+        final index = _appointments.indexWhere((appointment) => appointment['_id'] == appointmentId);
+        if (index != -1) {
+          // Update the starred status based on API response
+          final newStarredStatus = result['data']?['starred'] ?? false;
+          _appointments[index]['starred'] = newStarredStatus;
+          
+          // Remove from starred list if unstarred
+          if (!newStarredStatus) {
+            _appointments.removeAt(index);
+          }
         }
+      });
+    } else {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to update starred status'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
+    }
   }
 
   void _deleteAppointment(String appointmentId) {
@@ -158,7 +179,7 @@ class _StarredScreenState extends State<StarredScreen> {
                                         // Remove all starred appointments
                                         setState(() {
                                           for (final appointment in _appointments) {
-                                            appointment['isStarred'] = false;
+                                            appointment['starred'] = false;
                                           }
                                           _appointments.clear();
                                         });
@@ -199,21 +220,25 @@ class _StarredScreenState extends State<StarredScreen> {
                           final appointment = _appointments[index];
                           return AppointmentCard(
                             appointment: appointment,
-                            onStarToggle: (isStarred) {
-                              _toggleStar(appointment['_id']?.toString() ?? '');
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(isStarred ? 'Added to favorites' : 'Removed from favorites'),
-                                  backgroundColor: Colors.green,
-                                  action: SnackBarAction(
-                                    label: 'Undo',
-                                    textColor: Colors.white,
-                                    onPressed: () {
-                                      _toggleStar(appointment['_id']?.toString() ?? '');
-                                    },
+                            onStarToggle: (isStarred) async {
+                              final appointmentId = appointment['appointmentId']?.toString() ?? 
+                                                  appointment['_id']?.toString() ?? '';
+                              await _toggleStar(appointmentId);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(isStarred ? 'Added to favorites' : 'Removed from favorites'),
+                                    backgroundColor: Colors.green,
+                                    action: SnackBarAction(
+                                      label: 'Undo',
+                                      textColor: Colors.white,
+                                      onPressed: () async {
+                                        await _toggleStar(appointmentId);
+                                      },
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                             onDelete: () {
                               _deleteAppointment(appointment['_id']?.toString() ?? '');

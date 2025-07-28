@@ -867,19 +867,28 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Dot Indicators (dynamic based on filtered attendee count)
+              // Number Indicators (dynamic based on filtered attendee count)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_getFilteredAttendeeCount(), (index) {
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 8,
-                    height: 8,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(12),
                       color: _currentPage == index 
                         ? Colors.blue 
                         : Colors.grey[300],
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _currentPage == index 
+                          ? Colors.white 
+                          : Colors.grey[600],
+                      ),
                     ),
                   );
                 }),

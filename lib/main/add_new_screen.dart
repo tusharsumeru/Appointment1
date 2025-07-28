@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
+import '../components/appointment/add_new_appointment_form.dart';
 
 class AddNewScreen extends StatefulWidget {
   const AddNewScreen({super.key});
@@ -12,9 +13,9 @@ class _AddNewScreenState extends State<AddNewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFFAFAFA), // zinc-50
       appBar: AppBar(
-        title: const Text('Add New'),
+        title: const Text('Create Quick Appointment'),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -28,34 +29,59 @@ class _AddNewScreenState extends State<AddNewScreen> {
         ),
       ),
       drawer: const SidebarComponent(),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.add_circle_outline,
-              size: 100,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Add New',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFFAFAFA), // zinc-50
+              Colors.white,
+              Color(0xFFF4F4F5), // zinc-100
+            ],
+          ),
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey[200]!.withOpacity(0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: AddNewAppointmentForm(
+              onSave: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.white),
+                        const SizedBox(width: 12),
+                        const Text('Appointment created successfully!'),
+                      ],
+                    ),
+                    backgroundColor: Colors.green[600],
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+                Navigator.pop(context);
+              },
+              onCancel: () {
+                Navigator.pop(context);
+              },
             ),
-            SizedBox(height: 16),
-            Text(
-              'Add new appointment or item',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -149,24 +149,6 @@ class _EmailFormState extends State<EmailForm> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.email, color: Colors.blue, size: 24),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Send Email',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
             // Form
             Expanded(
               child: SingleChildScrollView(
@@ -257,140 +239,14 @@ class _EmailFormState extends State<EmailForm> {
                       
                       const SizedBox(height: 16),
                       
-                      // Email Template Section Header
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Email Template',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      
-                      // Email Template Dropdown
-                      DropdownButtonFormField<String>(
-                        value: _selectedTemplate.isEmpty ? null : _selectedTemplate,
-                        decoration: const InputDecoration(
-                          labelText: 'Select Template',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email_outlined),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: _emailTemplates.map((template) {
-                          return DropdownMenuItem(
-                            value: template['value'],
-                            child: Text(
-                              template['label']!,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _onTemplateChanged,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select a template';
-                          }
-                          return null;
-                        },
-                      ),
-                      
-                      // Darshan Line Fields (conditional)
-                      if (_showDarshanLineFields) ...[
-                        const SizedBox(height: 16),
-                        
-                        // Darshan Line Section Header
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            'Darshan Line Details',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                        
-                        // Darshan Line Date
-                        TextFormField(
-                          controller: _darshanLineDateController,
-                          focusNode: _darshanLineDateFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Darshan Line Date',
-                            hintText: 'Darshan Line Date',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                          ),
-                          readOnly: true,
-                          onTap: () async {
-                            _dismissKeyboard(); // Dismiss keyboard before showing date picker
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              _darshanLineDateController.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                            }
-                          },
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Darshan Line Time
-                        TextFormField(
-                          controller: _darshanLineTimeController,
-                          focusNode: _darshanLineTimeFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Darshan Line Time',
-                            hintText: 'Darshan Line Time',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.access_time),
-                          ),
-                          readOnly: true,
-                          onTap: () async {
-                            _dismissKeyboard(); // Dismiss keyboard before showing time picker
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              _darshanLineTimeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                            }
-                          },
-                        ),
-                      ],
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Email Content Section Header
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Email Content',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      
-                      // Email Subject
+                      // Subject Field
                       TextFormField(
                         controller: _emailSubjectController,
                         focusNode: _emailSubjectFocus,
                         onTap: () => _scrollToFocusedField(_emailSubjectFocus),
                         decoration: const InputDecoration(
-                          labelText: 'Email Subject',
-                          hintText: 'Email Subject',
+                          labelText: 'Subject',
+                          hintText: 'Enter email subject',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.subject),
                         ),
@@ -423,48 +279,42 @@ class _EmailFormState extends State<EmailForm> {
                           return null;
                         },
                       ),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // Action Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _dismissKeyboard();
-                                widget.onClose?.call();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text('Close'),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _dismissKeyboard();
-                                _sendEmail();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text('Send'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
+              ),
+            ),
+            
+            // Action Buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        _dismissKeyboard();
+                        widget.onClose?.call();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _dismissKeyboard();
+                        _sendEmail();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Send'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

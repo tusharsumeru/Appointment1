@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 
 class TodayDetailComponent extends StatefulWidget {
   final String categoryTitle;
+  final Color categoryColor;
   final IconData categoryIcon;
-  final int count;
-  final Function(String)? onItemCompleted;
-  final Function(String)? onItemUndone;
+  final List<Map<String, dynamic>> appointments;
 
   const TodayDetailComponent({
     super.key,
     required this.categoryTitle,
+    required this.categoryColor,
     required this.categoryIcon,
-    required this.count,
-    this.onItemCompleted,
-    this.onItemUndone,
+    required this.appointments,
   });
 
   @override
@@ -21,48 +19,37 @@ class TodayDetailComponent extends StatefulWidget {
 }
 
 class _TodayDetailComponentState extends State<TodayDetailComponent> {
-  String selectedDropdownValue = 'A';
-  List<int> completedItems = [];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.categoryTitle),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: widget.categoryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Column(
         children: [
-          // Header section with icon and count
+          // Header section
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withOpacity(0.1),
+              color: widget.categoryColor.withOpacity(0.1),
               border: Border(
                 bottom: BorderSide(color: Colors.grey.shade300),
               ),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    widget.categoryIcon,
-                    color: Colors.deepPurple,
-                    size: 30,
-                  ),
+                Icon(
+                  widget.categoryIcon,
+                  color: widget.categoryColor,
+                  size: 32,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -71,18 +58,18 @@ class _TodayDetailComponentState extends State<TodayDetailComponent> {
                     children: [
                       Text(
                         widget.categoryTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
+                          color: widget.categoryColor,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${widget.count} items',
+                        '${widget.appointments.length} appointments',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey.shade600,
+                          color: Colors.grey[600],
                         ),
                       ),
                     ],
@@ -92,352 +79,310 @@ class _TodayDetailComponentState extends State<TodayDetailComponent> {
             ),
           ),
           
-          // Content area
+          // Appointments list
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Items for ${widget.categoryTitle}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Cards based on count
-                  Expanded(
-                    child: widget.count > 0 
-                        ? ListView.builder(
-                            itemCount: widget.count,
-                            itemBuilder: (context, index) {
-                              final itemNumber = index + 1;
-                              // Skip completed items
-                              if (completedItems.contains(itemNumber)) {
-                                return const SizedBox.shrink();
-                              }
-                              return _buildItemCard(itemNumber);
-                            },
-                          )
-                        : Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inbox_outlined,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No items found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Items for ${widget.categoryTitle} will appear here when available.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
+            child: widget.appointments.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No appointments in this category',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
                           ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: widget.appointments.length,
+                    itemBuilder: (context, index) {
+                      final appointment = widget.appointments[index];
+                      return _buildAppointmentCard(appointment, index);
+                    },
                   ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildItemCard(int itemNumber) {
-    // Sample data for demonstration
-    final List<Map<String, dynamic>> sampleData = [
-      {
-        'name': 'Divya - Testing',
-        'designation': 'Developer',
-        'time': '04:30 PM',
-        'hasHomeIcon': true,
-        'hasUserIcon': true,
-        'userCount': 2,
-        'assignee': 'KK',
-      },
-      {
-        'name': 'Divya',
-        'designation': 'tester',
-        'time': '04:30 PM',
-        'hasHomeIcon': true,
-        'hasUserIcon': true,
-        'userCount': 1,
-        'assignee': 'MP',
-      },
-      {
-        'name': 'avinash Choudhary',
-        'designation': 'Devops',
-        'time': '04:45 PM',
-        'hasHomeIcon': false,
-        'hasUserIcon': true,
-        'userCount': 1,
-        'assignee': '',
-      },
-    ];
-
-    final data = sampleData[itemNumber % sampleData.length];
-
+  Widget _buildAppointmentCard(Map<String, dynamic> appointment, int index) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      padding: const EdgeInsets.all(20.0),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
-            blurRadius: 5,
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top section with profile and dropdown
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Profile picture
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(25),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row with time and status
+            Row(
+              children: [
+                // Time badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: widget.categoryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getTimeForAppointment(appointment),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: widget.categoryColor,
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  Icons.person,
-                  size: 30,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(width: 16),
-              
-              // Content section
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name
-                    Text(
-                      data['name'],
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Designation
-                    Text(
-                      data['designation'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Time, user count, and home icon
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          data['time'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                                            // User count with icon and assignee
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.person,
-                          size: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${data['userCount']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        if (data['assignee'].isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.deepPurple.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              data['assignee'],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.deepPurple,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                        const SizedBox(width: 12),
-                        // Home icon (if present)
-                        if (data['hasHomeIcon'])
-                          Icon(
-                            Icons.home,
-                            size: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Dropdown at top right corner
-              PopupMenuButton<String>(
-                onSelected: (String value) {
-                  setState(() {
-                    selectedDropdownValue = value;
-                  });
-                },
-                child: Container(
+                const Spacer(),
+                // Status indicator
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                    borderRadius: BorderRadius.circular(4),
+                    color: _getStatusColor(appointment['status']).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Text(
+                    _getStatusText(appointment['status']),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _getStatusColor(appointment['status']),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // User information
+            Row(
+              children: [
+                // User avatar
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: widget.categoryColor.withOpacity(0.2),
+                  child: Text(
+                    _getUserInitials(appointment),
+                    style: TextStyle(
+                      color: widget.categoryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // User details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        selectedDropdownValue,
+                        _getAppointmentName(appointment),
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: Colors.grey.shade600,
+                      const SizedBox(height: 4),
+                      Text(
+                        _getUserEmail(appointment),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                itemBuilder: (BuildContext context) => [
-                  const PopupMenuItem(
-                    value: 'A',
-                    child: Text('A'),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Location information
+            Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _getLocation(appointment),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                  const PopupMenuItem(
-                    value: 'O',
-                    child: Text('O'),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Additional details
+            if (_getUserDesignation(appointment).isNotEmpty)
+              Row(
+                children: [
+                  Icon(
+                    Icons.work,
+                    size: 16,
+                    color: Colors.grey[600],
                   ),
-                  const PopupMenuItem(
-                    value: 'A1',
-                    child: Text('A1'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'A2',
-                    child: Text('A2'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'A3',
-                    child: Text('A3'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'R',
-                    child: Text('R'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getUserDesignation(appointment),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-                      // Done button at bottom center with full width
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Handle done action for this specific card
-                  _handleDoneAction(itemNumber);
-                },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-              child: const Text(
-                'Done',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  void _handleDoneAction(int itemNumber) {
-    final itemId = '${widget.categoryTitle}_$itemNumber';
+  String _getTimeForAppointment(Map<String, dynamic> appointment) {
+    // Try multiple time fields in order of preference
+    final timeString = appointment['scheduledTime']?.toString() ?? 
+                      appointment['preferredTime']?.toString() ?? 
+                      appointment['createdAt']?.toString();
     
-    setState(() {
-      completedItems.add(itemNumber);
-    });
+    if (timeString == null) return 'No time';
     
-    // Notify parent component
-    widget.onItemCompleted?.call(itemId);
+    try {
+      final time = DateTime.parse(timeString);
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'Invalid time';
+    }
+  }
+
+  String _getAppointmentName(Map<String, dynamic> appointment) {
+    return appointment['userCurrentDesignation']?.toString() ?? 
+           appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getUserEmail(Map<String, dynamic> appointment) {
+    return appointment['email']?.toString() ?? 'No email';
+  }
+
+  String _getUserDesignation(Map<String, dynamic> appointment) {
+    return appointment['userCurrentDesignation']?.toString() ?? '';
+  }
+
+  String _getUserInitials(Map<String, dynamic> appointment) {
+    final name = _getAppointmentName(appointment);
+    if (name == 'Unknown') return 'U';
     
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Item $itemNumber moved to Done category!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return 'U';
+  }
+
+  String _getLocation(Map<String, dynamic> appointment) {
+    // First try to get location from appointmentLocation object
+    final appointmentLocation = appointment['appointmentLocation'];
+    if (appointmentLocation is Map<String, dynamic>) {
+      final name = appointmentLocation['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+    
+    // Fallback to other location fields
+    final location = appointment['location'];
+    if (location is Map<String, dynamic>) {
+      final name = location['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+    
+    // Try other string fields
+    final locationString = appointment['locationName']?.toString() ?? 
+                          appointment['venue']?.toString() ?? 
+                          appointment['address']?.toString() ?? 
+                          appointment['city']?.toString() ?? 
+                          appointment['state']?.toString() ?? 
+                          appointment['country']?.toString();
+    
+    if (locationString != null && locationString.isNotEmpty) {
+      return locationString;
+    }
+    
+    return 'Location not specified';
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == null) return Colors.grey;
+    
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return Colors.green;
+      case 'pending':
+      case 'tbs':
+      case 'requested':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String? status) {
+    if (status == null) return 'Unknown';
+    
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return 'Completed';
+      case 'pending':
+        return 'Pending';
+      case 'tbs':
+        return 'TBS';
+      case 'requested':
+        return 'Requested';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
   }
 } 
