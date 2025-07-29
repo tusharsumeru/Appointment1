@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../action/action.dart';
 
 class StarForm extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -46,53 +47,6 @@ class _StarFormState extends State<StarForm> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Simple handle
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            width: 32,
-            height: 3,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Simple header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  isStarred ? Icons.star : Icons.star_border,
-                  color: isStarred ? Colors.amber : Colors.grey[600],
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isStarred ? 'Remove from Starred' : 'Add to Starred',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        _getAppointmentName(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           // Content
           Padding(
             padding: const EdgeInsets.all(16),
@@ -119,9 +73,47 @@ class _StarFormState extends State<StarForm> {
                     size: 16,
                     color: Colors.grey[400],
                   ),
-                  onTap: () {
-                    widget.onStar?.call();
-                    Navigator.pop(context);
+                  onTap: () async {
+                    // Show loading indicator
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Updating starred status...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                    
+                    // Call the API to update starred status
+                    final result = await ActionService.updateStarred(_getAppointmentId());
+                    
+                    if (result['success']) {
+                      widget.onStar?.call();
+                      Navigator.pop(context);
+                      
+                      // Show success message
+                      if (context.mounted) {
+                        final newStarredStatus = result['data']?['starred'] ?? !_isStarred();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(newStarredStatus ? 'Added to favorites' : 'Removed from favorites'),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    } else {
+                      // Show error message
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'Failed to update starred status'),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
                   },
                 ),
               ],

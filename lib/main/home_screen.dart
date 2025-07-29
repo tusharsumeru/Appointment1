@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
+import 'add_new_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,8 +54,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.grey,
               ),
             ),
+            SizedBox(height: 30),
+            Text(
+              'Tap the + button to add a new appointment',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddNewScreen(),
+            ),
+          );
+        },
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }

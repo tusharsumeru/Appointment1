@@ -29,6 +29,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   // Filter state
   String _selectedFilter = '30_days'; // Default to 30 days
   bool _isRefreshing = false;
+  
+  // Appointments overview state
+  List<Map<String, dynamic>> _upcomingAppointments = [];
+  List<Map<String, dynamic>> _appointmentHistory = [];
+  bool _isLoadingOverview = false;
 
   @override
   void initState() {
@@ -36,6 +41,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // Initialize with empty text
     _notesController.text = "";
     _remarksController.text = "";
+    
+    // Fetch appointments overview data
+    _fetchAppointmentsOverview();
   }
 
   @override
@@ -486,6 +494,125 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
   }
 
+  Future<void> _fetchAppointmentsOverview() async {
+    setState(() {
+      _isLoadingOverview = true;
+    });
+
+    try {
+      // Get the MongoDB _id from the appointment data
+      String? userId = widget.appointment['_id']?.toString();
+      
+      // If still not found, try _id field directly (this might be the appointment ID, not user ID)
+      if (userId == null || userId.isEmpty) {
+        // If user ID is not found, we cannot fetch appointments overview
+        setState(() {
+          _upcomingAppointments = [];
+          _appointmentHistory = [];
+          _isLoadingOverview = false;
+        });
+        return;
+      }
+      
+      if (userId == null || userId.isEmpty) {
+        print('Warning: User ID not found in appointment data. Available fields: ${widget.appointment.keys.toList()}');
+        print('CreatedBy data: ${widget.appointment['createdBy']}');
+        // Don't throw exception, just set empty lists
+        setState(() {
+          _upcomingAppointments = [];
+          _appointmentHistory = [];
+          _isLoadingOverview = false;
+        });
+        return;
+      }
+
+      // Fetch upcoming appointments
+      final upcomingResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
+      
+      // Fetch appointment history
+      final historyResult = await ActionService.getAppointmentHistoryByUser(userId: userId);
+      
+      // Debug: Print the results to see the data structure
+      print('Upcoming result: $upcomingResult');
+      print('History result: $historyResult');
+      print('User ID being used: $userId');
+      
+      if (mounted) {
+        setState(() {
+          if (upcomingResult['success'] && upcomingResult['data'] != null) {
+            final List<dynamic> upcomingData = upcomingResult['data'];
+            if (upcomingData is List) {
+              _upcomingAppointments = upcomingData.map((item) {
+                if (item is Map<String, dynamic>) {
+                  return item;
+                } else if (item is Map) {
+                  return Map<String, dynamic>.from(item);
+                } else {
+                  return <String, dynamic>{};
+                }
+              }).toList();
+            } else {
+              _upcomingAppointments = [];
+            }
+          } else {
+            _upcomingAppointments = [];
+          }
+          
+          if (historyResult['success'] && historyResult['data'] != null) {
+            final List<dynamic> historyData = historyResult['data'];
+            if (historyData is List) {
+              _appointmentHistory = historyData.map((item) {
+                if (item is Map<String, dynamic>) {
+                  return item;
+                } else if (item is Map) {
+                  return Map<String, dynamic>.from(item);
+                } else {
+                  return <String, dynamic>{};
+                }
+              }).toList();
+            } else {
+              _appointmentHistory = [];
+            }
+          } else {
+            _appointmentHistory = [];
+          }
+          
+          _isLoadingOverview = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _upcomingAppointments = [];
+          _appointmentHistory = [];
+          _isLoadingOverview = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to fetch appointments overview: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _refreshAppointmentsOverview() async {
+    await _fetchAppointmentsOverview();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Appointments overview refreshed successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   bool _shouldShowUser(int userIndex) {
     if (userIndex == 0) return true; // Always show main user
     
@@ -640,6 +767,78 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       return aolTeacher['isTeacher'] == true;
     }
     return false;
+  }
+
+  String _formatAppointmentDateTime(Map<String, dynamic> appointment) {
+    try {
+      // Debug: Print the appointment data to see its structure
+      print('Appointment data for formatting: $appointment');
+      print('Appointment keys: ${appointment.keys.toList()}');
+      
+      // Try to get scheduled date and time
+      final scheduledDateTime = appointment['scheduledDateTime'];
+      print('ScheduledDateTime: $scheduledDateTime');
+      
+      if (scheduledDateTime is Map<String, dynamic>) {
+        final scheduledDate = scheduledDateTime['date']?.toString();
+        final scheduledTime = scheduledDateTime['time']?.toString();
+        
+        print('ScheduledDate: $scheduledDate, ScheduledTime: $scheduledTime');
+        
+        if (scheduledDate != null && scheduledTime != null) {
+          final date = DateTime.parse(scheduledDate);
+          return '${date.day}/${date.month}/${date.year} at $scheduledTime';
+        }
+      }
+      
+      // Fallback to startTime and endTime
+      final startTime = appointment['startTime']?.toString();
+      final endTime = appointment['endTime']?.toString();
+      
+      print('StartTime: $startTime, EndTime: $endTime');
+      
+      if (startTime != null) {
+        final start = DateTime.parse(startTime);
+        if (endTime != null) {
+          final end = DateTime.parse(endTime);
+          return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')} - ${end.hour}:${end.minute.toString().padLeft(2, '0')}';
+        } else {
+          return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')}';
+        }
+      }
+      
+      // Fallback to createdAt
+      final createdAt = appointment['createdAt']?.toString();
+      print('CreatedAt: $createdAt');
+      
+      if (createdAt != null) {
+        final created = DateTime.parse(createdAt);
+        return '${created.day}/${created.month}/${created.year}';
+      }
+      
+      return 'Date not specified';
+    } catch (e) {
+      print('Error formatting appointment date time: $e');
+      print('Error stack trace: ${StackTrace.current}');
+      return 'Date not specified';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'confirmed':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      case 'rescheduled':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -867,19 +1066,28 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Dot Indicators (dynamic based on filtered attendee count)
+              // Number Indicators (dynamic based on filtered attendee count)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_getFilteredAttendeeCount(), (index) {
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 8,
-                    height: 8,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(12),
                       color: _currentPage == index 
                         ? Colors.blue 
                         : Colors.grey[300],
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _currentPage == index 
+                          ? Colors.white 
+                          : Colors.grey[600],
+                      ),
                     ),
                   );
                 }),
@@ -1389,20 +1597,51 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Appointments Overview',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Appointment history and upcoming appointments.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Appointments Overview',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Appointment history and upcoming appointments.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Refresh button
+              IconButton(
+                onPressed: _isLoadingOverview ? null : () => _refreshAppointmentsOverview(),
+                icon: _isLoadingOverview 
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                      ),
+                    )
+                  : const Icon(Icons.refresh),
+                tooltip: _isLoadingOverview ? 'Refreshing...' : 'Refresh appointments overview',
+                style: IconButton.styleFrom(
+                  backgroundColor: _isLoadingOverview ? Colors.grey[100] : Colors.blue[50],
+                  foregroundColor: _isLoadingOverview ? Colors.grey[400] : Colors.blue[600],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           
@@ -1431,7 +1670,58 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              // No upcoming appointments to display
+              if (_isLoadingOverview) ...[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                    ),
+                  ),
+                ),
+              ] else if (_upcomingAppointments.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.event_busy, color: Colors.grey[400], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'No upcoming appointments found',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                ..._upcomingAppointments.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
+                  try {
+                    return _buildAppointmentItem(
+                      appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
+                      _formatAppointmentDateTime(appointment),
+                      appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
+                      _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
+                    );
+                  } catch (e) {
+                    print('Error building appointment item: $e');
+                    return _buildAppointmentItem(
+                      'Unknown User',
+                      'Date not specified',
+                      'Unknown',
+                      Colors.grey,
+                    );
+                  }
+                }).toList(),
+              ],
             ],
           ),
           
@@ -1462,7 +1752,118 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              // No appointment history to display
+              if (_isLoadingOverview) ...[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+                    ),
+                  ),
+                ),
+              ] else if (_appointmentHistory.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.history, color: Colors.grey[400], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'No appointment history found',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // Scrollable container for appointment history
+                Container(
+                  height: 300, // Fixed height for scrollable area
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header for appointment history
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            topRight: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history, color: Colors.grey[600], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Appointment History',
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${_appointmentHistory.length} items',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Scrollable content
+                      Expanded(
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          trackVisibility: true,
+                          thickness: 6,
+                          radius: const Radius.circular(10),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: _appointmentHistory.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
+                                try {
+                                  return _buildAppointmentItem(
+                                    appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
+                                    _formatAppointmentDateTime(appointment),
+                                    appointment['appointmentStatus']?['status']?.toString() ?? 'Completed',
+                                    _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'completed'),
+                                  );
+                                } catch (e) {
+                                  print('Error building appointment item: $e');
+                                  return _buildAppointmentItem(
+                                    'Unknown User',
+                                    'Date not specified',
+                                    'Unknown',
+                                    Colors.grey,
+                                  );
+                                }
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ],

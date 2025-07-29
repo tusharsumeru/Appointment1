@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
 
 class EmailForm extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -42,8 +44,8 @@ class _EmailFormState extends State<EmailForm> {
   bool _includeReferenceEmail = false;
   bool _showDarshanLineFields = false;
   
-  // Email templates
-  final List<Map<String, String>> _emailTemplates = [
+  // Email templates from JSON
+  List<Map<String, String>> _emailTemplates = [
     {'value': '', 'label': 'Select Template'},
     {'value': '1', 'label': 'APPOINTMENT CONFIRMATION'},
     {'value': '2', 'label': 'APPOINTMENT RESCHEDULED'},
@@ -60,6 +62,184 @@ class _EmailFormState extends State<EmailForm> {
     {'value': '41', 'label': 'Europe - Appointment & TBS Rescheduling'},
     {'value': '42', 'label': 'SATSANG BACKSTAGE'},
   ];
+  
+  // Template data from JSON
+  Map<String, Map<String, dynamic>> _templateData = {
+    '1': {
+      'subject': r'Confirmation of your appointment {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+{$email_note}'''
+    },
+    '2': {
+      'subject': r'IMP: Appointment rescheduled {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your appointment {$AID} has been rescheduled. Please find the new details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+{$email_note}'''
+    },
+    '3': {
+      'subject': r'Gentle reminder of your appointment {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is a reminder email. Kindly note that your appointment request {$AID} is scheduled for today. Please find the details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+{$email_note}'''
+    },
+    '5': {
+      'subject': r'Response to your appointment request {$AID} with Gurudev',
+      'content': r'''Dear {$full_name} {$ji},
+
+You can come for Gurudev's darshan at {$time} on {$date}. Kindly collect your Darshan pass from Secretariat office on the same day.
+
+Requested for: {$no_people}
+Area: {$area}
+Location: {$app_location}
+
+NOTE: Please note that our official photographer will be taking your pictures with Gurudev which will be uploaded on www.soulbook.me.'''
+    },
+    '10': {
+      'subject': r'Inputs required for this request',
+      'content': r'''Dear One,
+
+Can you please provide inputs for following appointment request.
+
+Name: {$full_name}
+Designation: {$designation}
+Mobile: {$mobile}
+Email: {$email}
+Reference Name: {$ref_by}
+Reference Phone: {$ref_phone}
+Subject: {$subject}
+Purpose: {$purpose}
+Preferred date: {$date}
+Number of People: {$no_people}
+
+NOTE: Please share your inputs on secretariat@artofliving.org, emails to this ID are not monitored.'''
+    },
+    '13': {
+      'subject': r'Appointment guest guidelines',
+      'content': r'''Dear {$ref_name} {$ji},
+
+Your appointment with Gurudev (for {$appointee_name}) is scheduled on {$date} at {$time}. Total People: {$no_people}
+
+Kindly come to secretariat office 15 mins prior to allotted time and meet with Shabnam/Chandrakant who will guide you.
+
+We request you to ensure that the guests have had an ashram tour and have watched Love moves the world prior to Gurudev's appointment.
+
+NOTE: Videography or photography (using mobile phones) would not be needed from your side as the Art of Living official photographer will take pictures which will be emailed the following day of the appointment.'''
+    },
+    '14': {
+      'subject': r'Information regarding Pujas & Homas on your special occasion',
+      'content': r'''Dear {$appointee_name} {$ji},
+
+The Vaidic Dharma Sansthan desk (in cc) organizes Pujas & Homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on +91 9538186844 (M) / +91 80 67262639 (O).'''
+    },
+    '15': {
+      'subject': r'Unable to process your appointment request',
+      'content': r'''Dear {$appointee_name} {$ji},
+
+We are unable to process your request at the moment. It could be due to the following reason(s):
+
+1. Purpose not clear - We will need complete details of the reason for your appointment stating the context of the issue and the questions you have for Gurudev.
+
+2. Details of contact person not complete - Please make sure the name, designation and contact details of the person wanting to meet and the reference person are clearly filled.
+
+Request you to kindly re-fill in the appointment request.'''
+    },
+    '21': {
+      'subject': r'Art of Living, Appointment',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is a customized email for your appointment.
+
+{$email_note}'''
+    },
+    '38': {
+      'subject': r'IMP: Appointment {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your request {$AID} has been confirmed. Please show this message to the security guard near front enclosure at Shiva Temple.
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+{$email_note}'''
+    },
+    '39': {
+      'subject': r'IMP: Appointment {$AID} Rescheduled',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your request {$AID} has been rescheduled. Please find the details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+{$email_note}'''
+    },
+    '40': {
+      'subject': r'Confirmation of your appointment {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+NOTE: Please come to the above location 15 minutes prior to your scheduled time.
+
+Warm Regards,
+The Art of Living Team Europe'''
+    },
+    '41': {
+      'subject': r'IMP: Appointment rescheduled {$AID}',
+      'content': r'''Dear {$full_name} {$ji},
+
+This is to inform you that your appointment request {$AID} has been rescheduled. Please find the details below:
+
+Date: {$date}
+Time: {$time}
+Requested for: {$no_people}
+Location: {$app_location}
+
+NOTE: Please come to the above location 15 minutes prior to your scheduled time.
+
+Warm Regards,
+The Art of Living Team Europe'''
+    },
+    '42': {
+      'subject': r'Response to appointment request {$AID} with Gurudev',
+      'content': r'''Dear {$full_name} {$ji},
+
+An appointment may not be possible. However, you may take blessings from Gurudev when he enters/exits satsang. Please contact Shabnam/Chandrakanth at Secretariat office 15 mins before beginning of Satsang on that day.
+
+Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on - +91 9538186844 (M) / +91 80 67262639 (O).'''
+    },
+  };
 
   String _getAppointmentId() {
     return widget.appointment['appointmentId']?.toString() ?? 
@@ -74,6 +254,51 @@ class _EmailFormState extends State<EmailForm> {
   String _getAppointeeEmail() {
     return widget.appointment['email']?.toString() ?? '';
   }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _loadEmailTemplates();
+  // }
+
+  // Future<void> _loadEmailTemplates() async {
+  //   try {
+  //     // Load JSON file
+  //     final String jsonString = await rootBundle.loadString('emailtemplate.json');
+  //     final Map<String, dynamic> jsonData = json.decode(jsonString);
+  //     
+  //     // Get email templates
+  //     final List<dynamic> emailTemplates = jsonData['Email'] ?? [];
+  //     
+  //     // Clear existing templates and add default
+  //     _emailTemplates = [{'value': '', 'label': 'Select Template'}];
+  //     
+  //     // Add templates from JSON
+  //     for (var template in emailTemplates) {
+  //       final String id = template['id'].toString();
+  //       final String name = template['template_name'];
+  //       final int status = template['status'] ?? 0;
+  //       
+  //       // Only add active templates (status = 1)
+  //       if (status == 1) {
+  //         _emailTemplates.add({
+  //           'value': id,
+  //           'label': name,
+  //         });
+  //         
+  //         // Store template data for later use
+  //         _templateData[id] = {
+  //           'subject': template['template_subject'] ?? '',
+  //           'content': template['template_data'] ?? '',
+  //         };
+  //       }
+  //     }
+  //     
+  //     setState(() {});
+  //   } catch (e) {
+  //     print('Error loading email templates: $e');
+  //   }
+  // }
 
   @override
   void dispose() {
@@ -103,6 +328,30 @@ class _EmailFormState extends State<EmailForm> {
         _showDarshanLineFields = value == '5'; // Show darshan line fields for DARSHAN LINE template
       });
     }
+  }
+
+  String _replacePlaceholders(String text) {
+    String result = text;
+    result = result.replaceAll('{\$AID}', 'APP123456');
+    result = result.replaceAll('{\$full_name}', 'John Doe');
+    result = result.replaceAll('{\$ji}', 'Ji');
+    result = result.replaceAll('{\$date}', '15 January 2024');
+    result = result.replaceAll('{\$time}', '10:00 AM');
+    result = result.replaceAll('{\$no_people}', '2');
+    result = result.replaceAll('{\$app_location}', 'Bangalore Ashram');
+    result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
+    result = result.replaceAll('{\$area}', 'Main Hall');
+    result = result.replaceAll('{\$designation}', 'Software Engineer');
+    result = result.replaceAll('{\$mobile}', '+91 9876543210');
+    result = result.replaceAll('{\$email}', 'john.doe@example.com');
+    result = result.replaceAll('{\$ref_by}', 'Gurudev');
+    result = result.replaceAll('{\$ref_phone}', '+91 9876543211');
+    result = result.replaceAll('{\$subject}', 'Meeting with Gurudev');
+    result = result.replaceAll('{\$purpose}', 'Seeking guidance on spiritual matters');
+    result = result.replaceAll('{\$ref_name}', 'Gurudev');
+    result = result.replaceAll('{\$appointee_name}', 'John Doe');
+    result = result.replaceAll('{\$appointeeName}', 'John Doe');
+    return result;
   }
 
   void _sendEmail() {
@@ -149,24 +398,6 @@ class _EmailFormState extends State<EmailForm> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.email, color: Colors.blue, size: 24),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Send Email',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
             // Form
             Expanded(
               child: SingleChildScrollView(
@@ -257,140 +488,47 @@ class _EmailFormState extends State<EmailForm> {
                       
                       const SizedBox(height: 16),
                       
-                      // Email Template Section Header
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Email Template',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      
                       // Email Template Dropdown
                       DropdownButtonFormField<String>(
                         value: _selectedTemplate.isEmpty ? null : _selectedTemplate,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTemplate = value ?? '';
+                            // Populate subject and content if template is selected
+                            if (value != null && value.isNotEmpty && _templateData.containsKey(value)) {
+                              final template = _templateData[value]!;
+                              _emailSubjectController.text = _replacePlaceholders(template['subject'] ?? '');
+                              _emailTemplateController.text = _replacePlaceholders(template['content'] ?? '');
+                            }
+                          });
+                        },
                         decoration: const InputDecoration(
-                          labelText: 'Select Template',
+                          labelText: 'Email Template',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email_outlined),
-                          isDense: true,
+                          prefixIcon: Icon(Icons.description_outlined),
                         ),
                         isExpanded: true,
                         items: _emailTemplates.map((template) {
-                          return DropdownMenuItem(
+                          return DropdownMenuItem<String>(
                             value: template['value'],
                             child: Text(
                               template['label']!,
                               overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: const TextStyle(fontSize: 14),
                             ),
                           );
                         }).toList(),
-                        onChanged: _onTemplateChanged,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select a template';
-                          }
-                          return null;
-                        },
                       ),
-                      
-                      // Darshan Line Fields (conditional)
-                      if (_showDarshanLineFields) ...[
-                        const SizedBox(height: 16),
-                        
-                        // Darshan Line Section Header
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            'Darshan Line Details',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                        
-                        // Darshan Line Date
-                        TextFormField(
-                          controller: _darshanLineDateController,
-                          focusNode: _darshanLineDateFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Darshan Line Date',
-                            hintText: 'Darshan Line Date',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                          ),
-                          readOnly: true,
-                          onTap: () async {
-                            _dismissKeyboard(); // Dismiss keyboard before showing date picker
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              _darshanLineDateController.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                            }
-                          },
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Darshan Line Time
-                        TextFormField(
-                          controller: _darshanLineTimeController,
-                          focusNode: _darshanLineTimeFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Darshan Line Time',
-                            hintText: 'Darshan Line Time',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.access_time),
-                          ),
-                          readOnly: true,
-                          onTap: () async {
-                            _dismissKeyboard(); // Dismiss keyboard before showing time picker
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              _darshanLineTimeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                            }
-                          },
-                        ),
-                      ],
                       
                       const SizedBox(height: 16),
                       
-                      // Email Content Section Header
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Email Content',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      
-                      // Email Subject
+                      // Subject Field
                       TextFormField(
                         controller: _emailSubjectController,
                         focusNode: _emailSubjectFocus,
                         onTap: () => _scrollToFocusedField(_emailSubjectFocus),
                         decoration: const InputDecoration(
-                          labelText: 'Email Subject',
-                          hintText: 'Email Subject',
+                          labelText: 'Subject',
+                          hintText: 'Enter email subject',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.subject),
                         ),
@@ -423,48 +561,42 @@ class _EmailFormState extends State<EmailForm> {
                           return null;
                         },
                       ),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // Action Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _dismissKeyboard();
-                                widget.onClose?.call();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text('Close'),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _dismissKeyboard();
-                                _sendEmail();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text('Send'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
+              ),
+            ),
+            
+            // Action Buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        _dismissKeyboard();
+                        widget.onClose?.call();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _dismissKeyboard();
+                        _sendEmail();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Send'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

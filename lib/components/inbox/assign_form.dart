@@ -25,6 +25,8 @@ class _AssignFormState extends State<AssignForm> {
     {'id': '4', 'name': 'Admin Team', 'email': 'admin@sumerudigital.com'},
   ];
 
+  String _selectedAssignee = '';
+
   String _getAppointmentName() {
     return widget.appointment['userCurrentDesignation']?.toString() ?? 
            widget.appointment['email']?.toString() ?? 'Unknown';
@@ -44,104 +46,102 @@ class _AssignFormState extends State<AssignForm> {
     return name[0].toUpperCase();
   }
 
+  void _assignTo(String assigneeId, String assigneeName) {
+    setState(() {
+      _selectedAssignee = assigneeId;
+    });
+    widget.onAssignTo?.call('${_getAppointmentId()}|$assigneeId|$assigneeName');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.8,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Simple handle
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            width: 32,
-            height: 3,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Simple header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.group_add,
-                  color: Colors.indigo[600],
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Assign to Team',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+          // Radio buttons for assignees
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: _availableAssignees.map((assignee) {
+                  final isSelected = _selectedAssignee == assignee['id'];
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.indigo.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected ? Colors.indigo : Colors.grey.withOpacity(0.3),
+                        width: 1,
                       ),
-                      Text(
-                        _getAppointmentName(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Content - Compact list
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: _availableAssignees.map((assignee) {
-              return ListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.indigo[100],
-                  child: Text(
-                    _getInitials(assignee['name']),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.indigo,
                     ),
-                  ),
-                ),
-                title: Text(
-                  assignee['name'],
-                  style: const TextStyle(fontSize: 14),
-                ),
-                subtitle: Text(
-                  assignee['email'],
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: Colors.grey[400],
-                ),
-                onTap: () {
-                  widget.onAssignTo?.call('${_getAppointmentId()}|${assignee['id']}|${assignee['name']}');
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
+                    child: RadioListTile<String>(
+                      value: assignee['id']!,
+                      groupValue: _selectedAssignee,
+                      onChanged: (value) {
+                        if (value != null) {
+                          _assignTo(value, assignee['name']);
+                        }
+                      },
+                      title: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.indigo[100],
+                            child: Text(
+                              _getInitials(assignee['name']),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  assignee['name'],
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected ? Colors.indigo : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  assignee['email'],
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      activeColor: Colors.indigo,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
           
           // Action Buttons
@@ -156,6 +156,23 @@ class _AssignFormState extends State<AssignForm> {
                       Navigator.pop(context);
                     },
                     child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _selectedAssignee.isNotEmpty ? () {
+                      final selectedAssignee = _availableAssignees.firstWhere(
+                        (assignee) => assignee['id'] == _selectedAssignee,
+                      );
+                      _assignTo(_selectedAssignee, selectedAssignee['name']);
+                      Navigator.pop(context);
+                    } : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Assign'),
                   ),
                 ),
               ],

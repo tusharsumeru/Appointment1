@@ -40,53 +40,6 @@ class _DeleteFormState extends State<DeleteForm> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Simple handle
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            width: 32,
-            height: 3,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Simple header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.delete_forever,
-                  color: Colors.red[600],
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Delete Appointment',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        _getAppointmentName(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           // Content
           Padding(
             padding: const EdgeInsets.all(16),
@@ -102,7 +55,7 @@ class _DeleteFormState extends State<DeleteForm> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning, color: Colors.red[600], size: 20),
+                      Icon(Icons.warning, color: Colors.black, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -148,37 +101,37 @@ class _DeleteFormState extends State<DeleteForm> {
                 
                 const SizedBox(height: 16),
                 
-                // Action buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          widget.onClose?.call();
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Cancel'),
-                      ),
+              ],
+            ),
+          ),
+          
+          // Action Buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      widget.onClose?.call();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      widget.onDelete?.call();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          widget.onDelete?.call();
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Delete'),
-                      ),
-                    ),
-                  ],
+                    child: const Text('Delete'),
+                  ),
                 ),
               ],
             ),
