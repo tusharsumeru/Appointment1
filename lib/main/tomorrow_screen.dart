@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
-import '../components/today/today_card_component.dart';
-import '../action/action.dart';
+import '../components/tomorrow/tomorrow_card_component.dart';
 
-class TodayScreen extends StatefulWidget {
-  const TodayScreen({super.key});
+class TomorrowScreen extends StatefulWidget {
+  const TomorrowScreen({super.key});
 
   @override
-  State<TodayScreen> createState() => _TodayScreenState();
+  State<TomorrowScreen> createState() => _TomorrowScreenState();
 }
 
-class _TodayScreenState extends State<TodayScreen> {
-  DateTime _selectedDate = DateTime.now();
+class _TomorrowScreenState extends State<TomorrowScreen> {
+  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
 
   String _getFormattedDate(DateTime date) {
     final months = [
@@ -75,7 +74,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Today'),
+        title: const Text('Tomorrow'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -91,7 +90,7 @@ class _TodayScreenState extends State<TodayScreen> {
       drawer: const SidebarComponent(),
       body: Column(
         children: [
-          // Today's date section with calendar icon
+          // Tomorrow's date section with calendar icon
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -146,10 +145,10 @@ class _TodayScreenState extends State<TodayScreen> {
             ),
           ),
 
-          // Today card component
-          Expanded(child: TodayCardComponent()),
+          // Tomorrow card component
+          Expanded(child: TomorrowCardComponent(selectedDate: _selectedDate)),
         ],
       ),
     );
   }
-}
+} 

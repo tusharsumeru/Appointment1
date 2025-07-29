@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://f5c9f6886eb2.ngrok-free.app/api/v3'; // API base URL
+      'https://81650a222436.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -274,9 +274,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/appointments/status').replace(
-        queryParameters: queryParams,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/appointment/appointments/status',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -301,8 +301,9 @@ class ActionService {
 
       if (response.statusCode == 200) {
         // Success - save appointments data to local storage and return
-        final List<dynamic> appointments = responseData['data']?['appointments'] ?? [];
-        
+        final List<dynamic> appointments =
+            responseData['data']?['appointments'] ?? [];
+
         // No caching for inbox and assigned to me screens - always fetch fresh data
 
         return {
@@ -313,7 +314,8 @@ class ActionService {
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
           'pagination': responseData['pagination'] ?? {},
-          'message': responseData['message'] ?? 'Appointments retrieved successfully',
+          'message':
+              responseData['message'] ?? 'Appointments retrieved successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request - validation errors
@@ -343,7 +345,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 500,
-          'message': responseData['message'] ?? 'Server error. Please try again later.',
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
         };
       } else {
         // Other error
@@ -542,9 +546,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/appointments/status').replace(
-        queryParameters: queryParams,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/appointment/appointments/status',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -569,8 +573,9 @@ class ActionService {
 
       if (response.statusCode == 200) {
         // Success - return appointments data
-        final List<dynamic> appointments = responseData['data']?['appointments'] ?? [];
-        
+        final List<dynamic> appointments =
+            responseData['data']?['appointments'] ?? [];
+
         return {
           'success': true,
           'statusCode': 200,
@@ -579,7 +584,8 @@ class ActionService {
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
           'pagination': responseData['pagination'] ?? {},
-          'message': responseData['message'] ?? 'Appointments retrieved successfully',
+          'message':
+              responseData['message'] ?? 'Appointments retrieved successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request - validation errors
@@ -609,7 +615,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 500,
-          'message': responseData['message'] ?? 'Server error. Please try again later.',
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
         };
       } else {
         // Other error
@@ -679,7 +687,7 @@ class ActionService {
         // Success - but handle potential large response
         try {
           final responseData = jsonDecode(response.body);
-          
+
           // Extract only essential data to avoid issues with large documents
           final data = responseData['data'];
           final essentialData = {
@@ -692,12 +700,14 @@ class ActionService {
             'email': data?['email'],
             'userCurrentDesignation': data?['userCurrentDesignation'],
           };
-          
+
           return {
             'success': true,
             'statusCode': 200,
             'data': essentialData,
-            'message': responseData['message'] ?? 'Appointment starred status updated successfully',
+            'message':
+                responseData['message'] ??
+                'Appointment starred status updated successfully',
           };
         } catch (e) {
           // If parsing fails due to large response, assume success and return minimal data
@@ -709,7 +719,8 @@ class ActionService {
               'appointmentId': appointmentId,
               'starred': true, // Assume toggle worked
             },
-            'message': 'Appointment starred status updated successfully (minimal response)',
+            'message':
+                'Appointment starred status updated successfully (minimal response)',
           };
         }
       } else if (response.statusCode == 400) {
@@ -749,7 +760,9 @@ class ActionService {
       } else if (response.statusCode == 500) {
         // Server error - likely BSON serialization issue
         // Assume the operation succeeded despite the error
-        print('Warning: Server returned 500, but assuming starred toggle succeeded');
+        print(
+          'Warning: Server returned 500, but assuming starred toggle succeeded',
+        );
         return {
           'success': true,
           'statusCode': 200,
@@ -757,7 +770,8 @@ class ActionService {
             'appointmentId': appointmentId,
             'starred': true, // Assume toggle worked
           },
-          'message': 'Appointment starred status updated successfully (assumed)',
+          'message':
+              'Appointment starred status updated successfully (assumed)',
         };
       } else {
         // Other error
@@ -770,7 +784,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to update starred status',
+          'message':
+              responseData['message'] ?? 'Failed to update starred status',
         };
       }
     } catch (error) {
@@ -889,7 +904,9 @@ class ActionService {
 
       // Validate date and time format
       try {
-        final scheduledDateTime = DateTime.parse('${scheduledDate}T${scheduledTime}');
+        final scheduledDateTime = DateTime.parse(
+          '${scheduledDate}T${scheduledTime}',
+        );
         if (scheduledDateTime.isBefore(DateTime.now())) {
           return {
             'success': false,
@@ -909,14 +926,16 @@ class ActionService {
       final Map<String, dynamic> requestBody = {
         'scheduledDate': scheduledDate,
         'scheduledTime': scheduledTime,
-        'options': options ?? {
-          'tbsRequired': false,
-          'dontSendNotifications': false,
-          'sendArrivalTime': false,
-          'scheduleEmailSmsConfirmation': false,
-          'sendVdsEmail': false,
-          'stayAvailable': false,
-        },
+        'options':
+            options ??
+            {
+              'tbsRequired': false,
+              'dontSendNotifications': false,
+              'sendArrivalTime': false,
+              'scheduleEmailSmsConfirmation': false,
+              'sendVdsEmail': false,
+              'stayAvailable': false,
+            },
       };
 
       // Add optional fields if provided
@@ -961,7 +980,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Appointment scheduled successfully',
+          'message':
+              responseData['message'] ?? 'Appointment scheduled successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request - validation errors
@@ -991,14 +1011,17 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 500,
-          'message': responseData['message'] ?? 'Server error. Please try again later.',
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
         };
       } else {
         // Other error
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to schedule appointment',
+          'message':
+              responseData['message'] ?? 'Failed to schedule appointment',
           'error': responseData['error'],
         };
       }
@@ -1007,6 +1030,100 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get appointments by scheduled date
+  static Future<Map<String, dynamic>> getAppointmentsByScheduledDate({
+    required String date, // Format: YYYY-MM-DD
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate date format
+      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Invalid date format. Please use YYYY-MM-DD format.',
+        };
+      }
+
+      // Make API call
+      final url = '$baseUrl/appointment/scheduled/date?date=$date';
+      print('🌐 Making API call to: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      print('📡 API Response Status: ${response.statusCode}');
+      print('📡 API Response Body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return appointments data
+        final List<dynamic> appointments = responseData['data'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': appointments,
+          'message': responseData['message'] ?? 'Appointments fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid date format',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch appointments',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
       };
     }
   }
@@ -1100,9 +1217,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/appointments/status').replace(
-        queryParameters: queryParams,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/appointment/appointments/status',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -1127,8 +1244,9 @@ class ActionService {
 
       if (response.statusCode == 200) {
         // Success - return appointments data
-        final List<dynamic> appointments = responseData['data']?['appointments'] ?? [];
-        
+        final List<dynamic> appointments =
+            responseData['data']?['appointments'] ?? [];
+
         return {
           'success': true,
           'statusCode': 200,
@@ -1137,7 +1255,9 @@ class ActionService {
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
           'pagination': responseData['pagination'] ?? {},
-          'message': responseData['message'] ?? 'Assigned appointments retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Assigned appointments retrieved successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request - validation errors
@@ -1167,9 +1287,348 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve assigned appointments',
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve assigned appointments',
         };
       }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Mark appointment as done
+  static Future<Map<String, dynamic>> markAppointmentAsDone({
+    required String appointmentStatusId,
+  }) async {
+    try {
+      // Get stored token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate input
+      if (appointmentStatusId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Appointment status ID is required.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'appointmentStatusId': appointmentStatusId,
+      };
+
+      // Make API call
+      final response = await http.put(
+        Uri.parse('$baseUrl/appointment/$appointmentStatusId/done'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - appointment marked as completed
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Appointment marked as completed successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request parameters',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment status not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment status not found',
+        };
+      } else {
+        // Other error responses
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to mark appointment as completed',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Undo appointment status
+  static Future<Map<String, dynamic>> undoAppointmentStatus({
+    required String appointmentStatusId,
+  }) async {
+    try {
+      // Get stored token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate input
+      if (appointmentStatusId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Appointment status ID is required.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'appointmentStatusId': appointmentStatusId,
+      };
+
+      // Make API call
+      final response = await http.put(
+        Uri.parse('$baseUrl/appointment/$appointmentStatusId/undo'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - appointment status reverted
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Appointment status reverted successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request - no previous status to undo
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'No previous status found to undo',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment status not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment status not found',
+        };
+      } else {
+        // Other error responses
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to undo appointment status',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get upcoming appointments by user ID
+  static Future<Map<String, dynamic>> getUpcomingAppointmentsByUser({
+    required String userId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate userId
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'User ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$userId/upcoming'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return appointments data
+        final List<dynamic> appointments = responseData['data'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': appointments,
+          'message': responseData['message'] ?? 'Upcoming appointments fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid user ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // User not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'User not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch upcoming appointments',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get appointment history by user ID
+  static Future<Map<String, dynamic>> getAppointmentHistoryByUser({
+    required String userId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate userId
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'User ID is required',
+        };
+      }
+
+      // Use the existing appointments filtering system with past=true
+      return await getAppointmentsWithFilters(
+        page: 1,
+        limit: 50, // Get more history items
+        sortBy: "createdAt",
+        sortOrder: "desc",
+        dateType: "created",
+        past: true, // This will get past appointments
+        additionalFilters: {
+          '_id': userId, // Filter by the MongoDB _id
+        },
+      );
     } catch (error) {
       return {
         'success': false,

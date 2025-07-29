@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../action/action.dart';
 
-class TodayCardComponent extends StatefulWidget {
-  const TodayCardComponent({super.key});
+class TomorrowCardComponent extends StatefulWidget {
+  final DateTime selectedDate;
+  
+  const TomorrowCardComponent({
+    super.key,
+    required this.selectedDate,
+  });
 
   @override
-  State<TodayCardComponent> createState() => _TodayCardComponentState();
+  State<TomorrowCardComponent> createState() => _TomorrowCardComponentState();
 }
 
-class _TodayCardComponentState extends State<TodayCardComponent> {
-  List<Map<String, dynamic>> _todayAppointments = [];
+class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
+  List<Map<String, dynamic>> _tomorrowAppointments = [];
   bool _isLoading = false;
   String? _error;
   Set<String> _expandedCategories = {};
@@ -63,22 +68,30 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
   @override
   void initState() {
     super.initState();
-    _fetchTodayAppointments();
+    _fetchTomorrowAppointments();
   }
 
-  Future<void> _fetchTodayAppointments() async {
+  @override
+  void didUpdateWidget(TomorrowCardComponent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedDate != widget.selectedDate) {
+      _fetchTomorrowAppointments();
+    }
+  }
+
+  Future<void> _fetchTomorrowAppointments() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      final todayString = ActionService.formatDateForAPI(DateTime.now());
+      // Get selected date in YYYY-MM-DD format
+      final dateString = ActionService.formatDateForAPI(widget.selectedDate);
       
-      print('📅 Fetching appointments for today: $todayString');
+      print('📅 Fetching appointments for date: $dateString');
       
-      final result = await ActionService.getAppointmentsByScheduledDate(date: todayString);
+      final result = await ActionService.getAppointmentsByScheduledDate(date: dateString);
 
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
@@ -92,34 +105,34 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
             return timeA.compareTo(timeB);
           });
 
-          _todayAppointments = sortedAppointments;
+          _tomorrowAppointments = sortedAppointments;
 
           // Debug: Print first appointment data to understand structure
-          if (_todayAppointments.isNotEmpty) {
+          if (_tomorrowAppointments.isNotEmpty) {
             print('🔍 Debug: First appointment data:');
-            print('ID: ${_todayAppointments[0]['_id']}');
-            print('All fields: ${_todayAppointments[0].keys.toList()}');
-            print('Scheduled Time: ${_todayAppointments[0]['scheduledTime']}');
-            print('Preferred Time: ${_todayAppointments[0]['preferredTime']}');
-            print('Created At: ${_todayAppointments[0]['createdAt']}');
-            print('Status: ${_todayAppointments[0]['status']}');
-            print('Location: ${_getLocation(_todayAppointments[0])}');
+            print('ID: ${_tomorrowAppointments[0]['_id']}');
+            print('All fields: ${_tomorrowAppointments[0].keys.toList()}');
+            print('Scheduled Time: ${_tomorrowAppointments[0]['scheduledTime']}');
+            print('Preferred Time: ${_tomorrowAppointments[0]['preferredTime']}');
+            print('Created At: ${_tomorrowAppointments[0]['createdAt']}');
+            print('Status: ${_tomorrowAppointments[0]['status']}');
+            print('Location: ${_getLocation(_tomorrowAppointments[0])}');
             print(
-              'User Designation: ${_todayAppointments[0]['userCurrentDesignation']}',
+              'User Designation: ${_tomorrowAppointments[0]['userCurrentDesignation']}',
             );
             print('---');
           }
         } else {
-          _todayAppointments = [];
+          _tomorrowAppointments = [];
         }
         _error = null;
       } else {
-        _error = result['message'] ?? 'Failed to fetch today\'s appointments';
-        _todayAppointments = [];
+        _error = result['message'] ?? 'Failed to fetch appointments';
+        _tomorrowAppointments = [];
       }
     } catch (e) {
       _error = 'Network error: $e';
-      _todayAppointments = [];
+      _tomorrowAppointments = [];
     } finally {
       setState(() {
         _isLoading = false;
@@ -128,13 +141,13 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
   }
 
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
-    if (_todayAppointments.isEmpty) return [];
+    if (_tomorrowAppointments.isEmpty) return [];
 
     switch (categoryKey) {
       case 'morning':
       case 'evening':
       case 'night':
-        return _todayAppointments.where((appointment) {
+        return _tomorrowAppointments.where((appointment) {
           // First check if appointment is completed/done - if so, exclude it
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -179,7 +192,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'tbs_req':
-        return _todayAppointments.where((appointment) {
+        return _tomorrowAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           // Exclude completed/done appointments from TBS/Req category
           if (status == 'completed' || status == 'done') {
@@ -196,7 +209,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'done':
-        return _todayAppointments.where((appointment) {
+        return _tomorrowAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           final isDone = status == 'completed' || status == 'done';
           if (isDone) {
@@ -208,7 +221,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'satsang_backstage':
-        return _todayAppointments.where((appointment) {
+        return _tomorrowAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -227,7 +240,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'gurukul':
-        return _todayAppointments.where((appointment) {
+        return _tomorrowAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -247,6 +260,37 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       default:
         return [];
     }
+  }
+
+  String _getAppointmentStatus(Map<String, dynamic> appointment) {
+    // Try to get status from appointmentStatus object
+    final appointmentStatus = appointment['appointmentStatus'];
+    if (appointmentStatus is Map<String, dynamic>) {
+      final status = appointmentStatus['status']?.toString();
+      if (status != null && status.isNotEmpty) {
+        return status;
+      }
+    }
+    
+    // Fallback to direct status field
+    return appointment['status']?.toString() ?? 'Unknown';
+  }
+
+  String _getAppointmentTime(Map<String, dynamic> appointment) {
+    // Try to get time from scheduledDateTime object
+    final scheduledDateTime = appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final time = scheduledDateTime['time']?.toString();
+      if (time != null && time.isNotEmpty) {
+        return time;
+      }
+    }
+    
+    // Fallback to other time fields
+    return appointment['scheduledTime']?.toString() ?? 
+           appointment['preferredTime']?.toString() ?? 
+           appointment['createdAt']?.toString() ?? 
+           'No time';
   }
 
   String _getLocation(Map<String, dynamic> appointment) {
@@ -293,32 +337,125 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     return 'Not specified';
   }
 
-  String _formatTime(String? timeString) {
-    if (timeString == null) return 'No time';
-
-    try {
-      final time = DateTime.parse(timeString);
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Invalid time';
-    }
-  }
-
-  String _getAppointmentTime(Map<String, dynamic> appointment) {
-    // Try to get time from scheduledDateTime object
-    final scheduledDateTime = appointment['scheduledDateTime'];
-    if (scheduledDateTime is Map<String, dynamic>) {
-      final time = scheduledDateTime['time']?.toString();
-      if (time != null && time.isNotEmpty) {
-        return time;
+  String _getAppointmentName(Map<String, dynamic> appointment) {
+    // Try to get name from userId object first
+    final userId = appointment['userId'];
+    if (userId is Map<String, dynamic>) {
+      final fullName = userId['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return fullName;
       }
     }
     
-    // Fallback to other time fields
-    return appointment['scheduledTime']?.toString() ?? 
-           appointment['preferredTime']?.toString() ?? 
-           appointment['createdAt']?.toString() ?? 
-           'No time';
+    // Fallback to other fields
+    return appointment['userCurrentDesignation']?.toString() ??
+        appointment['email']?.toString() ??
+        'Unknown';
+  }
+
+  String _getUserEmail(Map<String, dynamic> appointment) {
+    // Try to get email from userId object first
+    final userId = appointment['userId'];
+    if (userId is Map<String, dynamic>) {
+      final email = userId['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    }
+    
+    // Fallback to direct email field
+    return appointment['email']?.toString() ?? 'No email';
+  }
+
+  String _getUserDesignation(Map<String, dynamic> appointment) {
+    return appointment['userCurrentDesignation']?.toString() ?? '';
+  }
+
+  String _getUserInitials(Map<String, dynamic> appointment) {
+    final name = _getAppointmentName(appointment);
+    if (name == 'Unknown') return 'U';
+
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return 'U';
+  }
+
+  String _getSecretaryInitials(Map<String, dynamic> appointment) {
+    // Try to get secretary name from assignedSecretary object
+    final assignedSecretary = appointment['assignedSecretary'];
+    if (assignedSecretary is Map<String, dynamic>) {
+      final fullName = assignedSecretary['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        final parts = fullName.split(' ');
+        if (parts.length >= 2) {
+          return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+        } else if (parts.length == 1) {
+          return parts[0][0].toUpperCase();
+        }
+      }
+    }
+    
+    // Fallback to other fields
+    final secretaryName = appointment['secretaryName']?.toString() ??
+                         appointment['assignedTo']?.toString() ??
+                         appointment['secretary']?.toString() ??
+                         'VM'; // Default fallback
+    
+    if (secretaryName == 'VM') return 'VM';
+
+    final parts = secretaryName.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return 'VM';
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == null) return Colors.grey;
+
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return Colors.green;
+      case 'pending':
+      case 'tbs':
+      case 'requested':
+        return Colors.orange;
+      case 'scheduled':
+        return Colors.blue;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String? status) {
+    if (status == null) return 'Unknown';
+
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'done':
+        return 'Completed';
+      case 'pending':
+        return 'Pending';
+      case 'tbs':
+        return 'TBS';
+      case 'requested':
+        return 'Requested';
+      case 'scheduled':
+        return 'Scheduled';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
   }
 
   @override
@@ -343,7 +480,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchTodayAppointments,
+              onPressed: _fetchTomorrowAppointments,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
                 foregroundColor: Colors.white,
@@ -356,7 +493,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchTodayAppointments,
+      onRefresh: _fetchTomorrowAppointments,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -377,10 +514,10 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.today, color: Colors.deepPurple, size: 20),
+                      Icon(Icons.event, color: Colors.deepPurple, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        'Today\'s Summary',
+                        'Appointments Summary',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -391,7 +528,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Total Appointments: ${_todayAppointments.length}',
+                    'Total Appointments: ${_tomorrowAppointments.length}',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -832,8 +969,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                     ],
                   ),
                 ),
-
-
               ],
             ),
           ),
@@ -888,175 +1023,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         ],
       ),
     );
-  }
-
-  String _getAppointmentName(Map<String, dynamic> appointment) {
-    // Try to get name from userId object first
-    final userId = appointment['userId'];
-    if (userId is Map<String, dynamic>) {
-      final fullName = userId['fullName']?.toString();
-      if (fullName != null && fullName.isNotEmpty) {
-        return fullName;
-      }
-    }
-    
-    // Fallback to other fields
-    return appointment['userCurrentDesignation']?.toString() ??
-        appointment['email']?.toString() ??
-        'Unknown';
-  }
-
-  String _getUserEmail(Map<String, dynamic> appointment) {
-    // Try to get email from userId object first
-    final userId = appointment['userId'];
-    if (userId is Map<String, dynamic>) {
-      final email = userId['email']?.toString();
-      if (email != null && email.isNotEmpty) {
-        return email;
-      }
-    }
-    
-    // Fallback to direct email field
-    return appointment['email']?.toString() ?? 'No email';
-  }
-
-  String _getUserDesignation(Map<String, dynamic> appointment) {
-    return appointment['userCurrentDesignation']?.toString() ?? '';
-  }
-
-  String _getUserInitials(Map<String, dynamic> appointment) {
-    final name = _getAppointmentName(appointment);
-    if (name == 'Unknown') return 'U';
-
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    } else if (parts.length == 1) {
-      return parts[0][0].toUpperCase();
-    }
-    return 'U';
-  }
-
-  String _getSecretaryInitials(Map<String, dynamic> appointment) {
-    // Try to get secretary name from assignedSecretary object
-    final assignedSecretary = appointment['assignedSecretary'];
-    if (assignedSecretary is Map<String, dynamic>) {
-      final fullName = assignedSecretary['fullName']?.toString();
-      if (fullName != null && fullName.isNotEmpty) {
-        final parts = fullName.split(' ');
-        if (parts.length >= 2) {
-          return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-        } else if (parts.length == 1) {
-          return parts[0][0].toUpperCase();
-        }
-      }
-    }
-    
-    // Fallback to other fields
-    final secretaryName = appointment['secretaryName']?.toString() ??
-                         appointment['assignedTo']?.toString() ??
-                         appointment['secretary']?.toString() ??
-                         'VM'; // Default fallback
-    
-    if (secretaryName == 'VM') return 'VM';
-
-    final parts = secretaryName.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    } else if (parts.length == 1) {
-      return parts[0][0].toUpperCase();
-    }
-    return 'VM';
-  }
-
-  String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // Try to get status from appointmentStatus object
-    final appointmentStatus = appointment['appointmentStatus'];
-    if (appointmentStatus is Map<String, dynamic>) {
-      final status = appointmentStatus['status']?.toString();
-      if (status != null && status.isNotEmpty) {
-        return status;
-      }
-    }
-    
-    // Fallback to direct status field
-    return appointment['status']?.toString() ?? 'Unknown';
-  }
-
-  Color _getStatusColor(String? status) {
-    if (status == null) return Colors.grey;
-
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'done':
-        return Colors.green;
-      case 'pending':
-      case 'tbs':
-      case 'requested':
-        return Colors.orange;
-      case 'scheduled':
-        return Colors.blue;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String? status) {
-    if (status == null) return 'Unknown';
-
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'done':
-        return 'Completed';
-      case 'pending':
-        return 'Pending';
-      case 'tbs':
-        return 'TBS';
-      case 'requested':
-        return 'Requested';
-      case 'scheduled':
-        return 'Scheduled';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
-
-  Future<void> _handleMarkAsDone(Map<String, dynamic> appointment) async {
-    try {
-      // Get the appointment status ID
-      final appointmentStatus = appointment['appointmentStatus'];
-      if (appointmentStatus == null || appointmentStatus['_id'] == null) {
-        _showSnackBar('Error: Appointment status not found', isError: true);
-        return;
-      }
-
-      final appointmentStatusId = appointmentStatus['_id'].toString();
-
-      // Show loading indicator
-      _showSnackBar('Marking appointment as done...', isError: false);
-
-      // Call the API
-      final result = await ActionService.markAppointmentAsDone(
-        appointmentStatusId: appointmentStatusId,
-      );
-
-      if (result['success']) {
-        // Success - show success message and refresh the data
-        _showSnackBar(result['message'] ?? 'Appointment marked as completed successfully', isError: false);
-        
-        // Refresh the appointments list
-        await _fetchTodayAppointments();
-      } else {
-        // Error - show error message
-        _showSnackBar(result['message'] ?? 'Failed to mark appointment as completed', isError: true);
-      }
-    } catch (error) {
-      _showSnackBar('Network error: $error', isError: true);
-    }
   }
 
   Widget _buildActionButton(Map<String, dynamic> appointment) {
@@ -1130,6 +1096,40 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     }
   }
 
+  Future<void> _handleMarkAsDone(Map<String, dynamic> appointment) async {
+    try {
+      // Get the appointment status ID
+      final appointmentStatus = appointment['appointmentStatus'];
+      if (appointmentStatus == null || appointmentStatus['_id'] == null) {
+        _showSnackBar('Error: Appointment status not found', isError: true);
+        return;
+      }
+
+      final appointmentStatusId = appointmentStatus['_id'].toString();
+
+      // Show loading indicator
+      _showSnackBar('Marking appointment as done...', isError: false);
+
+      // Call the API
+      final result = await ActionService.markAppointmentAsDone(
+        appointmentStatusId: appointmentStatusId,
+      );
+
+      if (result['success']) {
+        // Success - show success message and refresh the data
+        _showSnackBar(result['message'] ?? 'Appointment marked as completed successfully', isError: false);
+        
+        // Refresh the appointments list
+        await _fetchTomorrowAppointments();
+      } else {
+        // Error - show error message
+        _showSnackBar(result['message'] ?? 'Failed to mark appointment as completed', isError: true);
+      }
+    } catch (error) {
+      _showSnackBar('Network error: $error', isError: true);
+    }
+  }
+
   Future<void> _handleUndo(Map<String, dynamic> appointment) async {
     try {
       // Get the appointment status ID
@@ -1154,7 +1154,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         _showSnackBar(result['message'] ?? 'Appointment status reverted successfully', isError: false);
         
         // Refresh the appointments list
-        await _fetchTodayAppointments();
+        await _fetchTomorrowAppointments();
       } else {
         // Error - show error message
         _showSnackBar(result['message'] ?? 'Failed to undo appointment status', isError: true);
@@ -1182,4 +1182,4 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       );
     }
   }
-}
+} 
