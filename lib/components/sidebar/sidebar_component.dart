@@ -7,9 +7,63 @@ import '../../main/dashboard_screen.dart';
 import '../../main/quick_darshan_line_screen.dart';
 import '../../main/bulk_email_sms_screen.dart';
 import '../../main/upload_offline_appointment_screen.dart';
+import '../../main/assigned_to_me_screen.dart';
+import '../../main/starred_screen.dart';
+import '../../main/add_new_screen.dart';
+import '../../auth/login_screen.dart';
+import '../../action/action.dart';
+import '../../action/storage_service.dart';
 
-class SidebarComponent extends StatelessWidget {
+class SidebarComponent extends StatefulWidget {
   const SidebarComponent({super.key});
+
+  @override
+  State<SidebarComponent> createState() => _SidebarComponentState();
+}
+
+class _SidebarComponentState extends State<SidebarComponent> {
+  Map<String, dynamic>? _userData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final result = await ActionService.getCurrentUser();
+      
+      if (result['success']) {
+        setState(() {
+          _userData = result['data'];
+          _isLoading = false;
+        });
+      } else {
+        // Handle error - token expired or other issues
+        if (result['statusCode'] == 401 || result['statusCode'] == 403 || result['statusCode'] == 404) {
+          // Clear stored data and navigate to login
+          await StorageService.logout();
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          }
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (error) {
+      print('Error loading user data: $error');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,39 +72,78 @@ class SidebarComponent extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           // Header
-          DrawerHeader(
+          Container(
             decoration: const BoxDecoration(
               color: Colors.deepPurple,
             ),
+            padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const CircleAvatar(
-                  radius: 30,
+                // User Avatar
+                CircleAvatar(
+                  radius: 25,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 35,
-                    color: Colors.deepPurple,
+                  backgroundImage: _userData?['profilePhoto'] != null 
+                      ? NetworkImage(_userData!['profilePhoto'])
+                      : null,
+                  child: _userData?['profilePhoto'] == null
+                      ? const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: Colors.deepPurple,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                // User Name
+                Flexible(
+                  child: Text(
+                    _isLoading 
+                        ? 'Loading...'
+                        : _userData?['fullName'] ?? 'User',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Appointment App',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 2),
+                // User Email
+                Flexible(
+                  child: Text(
+                    _isLoading 
+                        ? 'Loading...'
+                        : _userData?['email'] ?? 'user@example.com',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  'user@example.com',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
+                // User Role (if available)
+                if (_userData?['role'] != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _userData!['role'].toString().toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -102,6 +195,42 @@ class SidebarComponent extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const UpcomingScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.assignment_ind, color: Colors.deepPurple),
+            title: const Text('Assigned to Me'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const AssignedToMeScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.star, color: Colors.deepPurple),
+            title: const Text('Starred'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const StarredScreen()),
+              );
+            },
+          ),
+          
+          ListTile(
+            leading: const Icon(Icons.add_circle_outline, color: Colors.deepPurple),
+            title: const Text('Add New'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const AddNewScreen()),
               );
             },
           ),
@@ -185,7 +314,6 @@ class SidebarComponent extends StatelessWidget {
             ),
             onTap: () {
               Navigator.pop(context);
-              // TODO: Implement logout functionality
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
@@ -198,9 +326,19 @@ class SidebarComponent extends StatelessWidget {
                         child: const Text('Cancel'),
                       ),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(context); // Close dialog
-                          // TODO: Navigate back to login screen
+                          
+                          // Clear stored data
+                          await StorageService.logout();
+                          
+                          // Navigate to login screen and clear navigation stack
+                          if (mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              (route) => false,
+                            );
+                          }
                         },
                         child: const Text(
                           'Logout',
