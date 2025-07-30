@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://81650a222436.ngrok-free.app/api/v3'; // API base URL
+      'https://c85dc7df20e5.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -1062,7 +1062,7 @@ class ActionService {
       // Make API call
       final url = '$baseUrl/appointment/scheduled/date?date=$date';
       print('🌐 Making API call to: $url');
-      
+
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -1070,7 +1070,7 @@ class ActionService {
           'Authorization': 'Bearer $token',
         },
       );
-      
+
       print('📡 API Response Status: ${response.statusCode}');
       print('📡 API Response Body: ${response.body}');
 
@@ -1094,7 +1094,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': appointments,
-          'message': responseData['message'] ?? 'Appointments fetched successfully',
+          'message':
+              responseData['message'] ?? 'Appointments fetched successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -1358,7 +1359,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Appointment marked as completed successfully',
+          'message':
+              responseData['message'] ??
+              'Appointment marked as completed successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -1387,7 +1390,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to mark appointment as completed',
+          'message':
+              responseData['message'] ??
+              'Failed to mark appointment as completed',
         };
       }
     } catch (error) {
@@ -1456,14 +1461,17 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Appointment status reverted successfully',
+          'message':
+              responseData['message'] ??
+              'Appointment status reverted successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request - no previous status to undo
         return {
           'success': false,
           'statusCode': 400,
-          'message': responseData['message'] ?? 'No previous status found to undo',
+          'message':
+              responseData['message'] ?? 'No previous status found to undo',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -1485,7 +1493,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to undo appointment status',
+          'message':
+              responseData['message'] ?? 'Failed to undo appointment status',
         };
       }
     } catch (error) {
@@ -1551,7 +1560,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': appointments,
-          'message': responseData['message'] ?? 'Upcoming appointments fetched successfully',
+          'message':
+              responseData['message'] ??
+              'Upcoming appointments fetched successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -1580,7 +1591,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to fetch upcoming appointments',
+          'message':
+              responseData['message'] ??
+              'Failed to fetch upcoming appointments',
         };
       }
     } catch (error) {
@@ -1635,6 +1648,79 @@ class ActionService {
         'statusCode': 500,
         'message': 'Network error: $error',
       };
+    }
+  }
+
+  // Get appointment by ID (for QR scanner)
+  static Future<Map<String, dynamic>> getAppointmentById(
+    String appointmentId,
+  ) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$appointmentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': data['data'],
+          'message': 'Appointment details retrieved successfully',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': 'Appointment not found',
+        };
+      } else {
+        final errorData = json.decode(response.body);
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': errorData['message'] ?? 'Failed to fetch appointment',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Extract appointment ID from QR code URL
+  static String? extractAppointmentIdFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final pathSegments = uri.pathSegments;
+
+      // Look for 'appointment' in the path and get the next segment as ID
+      for (int i = 0; i < pathSegments.length; i++) {
+        if (pathSegments[i] == 'appointment' && i + 1 < pathSegments.length) {
+          return pathSegments[i + 1];
+        }
+      }
+
+      return null;
+    } catch (e) {
+      return null;
     }
   }
 }

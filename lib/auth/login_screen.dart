@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../main/home_screen.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
+import '../guard/guard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -58,24 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
               await StorageService.saveUserData(data['user']);
             }
             
-            // Show success message
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(result['message'] ?? 'Login successful!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-
-            // Navigate to home screen
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const HomeScreen(),
-                ),
-              );
-            }
+            // Check user role and navigate accordingly
+            await _handleRoleBasedNavigation(data['user']);
           }
         } else {
           // Show error message
@@ -101,6 +86,91 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _handleRoleBasedNavigation(Map<String, dynamic>? userData) async {
+    if (userData == null) {
+      // If no user data, try to get it from the API
+      final userResult = await ActionService.getCurrentUser();
+      if (userResult['success']) {
+        userData = userResult['data'];
+      }
+    }
+
+    String? userRole = userData?['role']?.toString().toLowerCase();
+    
+    if (mounted) {
+      if (userRole == 'secretary') {
+        // Secretary role - navigate to appointment management interface
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Welcome back! You\'re now logged in as Secretary.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+          ),
+        );
+      } else if (userRole == 'admin') {
+        // Admin role - navigate to admin interface (to be implemented)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Welcome back! You\'re now logged in as Admin.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // TODO: Navigate to admin interface
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(), // Temporary - replace with AdminScreen
+          ),
+        );
+      } else if (userRole == 'guard') {
+        // Guard role - navigate to guard interface
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Welcome back! You\'re now logged in as Guard.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const GuardScreen(),
+          ),
+        );
+      } else if (userRole == 'user' || userRole == 'client') {
+        // Regular user/client role - navigate to user interface (to be implemented)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Welcome back! You\'re now logged in.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // TODO: Navigate to user interface
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(), // Temporary - replace with UserScreen
+          ),
+        );
+      } else {
+        // Unknown role or no role - show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Access denied. Your role (${userRole ?? 'unknown'}) is not authorized.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        
+        // Logout the user since they don't have proper access
+        await StorageService.logout();
       }
     }
   }

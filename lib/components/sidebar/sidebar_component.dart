@@ -112,6 +112,12 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
   @override
   Widget build(BuildContext context) {
+    // Get user role for conditional menu items
+    String? userRole = _userData?['role']?.toString().toLowerCase();
+    bool isSecretary = userRole == 'secretary';
+    bool isAdmin = userRole == 'admin';
+    bool isUser = userRole == 'user' || userRole == 'client';
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -194,7 +200,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ),
 
-          // Navigation Items
+          // Navigation Items - Show different items based on role
           ListTile(
             leading: const Icon(Icons.home, color: Colors.deepPurple),
             title: const Text('Home'),
@@ -207,94 +213,137 @@ class _SidebarComponentState extends State<SidebarComponent> {
             },
           ),
 
-          ListTile(
-            leading: const Icon(Icons.inbox, color: Colors.deepPurple),
-            title: const Text('Inbox'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const InboxScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.today, color: Colors.deepPurple),
-            title: const Text('Today'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TodayScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.event, color: Colors.deepPurple),
-            title: const Text('Tomorrow'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TomorrowScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.schedule, color: Colors.deepPurple),
-            title: const Text('Upcoming'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const UpcomingScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.assignment_ind, color: Colors.deepPurple),
-            title: const Text('Assigned to Me'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AssignedToMeScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.star, color: Colors.deepPurple),
-            title: const Text('Starred'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const StarredScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(
-              Icons.add_circle_outline,
-              color: Colors.deepPurple,
+          // Secretary-specific menu items
+          if (isSecretary) ...[
+            ListTile(
+              leading: const Icon(Icons.inbox, color: Colors.deepPurple),
+              title: const Text('Inbox'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InboxScreen()),
+                );
+              },
             ),
-            title: const Text('Add New'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const AddNewScreen()),
-              );
-            },
-          ),
+
+            ListTile(
+              leading: const Icon(Icons.today, color: Colors.deepPurple),
+              title: const Text('Today'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TodayScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.event, color: Colors.deepPurple),
+              title: const Text('Tomorrow'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TomorrowScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.schedule, color: Colors.deepPurple),
+              title: const Text('Upcoming'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UpcomingScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.assignment_ind, color: Colors.deepPurple),
+              title: const Text('Assigned to Me'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AssignedToMeScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.star, color: Colors.deepPurple),
+              title: const Text('Starred'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StarredScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.deepPurple,
+              ),
+              title: const Text('Add New'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddNewScreen()),
+                );
+              },
+            ),
+          ],
+
+          // Admin-specific menu items (to be implemented)
+          if (isAdmin) ...[
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
+              title: const Text('Admin Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to admin dashboard
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: Colors.deepPurple),
+              title: const Text('Manage Users'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to user management
+              },
+            ),
+          ],
+
+          // User/Client-specific menu items (to be implemented)
+          if (isUser) ...[
+            ListTile(
+              leading: const Icon(Icons.calendar_today, color: Colors.deepPurple),
+              title: const Text('My Appointments'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to user appointments
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history, color: Colors.deepPurple),
+              title: const Text('Appointment History'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to appointment history
+              },
+            ),
+          ],
 
           const Divider(),
 
