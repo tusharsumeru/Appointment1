@@ -4,7 +4,7 @@ import 'user_screen.dart';
 import 'appointment_details_screen.dart';
 
 class RequestAppointmentScreen extends StatefulWidget {
-  final AppointmentType selectedType;
+  final String selectedType;
 
   const RequestAppointmentScreen({
     super.key,
@@ -17,12 +17,7 @@ class RequestAppointmentScreen extends StatefulWidget {
 
 class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   String get _appointmentTypeText {
-    switch (widget.selectedType) {
-      case AppointmentType.myself:
-        return 'Myself';
-      case AppointmentType.guest:
-        return 'Guest';
-    }
+    return widget.selectedType;
   }
 
   // Form controllers

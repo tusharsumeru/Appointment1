@@ -3,6 +3,7 @@ import '../main/home_screen.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
+import '../user/user_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -146,18 +147,17 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else if (userRole == 'user' || userRole == 'client') {
-        // Regular user/client role - navigate to user interface (to be implemented)
+        // Regular user/client role - navigate to user interface
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in.'),
+            content: Text('🎉 Welcome back! You\'re now logged in as User.'),
             backgroundColor: Colors.green,
           ),
         );
 
-        // TODO: Navigate to user interface
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const HomeScreen(), // Temporary - replace with UserScreen
+            builder: (context) => const UserScreen(),
           ),
         );
       } else {
