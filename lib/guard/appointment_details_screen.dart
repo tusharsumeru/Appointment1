@@ -18,10 +18,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   bool isLoading = true;
   String? errorMessage;
   
-  // New state variables for Accept/Reject functionality
-  bool showCheckboxes = false;
-  Set<String> selectedUsers = {};
-  String? actionType; // 'accept' or 'reject'
+
 
   @override
   void initState() {
@@ -52,129 +49,674 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
-  void _showAcceptRejectAllDialog(String action) {
-    setState(() {
-      actionType = action;
-      showCheckboxes = true;
-      selectedUsers.clear();
-    });
+
+
+  // Helper methods for check-in status display
+  String _getMainStatusText() {
+    if (appointmentData == null) return 'Status not available';
+    final mainStatus = appointmentData!['mainStatus']?.toString().toLowerCase();
+    switch (mainStatus) {
+      case 'checked_in':
+        return 'Admitted';
+      case 'checked_in_partial':
+        return 'Partially Admitted';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending':
+        return 'Pending Admission';
+      case 'not_arrived':
+        return 'Not Arrived';
+      default:
+        return 'Not Arrived';
+    }
   }
 
-  void _toggleUserSelection(String userId) {
-    setState(() {
-      if (selectedUsers.contains(userId)) {
-        selectedUsers.remove(userId);
-      } else {
-        selectedUsers.add(userId);
-      }
-    });
+  Color _getMainStatusColor() {
+    if (appointmentData == null) return Colors.grey;
+    final mainStatus = appointmentData!['mainStatus']?.toString().toLowerCase();
+    switch (mainStatus) {
+      case 'checked_in':
+        return Colors.green;
+      case 'checked_in_partial':
+        return Colors.lightGreen;
+      case 'rejected':
+        return Colors.red;
+      case 'pending':
+        return Colors.orange;
+      case 'not_arrived':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
   }
 
-  void _selectAllUsers() {
-    setState(() {
-      selectedUsers.clear();
-      // Add main user
-      if (appointmentData?['createdBy'] != null) {
-        final mainUserId = appointmentData!['createdBy']['id'] ?? 'main_user';
-        selectedUsers.add(mainUserId);
-      }
-      // Add accompanying users
-      if (appointmentData?['accompanyUsers']?['users'] != null) {
-        for (var user in appointmentData!['accompanyUsers']['users']) {
-          final userId = user['id'] ?? 'accompanying_${user.hashCode}';
-          selectedUsers.add(userId);
-        }
-      }
-    });
+  IconData _getMainStatusIcon() {
+    if (appointmentData == null) return Icons.info_outline;
+    final mainStatus = appointmentData!['mainStatus']?.toString().toLowerCase();
+    switch (mainStatus) {
+      case 'checked_in':
+        return Icons.check_circle;
+      case 'checked_in_partial':
+        return Icons.check_circle_outline;
+      case 'rejected':
+        return Icons.cancel;
+      case 'pending':
+        return Icons.pending_actions;
+      case 'not_arrived':
+        return Icons.schedule;
+      default:
+        return Icons.schedule;
+    }
   }
 
-  void _deselectAllUsers() {
-    setState(() {
-      selectedUsers.clear();
-    });
+  String _getUserStatusText(String status) {
+    switch (status?.toString().toLowerCase()) {
+      case 'checked_in':
+        return 'Admitted';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending':
+        return 'Pending';
+      case 'not_arrived':
+        return 'Not Arrived';
+      default:
+        return 'Not Arrived';
+    }
   }
 
-  void _confirmAction() {
-    // TODO: Implement the actual accept/reject logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${actionType?.toUpperCase()} action for ${selectedUsers.length} users'),
-        backgroundColor: actionType == 'accept' ? Colors.green : Colors.red,
-      ),
-    );
+  Color _getUserStatusColor(String status) {
+    switch (status?.toString().toLowerCase()) {
+      case 'checked_in':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'pending':
+        return Colors.orange;
+      case 'not_arrived':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'N/A';
+    try {
+      final date = DateTime.parse(dateTime);
+      return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'Invalid date';
+    }
+  }
+
+  String _formatPhoneNumber(dynamic phoneData) {
+    if (phoneData == null) return 'N/A';
+    try {
+      final countryCode = phoneData['countryCode'] ?? '';
+      final number = phoneData['number'] ?? '';
+      if (countryCode.isEmpty && number.isEmpty) return 'N/A';
+      return '$countryCode$number';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  bool _hasPendingUsers() {
+    if (appointmentData == null || appointmentData!['users'] == null) return false;
     
-    setState(() {
-      showCheckboxes = false;
-      selectedUsers.clear();
-      actionType = null;
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    return usersList.any((user) {
+      final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+      final status = userMap['status']?.toString().toLowerCase();
+      return status == 'not_arrived' || status == 'pending' || status == null || status.isEmpty;
     });
   }
 
-  void _cancelAction() {
-    setState(() {
-      showCheckboxes = false;
-      selectedUsers.clear();
-      actionType = null;
-    });
+  int _getTotalUsers() {
+    if (appointmentData == null || appointmentData!['users'] == null) return 0;
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    return usersList.length;
+  }
+
+  int _getAdmittedUsers() {
+    if (appointmentData == null || appointmentData!['users'] == null) return 0;
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    return usersList.where((user) {
+      final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+      final status = userMap['status']?.toString().toLowerCase();
+      return status == 'checked_in';
+    }).length;
+  }
+
+  int _getRejectedUsers() {
+    if (appointmentData == null || appointmentData!['users'] == null) return 0;
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    return usersList.where((user) {
+      final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+      final status = userMap['status']?.toString().toLowerCase();
+      return status == 'rejected';
+    }).length;
+  }
+
+  int _getNotArrivedUsers() {
+    if (appointmentData == null || appointmentData!['users'] == null) return 0;
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    return usersList.where((user) {
+      final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+      final status = userMap['status']?.toString().toLowerCase();
+      return status == 'not_arrived' || status == 'pending' || status == null || status.isEmpty;
+    }).length;
+  }
+
+  Widget _buildCountItem(String label, int count, IconData icon, Color color) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 24,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _calculateMainStatus(List<Map<String, dynamic>> users) {
+    if (users.isEmpty) return 'not_arrived';
+
+    int checkedInCount = 0;
+    int rejectedCount = 0;
+    int totalUsers = users.length;
+
+    for (final user in users) {
+      final status = user['status']?.toString().toLowerCase();
+      if (status == 'checked_in') {
+        checkedInCount++;
+      } else if (status == 'rejected') {
+        rejectedCount++;
+      }
+    }
+
+    // All users admitted
+    if (checkedInCount == totalUsers) {
+      return 'checked_in';
+    }
+    
+    // All users rejected
+    if (rejectedCount == totalUsers) {
+      return 'rejected';
+    }
+    
+    // All users not arrived
+    if (checkedInCount == 0 && rejectedCount == 0) {
+      return 'not_arrived';
+    }
+    
+    // Mixed conditions (some accepted, some rejected, some not arrived, etc.)
+    return 'checked_in_partial';
   }
 
   void _showImageModal(String imageUrl, String userName) {
     showDialog(
       context: context,
+      barrierDismissible: true, // Allow tapping outside to close
       builder: (BuildContext context) {
         return Dialog(
           backgroundColor: Colors.transparent,
-          child: Stack(
-            children: [
-              // Full screen image
-              InteractiveViewer(
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.person,
-                        size: 200,
-                        color: Colors.grey,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              // Close button
-              Positioned(
-                top: 20,
-                right: 20,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 24,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(), // Tap anywhere to close
+            onDoubleTap: () => Navigator.of(context).pop(), // Double tap to close
+            child: InteractiveViewer(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Icon(
+                      Icons.person,
+                      size: 200,
+                      color: Colors.grey,
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  void _handleIndividualAction(String userId, String userName, String action) {
-    // TODO: Implement individual accept/reject logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$action for $userName'),
-        backgroundColor: action == 'Accept' ? Colors.green : Colors.red,
+  // Admit/Reject functionality
+  Future<void> _admitUser(Map<String, dynamic> user) async {
+    if (appointmentData == null) return;
+
+    try {
+      final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
+      final userIndex = updatedUsers.indexWhere((u) => 
+        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
+      );
+
+      if (userIndex != -1) {
+        updatedUsers[userIndex] = {
+          ...updatedUsers[userIndex],
+          'status': 'checked_in',
+          'checkedInAt': DateTime.now().toIso8601String(),
+        };
+
+        // Calculate main status based on all users
+        final mainStatus = _calculateMainStatus(updatedUsers);
+
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: mainStatus,
+          users: updatedUsers,
+        );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${user['fullName']} admitted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to admit user'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectUser(Map<String, dynamic> user) async {
+    if (appointmentData == null) return;
+
+    try {
+      final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
+      final userIndex = updatedUsers.indexWhere((u) => 
+        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
+      );
+
+      if (userIndex != -1) {
+        updatedUsers[userIndex] = {
+          ...updatedUsers[userIndex],
+          'status': 'rejected',
+          'rejectedAt': DateTime.now().toIso8601String(),
+        };
+
+        // Calculate main status based on all users
+        final mainStatus = _calculateMainStatus(updatedUsers);
+
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: mainStatus,
+          users: updatedUsers,
+        );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${user['fullName']} rejected successfully'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to reject user'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _admitAllUsers() async {
+    if (appointmentData == null) return;
+
+    try {
+      final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+      final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        return {
+          ...userMap,
+          'status': 'checked_in',
+          'checkedInAt': DateTime.now().toIso8601String(),
+        };
+      }).toList();
+
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: appointmentData!['_id'],
+        mainStatus: 'checked_in',
+        users: updatedUsers,
+      );
+
+      if (result['success']) {
+        setState(() {
+          appointmentData = result['data'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All users admitted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to admit all users'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectAllUsers() async {
+    if (appointmentData == null) return;
+
+    try {
+      final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+      final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        return {
+          ...userMap,
+          'status': 'rejected',
+          'rejectedAt': DateTime.now().toIso8601String(),
+        };
+      }).toList();
+
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: appointmentData!['_id'],
+        mainStatus: 'rejected',
+        users: updatedUsers,
+      );
+
+      if (result['success']) {
+        setState(() {
+          appointmentData = result['data'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All users rejected successfully'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to reject all users'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildUserCard(Map<String, dynamic> user) {
+    final fullName = user['fullName'] ?? 'Unknown';
+    final userType = user['userType'] ?? 'unknown';
+    final status = user['status'] ?? 'unknown';
+    final profilePhotoUrl = user['profilePhotoUrl'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _getUserStatusColor(status).withOpacity(0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // First line: Name and Status (left and right)
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$fullName (${userType == 'main' ? 'Main User' : 'Accompanying User'})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getUserStatusColor(status).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _getUserStatusText(status),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: _getUserStatusColor(status),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Second line: Full size image
+          GestureDetector(
+            onTap: () {
+              if (profilePhotoUrl != null) {
+                _showImageModal(profilePhotoUrl, fullName);
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              height: 200,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF1a237e).withOpacity(0.2),
+                  width: 2,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: profilePhotoUrl != null
+                    ? Image.network(
+                        profilePhotoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: const Color(0xFF1a237e).withOpacity(0.1),
+                            child: const Icon(
+                              Icons.person,
+                              size: 80,
+                              color: Color(0xFF1a237e),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: const Color(0xFF1a237e).withOpacity(0.1),
+                        child: const Icon(
+                          Icons.person,
+                          size: 80,
+                          color: Color(0xFF1a237e),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Third line: Action buttons or status display
+          if (status == 'checked_in') ...[
+            // Show checked in status instead of buttons
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.green,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Admitted',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (status == 'rejected') ...[
+            // Show rejected status instead of buttons
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.red,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.cancel,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Rejected',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Show action buttons for non-admitted users
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _admitUser(user),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Admit'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _rejectUser(user),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Reject'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -239,7 +781,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header Card
+                      // Appointment ID Card with Main Status
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -289,12 +831,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        'Status: ${appointmentData?['appointmentStatus']?['status'] ?? 'N/A'}',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.8),
-                                          fontSize: 14,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _getMainStatusIcon(),
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Status: ${_getMainStatusText()}',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -306,799 +859,106 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Accept All / Reject All Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showAcceptRejectAllDialog('accept'),
-                              icon: const Icon(Icons.check_circle),
-                              label: const Text('Accept All'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showAcceptRejectAllDialog('reject'),
-                              icon: const Icon(Icons.cancel),
-                              label: const Text('Reject All'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Checkboxes Section (shown when Accept All/Reject All is clicked)
-                      if (showCheckboxes) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: actionType == 'accept' ? Colors.green : Colors.red,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    actionType == 'accept' ? Icons.check_circle : Icons.cancel,
-                                    color: actionType == 'accept' ? Colors.green : Colors.red,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${actionType?.toUpperCase()} All Users',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: actionType == 'accept' ? Colors.green : Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Select All / Deselect All buttons
-                              Row(
-                                children: [
-                                  TextButton(
-                                    onPressed: _selectAllUsers,
-                                    child: const Text('Select All'),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  TextButton(
-                                    onPressed: _deselectAllUsers,
-                                    child: const Text('Deselect All'),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              
-                              // Main User Checkbox
-                              if (appointmentData?['createdBy'] != null)
-                                _buildUserCheckbox(
-                                  appointmentData!['createdBy']['id'] ?? 'main_user',
-                                  appointmentData!['createdBy']['fullName'] ?? 'Main User',
-                                  appointmentData!['createdBy']['profilePhoto'],
-                                  isMainUser: true,
-                                ),
-                              
-                              // Accompanying Users Checkboxes
-                              if (appointmentData?['accompanyUsers']?['users'] != null)
-                                ...(appointmentData!['accompanyUsers']['users'] as List).map((user) =>
-                                  _buildUserCheckbox(
-                                    user['id'] ?? 'accompanying_${user.hashCode}',
-                                    user['fullName'] ?? 'Accompanying User',
-                                    user['profilePhotoUrl'],
-                                    isMainUser: false,
-                                  ),
-                                ).toList(),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Action Buttons
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: selectedUsers.isNotEmpty ? _confirmAction : null,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: actionType == 'accept' ? Colors.green : Colors.red,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: Text('${actionType?.toUpperCase()} Selected (${selectedUsers.length})'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: _cancelAction,
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Main Visitor Information
-                      _buildVisitorCard(
-                        title: 'Main Visitor',
-                        visitorData: {
-                          'name': appointmentData?['createdBy']?['fullName'] ?? 'N/A',
-                          'phone': _formatPhoneNumber(appointmentData?['createdBy']?['phoneNumber']),
-                          'email': appointmentData?['email'] ?? 'N/A',
-                          'profilePhoto': appointmentData?['profilePhoto'],
-                          'accompanyingCount': appointmentData?['accompanyUsers']?['numberOfUsers'] ?? 0,
-                          'id': appointmentData?['createdBy']?['id'],
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Individual Accompanying User Cards
-                      if (appointmentData?['accompanyUsers'] != null && 
-                          appointmentData?['accompanyUsers']?['users'] != null &&
-                          (appointmentData?['accompanyUsers']?['users'] as List).isNotEmpty)
-                        ...(appointmentData!['accompanyUsers']['users'] as List).map((user) =>
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildIndividualAccompanyingUserCard(user),
-                          ),
-                        ).toList(),
-
-                    ],
-                  ),
-                ),
-    );
-  }
-
-  Widget _buildSectionCard({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: const Color(0xFF1a237e),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1a237e),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF666666),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF333333),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDateTime(dynamic dateTime) {
-    if (dateTime == null) return 'N/A';
-    try {
-      final date = DateTime.parse(dateTime.toString());
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return dateTime.toString();
-    }
-  }
-
-  String _formatTime(dynamic time) {
-    if (time == null) return 'N/A';
-    try {
-      final date = DateTime.parse(time.toString());
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return time.toString();
-    }
-  }
-
-  String _formatPhoneNumber(dynamic phoneData) {
-    if (phoneData == null) return 'N/A';
-    try {
-      final countryCode = phoneData['countryCode'] ?? '';
-      final number = phoneData['number'] ?? '';
-      return '$countryCode$number';
-    } catch (e) {
-      return phoneData.toString();
-    }
-  }
-
-  String _formatScheduledDate(dynamic scheduledDateTime) {
-    if (scheduledDateTime == null || scheduledDateTime['date'] == null) return 'N/A';
-    try {
-      final date = DateTime.parse(scheduledDateTime['date'].toString());
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return 'N/A';
-    }
-  }
-
-  String _formatScheduledTime(dynamic scheduledDateTime) {
-    if (scheduledDateTime == null || scheduledDateTime['time'] == null) return 'N/A';
-    return scheduledDateTime['time'].toString();
-  }
-
-  String _formatPreferredDateRange(dynamic preferredDateRange) {
-    if (preferredDateRange == null) return 'N/A';
-    try {
-      final fromDate = DateTime.parse(preferredDateRange['fromDate'].toString());
-      final toDate = DateTime.parse(preferredDateRange['toDate'].toString());
-      return '${fromDate.day}/${fromDate.month}/${fromDate.year} - ${toDate.day}/${toDate.month}/${toDate.year}';
-    } catch (e) {
-      return 'N/A';
-    }
-  }
-
-  String _formatCommunicationPreferences(dynamic preferences) {
-    if (preferences == null || preferences.isEmpty) return 'None specified';
-    try {
-      if (preferences is List) {
-        return preferences.join(', ');
-      }
-      return preferences.toString();
-    } catch (e) {
-      return 'N/A';
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'approved':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      case 'completed':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Widget _buildVisitorCard({
-    required String title,
-    required Map<String, dynamic> visitorData,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.person,
-                color: const Color(0xFF1a237e),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1a237e),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Profile Photo (Bigger)
-              GestureDetector(
-                onTap: () {
-                  if (visitorData['profilePhoto'] != null) {
-                    _showImageModal(visitorData['profilePhoto'], visitorData['name']);
-                  }
-                },
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF1a237e).withOpacity(0.2),
-                      width: 2,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: visitorData['profilePhoto'] != null
-                        ? Image.network(
-                            visitorData['profilePhoto'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: const Color(0xFF1a237e).withOpacity(0.1),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Color(0xFF1a237e),
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: const Color(0xFF1a237e).withOpacity(0.1),
-                            child: const Icon(
-                              Icons.person,
-                              size: 60,
-                              color: Color(0xFF1a237e),
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Visitor Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      visitorData['name'],
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildDetailRow(Icons.phone, visitorData['phone']),
-                    const SizedBox(height: 4),
-                    _buildDetailRow(Icons.email, visitorData['email']),
-                    const SizedBox(height: 8),
-                    // Accompanying Users Count
-                    if (visitorData['accompanyingCount'] > 0)
+                      // User Count Summary (always visible)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1a237e).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFF1a237e),
+                            color: Colors.grey[300]!,
                             width: 1,
                           ),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            const Icon(
-                              Icons.group,
-                              size: 16,
-                              color: Color(0xFF1a237e),
+                            _buildCountItem('Total', _getTotalUsers(), Icons.people, Colors.blue),
+                            _buildCountItem('Admitted', _getAdmittedUsers(), Icons.check_circle, Colors.green),
+                            _buildCountItem('Rejected', _getRejectedUsers(), Icons.cancel, Colors.red),
+                            _buildCountItem('Not Arrived', _getNotArrivedUsers(), Icons.schedule, Colors.grey),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Admit All and Reject All Buttons (only show when there are pending users)
+                      if (_hasPendingUsers()) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _admitAllUsers,
+                                icon: const Icon(Icons.check_circle),
+                                label: const Text('Admit All'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${visitorData['accompanyingCount']} Accompanying',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1a237e),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _rejectAllUsers,
+                                icon: const Icon(Icons.cancel),
+                                label: const Text('Reject All'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Individual Accept/Reject Buttons for Main Visitor
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _handleIndividualAction(
-                    visitorData['id'] ?? '',
-                    visitorData['name'],
-                    'Accept',
-                  ),
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Accept'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _handleIndividualAction(
-                    visitorData['id'] ?? '',
-                    visitorData['name'],
-                    'Reject',
-                  ),
-                  icon: const Icon(Icons.cancel),
-                  label: const Text('Reject'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-  Widget _buildDetailRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: const Color(0xFF666666),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF666666),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUserCheckbox(String userId, String userName, String? profilePhoto, {required bool isMainUser}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Checkbox(
-            value: selectedUsers.contains(userId),
-            onChanged: (value) => _toggleUserSelection(userId),
-            activeColor: actionType == 'accept' ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 8),
-          // Profile Photo
-          GestureDetector(
-            onTap: () {
-              if (profilePhoto != null) {
-                _showImageModal(profilePhoto, userName);
-              }
-            },
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF1a237e).withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: profilePhoto != null
-                    ? Image.network(
-                        profilePhoto,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: const Color(0xFF1a237e).withOpacity(0.1),
-                            child: const Icon(
-                              Icons.person,
-                              size: 25,
-                              color: Color(0xFF1a237e),
+                      ] else ...[
+                        // Show completion message when all users are processed
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.grey[300]!,
+                              width: 1,
                             ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: const Color(0xFF1a237e).withOpacity(0.1),
-                        child: const Icon(
-                          Icons.person,
-                          size: 25,
-                          color: Color(0xFF1a237e),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                Text(
-                  isMainUser ? 'Main Visitor' : 'Accompanying User',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIndividualAccompanyingUserCard(Map<String, dynamic> user) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.person,
-                color: const Color(0xFF1a237e),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Accompanying User',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1a237e),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Profile Photo (Same size as main user)
-              GestureDetector(
-                onTap: () {
-                  if (user['profilePhotoUrl'] != null) {
-                    _showImageModal(user['profilePhotoUrl'], user['fullName'] ?? 'User');
-                  }
-                },
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF1a237e).withOpacity(0.2),
-                      width: 2,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: user['profilePhotoUrl'] != null
-                        ? Image.network(
-                            user['profilePhotoUrl'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: const Color(0xFF1a237e).withOpacity(0.1),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Color(0xFF1a237e),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.task_alt,
+                                color: Colors.grey[600],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'All users have been processed',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
                                 ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: const Color(0xFF1a237e).withOpacity(0.1),
-                            child: const Icon(
-                              Icons.person,
-                              size: 60,
-                              color: Color(0xFF1a237e),
-                            ),
+                              ),
+                            ],
                           ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
+                      // User Cards
+                      if (appointmentData?['users'] != null) ...[
+                        ...appointmentData!['users'].map<Widget>((user) => _buildUserCard(user)).toList(),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 20),
-              // User Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user['fullName'] ?? 'N/A',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Age
-                    if (user['age'] != null)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.cake,
-                            size: 16,
-                            color: Color(0xFF666666),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Age: ${user['age']} years',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF666666),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Individual Accept/Reject Buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _handleIndividualAction(
-                    user['id'] ?? '',
-                    user['fullName'] ?? 'User',
-                    'Accept',
-                  ),
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Accept'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _handleIndividualAction(
-                    user['id'] ?? '',
-                    user['fullName'] ?? 'User',
-                    'Reject',
-                  ),
-                  icon: const Icon(Icons.cancel),
-                  label: const Text('Reject'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 } 

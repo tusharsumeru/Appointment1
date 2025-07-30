@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'appointment_detail_page.dart';
 import 'appointment_schedule_form.dart';
 import 'email_form.dart';
-import 'darshan_line_form.dart';
+import 'message_form.dart';
 import 'reminder_form.dart';
 import 'call_form.dart';
 import 'assign_form.dart';
@@ -32,8 +32,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
   @override
   Widget build(BuildContext context) {
     // Extract only essential data
-    final String id = widget.appointment['appointmentId']?.toString() ?? 
-                     widget.appointment['_id']?.toString() ?? '';
+    final String id =
+        widget.appointment['appointmentId']?.toString() ??
+        widget.appointment['_id']?.toString() ??
+        '';
     final String createdByName = _getCreatedByName();
     final String createdByDesignation = _getCreatedByDesignation();
     final String createdByImage = _getCreatedByImage();
@@ -45,18 +47,73 @@ class _AppointmentCardState extends State<AppointmentCard> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: widget.onTap ?? () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AppointmentDetailPage(appointment: widget.appointment),
-            ),
-          );
-        },
+        onTap:
+            widget.onTap ??
+            () async {
+              // Show loading indicator
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Loading appointment details...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
+
+              // Get appointment ID
+              final appointmentId = widget.appointment['appointmentId']?.toString() ?? 
+                                  widget.appointment['_id']?.toString() ?? '';
+              
+              if (appointmentId.isEmpty) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Error: Appointment ID not found'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+                return;
+              }
+
+              // Fetch detailed appointment data using the new API
+              final result = await ActionService.getAppointmentByIdDetailed(appointmentId);
+              
+              if (context.mounted) {
+                if (result['success']) {
+                  // Navigate to detail page with comprehensive data
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentDetailPage(
+                        appointment: result['data'],
+                      ),
+                    ),
+                  );
+                } else {
+                  // Show error and fallback to existing data
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['message'] ?? 'Failed to load detailed appointment data'),
+                      backgroundColor: Colors.orange,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  
+                  // Fallback to existing data
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AppointmentDetailPage(
+                        appointment: widget.appointment,
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -74,11 +131,15 @@ class _AppointmentCardState extends State<AppointmentCard> {
                       // Handle image loading error
                     },
                     child: createdByImage.isEmpty
-                        ? const Icon(Icons.person, size: 30, color: Colors.white)
+                        ? const Icon(
+                            Icons.person,
+                            size: 30,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
                   const SizedBox(width: 12),
-                  
+
                   // Created by name and designation
                   Expanded(
                     child: Column(
@@ -121,7 +182,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
                       ],
                     ),
                   ),
-                  
+
                   // Star button
                   IconButton(
                     onPressed: () async {
@@ -134,20 +195,25 @@ class _AppointmentCardState extends State<AppointmentCard> {
                           ),
                         );
                       }
-                      
+
                       // Call the API to update starred status
                       final result = await ActionService.updateStarred(id);
-                      
+
                       if (result['success']) {
                         // Update local state and notify parent
-                        final newStarredStatus = result['data']?['starred'] ?? !isStarred;
+                        final newStarredStatus =
+                            result['data']?['starred'] ?? !isStarred;
                         widget.onStarToggle?.call(newStarredStatus);
-                        
+
                         // Show success message
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(newStarredStatus ? 'Added to favorites' : 'Removed from favorites'),
+                              content: Text(
+                                newStarredStatus
+                                    ? 'Added to favorites'
+                                    : 'Removed from favorites',
+                              ),
                               backgroundColor: Colors.green,
                               duration: const Duration(seconds: 2),
                             ),
@@ -158,7 +224,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(result['message'] ?? 'Failed to update starred status'),
+                              content: Text(
+                                result['message'] ??
+                                    'Failed to update starred status',
+                              ),
                               backgroundColor: Colors.red,
                               duration: const Duration(seconds: 3),
                             ),
@@ -174,25 +243,28 @@ class _AppointmentCardState extends State<AppointmentCard> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Essential details only
               if (preferredDateRange.isNotEmpty) ...[
                 _buildDetailRow('Preferred Dates', preferredDateRange),
                 const SizedBox(height: 4),
               ],
               if (attendeeCount > 0) ...[
-                _buildDetailRow('Attendees', '$attendeeCount person${attendeeCount > 1 ? 's' : ''}'),
+                _buildDetailRow(
+                  'Attendees',
+                  '$attendeeCount person${attendeeCount > 1 ? 's' : ''}',
+                ),
                 const SizedBox(height: 4),
               ],
               if (_getAssignedSecretary().isNotEmpty) ...[
                 _buildDetailRow('Assigned To', _getAssignedSecretary()),
                 const SizedBox(height: 4),
               ],
-              
+
               const SizedBox(height: 12),
-              
+
               // Action buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -210,10 +282,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     onTap: () => _showActionBottomSheet(context, 'email'),
                   ),
                   _buildActionButton(
-                    icon: Icons.queue,
-                    label: 'Darshan',
+                    icon: Icons.message,
+                    label: 'Message',
                     color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'darshan'),
+                    onTap: () => _showActionBottomSheet(context, 'message'),
                   ),
                   _buildActionButton(
                     icon: Icons.call,
@@ -260,10 +332,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.black87,
-            ),
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -318,7 +387,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
   int _getAttendeeCount() {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
-      return accompanyUsers['numberOfUsers'] ?? 1;
+      return accompanyUsers['numberOfUsers'] ?? 0;
     }
     return 1;
   }
@@ -338,8 +407,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return _buildReminderContent();
       case 'email':
         return _buildEmailContent();
-      case 'darshan':
-        return _buildDarshanLineContent();
+      case 'message':
+        return _buildMessageContent();
       case 'call':
         return _buildCallContent();
       case 'assign':
@@ -383,17 +452,17 @@ class _AppointmentCardState extends State<AppointmentCard> {
     );
   }
 
-  Widget _buildDarshanLineContent() {
+  Widget _buildMessageContent() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
-          _buildActionHeader('Darshan Line'),
-          Expanded(child: DarshanLineForm(appointment: widget.appointment)),
+          _buildActionHeader('Send SMS'),
+          Expanded(child: MessageForm(appointment: widget.appointment)),
         ],
       ),
     );
@@ -441,10 +510,12 @@ class _AppointmentCardState extends State<AppointmentCard> {
       child: Column(
         children: [
           _buildActionHeader('Delete Appointment'),
-          Expanded(child: DeleteForm(
-            appointment: widget.appointment,
-            onDelete: widget.onDelete,
-          )),
+          Expanded(
+            child: DeleteForm(
+              appointment: widget.appointment,
+              onDelete: widget.onDelete,
+            ),
+          ),
         ],
       ),
     );
@@ -459,18 +530,11 @@ class _AppointmentCardState extends State<AppointmentCard> {
       ),
       child: Row(
         children: [
-          Icon(
-            _getActionIcon(title),
-            color: _getActionColor(title),
-            size: 24,
-          ),
+          Icon(_getActionIcon(title), color: _getActionColor(title), size: 24),
           const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           IconButton(
@@ -490,8 +554,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return Icons.schedule;
       case 'send email':
         return Icons.email;
-      case 'darshan line':
-        return Icons.queue;
+      case 'send sms':
+        return Icons.message;
       case 'make call':
         return Icons.call;
       case 'assign appointment':
@@ -511,7 +575,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return Colors.black;
       case 'send email':
         return Colors.black;
-      case 'darshan line':
+      case 'send sms':
         return Colors.black;
       case 'make call':
         return Colors.black;
@@ -535,14 +599,15 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   String _getCreatedByDesignation() {
     // Use the main appointment's user designation since createdBy doesn't have this field
-    return widget.appointment['userCurrentDesignation']?.toString() ?? 
-           widget.appointment['userCurrentCompany']?.toString() ?? '';
+    return widget.appointment['userCurrentDesignation']?.toString() ??
+        widget.appointment['userCurrentCompany']?.toString() ??
+        '';
   }
 
   String _getCreatedByImage() {
     // Use the main appointment's profilePhoto since createdBy doesn't have this field
-    return widget.appointment['profilePhoto']?.toString() ?? 
-           'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
+    return widget.appointment['profilePhoto']?.toString() ??
+        'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
   }
 
   String _getCreatedAt() {
@@ -593,4 +658,4 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return Colors.grey;
     }
   }
-} 
+}

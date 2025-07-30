@@ -171,7 +171,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
     
-    // If no face match data available, return 0 (will be fetched on refresh or navigation)
+    // If no face match data available, return 0 for accompanying users
     return 0;
   }
 
@@ -504,7 +504,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       final createdBy = widget.appointment['createdBy'];
       
       if (createdBy == null) {
-        print('Warning: createdBy not found in appointment data. Available fields: ${widget.appointment.keys.toList()}');
         setState(() {
           _upcomingAppointments = [];
           _appointmentHistory = [];
@@ -533,10 +532,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       // Fetch appointment history
       final historyResult = await ActionService.getAppointmentHistoryByUser(userId: userId);
       
-      // Debug: Print the results to see the data structure
-      print('Upcoming result: $upcomingResult');
-      print('History result: $historyResult');
-      print('User ID being used: $userId (from createdBy: $createdBy)');
+
       
       if (mounted) {
         setState(() {
@@ -772,19 +768,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   String _formatAppointmentDateTime(Map<String, dynamic> appointment) {
     try {
-      // Debug: Print the appointment data to see its structure
-      print('Appointment data for formatting: $appointment');
-      print('Appointment keys: ${appointment.keys.toList()}');
-      
       // Try to get scheduled date and time
       final scheduledDateTime = appointment['scheduledDateTime'];
-      print('ScheduledDateTime: $scheduledDateTime');
       
       if (scheduledDateTime is Map<String, dynamic>) {
         final scheduledDate = scheduledDateTime['date']?.toString();
         final scheduledTime = scheduledDateTime['time']?.toString();
-        
-        print('ScheduledDate: $scheduledDate, ScheduledTime: $scheduledTime');
         
         if (scheduledDate != null && scheduledTime != null) {
           final date = DateTime.parse(scheduledDate);
@@ -796,31 +785,38 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       final startTime = appointment['startTime']?.toString();
       final endTime = appointment['endTime']?.toString();
       
-      print('StartTime: $startTime, EndTime: $endTime');
-      
-      if (startTime != null) {
-        final start = DateTime.parse(startTime);
-        if (endTime != null) {
-          final end = DateTime.parse(endTime);
-          return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')} - ${end.hour}:${end.minute.toString().padLeft(2, '0')}';
-        } else {
-          return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')}';
+      if (startTime != null && startTime.isNotEmpty) {
+        try {
+          final start = DateTime.parse(startTime);
+          if (endTime != null && endTime.isNotEmpty) {
+            try {
+              final end = DateTime.parse(endTime);
+              return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')} - ${end.hour}:${end.minute.toString().padLeft(2, '0')}';
+            } catch (e) {
+              return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')}';
+            }
+          } else {
+            return '${start.day}/${start.month}/${start.year} ${start.hour}:${start.minute.toString().padLeft(2, '0')}';
+          }
+        } catch (e) {
+          // If startTime parsing fails, continue to next fallback
         }
       }
       
       // Fallback to createdAt
       final createdAt = appointment['createdAt']?.toString();
-      print('CreatedAt: $createdAt');
       
-      if (createdAt != null) {
-        final created = DateTime.parse(createdAt);
-        return '${created.day}/${created.month}/${created.year}';
+      if (createdAt != null && createdAt.isNotEmpty) {
+        try {
+          final created = DateTime.parse(createdAt);
+          return '${created.day}/${created.month}/${created.year}';
+        } catch (e) {
+          // If createdAt parsing fails, return default
+        }
       }
       
       return 'Date not specified';
     } catch (e) {
-      print('Error formatting appointment date time: $e');
-      print('Error stack trace: ${StackTrace.current}');
       return 'Date not specified';
     }
   }
@@ -865,8 +861,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Accompanying Users Section
             _buildAccompanyingUsersSection(),
             
-            // Teacher Verification Section
-            _buildTeacherVerificationSection(),
+            // Teacher Verification Section - Only show if user is verified
+            if (_isTeacher()) ...[
+              _buildTeacherVerificationSection(),
+            ] else ...[
+              // Basic Information Section for non-verified users
+              _buildBasicInformationSection(),
+            ],
             
             // Notes & Remarks Section
             _buildNotesRemarksSection(),
@@ -1181,18 +1182,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            matches > 0 
-                              ? 'Total Matches Found : $matches'
-                              : _isLoadingFaceMatch[userIndex] == true
-                                ? 'Loading matches...'
-                                : 'Click refresh to load matches',
+                            _isLoadingFaceMatch[userIndex] == true
+                              ? 'Loading matches...'
+                              : 'Total Matches Found : $matches',
                             style: TextStyle(
                               fontSize: 12,
-                              color: matches > 0 
-                                ? Colors.grey[600]
-                                : _isLoadingFaceMatch[userIndex] == true
-                                  ? Colors.blue[600]
-                                  : Colors.grey[500],
+                              color: _isLoadingFaceMatch[userIndex] == true
+                                ? Colors.blue[600]
+                                : Colors.grey[600],
                             ),
                             overflow: TextOverflow.visible,
                             softWrap: true,
@@ -1228,9 +1225,53 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
+  Widget _buildBasicInformationSection() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Basic Information',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Basic appointment information and preferences.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Basic Details
+          _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+          _buildDetailRow('Are you an Art Of Living teacher', 'No', Icons.school),
+          _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTeacherVerificationSection() {
     final teacherCode = _getTeacherCode();
-    final isTeacher = _isTeacher();
     
     return Container(
       margin: const EdgeInsets.all(16),
@@ -1271,9 +1312,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isTeacher ? Colors.green[50] : Colors.grey[50],
+              color: Colors.green[50],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isTeacher ? Colors.green[200]! : Colors.grey[200]!),
+              border: Border.all(color: Colors.green[200]!),
             ),
             child: Row(
               children: [
@@ -1308,17 +1349,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                       Row(
                         children: [
                           Icon(
-                            isTeacher ? Icons.verified : Icons.cancel,
-                            color: isTeacher ? Colors.green : Colors.grey,
+                            Icons.verified,
+                            color: Colors.green,
                             size: 16,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              isTeacher ? 'Verified By TAOL' : 'Not Verified',
+                              'Verified By TAOL',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: isTeacher ? Colors.green[700] : Colors.grey[700],
+                                color: Colors.green[700],
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1327,12 +1368,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (isTeacher && teacherCode.isNotEmpty) ...[
+                      if (teacherCode.isNotEmpty) ...[
                         _buildTeacherDetail('Teacher Code', teacherCode),
                         _buildTeacherDetail('Teacher Type', 'TAOL Teacher'),
                         _buildTeacherDetail('Can Teach', 'Happiness Program'),
-                      ] else ...[
-                        _buildTeacherDetail('Teacher Status', 'Not a verified teacher'),
                       ],
                     ],
                   ),
@@ -1345,8 +1384,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           // Additional Details
           _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
-          _buildDetailRow('Are you an Art Of Living teacher', isTeacher ? 'Yes, Part Time AOL Teacher' : 'No', Icons.school),
-          _buildDetailRow('Programs eligible to teach', isTeacher ? 'Happiness Program' : 'Not applicable', Icons.book),
+          _buildDetailRow('Are you an Art Of Living teacher', 'Yes, Part Time AOL Teacher', Icons.school),
+          _buildDetailRow('Programs eligible to teach', 'Happiness Program', Icons.book),
           _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
           _buildDetailRow('Tags', 'No tags', Icons.label),
         ],
@@ -1704,24 +1743,84 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   ),
                 ),
               ] else ...[
-                ..._upcomingAppointments.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
-                  try {
-                    return _buildAppointmentItem(
-                      appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
-                      _formatAppointmentDateTime(appointment),
-                      appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
-                      _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
-                    );
-                  } catch (e) {
-                    print('Error building appointment item: $e');
-                    return _buildAppointmentItem(
-                      'Unknown User',
-                      'Date not specified',
-                      'Unknown',
-                      Colors.grey,
-                    );
-                  }
-                }).toList(),
+                // Scrollable container for upcoming appointments
+                Container(
+                  height: 300, // Fixed height for scrollable area
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header for upcoming appointments
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            topRight: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event, color: Colors.blue[600], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Upcoming Appointments',
+                              style: TextStyle(
+                                color: Colors.blue[800],
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${_upcomingAppointments.length} items',
+                              style: TextStyle(
+                                color: Colors.blue[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Scrollable content
+                      Expanded(
+                        child: Scrollbar(
+                          controller: ScrollController(),
+                          thumbVisibility: true,
+                          trackVisibility: true,
+                          thickness: 6,
+                          radius: const Radius.circular(10),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: _upcomingAppointments.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
+                                try {
+                                  return _buildAppointmentItem(
+                                    appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
+                                    _formatAppointmentDateTime(appointment),
+                                    appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
+                                    _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
+                                  );
+                                } catch (e) {
+                                  return _buildAppointmentItem(
+                                    'Unknown User',
+                                    'Date not specified',
+                                    'Unknown',
+                                    Colors.grey,
+                                  );
+                                }
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -1832,6 +1931,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                       // Scrollable content
                       Expanded(
                         child: Scrollbar(
+                          controller: ScrollController(),
                           thumbVisibility: true,
                           trackVisibility: true,
                           thickness: 6,
@@ -1848,7 +1948,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'completed'),
                                   );
                                 } catch (e) {
-                                  print('Error building appointment item: $e');
                                   return _buildAppointmentItem(
                                     'Unknown User',
                                     'Date not specified',
@@ -1944,6 +2043,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 20, color: Colors.grey[600]),
           const SizedBox(width: 12),

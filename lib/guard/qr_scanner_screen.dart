@@ -55,9 +55,6 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     isScanning = false;
                   });
                   
-                  // Show feedback
-                  _showScanFeedback();
-                  
                   // Handle the scanned data directly
                   _handleScannedData(scannedData!);
                   break;
@@ -141,16 +138,6 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     );
   }
 
-  void _showScanFeedback() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('QR Code detected!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _handleScannedData(String scannedData) async {
     // Extract appointment ID from the URL
     final appointmentId = ActionService.extractAppointmentIdFromUrl(scannedData);
@@ -167,16 +154,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       return;
     }
 
-    // Show brief loading message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Loading appointment details...'),
-        backgroundColor: Colors.blue,
-        duration: Duration(seconds: 1),
-      ),
-    );
-
-    // Fetch appointment details
+    // Fetch appointment admission status
     final result = await ActionService.getAppointmentById(appointmentId);
 
     if (result['success']) {
@@ -192,7 +170,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       // Show error message and return to scanner
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? 'Failed to load appointment details.'),
+          content: Text(result['message'] ?? 'Failed to verify appointment status.'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
         ),
