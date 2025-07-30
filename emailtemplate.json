@@ -1,0 +1,485 @@
+{
+"Email":[
+ {
+  "id": 1,
+  "template_name": "APPOINTMENT CONFIRMATION",
+  "template_subject": "Confirmation of your appointment {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n\n<p>This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below::<\/p>\n\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\"><br>\n\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 2,
+  "template_name": "APPOINTMENT RESCHEDULED",
+  "template_subject": "IMP: Appointment rescheduled {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your appointment {$AID} &nbsp;has been rescheduled. Please find the new details below:<\/p>\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}\n<\/p>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>\n",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 3,
+  "template_name": "APPOINTMENT REMINDER",
+  "template_subject": "Gentle reminder of your appointment {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is a reminder email. Kindly note that your appointment request {$AID} is scheduled for today. Please find the details below:<\/p>\n\n\n<p>&nbsp;<\/p>\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 4,
+  "template_name": "REQUEST SUBMISSION",
+  "template_subject": "Appointment request {$AID} submitted successfully.",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n\n<p>Your appointment request is submitted.<\/p>\n<p><strong>Status<\/strong>:<strong>Not Confirmed \/ Pending<\/strong><br \/>\n<strong>Appointment ID:{$AID}<\/strong><br \/>\n<strong>Appointment requested for : {$no_people}<\/strong><\/p>\n<p><strong>NOTE:<\/strong>We are looking into your request. Please note that this is <b>not<\/b> a confirmation of your appointment. {$INDNote}<\/p>\n\n<p>&nbsp;<\/p>\n",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 5,
+  "template_name": "DARSHAN LINE",
+  "template_subject": "Response to your appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>You can come for Gurudev's darshan at {$time} on {$date}. Kindly collect your Darshan pass from Secretariat office on the same day.<\/p>\n\n\n<p>&nbsp;<\/p>\n\n<p>Requested for : {$no_people}<br \/>\nArea : {$area}<br \/>\nLocation : {$app_location}<\/p>\n\n<p>&nbsp;<\/p>\n\n<p><strong>NOTE:<\/strong> Please note that our official photographer will be taking your pictures with Gurudev which will be uploaded on www.soulbook.me.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,EUR"
+ },
+ {
+  "id": 6,
+  "template_name": "LOGIN DETAILS",
+  "template_subject": "Art of Living, Appointment Login Details",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<h3>Your login details<\/h3>\n\n<p><strong>Username<\/strong> : {$username}<br \/>\n<strong>Password<\/strong> :&nbsp;{$password}<\/p>\n\n<p><br \/>\n&nbsp;<\/p>\n\n<p>Warm Regards,<br \/>\nOffice of Gurudev Sri Sri Ravi Shankar<br \/>\nArt Of Living International Centre<br \/>\nBangalore, Karnataka<br \/> Contact: 080-67262616<\/p>\n<p>&nbsp;<\/p>\n<p>Follow Gurudev Sri Sri Ravishankar on<\/p>\n\n<a href='https:\/\/twitter.com\/SriSri'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/tw.png'><\/a>\n<a href='https:\/\/www.facebook.com\/SriSriRaviShankar\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/fb.png'><\/a>\n<a href='https:\/\/www.youtube.com\/channel\/UC4qz5w2M-Xmju7WC9ynqRtw'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/yt.png'><\/a>\n<a href='https:\/\/www.instagram.com\/srisriravishankar\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/inst.png'><\/a>\n<a href='https:\/\/in.linkedin.com\/in\/srisriravishankar'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/in.png'><\/a>\n\n<p>&nbsp;<\/p>\n\n<p><strong>NOTE:<\/strong> This is an auto-generated email. Please do not respond to this email.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 7,
+  "template_name": "EMAIL CONFIRMATION",
+  "template_subject": "Art of Living, Appointment - Activate your account",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} Ji,<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Thank you for registering with us. Please click the link below to activate your account.<\/p>\n\n<p><a href=\"{$link}\">Click here<\/a><\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 8,
+  "template_name": "APPOINTMENT SCHEDULED",
+  "template_subject": "IMP: Appointment scheduled {$AID}",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your appointment {$AID}&nbsp;has been scheduled. Please find the new details below:<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nNumber of People : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 9,
+  "template_name": "TB R\/S",
+  "template_subject": "IMP: Appointment {$AID}",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your request {$AID} has been confirmed. Please find the details below:<\/p>\n\n<p>Date : {$date}<br \/>\nTime : {$time} <br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<br>\n<br>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n<p><br \/>\n{$email_note}\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 10,
+  "template_name": "EMAIL FORWARD REQUEST",
+  "template_subject": "Inputs required for this request",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear One,<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Can you please provide inputs for following appointment request.<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Name: {$full_name}<br\/>\nDesignation: {$designation}<br\/>\nMobile: {$mobile}<br\/>\nEmail: {$email}<br\/>\nReference Name: {$ref_by}<br\/>\nReference Phone: {$ref_phone}<br\/>\nSubject: {$subject}<br\/>\nPurpose: {$purpose}<br\/>\nPreferred date: {$date}<br\/>\nNumber of People: {$no_people}<\/p>\n\n<p><br \/>\n&nbsp;<\/p>\n\n<p> NOTE: Please share your inputs on secretariat@artofliving.org,emails to this ID are not monitored. <\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 11,
+  "template_name": "SATSANG BACKSTAGE ",
+  "template_subject": "Response to appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment may not be possible. However, you may take blessings from Gurudev when he enters\/exits satsang. Please contact Shabnam\/Chandrakanth at Secretariat office 15 mins before beginning of Satsang on that day.<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Ps: The Vaidic Dharma Sansthan desk ( in cc ) organizes pujas & homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on - +91 9538186844 ( M ) \/ +91 80 67262639 ( O ).<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 12,
+  "template_name": "POOJA BACKSTAGE ",
+  "template_subject": "Response to appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment may not be possible. However, you may take blessings from Gurudev when he exits from the puja. Please contact Shabnam\/Chandrakanth at Secretariat office 15 mins before beginning of the Puja (Usually Rudra puja begins at 9 am on Mondays & Devi Puja begins at 11 am on Fridays). You may call on 080-67612300\/080-67262626 for exact puja timings.<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Ps: The Vaidic Dharma Sansthan desk ( in cc ) organizes pujas & homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on - +91 9538186844 ( M ) \/ +91 80 67262639 ( O ).<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 13,
+  "template_name": "GUEST GUIDELINES",
+  "template_subject": "Appointment guest guidelines",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$ref_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Your appointment with Gurudev (for {$appointee_name}) is scheduled on {$date} at {$time}. Total People : {$no_people}<\/p>\n\n<p>Kindly come to secretariat office 15 mins prior to allotted time and meet with Shabnam\/ Chandrakant who will guide you.<\/p>\n\n<p>We request you to ensure that the guests have had an ashram tour and have watched Love moves the world prior to Gurudev's appointment.<\/p>\n\n<p>&nbsp;<\/p>\n\n<p><strong>NOTE:<\/strong> Videography or photography (using mobile phones) would not be needed from your side as the Art of Living official photographer will take pictures which will be emailed the following day of the appointment.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 14,
+  "template_name": "INFORM VDS",
+  "template_subject": "Information regarding Pujas & Homas on your special occasion",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$appointee_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>The Vaidic Dharma Sansthan desk (in cc) organizes Pujas & Homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on +91 9538186844 (M) \/ +91 80 67262639 (O).<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 15,
+  "template_name": "UNABLE TO PROCESS YOUR REQUEST",
+  "template_subject": "Unable to process your appointment request",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$appointee_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your request at the moment. It could be due to the following reason (s):<\/p>\n\n<p>1. Purpose not clear - We will need complete details of the reason for your appointment stating the context of the issue and the questions you have for Gurudev.<\/p>\n\n<p>2. Details of contact person not complete - Please make sure the name, designation and contact details of the person wanting to meet and the reference person are clearly filled.<\/p>\n\n<p>Request you to kindly re-fill in the appointment request.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 16,
+  "template_name": "APPOINTMENT DATE IS LESS THAN 48 HRS",
+  "template_subject": "Important notification regarding your appointment request {$AID}",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Thank you for submitting your appointment request.<\/p>\n\n<p>Subject: {$meet_subject}<\/p>\n<p>Date: {$date} <p>\n<p>Since this request has been received on very short notice (requested appointment date is less than 48 hrs), we regret to inform you that we will not be able to process the same.<\/p>\n\n<p>You may edit your requested appointment date to after 48 hrs on the following link <a href=\"https:\/\/artofliving.io\/\">www.artofliving.io<\/a><\/p>\n<p>OR<\/p>\n\n<p>You may please submit another request for another date by logging in to <a href=\"https:\/\/artofliving.io\/\">www.artofliving.io<\/a><\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 17,
+  "template_name": "DELETE APPOINTMENT",
+  "template_subject": "We are unable to process your request at the moment",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your request at the moment. It could be due to the following reason(s):<\/p>\n\n<p>1. Purpose not clear - We will need complete details of the reason for your appointment stating the context of the issue and the questions you have for Gurudev.<\/p>\n\n<p>2.Details of contact person not complete - Please make sure the name, designation and contact details of the person wanting to meet and the reference person are clearly filled.<p>\n\n<p>3. Requested date range lapsed - Your requested dates for appointment has lapsed . An appointment was not possible during that time and therefore you had not received a message.<\/p>\n\n<p>4. Appointment not possible due to Gurudev's limited time availability - since at any given point of time there are lots of requests for meeting with Gurudev and Gurudev has only a limited time a meeting might not be possible.<\/p>\n\n<p>Request you to kindly edit or re-fill your appointment request with appropriate details if seeking an appointment is still relevant.<br>\nPlease note that since lock down has opened at ashram, Gurudev has been giving Darshan to the course participants of ashram courses.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 18,
+  "template_name": "P1 OR P2 APPOINTMENT",
+  "template_subject": "You had requested for an appointment with Gurudev",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>\nYou had requested for an appointment with Gurudev. Due to unavailability of Gurudev's time, a separate appointment will not be possible. However, you may take Darshan during Darshan-line. Gurudev meets people in darshan-line usually on Wednesdays or Saturdays at 430 pm when he is at the Bangalore ashram. Gurudev's tour details can be found here : <a href=\"https:\/\/www.artofliving.org\/in-en\/srisriontour\">www.artofliving.org\/in-en\/srisriontour<\/a> You will receive a message about the next darshan line.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 19,
+  "template_name": "Zoom Call Appointment Link",
+  "template_subject": "IMP: Gurudev's Darshan via Zoom {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n<strong>Subject<\/strong>:{$meet_subject}\n<p>&nbsp;<\/p>\n\n<p>Please find below details for Gurudev Darshan via Zoom below.<\/p>\n<p>&nbsp;<\/p>\n<p>Date :  <br \/>\nTime :  <br \/>\nNumber of People : {$no_people}<br \/>\nLocation:{$app_location}<\/p>\n\nPlease rename yourself as {$full_name} \/ {$meet_subject} as Zoom name.<br>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 20,
+  "template_name": "APPOINTMENT RESCHEDULED",
+  "template_subject": "IMP: Appointment rescheduled {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n<p>&nbsp;<\/p>\n<strong>Subject<\/strong>:{$meet_subject}\n<p>&nbsp;<\/p>\n\n<p>We acknowledge your request.You can take Gurudev's darshan on {$date} at the Shiva Temple (Near Maitri Hall)  at 4.30 pm.<\/p>\n\n<p>&nbsp;<\/p>\nNumber of People : {$no_people}<br \/>\n<\/p>\n<p><b>NOTE:<\/b><br>\n1) Kindly wear a facemask and maintain social distancing, please keep your hands sanitised.\n<br>\n2)  Photography and videography from your end would not be encouraged while meeting Gurudev. Please note that Ashram official photographer will be taking your pictures with Gurudev which will be uploaded on www.soulbook.me (by the end of Feb).\n<br>\n3)  In case of any change, you will be notified via phone\/email provided.\n<\/p>\n",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 21,
+  "template_name": "Customized Email",
+  "template_subject": "Art of Living, Appointment\n",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 22,
+  "template_name": "Duplicate Request",
+  "template_subject": "Your appointment request is duplicate",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>You have already submitted an appointment request with us. This is a duplicate request. Please await response for your existing request (in case you have not already received an update).<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 23,
+  "template_name": "Appointment not possible due to Gurudev's limited time availability",
+  "template_subject": "We are unable to process your request at the moment",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your appointment request, due to limited time availability.<\/p>\n<p>An appointment will not be possible at the moment.<\/p>\n\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 24,
+  "template_name": "Requested appointment dates have lapsed.",
+  "template_subject": "Requested appointment dates have lapsed.",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>The date(s) for which you had requested an appointment have lapsed. An appointment was not possible during that time. <br>\nWe request you to be in touch with our office, if seeking an appointment is still relevant.<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 25,
+  "template_name": "No explanation",
+  "template_subject": "We are unable to process your request",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to accommodate your appointment request at the moment.<br> For further queries, please be in touch with our office.<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 26,
+  "template_name": "Purpose of the appointment not clear",
+  "template_subject": "We are unable to process your request at the moment",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your request at the moment since the purpose for the appointment is not clear. <br>\n\nPlease specify the reason for your appointment \/ the context of the issue and the questions you have for Gurudev. <br>\n\nKindly edit your existing request (from your Profile -> My History -> Choose your Request ID -> Edit)  with appropriate details, if seeking an appointment is still relevant.\n<\/p>\n\n&nbsp;<\/p>",
+  "type": "mi",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 27,
+  "template_name": "Designation \/ Contact details of the person requesting appointment is not complete",
+  "template_subject": "We are unable to process your request at the moment",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your request at the moment as the details of the person requesting the appointment is not clear. <br>\n\nPlease make sure that the name, designation and contact details of the person wanting to meet Gurudev and the details of the reference person are clearly filled. <br>\n\nKindly edit your existing request (from your Profile -> My History -> Choose your Request ID -> Edit) with appropriate details, if seeking an appointment is still relevant.\n<\/p>\n\n&nbsp;<\/p>",
+  "type": "mi",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 28,
+  "template_name": "Navaratri- No Appointments available",
+  "template_subject": "Navaratri- No Appointments available",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment is not possible during Navratri time. Gurudev might give a Darshan to all post Navratri.\n\nPlease note that since the lockdown has opened up, Gurudev has been giving Darshan to the program participants at the Bangalore Ashram. You may register for the same. \n\nAlternatively Gurudev also gives Darshan at 4.45 pm everyday at Guru Paduka Vanam (will not be there during Navratri days)\n<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 0,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 29,
+  "template_name": "Shivaratri - No Appointments available",
+  "template_subject": "Shivaratri - No Appointments available",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment is not possible during Shivaratri time. Please note that since the lockdown has opened up, Gurudev has been giving Darshan to the program participants at the Bangalore Ashram.\n\nYou may register for the same. \n\nAlternatively Gurudev also gives Darshan at 4.45 pm everyday at Guru Paduka Vanam (will not be there during Shivaratri day)\n\n<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 0,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 30,
+  "template_name": "More information needed on your Appointment Request",
+  "template_subject": "More information needed on your Appointment Request ",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to process your request at the moment. It could be due to the following reason(s):<br>\n1. Purpose not clear - We will need complete details of the reason for your appointment stating the context of the issue and the questions you have for Gurudev.<br>\n2. Details of contact person not complete - Please make sure the name, designation and contact details of the person wanting to meet and the reference person are clearly filled.<br>\nRequest you to kindly re-fill in the appointment request.\n<\/p>\n\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 31,
+  "template_name": "Unable to process appointment request",
+  "template_subject": "We are unable to process your request at the moment",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>We are unable to accommodate your appointment request, due to Gurudev’s packed schedule and limited time availability.<\/p>\n<p>An appointment will not be possible at the moment. In case of any further queries in this regard, you may reach out on the contact number below.<\/p>\n<p>&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 32,
+  "template_name": "APPOINTMENT CONFIRMATION",
+  "template_subject": "Confirmation of your appointment {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n<p>This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below::<\/p>\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nNumber of People : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 33,
+  "template_name": "APPOINTMENT RESCHEDULED",
+  "template_subject": "IMP: Appointment rescheduled {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your appointment {$AID} &nbsp;has been rescheduled. Please find the new details below:<\/p>\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nNumber of People : {$no_people}<br \/>\nLocation: {$app_location}\n<\/p>\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>\n",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 34,
+  "template_name": "APPOINTMENT REMINDER",
+  "template_subject": "Gentle reminder of your appointment {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is a reminder email. Kindly note that your appointment request {$AID} is scheduled for today. Please find the details below:<\/p>\n<p>&nbsp;<\/p>\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nNumber of People : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 35,
+  "template_name": "APPOINTMENT SCHEDULED",
+  "template_subject": "IMP: Appointment scheduled {$AID}",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your appointment {$AID}&nbsp;has been scheduled. Please find the new details below:<\/p>\n<p>&nbsp;<\/p>\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nNumber of People : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<p>&nbsp;<\/p>\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 0,
+  "for_the_loc": "USA,EUR"
+ },
+ {
+  "id": 36,
+  "template_name": "Appointment already done",
+  "template_subject": "Your appointment request was processed earlier",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Your appointment request was processed earlier.  At the moment, we are unable to schedule your new request due to limited time availability.<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND,USA,EUR"
+ },
+ {
+  "id": 37,
+  "template_name": "DARSHAN LINE",
+  "template_subject": "Response to your appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>\n    Your request has been scheduled for {$time} on {$date}. Please show this email confirmation at the venue.\n<\/p>\n\n<p>Number of People : {$no_people}<br \/>\nLocation : {$app_location}<\/p>\n\n<p>&nbsp;<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "USA"
+ },
+ {
+  "id": 38,
+  "template_name": "TB R\/S Special Enclosure",
+  "template_subject": "IMP: Appointment {$AID}",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your request {$AID} has been confirmed. Please show this message to the security gaurd near front enclosure at Shiva Temple.<\/p>\n\n<p>Date : {$date}<br \/>\nTime : {$time} <br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<br>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n<p><br \/>\n{$email_note}\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 39,
+  "template_name": "TB R\/S Rescheduled",
+  "template_subject": "IMP: Appointment {$AID} Rescheduled",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your request {$AID} has been rescheduled. Please find the details below:<\/p>\n\n<p>Date : {$date}<br \/>\nTime : {$time} <br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n<br>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\">\n<p>&nbsp;<\/p>\n<p><br \/>\n{$email_note}\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 40,
+  "template_name": "Europe - Appointment & TBS confirmation",
+  "template_subject": "Confirmation of your appointment {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n\n<p>This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below:<\/p>\n\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<p><strong>NOTE:<\/strong> Please come to the above location 15 minutes prior to your scheduled time.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>\n\n\n<p>Warm Regards,<br \/>\nThe Art of Living Team Europe\n<\/p>\n<p>&nbsp;<\/p>\n<p>Follow Gurudev Sri Sri Ravi Shankar on<\/p>\n\n<a href='https:\/\/twitter.com\/SriSri'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/tw.png'><\/a>\n<a href='https:\/\/www.facebook.com\/gurudev\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/fb.png'><\/a>\n<a href='https:\/\/www.youtube.com\/channel\/UC4qz5w2M-Xmju7WC9ynqRtw'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/yt.png'><\/a>\n<a href='https:\/\/www.instagram.com\/srisriravishankar\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/inst.png'><\/a>\n<a href='https:\/\/in.linkedin.com\/in\/srisriravishankar'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/in.png'><\/a>\n\n<p>&nbsp;<\/p>\n\n<p><strong>NOTE:<\/strong> This is an auto-generated email. Please do not respond to this email.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>\n",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,EUR"
+ },
+ {
+  "id": 41,
+  "template_name": "Europe - Appointment & TBS Rescheduling",
+  "template_subject": "IMP: Appointment rescheduled {$AID}",
+  "template_data": "<p><img src='https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg'><\/p>\n<p>&nbsp;<\/p>\n<p>Dear {$full_name} {$ji},<\/p>\n\n\n<p>This is to inform you that your appointment request {$AID} has been rescheduled. Please find the details below:<\/p>\n\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<p><strong>NOTE:<\/strong> Please come to the above location 15 minutes prior to your scheduled time.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>\n\n<p>Warm Regards,<br \/>\nThe Art of Living Team Europe\n<\/p>\n<p>&nbsp;<\/p>\n<p>Follow Gurudev Sri Sri Ravi Shankar on<\/p>\n\n<a href='https:\/\/twitter.com\/SriSri'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/tw.png'><\/a>\n<a href='https:\/\/www.facebook.com\/gurudev\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/fb.png'><\/a>\n<a href='https:\/\/www.youtube.com\/channel\/UC4qz5w2M-Xmju7WC9ynqRtw'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/yt.png'><\/a>\n<a href='https:\/\/www.instagram.com\/srisriravishankar\/'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/inst.png'><\/a>\n<a href='https:\/\/in.linkedin.com\/in\/srisriravishankar'><img src='https:\/\/artofliving.io\/assets\/backend\/images\/in.png'><\/a>\n\n<p>&nbsp;<\/p>\n\n<p><strong>NOTE:<\/strong> This is an auto-generated email. Please do not respond to this email.<\/p>\n\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND,EUR"
+ },
+ {
+  "id": 42,
+  "template_name": "SATSANG BACKSTAGE",
+  "template_subject": "Response to appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment will not be possible. However, as a special consideration for you, You may take Darshan of Gurudev at Satsang entrance with the below details:<\/p>\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\"><br>\n\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 43,
+  "template_name": "Darshan at Gurukul",
+  "template_subject": "Response to appointment request {$AID} with Gurudev",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>An appointment will not be possible. However, as a special consideration for you, You may take Darshan of Gurudev at Gurukul with the below details:<\/p>\n\n<p>Date : {$date}<br \/>\nTime :&nbsp; {$time}<br \/>\nRequested for : {$no_people}<br \/>\nLocation: {$app_location}<\/p>\n\n<a href=\"https:\/\/artofliving.io\/Qrcodelib\/qrcodeGenerator\/{$AID}\">Please click on this link for Security ePass for entry<\/a> or use below QR Code\n<br>\n<img src=\"https:\/\/artofliving.io\/qrcode\/images\/{$AID}.png\"><br>\n\n{$email_note}\n<p><br \/>\n&nbsp;<\/p>",
+  "type": "appt",
+  "status": 1,
+  "for_the_loc": "IND"
+ },
+ {
+  "id": 44,
+  "template_name": "Incomplete \/ Inaccurate information on the filled form",
+  "template_subject": "Incomplete\/Incorrect Information on Appointment Submission",
+  "template_data": "<p><img src=\"https:\/\/artofliving.io\/assets\/backend\/images\/Email-Header-Band.jpg\" \/><\/p>\n\n<p>&nbsp;<\/p>\n\n<p>Dear {$full_name} {$ji},<\/p>\n\n<p>&nbsp;<\/p>\n\n<p>This is to inform you that your appointment request {$AID} cannot be processed further due to incomplete or incorrect information.<\/p>\n\n&nbsp;<\/p>",
+  "type": "del",
+  "status": 1,
+  "for_the_loc": "IND"
+ }
+],
+"SMS":[
+ {
+  "id": 1,
+  "template_name": "APPOINTMENT SUBMISSION REQUEST",
+  "template_data": "Dear {$firstname} {$ji}, your appointment request has been submitted successfully. Status: Pending\/Not Confirmed. Request ID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 2,
+  "template_name": "APPOINTMENT CONFIRMATION",
+  "template_data": "Dear {$firstname} {$ji}, Your appointment with Gurudev has been scheduled at {$time} on {$date}. Please come to {$sms_app_location} and show this confirmation AID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 3,
+  "template_name": "APPOINTMENT RESCHEDULED",
+  "template_data": "Dear {$firstname} {$ji}, your appointment has been rescheduled to {$time} on {$date}.Please come to {$sms_app_location} prior to your newly scheduled time AID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 4,
+  "template_name": "APPOINTMENT REMINDER",
+  "template_data": "Dear {$firstname} {$ji}, a gentle reminder.Your appointment is scheduled for today at {$time}. Please come to {$sms_app_location} prior to your scheduled time. AID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 5,
+  "template_name": "TBS\/Req",
+  "template_data": "Dear {$firstname} {$ji}, Your appointment has been scheduled on {$date}.Please come to {$sms_app_location} before {$time}. In case  of any further queries, please be in touch with Secretariat Office. AID:{$AID} Art of Living",
+  "status": 1
+ },
+ {
+  "id": 6,
+  "template_name": "APPOINTMENT SCHEDULE",
+  "template_data": "Dear {$firstname} {$ji}, Your appointment has been scheduled on {$date}. Please come to {$sms_app_location} before {$time}. In case of any further queries, please be in touch with Secretariat Office. AID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 7,
+  "template_name": "SMS FORWARD REQUEST",
+  "template_data": "Kindly provide your inputs for following request. Name:{$firstname},Designation:{$designation},Mobile: {$mobile},Email:{$email},Referred by:{$ref_by},Reference Phone:{$ref_phone},Reference email:{$ref_email},Subject:{$subject},Preferred date:{$date} Art of Living",
+  "status": 1
+ },
+ {
+  "id": 8,
+  "template_name": "When ?",
+  "template_data": "Dear {$firstname} {$ji},\nYou had requested an appointment with Gurudev. You had put a date range but when exactly is your birthday\/anniversary ?",
+  "status": 1
+ },
+ {
+  "id": 9,
+  "template_name": "G not here on requested dates",
+  "template_data": "Dear {$firstname} {$ji},\nYou had requested an appointment with Gurudev. Gurudev is not at Bangalore ashram in those dates. You can see Gurudev's schedule here: https:\/\/www.srisriravishankar.org\/tour-schedule and refill the form of appropriate",
+  "status": 1
+ },
+ {
+  "id": 10,
+  "template_name": "APPOINTMENT CONFIRMATION",
+  "template_data": "Dear {$firstname} {$ji}, Your appointment with Gurudev has been scheduled at {$time} on {$date}. Please come to {$sms_app_location} and show this confirmation AID:{$AID} Art of Living",
+  "status": 0
+ },
+ {
+  "id": 11,
+  "template_name": "TBS\/Req Rescheduled ",
+  "template_data": "Dear {$firstname} {$ji}, Your appointment has been rescheduled to {$date}.Please come to Shiva Temple 15 minutes before {$time}. In case  of any further queries, please be in touch with Secretariat Office. AID:{$AID} Art of Living",
+  "status": 1
+ },
+ {
+  "id": 12,
+  "template_name": "Birthday Gurukul",
+  "template_data": "Dear {$firstname} ji,\n\nYou may come to Gurukul by 8:30 am on June. Please send a screenshot of this message to Shabnam on  96633 89845 and coordinate with her.",
+  "status": 1
+ },
+ {
+  "id": 13,
+  "template_name": "Satsang Backstage",
+  "template_data": "Dear {$firstname} ji,\n\nAn appointment with Gurudev will not be possible. However as a special provision for you, you may take Darshan at Satsang entrance on June. Please send a screenshot of this message to Shabnam on +91 96633 89845 and coordinate with her.",
+  "status": 1
+ },
+ {
+  "id": 14,
+  "template_name": "Shivratri Darshan",
+  "template_data": "Dear {$firstname} ji,\n\nAs you might know that during Shivratri there is a huge crowd at the Bangalore Ashram. Separate appointments during those days are not possible. However, usually Gurudev gives darshan to all the people late night after the Shivratri puja, you can take Darshan of Gurudev at that time.\n\nWarm regards,\nVishal Merani",
+  "status": 1
+ }
+]
+}

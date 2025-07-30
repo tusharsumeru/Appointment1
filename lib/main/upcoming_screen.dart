@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
+import 'today_screen.dart';
 
 class UpcomingScreen extends StatefulWidget {
   const UpcomingScreen({super.key});
@@ -12,85 +13,28 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   
-  // Sample events data
+  // Sample events data - appointments for July 5th and 20th
   final Map<DateTime, List<Map<String, dynamic>>> _events = {
-    DateTime(2024, 3, 1): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
+    // July 5th appointments
+    DateTime(2024, 7, 5): [
+      {'title': 'Dr. Smith', 'color': Colors.blue.shade300},
+      {'title': 'Lab Test', 'color': Colors.orange.shade300},
+      {'title': 'X-Ray', 'color': Colors.purple.shade300},
     ],
-    DateTime(2024, 3, 2): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
+    
+    // July 5th appointments (2025) - 4 appointments
+    DateTime(2025, 7, 5): [
+      {'title': 'Dr. Smith', 'color': Colors.blue.shade300},
+      {'title': 'Lab Test', 'color': Colors.orange.shade300},
+      {'title': 'X-Ray', 'color': Colors.purple.shade300},
+      {'title': 'MRI Scan', 'color': Colors.grey.shade300},
     ],
-    DateTime(2024, 3, 3): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 6): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 7): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 8): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 9): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 10): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 13): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 14): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 15): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 16): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 17): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 20): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 21): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 22): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 23): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 24): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 27): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 28): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 29): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-    ],
-    DateTime(2024, 3, 30): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
-      {'title': 'Physical Visit', 'color': Colors.green.shade300},
-    ],
-    DateTime(2024, 3, 31): [
-      {'title': 'Elise', 'color': Colors.purple.shade300},
+    
+    // July 20th appointments
+    DateTime(2024, 7, 20): [
+      {'title': 'Cardiology', 'color': Colors.red.shade300},
+      {'title': 'Physical Therapy', 'color': Colors.green.shade300},
+      {'title': 'Dental Check', 'color': Colors.teal.shade300},
     ],
   };
 
@@ -98,7 +42,17 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
     return _events[DateTime(day.year, day.month, day.day)] ?? [];
   }
 
+  void _navigateToTodayScreen(DateTime selectedDate) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TodayScreen(selectedDate: selectedDate),
+      ),
+    );
+  }
+
   Future<void> _selectYear(BuildContext context) async {
+    final currentYear = DateTime.now().year;
     final int? pickedYear = await showDialog<int>(
       context: context,
       builder: (BuildContext context) {
@@ -108,7 +62,7 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
             width: double.maxFinite,
             height: 300,
             child: ListView.builder(
-              itemCount: 11, // 2020 to 2030
+              itemCount: currentYear - 2019, // 2020 to current year
               itemBuilder: (context, index) {
                 final year = 2020 + index;
                 return ListTile(
@@ -287,9 +241,8 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
     return GestureDetector(
       onTap: () {
         if (isCurrentMonth) {
-          setState(() {
-            _selectedDay = DateTime(_focusedDay.year, _focusedDay.month, day);
-          });
+          final selectedDate = DateTime(_focusedDay.year, _focusedDay.month, day);
+          _navigateToTodayScreen(selectedDate);
         }
       },
       child: Container(
@@ -322,35 +275,62 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
               ),
             ),
             
-            // Events
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                child: Column(
-                  children: events.take(2).map((event) {
-                    return Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: event['color'],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        event['title'],
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }).toList(),
+            // Static "4" for July 5th, 2025
+            if (_focusedDay.year == 2025 && _focusedDay.month == 7 && day == 5)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '4',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-            ),
+            
+            // Static "5" for July 15th, 2025
+            if (_focusedDay.year == 2025 && _focusedDay.month == 7 && day == 15)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '5',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            
+            // Static "8" for July 23rd, 2025
+            if (_focusedDay.year == 2025 && _focusedDay.month == 7 && day == 23)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '8',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -4,9 +4,16 @@ import '../../main/inbox_screen.dart';
 import '../../main/today_screen.dart';
 import '../../main/tomorrow_screen.dart';
 import '../../main/upcoming_screen.dart';
+import '../../main/dashboard_screen.dart';
+import '../../main/quick_darshan_line_screen.dart';
+import '../../main/bulk_email_sms_screen.dart';
+import '../../main/upload_offline_appointment_screen.dart';
 import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
+import '../../main/change_password_screen.dart';
+import '../../main/export_data_screen.dart';
+import '../../main/forward_request_logs_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -110,6 +117,82 @@ class _SidebarComponentState extends State<SidebarComponent> {
   //   }
   // }
 
+  Future<void> _handleLogout() async {
+    // Show confirmation dialog
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Logging out...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      try {
+        // Clear all stored data
+        await StorageService.logout();
+        
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        // Close drawer
+        Navigator.of(context).pop();
+        
+        // Navigate to login screen and clear all previous routes
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+          ),
+          (route) => false, // Remove all previous routes
+        );
+      } catch (e) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get user role for conditional menu items
@@ -200,7 +283,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ),
 
-          // Navigation Items - Show different items based on role
+          // Navigation Items
           ListTile(
             leading: const Icon(Icons.home, color: Colors.deepPurple),
             title: const Text('Home'),
@@ -246,7 +329,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pop(context); // Close drawer
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const TomorrowScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const TomorrowScreen(),
+                  ),
                 );
               },
             ),
@@ -258,13 +343,18 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pop(context); // Close drawer
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const UpcomingScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const UpcomingScreen(),
+                  ),
                 );
               },
             ),
 
             ListTile(
-              leading: const Icon(Icons.assignment_ind, color: Colors.deepPurple),
+              leading: const Icon(
+                Icons.assignment_ind,
+                color: Colors.deepPurple,
+              ),
               title: const Text('Assigned to Me'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -284,7 +374,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pop(context); // Close drawer
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const StarredScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const StarredScreen(),
+                  ),
                 );
               },
             ),
@@ -308,7 +400,10 @@ class _SidebarComponentState extends State<SidebarComponent> {
           // Admin-specific menu items (to be implemented)
           if (isAdmin) ...[
             ListTile(
-              leading: const Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
+              leading: const Icon(
+                Icons.admin_panel_settings,
+                color: Colors.deepPurple,
+              ),
               title: const Text('Admin Dashboard'),
               onTap: () {
                 Navigator.pop(context);
@@ -328,7 +423,10 @@ class _SidebarComponentState extends State<SidebarComponent> {
           // User/Client-specific menu items (to be implemented)
           if (isUser) ...[
             ListTile(
-              leading: const Icon(Icons.calendar_today, color: Colors.deepPurple),
+              leading: const Icon(
+                Icons.calendar_today,
+                color: Colors.deepPurple,
+              ),
               title: const Text('My Appointments'),
               onTap: () {
                 Navigator.pop(context);
@@ -344,7 +442,62 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
           ],
-
+          // Quick Darshan Line Navigation Item
+          ListTile(
+            leading: const Icon(Icons.queue, color: Colors.deepPurple),
+            title: const Text('Quick Darshan Line'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const QuickDarshanLineScreen(),
+                ),
+              );
+            },
+          ),
+          // Send Bulk Email & SMS Navigation Item
+          ListTile(
+            leading: const Icon(Icons.email, color: Colors.deepPurple),
+            title: const Text('Send Bulk Email & SMS'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BulkEmailSmsScreen(),
+                ),
+              );
+            },
+          ),
+          // Upload Offline Appointment Navigation Item
+          ListTile(
+            leading: const Icon(Icons.upload_file, color: Colors.deepPurple),
+            title: const Text('Upload Offline Appointment'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UploadOfflineAppointmentScreen(),
+                ),
+              );
+            },
+          ),
+          // Dashboard Navigation Item
+          ListTile(
+            leading: const Icon(Icons.dashboard, color: Colors.deepPurple),
+            title: const Text('Dashboard'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DashboardScreen(),
+                ),
+              );
+            },
+          ),
           const Divider(),
 
           // Settings and other options
@@ -354,6 +507,48 @@ class _SidebarComponentState extends State<SidebarComponent> {
             onTap: () {
               Navigator.pop(context);
               // TODO: Navigate to settings screen
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.lock_reset, color: Colors.grey),
+            title: const Text('Change Password'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ChangePasswordScreen(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.file_download, color: Colors.grey),
+            title: const Text('Export Data'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ExportDataScreen(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.forward, color: Colors.grey),
+            title: const Text('Forward Request Logs'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ForwardRequestLogsScreen(),
+                ),
+              );
             },
           ),
 
@@ -372,46 +567,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.pop(context); // Close dialog
-
-                          // Clear stored data
-                          await StorageService.logout();
-
-                          // Navigate to login screen and clear navigation stack
-                          if (mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => const LoginScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          }
-                        },
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+            onTap: _handleLogout,
           ),
         ],
       ),
