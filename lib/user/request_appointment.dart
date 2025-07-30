@@ -17,7 +17,13 @@ class RequestAppointmentScreen extends StatefulWidget {
 
 class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   String get _appointmentTypeText {
-    return widget.selectedType;
+    return widget.selectedType == 'myself' ? 'Myself' : 'Guest';
+  }
+
+  String get _appointmentTypeDisplayText {
+    return widget.selectedType == 'myself' 
+        ? 'Request appointment for Myself' 
+        : 'Request appointment for a Guest';
   }
 
   // Form controllers
@@ -131,6 +137,61 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+
+                  // Appointment Type Display Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.lightGreen.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.lightGreen.shade300,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _appointmentTypeDisplayText,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Appointment Type Selected',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
                   // Full Name
                   _buildTextField(

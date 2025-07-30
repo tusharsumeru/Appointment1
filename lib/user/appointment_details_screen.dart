@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import 'user_screen.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
@@ -25,7 +27,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Form state
   bool _isFormValid = false;
   String? _selectedSecretary;
-  String? _selectedFile;
+  PlatformFile? _selectedFile;
   bool _isAttendingProgram = false;
 
   final List<String> _secretaries = [
@@ -74,19 +76,89 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
-  void _chooseFile() {
-    // TODO: Implement file picker
+  Future<void> _chooseFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+
+      if (result != null) {
+        PlatformFile file = result.files.first;
+        
+        // Check file size (5MB = 5 * 1024 * 1024 bytes)
+        const int maxSizeInBytes = 5 * 1024 * 1024; // 5MB
+        
+        if (file.size > maxSizeInBytes) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 5MB'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _selectedFile = file;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('File "${file.name}" selected successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting file: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _removeFile() {
     setState(() {
-      _selectedFile = 'sample_document.pdf';
+      _selectedFile = null;
     });
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('File selection feature coming soon!'),
+        content: Text('File removed'),
+        backgroundColor: Colors.orange,
       ),
     );
   }
 
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   void _submitForm() {
+    // Prepare form data
+    final formData = {
+      'location': _locationController.text,
+      'secretary': _selectedSecretary,
+      'purpose': _purposeController.text,
+      'peopleCount': _peopleCountController.text,
+      'fromDate': _fromDateController.text,
+      'toDate': _toDateController.text,
+      'isAttendingProgram': _isAttendingProgram,
+      'attachment': _selectedFile != null ? {
+        'name': _selectedFile!.name,
+        'size': _selectedFile!.size,
+        'path': _selectedFile!.path,
+        'extension': _selectedFile!.extension,
+      } : null,
+    };
+
+    print('Form Data: $formData');
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Appointment request submitted successfully!'),
@@ -470,13 +542,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                _selectedFile ?? 'No file chosen',
+                _selectedFile != null ? '${_selectedFile!.name} (${_formatFileSize(_selectedFile!.size)})' : 'No file chosen',
                 style: TextStyle(
                   color: _selectedFile != null ? Colors.black87 : Colors.grey[500],
                   fontSize: 14,
                 ),
               ),
             ),
+            if (_selectedFile != null)
+              IconButton(
+                onPressed: _removeFile,
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+              ),
           ],
         ),
       ],

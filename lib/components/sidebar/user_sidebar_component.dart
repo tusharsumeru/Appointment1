@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../auth/login_screen.dart';
 import '../../action/storage_service.dart';
-import '../../user/request_appointment.dart';
+import '../../user/appointment_type_selection_screen.dart';
 import '../../user/appointment_details_screen.dart';
 import '../../user/user_screen.dart';
 import '../../user/user_history_screen.dart';
@@ -230,9 +230,7 @@ class _UserSidebarComponentState extends State<UserSidebarComponent> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const RequestAppointmentScreen(
-                            selectedType: 'Guest',
-                          ),
+                          builder: (context) => const AppointmentTypeSelectionScreen(),
                         ),
                       );
                     },

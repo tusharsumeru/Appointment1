@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -19,6 +21,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _designationController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+  
+  // Photo upload state
+  File? _selectedImage;
   
   // Role checkboxes state
   final Map<String, bool> _roleCheckboxes = {
@@ -54,6 +59,37 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _designationController.text = widget.userData?['designation'] ?? 'Office Operations Specialist';
     _companyController.text = widget.userData?['company'] ?? 'Sumeru Digital';
     _locationController.text = widget.userData?['location'] ?? 'Coimbatore, Tamil Nadu, India';
+  }
+
+  // Photo upload functions
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+    
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera 
+                ? 'Photo captured successfully!' 
+                : 'Photo uploaded successfully!'
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
   }
 
   @override
@@ -109,29 +145,34 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               ),
                             ),
                             child: ClipOval(
-                              child: widget.userData?['profilePhoto'] != null
-                                  ? Image.network(
-                                      widget.userData!['profilePhoto'],
+                              child: _selectedImage != null
+                                  ? Image.file(
+                                      _selectedImage!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
+                                    )
+                                  : widget.userData?['profilePhoto'] != null
+                                      ? Image.network(
+                                          widget.userData!['profilePhoto'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.lightGreen.shade50,
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 60,
+                                                color: Colors.green,
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Container(
                                           color: Colors.lightGreen.shade50,
                                           child: const Icon(
                                             Icons.person,
                                             size: 60,
                                             color: Colors.green,
                                           ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: Colors.lightGreen.shade50,
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 60,
-                                        color: Colors.green,
-                                      ),
-                                    ),
+                                        ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -163,14 +204,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Upload photo functionality coming soon!'),
-                                        backgroundColor: Colors.blue,
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () => _pickImage(ImageSource.gallery),
                                   icon: const Icon(Icons.cloud_upload_outlined),
                                   label: const Text('Upload Different Photo'),
                                   style: OutlinedButton.styleFrom(
@@ -189,14 +223,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Camera functionality coming soon!'),
-                                        backgroundColor: Colors.blue,
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () => _pickImage(ImageSource.camera),
                                   icon: const Icon(Icons.camera_alt_outlined),
                                   label: const Text('Take New Photo'),
                                   style: OutlinedButton.styleFrom(
@@ -215,14 +242,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Delete photo functionality coming soon!'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  },
+                                  onPressed: _removeImage,
                                   icon: const Icon(Icons.delete_outline),
                                   label: const Text('Delete Photo'),
                                   style: OutlinedButton.styleFrom(
@@ -704,6 +724,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .where((entry) => entry.value == true)
           .map((entry) => entry.key)
           .toList(),
+      'profilePhoto': _selectedImage?.path, // Include the selected photo path
     };
     
     // Show success message
