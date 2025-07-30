@@ -14,6 +14,7 @@ import '../../main/add_new_screen.dart';
 import '../../main/change_password_screen.dart';
 import '../../main/export_data_screen.dart';
 import '../../main/forward_request_logs_screen.dart';
+import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -147,6 +148,16 @@ class _SidebarComponentState extends State<SidebarComponent> {
                       : null,
                 ),
                 const SizedBox(height: 8),
+                // Greeting
+                Text(
+                  'Hi User!',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 // User Name
                 Flexible(
                   child: Text(
@@ -349,6 +360,19 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const DashboardScreen()),
+              );
+            },
+          ),
+
+          // User Profile Navigation Item
+          ListTile(
+            leading: const Icon(Icons.person, color: Colors.deepPurple),
+            title: const Text('User Profile'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const UserScreen()),
               );
             },
           ),
