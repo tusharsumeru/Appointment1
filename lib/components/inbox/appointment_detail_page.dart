@@ -500,12 +500,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     });
 
     try {
-      // Get the MongoDB _id from the appointment data
-      String? userId = widget.appointment['_id']?.toString();
+      // Get the createdBy object which contains the user information
+      final createdBy = widget.appointment['createdBy'];
       
-      // If still not found, try _id field directly (this might be the appointment ID, not user ID)
-      if (userId == null || userId.isEmpty) {
-        // If user ID is not found, we cannot fetch appointments overview
+      if (createdBy == null) {
+        print('Warning: createdBy not found in appointment data. Available fields: ${widget.appointment.keys.toList()}');
         setState(() {
           _upcomingAppointments = [];
           _appointmentHistory = [];
@@ -514,16 +513,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         return;
       }
       
-      if (userId == null || userId.isEmpty) {
-        print('Warning: User ID not found in appointment data. Available fields: ${widget.appointment.keys.toList()}');
-        print('CreatedBy data: ${widget.appointment['createdBy']}');
-        // Don't throw exception, just set empty lists
-        setState(() {
-          _upcomingAppointments = [];
-          _appointmentHistory = [];
-          _isLoadingOverview = false;
-        });
-        return;
+      // Use createdBy as the user identifier (since it contains the same info as userId)
+      String userId;
+      
+      if (createdBy is Map<String, dynamic>) {
+        // Try to get user ID from createdBy object
+        userId = createdBy['_id']?.toString() ?? 
+                createdBy['userId']?.toString() ?? 
+                createdBy['id']?.toString() ?? 
+                createdBy.toString(); // Fallback to string representation
+      } else {
+        // If createdBy is not a Map, use its string representation
+        userId = createdBy.toString();
       }
 
       // Fetch upcoming appointments
@@ -535,7 +536,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       // Debug: Print the results to see the data structure
       print('Upcoming result: $upcomingResult');
       print('History result: $historyResult');
-      print('User ID being used: $userId');
+      print('User ID being used: $userId (from createdBy: $createdBy)');
       
       if (mounted) {
         setState(() {

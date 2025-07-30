@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'login_screen.dart';
 import '../main/home_screen.dart';
 import '../action/storage_service.dart';
+import '../action/action.dart';
+import '../guard/guard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -84,17 +86,8 @@ class _SplashScreenState extends State<SplashScreen>
         final token = await StorageService.getToken();
         
         if (isLoggedIn && token != null) {
-          // User is logged in, navigate to home screen
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const HomeScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 800),
-            ),
-          );
+          // User is logged in, check role and navigate accordingly
+          await _handleRoleBasedNavigation();
         } else {
           // User is not logged in, navigate to login screen
           Navigator.of(context).pushReplacement(
@@ -110,6 +103,108 @@ class _SplashScreenState extends State<SplashScreen>
         }
       } catch (e) {
         // If there's an error, navigate to login screen
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const LoginScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleRoleBasedNavigation() async {
+    try {
+      // Get user data from storage or API
+      var userData = await StorageService.getUserData();
+      
+      if (userData == null) {
+        // If no cached user data, fetch from API
+        final userResult = await ActionService.getCurrentUser();
+        if (userResult['success']) {
+          userData = userResult['data'];
+          if (userData != null) {
+            await StorageService.saveUserData(userData);
+          }
+        }
+      }
+
+      String? userRole = userData?['role']?.toString().toLowerCase();
+      
+      if (mounted) {
+        if (userRole == 'secretary') {
+          // Secretary role - navigate to appointment management interface
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const HomeScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        } else if (userRole == 'admin') {
+          // Admin role - navigate to admin interface (to be implemented)
+          // TODO: Replace with AdminScreen when implemented
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const HomeScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        } else if (userRole == 'guard') {
+          // Guard role - navigate to guard interface
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const GuardScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        } else if (userRole == 'user' || userRole == 'client') {
+          // Regular user/client role - navigate to user interface (to be implemented)
+          // TODO: Replace with UserScreen when implemented
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const HomeScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        } else {
+          // Unknown role or no role - logout and go to login
+          await StorageService.logout();
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const LoginScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // If there's an error, logout and go to login screen
+      await StorageService.logout();
+      if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>

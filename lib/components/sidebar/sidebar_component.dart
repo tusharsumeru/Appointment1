@@ -118,8 +118,90 @@ class _SidebarComponentState extends State<SidebarComponent> {
   //   }
   // }
 
+  Future<void> _handleLogout() async {
+    // Show confirmation dialog
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Logging out...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      try {
+        // Clear all stored data
+        await StorageService.logout();
+        
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        // Close drawer
+        Navigator.of(context).pop();
+        
+        // Navigate to login screen and clear all previous routes
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+          ),
+          (route) => false, // Remove all previous routes
+        );
+      } catch (e) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Get user role for conditional menu items
+    String? userRole = _userData?['role']?.toString().toLowerCase();
+    bool isSecretary = userRole == 'secretary';
+    bool isAdmin = userRole == 'admin';
+    bool isUser = userRole == 'user' || userRole == 'client';
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -211,8 +293,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
               ],
             ),
           ),
-          
-        
 
           // Navigation Items
           ListTile(
@@ -227,94 +307,152 @@ class _SidebarComponentState extends State<SidebarComponent> {
             },
           ),
 
-          ListTile(
-            leading: const Icon(Icons.inbox, color: Colors.deepPurple),
-            title: const Text('Inbox'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const InboxScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.today, color: Colors.deepPurple),
-            title: const Text('Today'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TodayScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.event, color: Colors.deepPurple),
-            title: const Text('Tomorrow'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TomorrowScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.schedule, color: Colors.deepPurple),
-            title: const Text('Upcoming'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const UpcomingScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.assignment_ind, color: Colors.deepPurple),
-            title: const Text('Assigned to Me'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AssignedToMeScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.star, color: Colors.deepPurple),
-            title: const Text('Starred'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const StarredScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(
-              Icons.add_circle_outline,
-              color: Colors.deepPurple,
+          // Secretary-specific menu items
+          if (isSecretary) ...[
+            ListTile(
+              leading: const Icon(Icons.inbox, color: Colors.deepPurple),
+              title: const Text('Inbox'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InboxScreen()),
+                );
+              },
             ),
-            title: const Text('Add New'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const AddNewScreen()),
-              );
-            },
-          ),
+
+            ListTile(
+              leading: const Icon(Icons.today, color: Colors.deepPurple),
+              title: const Text('Today'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TodayScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.event, color: Colors.deepPurple),
+              title: const Text('Tomorrow'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TomorrowScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.schedule, color: Colors.deepPurple),
+              title: const Text('Upcoming'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const UpcomingScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(
+                Icons.assignment_ind,
+                color: Colors.deepPurple,
+              ),
+              title: const Text('Assigned to Me'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AssignedToMeScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.star, color: Colors.deepPurple),
+              title: const Text('Starred'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StarredScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.deepPurple,
+              ),
+              title: const Text('Add New'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddNewScreen()),
+                );
+              },
+            ),
+          ],
+
+          // Admin-specific menu items (to be implemented)
+          if (isAdmin) ...[
+            ListTile(
+              leading: const Icon(
+                Icons.admin_panel_settings,
+                color: Colors.deepPurple,
+              ),
+              title: const Text('Admin Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to admin dashboard
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: Colors.deepPurple),
+              title: const Text('Manage Users'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to user management
+              },
+            ),
+          ],
+
+          // User/Client-specific menu items (to be implemented)
+          if (isUser) ...[
+            ListTile(
+              leading: const Icon(
+                Icons.calendar_today,
+                color: Colors.deepPurple,
+              ),
+              title: const Text('My Appointments'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to user appointments
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history, color: Colors.deepPurple),
+              title: const Text('Appointment History'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to appointment history
+              },
+            ),
+          ],
           // Quick Darshan Line Navigation Item
           ListTile(
             leading: const Icon(Icons.queue, color: Colors.deepPurple),
@@ -323,7 +461,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const QuickDarshanLineScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const QuickDarshanLineScreen(),
+                ),
               );
             },
           ),
@@ -335,7 +475,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const BulkEmailSmsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const BulkEmailSmsScreen(),
+                ),
               );
             },
           ),
@@ -347,7 +489,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const UploadOfflineAppointmentScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const UploadOfflineAppointmentScreen(),
+                ),
               );
             },
           ),
@@ -359,7 +503,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const DashboardScreen(),
+                ),
               );
             },
           ),
@@ -395,7 +541,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const ChangePasswordScreen(),
+                ),
               );
             },
           ),
@@ -407,7 +555,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ExportDataScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const ExportDataScreen(),
+                ),
               );
             },
           ),
@@ -419,7 +569,9 @@ class _SidebarComponentState extends State<SidebarComponent> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ForwardRequestLogsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const ForwardRequestLogsScreen(),
+                ),
               );
             },
           ),
@@ -439,46 +591,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              Navigator.pop(context);
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.pop(context); // Close dialog
-
-                          // Clear stored data
-                          await StorageService.logout();
-
-                          // Navigate to login screen and clear navigation stack
-                          if (mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => const LoginScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          }
-                        },
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+            onTap: _handleLogout,
           ),
         ],
       ),
