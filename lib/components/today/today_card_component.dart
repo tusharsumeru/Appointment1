@@ -748,44 +748,9 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
                       const SizedBox(height: 8),
 
-                      // Bottom row - Accompany and Secretary
+                      // Bottom row - Secretary
                       Row(
                         children: [
-                          // Accompany
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 4),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Accompany',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${appointment['accompanyCount'] ?? 0}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
                           // Secretary
                           Expanded(
                             child: Row(

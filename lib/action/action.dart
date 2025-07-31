@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://c85dc7df20e5.ngrok-free.app/api/v3'; // API base URL
+      'https://119cd3e3ad08.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -191,6 +191,57 @@ class ActionService {
     }
   }
 
+  // Helper method to process appointment data and format user fields
+  static Map<String, dynamic> _processAppointmentData(Map<String, dynamic> appointment) {
+    // Create a copy of the appointment data
+    final Map<String, dynamic> processedAppointment = Map<String, dynamic>.from(appointment);
+    
+    // Process userMobile field - handle both object and string formats
+    final userMobile = appointment['userMobile'];
+    if (userMobile is Map<String, dynamic>) {
+      final countryCode = userMobile['countryCode']?.toString() ?? '';
+      final number = userMobile['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        processedAppointment['userMobile'] = '$countryCode $number';
+      }
+    }
+    
+    // Ensure userEmail is properly set
+    if (processedAppointment['userEmail'] == null || processedAppointment['userEmail'].toString().isEmpty) {
+      // Fallback to email field if userEmail is not available
+      final email = appointment['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        processedAppointment['userEmail'] = email;
+      }
+    }
+    
+    // Ensure referencePhoneNumber is properly set
+    if (processedAppointment['referencePhoneNumber'] == null || processedAppointment['referencePhoneNumber'].toString().isEmpty) {
+      // Try alternative field names
+      final refPhone = appointment['referencePhone']?.toString() ?? 
+                      appointment['refPhone']?.toString() ?? 
+                      appointment['emergencyPhone']?.toString() ?? 
+                      appointment['contactPhone']?.toString();
+      if (refPhone != null && refPhone.isNotEmpty) {
+        processedAppointment['referencePhoneNumber'] = refPhone;
+      }
+    }
+    
+    // Ensure referenceEmail is properly set
+    if (processedAppointment['referenceEmail'] == null || processedAppointment['referenceEmail'].toString().isEmpty) {
+      // Try alternative field names
+      final refEmail = appointment['referenceEmail']?.toString() ?? 
+                      appointment['refEmail']?.toString() ?? 
+                      appointment['emergencyEmail']?.toString() ?? 
+                      appointment['contactEmail']?.toString();
+      if (refEmail != null && refEmail.isNotEmpty) {
+        processedAppointment['referenceEmail'] = refEmail;
+      }
+    }
+    
+    return processedAppointment;
+  }
+
   // Get appointments for secretary with advanced filtering
   static Future<Map<String, dynamic>> getAppointmentsForSecretary({
     int page = 1,
@@ -300,16 +351,24 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - save appointments data to local storage and return
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
+          if (appointment is Map<String, dynamic>) {
+            return _processAppointmentData(appointment);
+          }
+          return <String, dynamic>{};
+        }).toList();
 
         // No caching for inbox and assigned to me screens - always fetch fresh data
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -572,14 +631,22 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - return appointments data
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
+          if (appointment is Map<String, dynamic>) {
+            return _processAppointmentData(appointment);
+          }
+          return <String, dynamic>{};
+        }).toList();
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -1244,14 +1311,22 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - return appointments data
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
+          if (appointment is Map<String, dynamic>) {
+            return _processAppointmentData(appointment);
+          }
+          return <String, dynamic>{};
+        }).toList();
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -1755,7 +1830,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Appointment details retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Appointment details retrieved successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -1784,14 +1861,17 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 500,
-          'message': responseData['message'] ?? 'Server error. Please try again later.',
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
         };
       } else {
         // Other error
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to fetch appointment details',
+          'message':
+              responseData['message'] ?? 'Failed to fetch appointment details',
         };
       }
     } catch (error) {
@@ -1857,11 +1937,14 @@ class ActionService {
         };
       }
 
-      if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])').hasMatch(newPassword)) {
+      if (!RegExp(
+        r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])',
+      ).hasMatch(newPassword)) {
         return {
           'success': false,
           'statusCode': 400,
-          'message': 'New password must contain uppercase, lowercase, number, and special character',
+          'message':
+              'New password must contain uppercase, lowercase, number, and special character',
         };
       }
 
@@ -1899,7 +1982,9 @@ class ActionService {
         return {
           'success': true,
           'statusCode': 200,
-          'message': responseData['message'] ?? 'Password changed successfully. Please log in again.',
+          'message':
+              responseData['message'] ??
+              'Password changed successfully. Please log in again.',
         };
       } else if (response.statusCode == 400) {
         // Bad request - validation errors
@@ -1929,7 +2014,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 500,
-          'message': responseData['message'] ?? 'Server error. Please try again later.',
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
         };
       } else {
         // Other error
@@ -1984,9 +2071,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/email-templates').replace(
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/email-templates',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       // Make API call
       final response = await http.get(
@@ -2015,7 +2102,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Email templates retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Email templates retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -2030,7 +2119,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve email templates',
+          'message':
+              responseData['message'] ?? 'Failed to retrieve email templates',
         };
       }
     } catch (error) {
@@ -2077,9 +2167,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/email-templates/ids').replace(
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
+      final uri = Uri.parse(
+        '$baseUrl/email-templates/ids',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       // Make API call
       final response = await http.get(
@@ -2108,7 +2198,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Email template IDs retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Email template IDs retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -2123,7 +2215,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve email template IDs',
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve email template IDs',
         };
       }
     } catch (error) {
@@ -2185,7 +2279,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Email template retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Email template retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -2207,7 +2303,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve email template',
+          'message':
+              responseData['message'] ?? 'Failed to retrieve email template',
         };
       }
     } catch (error) {
@@ -2260,7 +2357,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Email template options retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Email template options retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -2275,7 +2374,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve email template options',
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve email template options',
         };
       }
     } catch (error) {
@@ -2329,13 +2430,15 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Check-in status updated successfully',
+          'message':
+              responseData['message'] ?? 'Check-in status updated successfully',
         };
       } else {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to update check-in status',
+          'message':
+              responseData['message'] ?? 'Failed to update check-in status',
           'error': responseData['error'],
         };
       }
@@ -2344,6 +2447,471 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get all SMS templates with optional filters
+  static Future<Map<String, dynamic>> getAllSmsTemplates({
+    bool? isActive,
+    List<String>? tags,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {};
+      if (isActive != null) {
+        queryParams['isActive'] = isActive.toString();
+      }
+      if (tags != null && tags.isNotEmpty) {
+        queryParams['tags'] = tags.join(',');
+      }
+
+      final uri = Uri.parse('$baseUrl/sms-templates').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'SMS templates retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve SMS templates',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get single SMS template by ID
+  static Future<Map<String, dynamic>> getSmsTemplateById(String id) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/sms-templates/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'SMS template retrieved successfully',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': 'SMS template not found',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve SMS template',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get available tags for SMS templates
+  static Future<Map<String, dynamic>> getSmsTemplateOptions() async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/sms-templates/options'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'SMS template options retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve SMS template options',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Send appointment SMS
+  static Future<Map<String, dynamic>> sendAppointmentSms({
+    required String appointeeMobile,
+    required String referenceMobile,
+    required bool useAppointee,
+    required bool useReference,
+    String? otherSms,
+    String? selectedTemplateId,
+    String? smsContent,
+    Map<String, dynamic>? templateData,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'appointeeMobile': appointeeMobile,
+        'referenceMobile': referenceMobile,
+        'useAppointee': useAppointee,
+        'useReference': useReference,
+      };
+
+      // Add optional fields
+      if (otherSms != null && otherSms.isNotEmpty) {
+        requestBody['otherSms'] = otherSms;
+      }
+      if (selectedTemplateId != null && selectedTemplateId.isNotEmpty) {
+        requestBody['selectedTemplateId'] = selectedTemplateId;
+      }
+      if (smsContent != null && smsContent.isNotEmpty) {
+        requestBody['smsContent'] = smsContent;
+      }
+      if (templateData != null) {
+        requestBody['templateData'] = templateData;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment/send-sms'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'SMS sent successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request data',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to send SMS',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get assigned secretaries by ashram location
+  static Future<Map<String, dynamic>> getAssignedSecretariesByAshramLocation({
+    required String locationId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate locationId
+      if (locationId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Location ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$locationId/secretaries'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return secretaries data
+        final List<dynamic> secretaries = responseData['data'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': secretaries,
+          'message': responseData['message'] ?? 'Secretaries fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid location ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Location not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Ashram location not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch secretaries',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Update assigned secretary for an appointment
+  static Future<Map<String, dynamic>> updateAssignedSecretary({
+    required String appointmentId,
+    required String secretaryId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate inputs
+      if (appointmentId.isEmpty || secretaryId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Both appointment ID and secretary ID are required',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'secretaryId': secretaryId,
+      };
+
+      // Make API call
+      final response = await http.put(
+        Uri.parse('$baseUrl/appointment/$appointmentId/assign-secretary'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Assigned secretary updated successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request data',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to update assigned secretary',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
       };
     }
   }

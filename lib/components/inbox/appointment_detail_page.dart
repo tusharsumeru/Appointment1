@@ -83,9 +83,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   String _getUserName(int index) {
     // Generate user names based on index and attendee count
     if (index == 0) {
-      return _getCreatedByName(); // Main user is the creator
+      // Main user - try to get from mainUser object first, then fallback
+      final mainUser = widget.appointment['mainUser'];
+      if (mainUser is Map<String, dynamic>) {
+        return mainUser['fullName']?.toString() ?? _getCreatedByName();
+      }
+      return _getCreatedByName(); // Fallback to createdBy
     } else {
-      // Get accompanying user names from API data
+      // Accompanying user - try to get from guest object
+      final guest = widget.appointment['guest'];
+      if (guest is Map<String, dynamic>) {
+        return guest['fullName']?.toString() ?? 'Guest User';
+      }
+      
+      // Fallback to old accompanyUsers structure
       final accompanyUsers = widget.appointment['accompanyUsers'];
       if (accompanyUsers is Map<String, dynamic>) {
         final users = accompanyUsers['users'] as List<dynamic>?;
@@ -97,7 +108,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         }
       }
       
-      // Fallback names
+      // Final fallback
       return 'User ${index + 1}';
     }
   }
@@ -152,7 +163,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       return 1;
     }
     
-    // For accompanying users, count matches from API result
+    // For accompanying users, count matches from API result + 1 for profile image
     final faceMatchResults = _faceMatchData[index] ?? [];
     
     if (faceMatchResults.isNotEmpty) {
@@ -166,13 +177,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
         final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
         
-        // Return total count of all matches for this specific user
-        return matches30.length + matches60.length + matches90.length;
+        // Return total count of all matches + 1 for profile image
+        return matches30.length + matches60.length + matches90.length + 1;
       }
     }
     
-    // If no face match data available, return 0 for accompanying users
-    return 0;
+    // If no face match data available, return 1 for profile image (same as main user)
+    return 1;
   }
 
   String _extractAge(String label) {
@@ -197,65 +208,72 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     });
 
     try {
-      // Use MongoDB ObjectId instead of appointmentId string
-      final mongoDbId = widget.appointment['_id']?.toString() ?? '';
-      if (mongoDbId.isEmpty) {
-        throw Exception('MongoDB ID not found');
+      // Use Appointment ID (like "APT-729a9644") instead of MongoDB ID
+      final appointmentId = widget.appointment['appointmentId']?.toString() ?? '';
+      if (appointmentId.isEmpty) {
+        throw Exception('Appointment ID not found');
       }
       
-      final result = await ActionService.getFaceMatchResultByAppointmentId(mongoDbId);
+      final result = await ActionService.getFaceMatchResultByAppointmentId(appointmentId);
       
       if (result['success']) {
-        final data = result['data'];
+        final responseData = result['data'];
         List<Map<String, dynamic>> faceMatchResults = [];
         
-        if (data != null) {
-          if (data is List) {
-            // Get the user's photo URL to match with API results
-            final userPhotoUrl = _getUserImageUrl(userIndex);
-            
-            // Find the matching result by comparing photo URLs
-            for (final resultItem in data) {
+        if (responseData != null && responseData is Map<String, dynamic>) {
+          // New API structure: faceMatchResults is inside data object
+          final faceMatchData = responseData['faceMatchResults'];
+          
+          if (faceMatchData != null && faceMatchData is List) {
+            // Process the faceMatchResults array
+            for (final resultItem in faceMatchData) {
               if (resultItem is Map<String, dynamic>) {
-                final resultPhotoUrl = resultItem['photoUrl']?.toString();
-                if (resultPhotoUrl == userPhotoUrl) {
+                final userType = resultItem['userType']?.toString();
+                
+                // Match by userType: "main" for index 0, "guest" for index 1
+                if ((userIndex == 0 && userType == 'main') || 
+                    (userIndex == 1 && userType == 'guest')) {
                   faceMatchResults = [resultItem];
                   break;
                 }
               }
             }
             
-            // If no match found by photo URL, try different matching strategies
+            // If no match found by userType, try photo URL matching as fallback
             if (faceMatchResults.isEmpty) {
-              // For main user (index 0), try to find result without userId or with main user's userId
-              if (userIndex == 0) {
-                // Look for result that might be for main user (no accompanyUser field or different structure)
-                for (final resultItem in data) {
-                  if (resultItem is Map<String, dynamic>) {
-                    // Check if this result doesn't have accompanyUser field (likely main user)
-                    if (!resultItem.containsKey('accompanyUser')) {
-                      faceMatchResults = [resultItem];
-                      break;
-                    }
-                  }
-                }
-              }
-              
-              // If still no match, fall back to index-based matching
-              if (faceMatchResults.isEmpty) {
-                final apiIndex = userIndex - 1; // Convert to 0-based index
-                if (apiIndex >= 0 && apiIndex < data.length) {
-                  final userResult = data[apiIndex];
-                  if (userResult is Map<String, dynamic>) {
-                    faceMatchResults = [userResult];
+              final userPhotoUrl = _getUserImageUrl(userIndex);
+              for (final resultItem in faceMatchData) {
+                if (resultItem is Map<String, dynamic>) {
+                  final resultPhotoUrl = resultItem['photoUrl']?.toString();
+                  if (resultPhotoUrl == userPhotoUrl) {
+                    faceMatchResults = [resultItem];
+                    break;
                   }
                 }
               }
             }
-          } else if (data is Map<String, dynamic>) {
-            // If it's a single result, use it for main user or first accompanying user
-            if (userIndex == 0 || userIndex == 1) {
-              faceMatchResults = [data];
+            
+            // If still no match, try index-based matching as final fallback
+            if (faceMatchResults.isEmpty && faceMatchData.isNotEmpty) {
+              final apiIndex = userIndex < faceMatchData.length ? userIndex : 0;
+              final userResult = faceMatchData[apiIndex];
+              if (userResult is Map<String, dynamic>) {
+                faceMatchResults = [userResult];
+              }
+            }
+          }
+        } else if (responseData != null && responseData is List) {
+          // Fallback: if data is directly a list (old structure)
+          for (final resultItem in responseData) {
+            if (resultItem is Map<String, dynamic>) {
+              final userType = resultItem['userType']?.toString();
+              
+              // Match by userType: "main" for index 0, "guest" for index 1
+              if ((userIndex == 0 && userType == 'main') || 
+                  (userIndex == 1 && userType == 'guest')) {
+                faceMatchResults = [resultItem];
+                break;
+              }
             }
           }
         }
@@ -264,6 +282,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           _faceMatchData[userIndex] = faceMatchResults;
           _isLoadingFaceMatch[userIndex] = false;
         });
+        
+        // Debug: Print the results
+        print('User $userIndex: Found ${faceMatchResults.length} face match results');
+        if (faceMatchResults.isNotEmpty) {
+          print('User $userIndex: First result userType: ${faceMatchResults[0]['userType']}');
+        } else {
+          print('User $userIndex: No face match results found - this is normal for users without face match data');
+        }
       } else {
         setState(() {
           _faceMatchErrors[userIndex] = result['message'] ?? 'Failed to fetch face match results';
@@ -282,20 +308,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // Get the user's image URL based on index
     String userImageUrl = _getUserImageUrl(userIndex);
     
-    // Fetch face match data for the specific user (including main user)
-    await _fetchFaceMatchData(userIndex);
+    // Use existing face match data without fetching new data
+    // Only fetch data when refresh button is clicked
     
-    // For main user, ensure we have at least 1 image count
+    // For all users, ensure we have at least 1 image count (profile image)
     int finalImageCount = imageCount;
-    if (userIndex == 0) {
-      // Recalculate image count after fetching data
-      final updatedMatches = _getUserMatches(userIndex);
-      finalImageCount = updatedMatches > 0 ? updatedMatches : 1; // At least show profile image
-    } else if (imageCount == 0) {
-      // For accompanying users, recalculate after fetching data
-      final updatedMatches = _getUserMatches(userIndex);
-      finalImageCount = updatedMatches;
-    }
+    final currentMatches = _getUserMatches(userIndex);
+    finalImageCount = currentMatches > 0 ? currentMatches : 1; // At least show profile image
     
     Navigator.push(
       context,
@@ -316,11 +335,28 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   String _getUserImageUrl(int userIndex) {
     // Get user images from API data
     if (userIndex == 0) {
+      // Main user - try to get from mainUser object first, then fallback
+      final mainUser = widget.appointment['mainUser'];
+      if (mainUser is Map<String, dynamic>) {
+        // Main user might not have profilePhotoUrl in this structure
+        // Use the profilePhoto from the main appointment object
+        return widget.appointment['profilePhoto']?.toString() ?? 
+               'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+      }
       return widget.appointment['profilePhoto']?.toString() ?? 
              'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
     }
     
-    // Get accompanying user images from API data
+    // Accompanying user - try to get from guest object
+    final guest = widget.appointment['guest'];
+    if (guest is Map<String, dynamic>) {
+      final imageUrl = guest['profilePhotoUrl']?.toString();
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return imageUrl;
+      }
+    }
+    
+    // Fallback to old accompanyUsers structure
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
       final users = accompanyUsers['users'] as List<dynamic>?;
@@ -336,8 +372,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
     
     // Fallback to default image
-    return widget.appointment['profilePhoto']?.toString() ?? 
-           'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+    return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
   }
 
   String _getAppointmentName() {
@@ -461,10 +496,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     try {
       // Refresh face match data for all users including main user
       final attendeeCount = _getAttendeeCount();
+      print('Refresh: Starting refresh for $attendeeCount users');
       
       for (int i = 0; i < attendeeCount; i++) {
+        print('Refresh: Fetching data for user $i');
         await _fetchFaceMatchData(i);
       }
+      
+      // Force UI update to show new match counts
+      setState(() {
+        // This will trigger rebuild with updated face match data
+      });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -741,10 +783,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   int _getAttendeeCount() {
+    // Check if guest exists in new structure
+    final guest = widget.appointment['guest'];
+    if (guest != null) {
+      print('Attendee count: Found guest, returning 2');
+      return 2; // Main user + guest
+    }
+    
+    // Fallback to old accompanyUsers structure
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
-      return accompanyUsers['numberOfUsers'] ?? 1;
+      final count = accompanyUsers['numberOfUsers'] ?? 1;
+      print('Attendee count: Using accompanyUsers, returning $count');
+      return count;
     }
+    print('Attendee count: No guest or accompanyUsers, returning 1');
     return 1;
   }
 
@@ -904,16 +957,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           // Header with user info
           Row(
             children: [
-              // Profile Image
+              // Profile Image (Square)
               Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(color: Colors.red, width: 3),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(37),
+                  borderRadius: BorderRadius.circular(5),
                   child: _buildNetworkImage(_getAppointmentImageUrl(), 40),
                 ),
               ),
@@ -1054,12 +1106,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   itemCount: _getFilteredAttendeeCount(), // Use filtered count
                   itemBuilder: (context, index) {
                     final actualIndex = _getActualUserIndex(index);
+                    final userName = _getUserName(actualIndex);
+                    final userLabel = _getUserLabel(actualIndex);
+                    final userMatches = _getUserMatches(actualIndex);
+                    
+                    print('Building user card $index: actualIndex=$actualIndex, name="$userName", label="$userLabel", matches=$userMatches');
+                    
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: _buildUserCard(
-                        _getUserName(actualIndex),
-                        _getUserLabel(actualIndex),
-                        _getUserMatches(actualIndex),
+                        userName,
+                        userLabel,
+                        userMatches,
                         actualIndex == 0, // First user is main user
                         actualIndex, // Pass the user index
                       ),
@@ -1082,7 +1140,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         : Colors.grey[300],
                     ),
                     child: Text(
-                      '${index + 1}',
+                      '${index}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -1102,8 +1160,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildUserCard(String name, String label, int matches, bool isMainUser, int userIndex) {
-    // Determine if card should be clickable
-    bool isClickable = matches > 0 || isMainUser; // Main user is always clickable
+    // Determine if card should be clickable - all users are clickable since they have at least 1 image (profile)
+    bool isClickable = matches > 0; // All users have at least 1 image (profile image)
     
     return GestureDetector(
       onTap: isClickable ? () => _navigateToUserImages(name, matches, userIndex) : null,
@@ -1184,12 +1242,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           child: Text(
                             _isLoadingFaceMatch[userIndex] == true
                               ? 'Loading matches...'
-                              : 'Total Matches Found : $matches',
+                              : _faceMatchData[userIndex]?.isNotEmpty == true
+                                ? 'Total Matches Found : $matches'
+                                : 'No face match data available',
                             style: TextStyle(
                               fontSize: 12,
                               color: _isLoadingFaceMatch[userIndex] == true
                                 ? Colors.blue[600]
-                                : Colors.grey[600],
+                                : _faceMatchData[userIndex]?.isNotEmpty == true
+                                  ? Colors.grey[600]
+                                  : Colors.grey[500],
                             ),
                             overflow: TextOverflow.visible,
                             softWrap: true,
@@ -1973,65 +2035,60 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   Widget _buildAppointmentItem(String name, String dateTime, String status, Color statusColor) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.grey[300],
-            ),
-            child: const Icon(Icons.person, color: Colors.grey),
-          ),
-          const SizedBox(width: 12),
-          
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          // First row: Name on left, Status on right
+          Row(
+            children: [
+              // Name
+              Expanded(
+                child: Text(
                   name,
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  dateTime,
-                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              
+              // Status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: statusColor,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           
-          // Status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: statusColor.withOpacity(0.3)),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: statusColor,
-              ),
+          const SizedBox(height: 4),
+          
+          // Second row: Date and Time
+          Text(
+            dateTime,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
             ),
           ),
         ],

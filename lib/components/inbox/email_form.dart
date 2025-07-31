@@ -141,36 +141,135 @@ class _EmailFormState extends State<EmailForm> {
 
   String _getAppointeeEmail() {
     // Try multiple possible fields for the appointee email
-    return widget.appointment['email']?.toString() ?? 
-           widget.appointment['appointeeEmail']?.toString() ??
-           widget.appointment['userEmail']?.toString() ??
-           '';
+    // Primary: email field (from the actual data structure)
+    final email = widget.appointment['email']?.toString();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+    
+    // Secondary: userEmail field
+    final userEmail = widget.appointment['userEmail']?.toString();
+    if (userEmail != null && userEmail.isNotEmpty) {
+      return userEmail;
+    }
+    
+    // Fallback: appointeeEmail field
+    final appointeeEmail = widget.appointment['appointeeEmail']?.toString();
+    if (appointeeEmail != null && appointeeEmail.isNotEmpty) {
+      return appointeeEmail;
+    }
+    
+    return '';
   }
 
   String _getReferenceEmail() {
     // Try multiple possible fields for the reference email
-    return widget.appointment['refEmail']?.toString() ?? 
-           widget.appointment['referenceEmail']?.toString() ??
-           widget.appointment['refByEmail']?.toString() ??
-           widget.appointment['referenceByEmail']?.toString() ??
-           '';
+    // Primary: referencePerson.email (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final email = referencePerson['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    }
+    
+    // Secondary: referenceEmail field
+    final referenceEmail = widget.appointment['referenceEmail']?.toString();
+    if (referenceEmail != null && referenceEmail.isNotEmpty) {
+      return referenceEmail;
+    }
+    
+    // Fallback: other possible field names
+    final refEmail = widget.appointment['refEmail']?.toString();
+    if (refEmail != null && refEmail.isNotEmpty) {
+      return refEmail;
+    }
+    
+    final refByEmail = widget.appointment['refByEmail']?.toString();
+    if (refByEmail != null && refByEmail.isNotEmpty) {
+      return refByEmail;
+    }
+    
+    final referenceByEmail = widget.appointment['referenceByEmail']?.toString();
+    if (referenceByEmail != null && referenceByEmail.isNotEmpty) {
+      return referenceByEmail;
+    }
+    
+    return '';
   }
 
   String _getReferenceName() {
     // Try multiple possible fields for the reference name
-    return widget.appointment['refName']?.toString() ?? 
-           widget.appointment['refBy']?.toString() ??
-           widget.appointment['referenceName']?.toString() ??
-           widget.appointment['referenceBy']?.toString() ??
-           'Unknown Reference';
+    // Primary: referencePerson.name (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final name = referencePerson['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+    
+    // Secondary: other possible field names
+    final refName = widget.appointment['refName']?.toString();
+    if (refName != null && refName.isNotEmpty) {
+      return refName;
+    }
+    
+    final refBy = widget.appointment['refBy']?.toString();
+    if (refBy != null && refBy.isNotEmpty) {
+      return refBy;
+    }
+    
+    final referenceName = widget.appointment['referenceName']?.toString();
+    if (referenceName != null && referenceName.isNotEmpty) {
+      return referenceName;
+    }
+    
+    final referenceBy = widget.appointment['referenceBy']?.toString();
+    if (referenceBy != null && referenceBy.isNotEmpty) {
+      return referenceBy;
+    }
+    
+    return 'Unknown Reference';
   }
 
   String _getReferencePhone() {
     // Try multiple possible fields for the reference phone
-    return widget.appointment['refPhone']?.toString() ?? 
-           widget.appointment['referencePhone']?.toString() ??
-           widget.appointment['refByPhone']?.toString() ??
-           '';
+    // Primary: referencePerson.phoneNumber (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final phoneNumber = referencePerson['phoneNumber'];
+      if (phoneNumber is Map<String, dynamic>) {
+        final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+        final number = phoneNumber['number']?.toString() ?? '';
+        if (countryCode.isNotEmpty && number.isNotEmpty) {
+          return '$countryCode $number';
+        }
+      }
+      
+      // Handle phoneNumber as a string
+      if (phoneNumber is String && phoneNumber.isNotEmpty) {
+        return phoneNumber;
+      }
+    }
+    
+    // Secondary: other possible field names
+    final refPhone = widget.appointment['refPhone']?.toString();
+    if (refPhone != null && refPhone.isNotEmpty) {
+      return refPhone;
+    }
+    
+    final referencePhone = widget.appointment['referencePhone']?.toString();
+    if (referencePhone != null && referencePhone.isNotEmpty) {
+      return referencePhone;
+    }
+    
+    final refByPhone = widget.appointment['refByPhone']?.toString();
+    if (refByPhone != null && refByPhone.isNotEmpty) {
+      return refByPhone;
+    }
+    
+    return '';
   }
 
   List<String> _getRecipientEmails() {
@@ -515,7 +614,7 @@ class _EmailFormState extends State<EmailForm> {
                         value: _includeReferenceEmail,
                         onChanged: (value) => setState(() => _includeReferenceEmail = value ?? false),
                         title: 'Reference Email: ${_getReferenceEmail()}',
-                        subtitle: _getReferenceEmail().isNotEmpty ? '${_getReferenceName()} (${_getReferencePhone()})' : 'No reference email available',
+                        subtitle: _getReferenceEmail().isNotEmpty ? null : 'No reference email available',
                       ),
                       
                       const SizedBox(height: 16),
@@ -673,12 +772,12 @@ class _EmailFormState extends State<EmailForm> {
                         controller: _emailTemplateController,
                         focusNode: _emailTemplateFocus,
                         onTap: () => _scrollToFocusedField(_emailTemplateFocus),
-                        decoration: const InputDecoration(
-                          labelText: 'Email Template',
-                          hintText: 'Enter email content here...',
-                          border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
-                        ),
+                                                 decoration: const InputDecoration(
+                           labelText: 'Email Body',
+                           hintText: 'Enter email content here...',
+                           border: OutlineInputBorder(),
+                           alignLabelWithHint: true,
+                         ),
                         maxLines: 8,
                         validator: (value) {
                           if (value == null || value.isEmpty) {

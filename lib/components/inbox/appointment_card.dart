@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'appointment_detail_page.dart';
 import 'appointment_schedule_form.dart';
 import 'email_form.dart';
@@ -15,6 +16,7 @@ class AppointmentCard extends StatefulWidget {
   final VoidCallback? onTap;
   final Function(bool)? onStarToggle;
   final VoidCallback? onDelete;
+  final VoidCallback? onRefresh; // Add refresh callback
 
   const AppointmentCard({
     super.key,
@@ -22,6 +24,7 @@ class AppointmentCard extends StatefulWidget {
     this.onTap,
     this.onStarToggle,
     this.onDelete,
+    this.onRefresh, // Add refresh callback parameter
   });
 
   @override
@@ -47,6 +50,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap:
@@ -123,20 +127,51 @@ class _AppointmentCardState extends State<AppointmentCard> {
               // Header with created by info
               Row(
                 children: [
-                  // Created by Avatar
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(createdByImage),
-                    onBackgroundImageError: (exception, stackTrace) {
-                      // Handle image loading error
-                    },
-                    child: createdByImage.isEmpty
-                        ? const Icon(
-                            Icons.person,
-                            size: 30,
-                            color: Colors.white,
-                          )
-                        : null,
+                  // Created by Avatar (Square Box)
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!, width: 1),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: createdByImage.isNotEmpty
+                          ? Image.network(
+                              createdByImage,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[300],
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 25,
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: Colors.grey[300],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.grey[300],
+                              child: const Icon(
+                                Icons.person,
+                                size: 25,
+                                color: Colors.grey,
+                              ),
+                            ),
+                    ),
                   ),
                   const SizedBox(width: 12),
 
@@ -167,18 +202,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                        if (createdAt.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Created: $createdAt',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+
                       ],
                     ),
                   ),
@@ -248,22 +272,16 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
               // Essential details only
               if (preferredDateRange.isNotEmpty) ...[
-                _buildDetailRow('Preferred Dates', preferredDateRange),
-                const SizedBox(height: 4),
-              ],
-              if (attendeeCount > 0) ...[
-                _buildDetailRow(
-                  'Attendees',
-                  '$attendeeCount person${attendeeCount > 1 ? 's' : ''}',
-                ),
-                const SizedBox(height: 4),
-              ],
-              if (_getAssignedSecretary().isNotEmpty) ...[
-                _buildDetailRow('Assigned To', _getAssignedSecretary()),
-                const SizedBox(height: 4),
+                _buildPreferredDateWidget(preferredDateRange),
+                const SizedBox(height: 2),
               ],
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+
+              // Footer section with assigned secretary and people count
+              _buildFooterSection(),
+
+              const SizedBox(height: 8),
 
               // Action buttons
               Row(
@@ -291,7 +309,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     icon: Icons.call,
                     label: 'Call',
                     color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'call'),
+                    onTap: _makePhoneCall,
                   ),
                   _buildActionButton(
                     icon: Icons.assignment_ind,
@@ -319,25 +337,144 @@ class _AppointmentCardState extends State<AppointmentCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 80,
+          width: 90,
           child: Text(
             '$label:',
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
             ),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
-            maxLines: 2,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPreferredDateWidget(String dateRange) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Colors.amber[50]!.withOpacity(0.6),
+            Colors.orange[50]!.withOpacity(0.6),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.amber[200]!.withOpacity(0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_today,
+            size: 14,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              dateRange,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterSection() {
+    final assignedSecretary = _getAssignedSecretary();
+    final attendeeCount = _getAttendeeCount();
+    
+    return Container(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          // Assigned secretary section
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  Icons.person,
+                  size: 18,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    assignedSecretary.isNotEmpty ? assignedSecretary : 'Unassigned',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: assignedSecretary.isNotEmpty ? Colors.grey[700] : Colors.grey[500],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // People count badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.grey[300]!.withOpacity(0.6),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.people,
+                  size: 12,
+                  color: Colors.grey[600],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$attendeeCount ${attendeeCount == 1 ? 'Person' : 'People'}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -399,6 +536,62 @@ class _AppointmentCardState extends State<AppointmentCard> {
       backgroundColor: Colors.transparent,
       builder: (context) => _buildActionContent(action),
     );
+  }
+
+  Future<void> _makePhoneCall() async {
+    // Get the phone number from appointment data
+    final phoneNumber = _getAppointeeMobile();
+    
+    if (phoneNumber.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No phone number available for this appointment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Create the phone URL
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not launch phone app'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error making call: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getAppointeeMobile() {
+    final phoneNumber = widget.appointment['phoneNumber'];
+    if (phoneNumber is Map<String, dynamic>) {
+      final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+      final number = phoneNumber['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode$number';
+      }
+    }
+    return phoneNumber?.toString() ?? '';
   }
 
   Widget _buildActionContent(String action) {
@@ -493,8 +686,13 @@ class _AppointmentCardState extends State<AppointmentCard> {
       ),
       child: Column(
         children: [
-          _buildActionHeader('Assign Appointment'),
-          Expanded(child: AssignForm(appointment: widget.appointment)),
+          _buildActionHeader('Assign Secretary'),
+          Expanded(
+            child: AssignForm(
+              appointment: widget.appointment,
+              onRefresh: widget.onRefresh, // Pass refresh callback
+            ),
+          ),
         ],
       ),
     );
@@ -643,6 +841,178 @@ class _AppointmentCardState extends State<AppointmentCard> {
     if (assignedSecretary is Map<String, dynamic>) {
       return assignedSecretary['fullName']?.toString() ?? '';
     }
+    return '';
+  }
+
+  // New methods to get user contact information
+  String _getUserMobile() {
+    // Try to get userMobile from the appointment data
+    final userMobile = widget.appointment['userMobile'];
+    
+    // Handle userMobile as an object with countryCode and number
+    if (userMobile is Map<String, dynamic>) {
+      final countryCode = userMobile['countryCode']?.toString() ?? '';
+      final number = userMobile['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode $number';
+      }
+    }
+    
+    // Handle userMobile as a string
+    if (userMobile is String && userMobile.isNotEmpty) {
+      return userMobile;
+    }
+    
+    // Try phoneNumber field (from the actual data structure)
+    final phoneNumber = widget.appointment['phoneNumber'];
+    if (phoneNumber is Map<String, dynamic>) {
+      final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+      final number = phoneNumber['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode $number';
+      }
+    }
+    
+    // Handle phoneNumber as a string
+    if (phoneNumber is String && phoneNumber.isNotEmpty) {
+      return phoneNumber;
+    }
+    
+    // Try to get from userData if available
+    final userData = widget.appointment['userData'];
+    if (userData is Map<String, dynamic>) {
+      final mobile = userData['phoneNumber']?.toString();
+      if (mobile != null && mobile.isNotEmpty) {
+        return mobile;
+      }
+    }
+    
+    // Try other possible field names
+    final possibleMobileFields = ['mobile', 'userPhone', 'contactNumber', 'phone'];
+    for (final field in possibleMobileFields) {
+      final value = widget.appointment[field]?.toString();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    
+    return '';
+  }
+
+  String _getUserEmail() {
+    // Try to get userEmail from the appointment data
+    final userEmail = widget.appointment['userEmail']?.toString();
+    if (userEmail != null && userEmail.isNotEmpty) {
+      return userEmail;
+    }
+    
+    // Try email field (from the actual data structure)
+    final email = widget.appointment['email']?.toString();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+    
+    // Try to get from userData if available
+    final userData = widget.appointment['userData'];
+    if (userData is Map<String, dynamic>) {
+      final email = userData['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    }
+    
+    // Try other possible field names
+    final possibleEmailFields = ['userEmail', 'contactEmail', 'primaryEmail'];
+    for (final field in possibleEmailFields) {
+      final value = widget.appointment[field]?.toString();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    
+    return '';
+  }
+
+  String _getReferencePhoneNumber() {
+    // Try to get referencePhoneNumber from the appointment data
+    final referencePhoneNumber = widget.appointment['referencePhoneNumber']?.toString();
+    if (referencePhoneNumber != null && referencePhoneNumber.isNotEmpty) {
+      return referencePhoneNumber;
+    }
+    
+    // Try referencePerson.phoneNumber (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final phoneNumber = referencePerson['phoneNumber'];
+      if (phoneNumber is Map<String, dynamic>) {
+        final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+        final number = phoneNumber['number']?.toString() ?? '';
+        if (countryCode.isNotEmpty && number.isNotEmpty) {
+          return '$countryCode $number';
+        }
+      }
+      
+      // Handle phoneNumber as a string
+      if (phoneNumber is String && phoneNumber.isNotEmpty) {
+        return phoneNumber;
+      }
+    }
+    
+    // Try to get from userData if available
+    final userData = widget.appointment['userData'];
+    if (userData is Map<String, dynamic>) {
+      final refPhone = userData['referencePhoneNumber']?.toString();
+      if (refPhone != null && refPhone.isNotEmpty) {
+        return refPhone;
+      }
+    }
+    
+    // Try other possible field names
+    final possibleRefPhoneFields = ['referencePhone', 'refPhone', 'emergencyPhone', 'contactPhone'];
+    for (final field in possibleRefPhoneFields) {
+      final value = widget.appointment[field]?.toString();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    
+    return '';
+  }
+
+  String _getReferenceEmail() {
+    // Try to get referenceEmail from the appointment data
+    final referenceEmail = widget.appointment['referenceEmail']?.toString();
+    if (referenceEmail != null && referenceEmail.isNotEmpty) {
+      return referenceEmail;
+    }
+    
+    // Try referencePerson.email (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final email = referencePerson['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    }
+    
+    // Try to get from userData if available
+    final userData = widget.appointment['userData'];
+    if (userData is Map<String, dynamic>) {
+      final refEmail = userData['referenceEmail']?.toString();
+      if (refEmail != null && refEmail.isNotEmpty) {
+        return refEmail;
+      }
+    }
+    
+    // Try other possible field names
+    final possibleRefEmailFields = ['referenceEmail', 'refEmail', 'emergencyEmail', 'contactEmail'];
+    for (final field in possibleRefEmailFields) {
+      final value = widget.appointment[field]?.toString();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    
     return '';
   }
 

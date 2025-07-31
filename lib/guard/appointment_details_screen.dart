@@ -509,7 +509,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
-  Widget _buildUserCard(Map<String, dynamic> user) {
+  Widget _buildUserCard(Map<String, dynamic> user, int index) {
     final fullName = user['fullName'] ?? 'Unknown';
     final userType = user['userType'] ?? 'unknown';
     final status = user['status'] ?? 'unknown';
@@ -536,35 +536,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // First line: Name and Status (left and right)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '$fullName (${userType == 'main' ? 'Main User' : 'Accompanying User'})',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getUserStatusColor(status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _getUserStatusText(status),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: _getUserStatusColor(status),
-                  ),
-                ),
-              ),
-            ],
+          // First line: Index and Name (removed status from right corner)
+          Text(
+            '${index + 1}. $fullName${userType == 'main' ? ' (Main Appointee)' : ''}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
           ),
           const SizedBox(height: 12),
           
@@ -859,6 +838,42 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // Show completion message when all users are processed (moved above count)
+                      if (!_hasPendingUsers()) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.green,
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.task_alt,
+                                color: Colors.green,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'All users have been processed',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
                       // User Count Summary (always visible)
                       Container(
                         width: double.infinity,
@@ -916,45 +931,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                           ],
                         ),
-                      ] else ...[
-                        // Show completion message when all users are processed
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.grey[300]!,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.task_alt,
-                                color: Colors.grey[600],
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'All users have been processed',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                       const SizedBox(height: 20),
 
                       // User Cards
                       if (appointmentData?['users'] != null) ...[
-                        ...appointmentData!['users'].map<Widget>((user) => _buildUserCard(user)).toList(),
+                        ...appointmentData!['users'].asMap().entries.map<Widget>((entry) => 
+                          _buildUserCard(entry.value, entry.key)
+                        ).toList(),
                       ],
                     ],
                   ),
