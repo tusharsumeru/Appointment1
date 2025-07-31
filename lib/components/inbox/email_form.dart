@@ -255,6 +255,14 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
     return widget.appointment['email']?.toString() ?? '';
   }
 
+  String _getReferenceEmail() {
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      return referencePerson['email']?.toString() ?? '';
+    }
+    return '';
+  }
+
   // @override
   // void initState() {
   //   super.initState();
@@ -332,26 +340,233 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
 
   String _replacePlaceholders(String text) {
     String result = text;
-    result = result.replaceAll('{\$AID}', 'APP123456');
-    result = result.replaceAll('{\$full_name}', 'John Doe');
-    result = result.replaceAll('{\$ji}', 'Ji');
-    result = result.replaceAll('{\$date}', '15 January 2024');
-    result = result.replaceAll('{\$time}', '10:00 AM');
-    result = result.replaceAll('{\$no_people}', '2');
-    result = result.replaceAll('{\$app_location}', 'Bangalore Ashram');
-    result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
-    result = result.replaceAll('{\$area}', 'Main Hall');
-    result = result.replaceAll('{\$designation}', 'Software Engineer');
-    result = result.replaceAll('{\$mobile}', '+91 9876543210');
-    result = result.replaceAll('{\$email}', 'john.doe@example.com');
-    result = result.replaceAll('{\$ref_by}', 'Gurudev');
-    result = result.replaceAll('{\$ref_phone}', '+91 9876543211');
-    result = result.replaceAll('{\$subject}', 'Meeting with Gurudev');
-    result = result.replaceAll('{\$purpose}', 'Seeking guidance on spiritual matters');
-    result = result.replaceAll('{\$ref_name}', 'Gurudev');
-    result = result.replaceAll('{\$appointee_name}', 'John Doe');
-    result = result.replaceAll('{\$appointeeName}', 'John Doe');
+    
+    // Extract data from appointment object
+    final appointmentId = _getAppointmentId();
+    final fullName = _getFullName();
+    final ji = _getJi();
+    final date = _getAppointmentDate();
+    final time = _getAppointmentTime();
+    final noPeople = _getNumberOfPeople();
+    final appLocation = _getAppointmentLocation();
+    final emailNote = _getEmailNote();
+    final area = _getArea();
+    final designation = _getDesignation();
+    final mobile = _getMobile();
+    final email = _getEmail();
+    final refBy = _getReferenceBy();
+    final refPhone = _getReferencePhone();
+    final subject = _getSubject();
+    final purpose = _getPurpose();
+    final refName = _getReferenceName();
+    final appointeeName = _getAppointeeName();
+    
+    // Replace placeholders with dynamic values
+    result = result.replaceAll('{\$AID}', appointmentId);
+    result = result.replaceAll('{\$full_name}', fullName);
+    result = result.replaceAll('{\$ji}', ji);
+    result = result.replaceAll('{\$date}', date);
+    result = result.replaceAll('{\$time}', time);
+    result = result.replaceAll('{\$no_people}', noPeople);
+    result = result.replaceAll('{\$app_location}', appLocation);
+    result = result.replaceAll('{\$email_note}', emailNote);
+    result = result.replaceAll('{\$area}', area);
+    result = result.replaceAll('{\$designation}', designation);
+    result = result.replaceAll('{\$mobile}', mobile);
+    result = result.replaceAll('{\$email}', email);
+    result = result.replaceAll('{\$ref_by}', refBy);
+    result = result.replaceAll('{\$ref_phone}', refPhone);
+    result = result.replaceAll('{\$subject}', subject);
+    result = result.replaceAll('{\$purpose}', purpose);
+    result = result.replaceAll('{\$ref_name}', refName);
+    result = result.replaceAll('{\$appointee_name}', appointeeName);
+    result = result.replaceAll('{\$appointeeName}', appointeeName);
+    
     return result;
+  }
+
+  // Helper methods to extract data from appointment object
+  String _getFullName() {
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      return createdBy['fullName']?.toString() ?? '';
+    }
+    return widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getJi() {
+    // Add "Ji" suffix for respectful address
+    return 'Ji';
+  }
+
+  String _getAppointmentDate() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final date = scheduledDateTime['date']?.toString();
+      if (date != null) {
+        final dateTime = DateTime.tryParse(date);
+        if (dateTime != null) {
+          return '${dateTime.day} ${_getMonthName(dateTime.month)} ${dateTime.year}';
+        }
+      }
+    }
+    
+    // Fallback to preferred date range
+    final preferredDateRange = widget.appointment['preferredDateRange'];
+    if (preferredDateRange is Map<String, dynamic>) {
+      final fromDate = preferredDateRange['fromDate']?.toString();
+      if (fromDate != null) {
+        final dateTime = DateTime.tryParse(fromDate);
+        if (dateTime != null) {
+          return '${dateTime.day} ${_getMonthName(dateTime.month)} ${dateTime.year}';
+        }
+      }
+    }
+    
+    return 'TBD';
+  }
+
+  String _getAppointmentTime() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final time = scheduledDateTime['time']?.toString();
+      if (time != null) {
+        // Convert 24-hour format to 12-hour format
+        final timeParts = time.split(':');
+        if (timeParts.length == 2) {
+          final hour = int.tryParse(timeParts[0]) ?? 0;
+          final minute = timeParts[1];
+          final period = hour >= 12 ? 'PM' : 'AM';
+          final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+          return '${displayHour.toString().padLeft(2, '0')}:$minute $period';
+        }
+        return time;
+      }
+    }
+    return 'TBD';
+  }
+
+  String _getNumberOfPeople() {
+    final accompanyUsers = widget.appointment['accompanyUsers'];
+    if (accompanyUsers is List) {
+      int totalCount = 1; // Include main applicant
+      for (final group in accompanyUsers) {
+        if (group is Map<String, dynamic>) {
+          final users = group['users'];
+          if (users is List) {
+            totalCount += users.length;
+          }
+        }
+      }
+      return totalCount.toString();
+    } else if (accompanyUsers is Map<String, dynamic>) {
+      return (accompanyUsers['numberOfUsers'] ?? 1).toString();
+    }
+    return '1';
+  }
+
+  String _getAppointmentLocation() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      return scheduledDateTime['venueLabel']?.toString() ?? '';
+    }
+    
+    final venue = widget.appointment['venue'];
+    if (venue is Map<String, dynamic>) {
+      return venue['name']?.toString() ?? '';
+    }
+    
+    return 'Bangalore Ashram';
+  }
+
+  String _getEmailNote() {
+    return 'Please arrive 15 minutes before your scheduled time.';
+  }
+
+  String _getArea() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString() ?? '';
+      if (venueLabel.contains('Satsang')) {
+        return 'Satsang Hall';
+      } else if (venueLabel.contains('Gurukul')) {
+        return 'Gurukul';
+      }
+    }
+    return 'Main Hall';
+  }
+
+  String _getDesignation() {
+    return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['userCurrentCompany']?.toString() ?? 
+           'Not specified';
+  }
+
+  String _getMobile() {
+    final phoneNumber = widget.appointment['phoneNumber'];
+    if (phoneNumber is Map<String, dynamic>) {
+      final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+      final number = phoneNumber['number']?.toString() ?? '';
+      return '$countryCode $number';
+    }
+    return 'Not provided';
+  }
+
+  String _getEmail() {
+    return widget.appointment['email']?.toString() ?? 'Not provided';
+  }
+
+  String _getReferenceBy() {
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      return referencePerson['name']?.toString() ?? '';
+    }
+    return 'Not specified';
+  }
+
+  String _getReferencePhone() {
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final phoneNumber = referencePerson['phoneNumber'];
+      if (phoneNumber is Map<String, dynamic>) {
+        final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+        final number = phoneNumber['number']?.toString() ?? '';
+        return '$countryCode $number';
+      }
+    }
+    return 'Not provided';
+  }
+
+  String _getSubject() {
+    return widget.appointment['appointmentSubject']?.toString() ?? 'Meeting with Gurudev';
+  }
+
+  String _getPurpose() {
+    return widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified';
+  }
+
+  String _getReferenceName() {
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      return referencePerson['name']?.toString() ?? '';
+    }
+    return 'Not specified';
+  }
+
+  String _getAppointeeName() {
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      return createdBy['fullName']?.toString() ?? '';
+    }
+    return widget.appointment['email']?.toString() ?? 'Unknown';
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
   }
 
   void _sendEmail() {
@@ -436,7 +651,7 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
                       _buildCheckbox(
                         value: _includeReferenceEmail,
                         onChanged: (value) => setState(() => _includeReferenceEmail = value ?? false),
-                        title: 'Reference Email:',
+                        title: 'Reference Email: ${_getReferenceEmail()}',
                       ),
                       
                       const SizedBox(height: 16),
