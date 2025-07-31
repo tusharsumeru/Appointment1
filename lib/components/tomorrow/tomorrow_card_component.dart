@@ -24,43 +24,43 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     'morning': {
       'title': 'Morning',
       'icon': Icons.wb_sunny,
-      'color': Colors.orange,
-      'timeRange': {'start': 6, 'end': 12},
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 6, 'end': 15}, // 6 AM to 3 PM
     },
     'evening': {
       'title': 'Evening',
       'icon': Icons.wb_sunny_outlined,
-      'color': Colors.amber,
-      'timeRange': {'start': 12, 'end': 18},
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 15, 'end': 18.5}, // 3 PM to 6:30 PM
     },
     'night': {
       'title': 'Night',
       'icon': Icons.nightlight_round,
-      'color': Colors.indigo,
-      'timeRange': {'start': 18, 'end': 24},
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 20, 'end': 22}, // 8 PM to 10 PM
     },
     'tbs_req': {
       'title': 'TBS/Req',
       'icon': Icons.pending_actions,
-      'color': Colors.red,
+      'color': Colors.deepPurple,
       'timeRange': null, // Based on status
     },
     'done': {
       'title': 'Done',
       'icon': Icons.check_circle,
-      'color': Colors.green,
+      'color': Colors.deepPurple,
       'timeRange': null, // Based on status
     },
     'satsang_backstage': {
       'title': 'Satsang Backstage',
       'icon': Icons.music_note,
-      'color': Colors.purple,
+      'color': Colors.deepPurple,
       'timeRange': null, // Based on venue
     },
     'gurukul': {
       'title': 'Gurukul',
       'icon': Icons.school,
-      'color': Colors.teal,
+      'color': Colors.deepPurple,
       'timeRange': null, // Based on venue
     },
   };
@@ -154,11 +154,41 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             return false; // Don't show completed appointments in time-based categories
           }
 
+          // Check if appointment has TBS/Req communication preference - if so, exclude from time-based
+          final communicationPreferences = appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any((pref) => 
+              pref.toString() == 'TBS/Req'
+            );
+            if (hasTbsReq) {
+              return false; // Don't show TBS/Req appointments in time categories
+            }
+          }
+
+          // Check if appointment belongs to location-based categories - if so, exclude from time-based
+          final location = _getLocation(appointment).toLowerCase();
+          final isSatsangBackstage = location.contains('satsang') && location.contains('backstage');
+          final isGurukul = location.contains('gurukul');
+          
+          if (isSatsangBackstage || isGurukul) {
+            return false; // Don't show location-based appointments in time categories
+          }
+
           // Try multiple time fields
-          String? timeString =
-              appointment['scheduledTime']?.toString() ??
-              appointment['preferredTime']?.toString() ??
-              appointment['createdAt']?.toString();
+          String? timeString;
+          
+          // First try to get time from scheduledDateTime object
+          final scheduledDateTime = appointment['scheduledDateTime'];
+          if (scheduledDateTime is Map<String, dynamic>) {
+            timeString = scheduledDateTime['time']?.toString();
+          }
+          
+          // Fallback to other time fields
+          if (timeString == null || timeString.isEmpty) {
+            timeString = appointment['scheduledTime']?.toString() ??
+                        appointment['preferredTime']?.toString() ??
+                        appointment['createdAt']?.toString();
+          }
 
           if (timeString == null) {
             print(
@@ -168,8 +198,18 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           }
 
           try {
-            final time = DateTime.parse(timeString);
-            final hour = time.hour;
+            // Handle time string like "20:55" or full DateTime
+            int hour;
+            if (timeString.contains(':')) {
+              // Time string like "20:55"
+              final parts = timeString.split(':');
+              hour = int.parse(parts[0]);
+            } else {
+              // Full DateTime string
+              final time = DateTime.parse(timeString);
+              hour = time.hour;
+            }
+            
             final category = _categories[categoryKey]!;
             final start = category['timeRange']['start'] as int;
             final end = category['timeRange']['end'] as int;
@@ -180,7 +220,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
             if (isInRange) {
               print(
-                '✅ ${categoryKey.toUpperCase()}: Appointment ${appointment['_id']} at ${time.hour}:${time.minute}',
+                '✅ ${categoryKey.toUpperCase()}: Appointment ${appointment['_id']} at hour: $hour',
               );
             }
 
@@ -198,11 +238,28 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           if (status == 'completed' || status == 'done') {
             return false;
           }
-          final isTbsReq =
+          
+
+          
+          // Check status-based TBS/Req
+          final isStatusTbsReq =
               status == 'pending' || status == 'tbs' || status == 'requested';
+          
+          // Check communication preferences for TBS/Req
+          final communicationPreferences = appointment['communicationPreferences'];
+          bool isCommunicationTbsReq = false;
+          
+          if (communicationPreferences is List) {
+            isCommunicationTbsReq = communicationPreferences.any((pref) => 
+              pref.toString() == 'TBS/Req'
+            );
+          }
+          
+          final isTbsReq = isStatusTbsReq || isCommunicationTbsReq;
+          
           if (isTbsReq) {
             print(
-              '✅ TBS/REQ: Appointment ${appointment['_id']} with status: $status',
+              '✅ TBS/REQ: Appointment ${appointment['_id']} with status: $status, communicationPreferences: $communicationPreferences',
             );
           }
           return isTbsReq;
@@ -263,7 +320,16 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // Try to get status from appointmentStatus object
+    // Try to get mainStatus from checkInStatus object first
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is Map<String, dynamic>) {
+      final mainStatus = checkInStatus['mainStatus']?.toString();
+      if (mainStatus != null && mainStatus.isNotEmpty) {
+        return mainStatus;
+      }
+    }
+    
+    // Fallback to appointmentStatus.status
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
       final status = appointmentStatus['status']?.toString();
@@ -272,8 +338,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       }
     }
     
-    // Fallback to direct status field
-    return appointment['status']?.toString() ?? 'Unknown';
+    // Final fallback to direct mainStatus field
+    return appointment['mainStatus']?.toString() ?? 'Unknown';
   }
 
   String _getAppointmentTime(Map<String, dynamic> appointment) {
@@ -384,6 +450,25 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     return 'U';
   }
 
+  String _getSecretaryName(Map<String, dynamic> appointment) {
+    // Try to get secretary name from assignedSecretary object
+    final assignedSecretary = appointment['assignedSecretary'];
+    if (assignedSecretary is Map<String, dynamic>) {
+      final fullName = assignedSecretary['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return fullName;
+      }
+    }
+    
+    // Fallback to other fields
+    final secretaryName = appointment['secretaryName']?.toString() ??
+                         appointment['assignedTo']?.toString() ??
+                         appointment['secretary']?.toString() ??
+                         'Vishal Merani'; // Default fallback
+    
+    return secretaryName;
+  }
+
   String _getSecretaryInitials(Map<String, dynamic> appointment) {
     // Try to get secretary name from assignedSecretary object
     final assignedSecretary = appointment['assignedSecretary'];
@@ -418,44 +503,14 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   Color _getStatusColor(String? status) {
     if (status == null) return Colors.grey;
-
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'done':
-        return Colors.green;
-      case 'pending':
-      case 'tbs':
-      case 'requested':
-        return Colors.orange;
-      case 'scheduled':
-        return Colors.blue;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+    print('Tomorrow Screen - Status Color: $status'); // Log status for debugging
+    return Colors.blue; // Default color for all statuses
   }
 
   String _getStatusText(String? status) {
     if (status == null) return 'Unknown';
-
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'done':
-        return 'Completed';
-      case 'pending':
-        return 'Pending';
-      case 'tbs':
-        return 'TBS';
-      case 'requested':
-        return 'Requested';
-      case 'scheduled':
-        return 'Scheduled';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
+    print('Tomorrow Screen - Status Text: $status'); // Log status for debugging
+    return status; // Display exactly what comes from API
   }
 
   @override
@@ -811,161 +866,125 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                   ),
                 ),
 
-                // Second line - Status, Time, Accompany, Secretary
+                // Second line - Status, Time, Accompany, Secretary (Side by Side Layout)
                 Container(
                   padding: const EdgeInsets.all(12),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top row - Status and Time
+                      // Status
                       Row(
                         children: [
-                          // Status
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Status',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(_getAppointmentStatus(appointment)).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    _getStatusText(_getAppointmentStatus(appointment)),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: _getStatusColor(_getAppointmentStatus(appointment)),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            'Status: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(_getAppointmentStatus(appointment)).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _getStatusText(_getAppointmentStatus(appointment)),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: _getStatusColor(_getAppointmentStatus(appointment)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
 
-                          // Time
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Time',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _getAppointmentTime(appointment),
+                      const SizedBox(height: 12),
+
+                      // Time
+                      Row(
+                        children: [
+                          Text(
+                            'Time: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            _getAppointmentTime(appointment),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Accompany
+                      Row(
+                        children: [
+                          Text(
+                            'Accompany: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '${appointment['accompanyCount'] ?? 0}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                                              // Secretary
+                        Row(
+                          children: [
+                            Text(
+                              'Secretary: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade600,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _getSecretaryInitials(appointment),
                                   style: const TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
+                                    color: Colors.white,
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Bottom row - Accompany and Secretary
-                      Row(
-                        children: [
-                          // Accompany
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 4),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Accompany',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${appointment['accompanyCount'] ?? 0}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Secretary
-                          Expanded(
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 10,
-                                  backgroundColor: Colors.blue.shade100,
-                                  child: Text(
-                                    _getSecretaryInitials(appointment),
-                                    style: TextStyle(
-                                      color: Colors.blue.shade700,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Secretary',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      _getSecretaryInitials(appointment),
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -984,41 +1003,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                 bottomRight: Radius.circular(12),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Location info
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _getLocation(appointment),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Action buttons
-                Row(
-                  children: [
-                    // Action button (Done or Undo based on status)
-                    _buildActionButton(appointment),
-                  ],
-                ),
-              ],
-            ),
+            child: _buildActionButton(appointment),
           ),
         ],
       ),
@@ -1031,66 +1016,72 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
     if (isCompleted) {
       // Show Undo button for completed appointments
-      return ElevatedButton(
-        onPressed: () async {
-          await _handleUndo(appointment);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange.shade600,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () async {
+            await _handleUndo(appointment);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange.shade600,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Undo',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Undo',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.undo,
-              size: 16,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.undo,
+                size: 18,
+              ),
+            ],
+          ),
         ),
       );
     } else {
       // Show Done button for non-completed appointments
-      return ElevatedButton(
-        onPressed: () async {
-          await _handleMarkAsDone(appointment);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green.shade600,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () async {
+            await _handleMarkAsDone(appointment);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade600,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Done',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Done',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.arrow_forward,
-              size: 16,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward,
+                size: 18,
+              ),
+            ],
+          ),
         ),
       );
     }
