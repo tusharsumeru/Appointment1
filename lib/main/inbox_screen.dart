@@ -551,15 +551,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   );
                 }
               },
-              onDelete: () {
-                _deleteAppointment(appointment['_id']?.toString() ?? '');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${appointment['name']?.toString() ?? ''} deleted'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              },
+
               onRefresh: () {
                 // Refresh the appointments list when secretary is updated
                 _fetchAppointments();

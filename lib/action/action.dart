@@ -192,10 +192,14 @@ class ActionService {
   }
 
   // Helper method to process appointment data and format user fields
-  static Map<String, dynamic> _processAppointmentData(Map<String, dynamic> appointment) {
+  static Map<String, dynamic> _processAppointmentData(
+    Map<String, dynamic> appointment,
+  ) {
     // Create a copy of the appointment data
-    final Map<String, dynamic> processedAppointment = Map<String, dynamic>.from(appointment);
-    
+    final Map<String, dynamic> processedAppointment = Map<String, dynamic>.from(
+      appointment,
+    );
+
     // Process userMobile field - handle both object and string formats
     final userMobile = appointment['userMobile'];
     if (userMobile is Map<String, dynamic>) {
@@ -205,40 +209,45 @@ class ActionService {
         processedAppointment['userMobile'] = '$countryCode $number';
       }
     }
-    
+
     // Ensure userEmail is properly set
-    if (processedAppointment['userEmail'] == null || processedAppointment['userEmail'].toString().isEmpty) {
+    if (processedAppointment['userEmail'] == null ||
+        processedAppointment['userEmail'].toString().isEmpty) {
       // Fallback to email field if userEmail is not available
       final email = appointment['email']?.toString();
       if (email != null && email.isNotEmpty) {
         processedAppointment['userEmail'] = email;
       }
     }
-    
+
     // Ensure referencePhoneNumber is properly set
-    if (processedAppointment['referencePhoneNumber'] == null || processedAppointment['referencePhoneNumber'].toString().isEmpty) {
+    if (processedAppointment['referencePhoneNumber'] == null ||
+        processedAppointment['referencePhoneNumber'].toString().isEmpty) {
       // Try alternative field names
-      final refPhone = appointment['referencePhone']?.toString() ?? 
-                      appointment['refPhone']?.toString() ?? 
-                      appointment['emergencyPhone']?.toString() ?? 
-                      appointment['contactPhone']?.toString();
+      final refPhone =
+          appointment['referencePhone']?.toString() ??
+          appointment['refPhone']?.toString() ??
+          appointment['emergencyPhone']?.toString() ??
+          appointment['contactPhone']?.toString();
       if (refPhone != null && refPhone.isNotEmpty) {
         processedAppointment['referencePhoneNumber'] = refPhone;
       }
     }
-    
+
     // Ensure referenceEmail is properly set
-    if (processedAppointment['referenceEmail'] == null || processedAppointment['referenceEmail'].toString().isEmpty) {
+    if (processedAppointment['referenceEmail'] == null ||
+        processedAppointment['referenceEmail'].toString().isEmpty) {
       // Try alternative field names
-      final refEmail = appointment['referenceEmail']?.toString() ?? 
-                      appointment['refEmail']?.toString() ?? 
-                      appointment['emergencyEmail']?.toString() ?? 
-                      appointment['contactEmail']?.toString();
+      final refEmail =
+          appointment['referenceEmail']?.toString() ??
+          appointment['refEmail']?.toString() ??
+          appointment['emergencyEmail']?.toString() ??
+          appointment['contactEmail']?.toString();
       if (refEmail != null && refEmail.isNotEmpty) {
         processedAppointment['referenceEmail'] = refEmail;
       }
     }
-    
+
     return processedAppointment;
   }
 
@@ -356,12 +365,14 @@ class ActionService {
             responseData['data']?['appointments'] ?? [];
 
         // Process appointments to ensure all user fields are properly formatted
-        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
-          if (appointment is Map<String, dynamic>) {
-            return _processAppointmentData(appointment);
-          }
-          return <String, dynamic>{};
-        }).toList();
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         // No caching for inbox and assigned to me screens - always fetch fresh data
 
@@ -636,12 +647,14 @@ class ActionService {
             responseData['data']?['appointments'] ?? [];
 
         // Process appointments to ensure all user fields are properly formatted
-        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
-          if (appointment is Map<String, dynamic>) {
-            return _processAppointmentData(appointment);
-          }
-          return <String, dynamic>{};
-        }).toList();
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         return {
           'success': true,
@@ -1316,12 +1329,14 @@ class ActionService {
             responseData['data']?['appointments'] ?? [];
 
         // Process appointments to ensure all user fields are properly formatted
-        final List<Map<String, dynamic>> processedAppointments = rawAppointments.map((appointment) {
-          if (appointment is Map<String, dynamic>) {
-            return _processAppointmentData(appointment);
-          }
-          return <String, dynamic>{};
-        }).toList();
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         return {
           'success': true,
@@ -1680,51 +1695,7 @@ class ActionService {
     }
   }
 
-  // Get appointment history by user ID
-  static Future<Map<String, dynamic>> getAppointmentHistoryByUser({
-    required String userId,
-  }) async {
-    try {
-      // Get token from storage
-      final token = await StorageService.getToken();
 
-      if (token == null) {
-        return {
-          'success': false,
-          'statusCode': 401,
-          'message': 'No authentication token found. Please login again.',
-        };
-      }
-
-      // Validate userId
-      if (userId.isEmpty) {
-        return {
-          'success': false,
-          'statusCode': 400,
-          'message': 'User ID is required',
-        };
-      }
-
-      // Use the existing appointments filtering system with past=true
-      return await getAppointmentsWithFilters(
-        page: 1,
-        limit: 50, // Get more history items
-        sortBy: "createdAt",
-        sortOrder: "desc",
-        dateType: "created",
-        past: true, // This will get past appointments
-        additionalFilters: {
-          '_id': userId, // Filter by the MongoDB _id
-        },
-      );
-    } catch (error) {
-      return {
-        'success': false,
-        'statusCode': 500,
-        'message': 'Network error: $error',
-      };
-    }
-  }
 
   // Get appointment by ID (for QR scanner)
   static Future<Map<String, dynamic>> getAppointmentById(
@@ -2476,7 +2447,9 @@ class ActionService {
         queryParams['tags'] = tags.join(',');
       }
 
-      final uri = Uri.parse('$baseUrl/sms-templates').replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$baseUrl/sms-templates',
+      ).replace(queryParameters: queryParams);
 
       final response = await http.get(
         uri,
@@ -2493,7 +2466,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'SMS templates retrieved successfully',
+          'message':
+              responseData['message'] ?? 'SMS templates retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         await StorageService.logout();
@@ -2506,7 +2480,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve SMS templates',
+          'message':
+              responseData['message'] ?? 'Failed to retrieve SMS templates',
         };
       }
     } catch (error) {
@@ -2546,7 +2521,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'SMS template retrieved successfully',
+          'message':
+              responseData['message'] ?? 'SMS template retrieved successfully',
         };
       } else if (response.statusCode == 404) {
         return {
@@ -2565,7 +2541,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve SMS template',
+          'message':
+              responseData['message'] ?? 'Failed to retrieve SMS template',
         };
       }
     } catch (error) {
@@ -2605,7 +2582,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'SMS template options retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'SMS template options retrieved successfully',
         };
       } else if (response.statusCode == 401) {
         await StorageService.logout();
@@ -2618,7 +2597,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve SMS template options',
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve SMS template options',
         };
       }
     } catch (error) {
@@ -2775,7 +2756,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': secretaries,
-          'message': responseData['message'] ?? 'Secretaries fetched successfully',
+          'message':
+              responseData['message'] ?? 'Secretaries fetched successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -2843,9 +2825,7 @@ class ActionService {
       }
 
       // Prepare request body
-      final Map<String, dynamic> requestBody = {
-        'secretaryId': secretaryId,
-      };
+      final Map<String, dynamic> requestBody = {'secretaryId': secretaryId};
 
       // Make API call
       final response = await http.put(
@@ -2875,7 +2855,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Assigned secretary updated successfully',
+          'message':
+              responseData['message'] ??
+              'Assigned secretary updated successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -2904,7 +2886,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to update assigned secretary',
+          'message':
+              responseData['message'] ?? 'Failed to update assigned secretary',
         };
       }
     } catch (error) {
@@ -2913,6 +2896,116 @@ class ActionService {
         'statusCode': 500,
         'message': 'Network error. Please check your connection and try again.',
       };
+    }
+  }
+
+  // Fetch appointments for darshan line with filtering
+  static Future<List<Map<String, dynamic>>> fetchAppointments({
+    String? search,
+    String? darshanType,
+    String? emailStatus,
+    String? fromDate,
+    String? toDate,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found. Please login again.');
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'pageSize': pageSize.toString(),
+      };
+
+      // Add optional parameters
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (darshanType != null && darshanType.isNotEmpty) {
+        queryParams['darshanType'] = darshanType;
+      }
+      if (emailStatus != null && emailStatus.isNotEmpty) {
+        queryParams['emailStatus'] = emailStatus;
+      }
+      if (fromDate != null && fromDate.isNotEmpty) {
+        queryParams['fromDate'] = fromDate;
+      }
+      if (toDate != null && toDate.isNotEmpty) {
+        queryParams['toDate'] = toDate;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse(
+        '$baseUrl/appointment/darshan-line',
+      ).replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final List<dynamic> appointments = responseData['data'] ?? [];
+        return List<Map<String, dynamic>>.from(appointments);
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        throw Exception('Session expired. Please login again.');
+      } else {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to fetch appointments');
+      }
+    } catch (error) {
+      if (error is Exception) {
+        rethrow;
+      }
+      throw Exception(
+        'Network error. Please check your connection and try again.',
+      );
+    }
+  }
+
+  // Alternative method that returns the same format as other methods in this class
+  static Future<Map<String, dynamic>> fetchAppointmentsWithResponse({
+    String? search,
+    String? darshanType,
+    String? emailStatus,
+    String? fromDate,
+    String? toDate,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      final appointments = await fetchAppointments(
+        search: search,
+        darshanType: darshanType,
+        emailStatus: emailStatus,
+        fromDate: fromDate,
+        toDate: toDate,
+        page: page,
+        pageSize: pageSize,
+      );
+
+      return {
+        'success': true,
+        'statusCode': 200,
+        'data': appointments,
+        'message': 'Appointments fetched successfully',
+      };
+    } catch (error) {
+      return {'success': false, 'statusCode': 500, 'message': error.toString()};
     }
   }
 }

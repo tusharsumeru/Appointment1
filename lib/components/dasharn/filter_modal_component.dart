@@ -3,11 +3,21 @@ import 'package:flutter/material.dart';
 class FilterModalComponent extends StatefulWidget {
   final VoidCallback? onClose;
   final VoidCallback? onApplyFilters;
+  final String? initialEmailStatus;
+  final String? initialDarshanType;
+  final DateTime? initialFromDate;
+  final DateTime? initialToDate;
+  final Function(String, String, DateTime?, DateTime?)? onFiltersChanged;
   
   const FilterModalComponent({
     super.key,
     this.onClose,
     this.onApplyFilters,
+    this.initialEmailStatus,
+    this.initialDarshanType,
+    this.initialFromDate,
+    this.initialToDate,
+    this.onFiltersChanged,
   });
 
   @override
@@ -25,7 +35,7 @@ class _FilterModalComponentState extends State<FilterModalComponent>
 
   // Dropdown options
   final List<String> _emailStatusOptions = ['Email Sent', 'Not Sent'];
-  final List<String> _darshanTypeOptions = ['P1', 'P2', 'SB', 'PM', 'Z'];
+  final List<String> _darshanTypeOptions = ['Satsang Backstage', 'Pooja Backstage'];
 
   @override
   void initState() {
@@ -42,6 +52,12 @@ class _FilterModalComponentState extends State<FilterModalComponent>
       curve: Curves.easeOut,
     ));
     _animationController.forward();
+    
+    // Initialize with passed values
+    _emailStatus = widget.initialEmailStatus ?? '';
+    _darshanType = widget.initialDarshanType ?? '';
+    _fromDate = widget.initialFromDate;
+    _toDate = widget.initialToDate;
   }
 
   @override
@@ -90,6 +106,7 @@ class _FilterModalComponentState extends State<FilterModalComponent>
                   setState(() {
                     _emailStatus = option;
                   });
+                  widget.onFiltersChanged?.call(_emailStatus, _darshanType, _fromDate, _toDate);
                   Navigator.pop(context);
                 },
                 trailing: _emailStatus == option
@@ -144,6 +161,7 @@ class _FilterModalComponentState extends State<FilterModalComponent>
                   setState(() {
                     _darshanType = option;
                   });
+                  widget.onFiltersChanged?.call(_emailStatus, _darshanType, _fromDate, _toDate);
                   Navigator.pop(context);
                 },
                 trailing: _darshanType == option
@@ -182,6 +200,7 @@ class _FilterModalComponentState extends State<FilterModalComponent>
       setState(() {
         _fromDate = picked;
       });
+      widget.onFiltersChanged?.call(_emailStatus, _darshanType, _fromDate, _toDate);
     }
   }
 
@@ -209,6 +228,7 @@ class _FilterModalComponentState extends State<FilterModalComponent>
       setState(() {
         _toDate = picked;
       });
+      widget.onFiltersChanged?.call(_emailStatus, _darshanType, _fromDate, _toDate);
     }
   }
 

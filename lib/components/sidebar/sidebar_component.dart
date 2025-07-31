@@ -5,15 +5,14 @@ import '../../main/today_screen.dart';
 import '../../main/tomorrow_screen.dart';
 import '../../main/upcoming_screen.dart';
 import '../../main/dashboard_screen.dart';
-import '../../main/quick_darshan_line_screen.dart';
 import '../../main/bulk_email_sms_screen.dart';
-import '../../main/upload_offline_appointment_screen.dart';
 import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
 import '../../main/change_password_screen.dart';
 import '../../main/export_data_screen.dart';
 import '../../main/forward_request_logs_screen.dart';
+import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -229,6 +228,16 @@ class _SidebarComponentState extends State<SidebarComponent> {
                       : null,
                 ),
                 const SizedBox(height: 8),
+                // Greeting
+                Text(
+                  'Hi User!',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 // User Name
                 Flexible(
                   child: Text(
@@ -442,20 +451,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
           ],
-          // Quick Darshan Line Navigation Item
-          ListTile(
-            leading: const Icon(Icons.queue, color: Colors.deepPurple),
-            title: const Text('Quick Darshan Line'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const QuickDarshanLineScreen(),
-                ),
-              );
-            },
-          ),
+          // Quick Darshan Line Navigation Item - Commented out
+          // ListTile(
+          //   leading: const Icon(Icons.queue, color: Colors.deepPurple),
+          //   title: const Text('Quick Darshan Line'),
+          //   onTap: () {
+          //     Navigator.pop(context); // Close drawer
+          //     Navigator.pushReplacement(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => const QuickDarshanLineScreen(),
+          //       ),
+          //     );
+          //   },
+          // ),
           // Send Bulk Email & SMS Navigation Item
           ListTile(
             leading: const Icon(Icons.email, color: Colors.deepPurple),
@@ -470,24 +479,11 @@ class _SidebarComponentState extends State<SidebarComponent> {
               );
             },
           ),
-          // Upload Offline Appointment Navigation Item
-          ListTile(
-            leading: const Icon(Icons.upload_file, color: Colors.deepPurple),
-            title: const Text('Upload Offline Appointment'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UploadOfflineAppointmentScreen(),
-                ),
-              );
-            },
-          ),
+
           // Dashboard Navigation Item
           ListTile(
             leading: const Icon(Icons.dashboard, color: Colors.deepPurple),
-            title: const Text('Dashboard'),
+            title: const Text('Darshan Line'),
             onTap: () {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
@@ -498,17 +494,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
               );
             },
           ),
-          const Divider(),
 
-          // Settings and other options
-          ListTile(
-            leading: const Icon(Icons.settings, color: Colors.grey),
-            title: const Text('Settings'),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: Navigate to settings screen
-            },
-          ),
+          // User Profile Navigation Item
+          // ListTile(
+          //   leading: const Icon(Icons.person, color: Colors.deepPurple),
+          //   title: const Text('User Profile'),
+          //   onTap: () {
+          //     Navigator.pop(context); // Close drawer
+          //     Navigator.pushReplacement(
+          //       context,
+          //       MaterialPageRoute(builder: (context) => const UserScreen()),
+          //     );
+          //   },
+          // ),
+          const Divider(),
 
           ListTile(
             leading: const Icon(Icons.lock_reset, color: Colors.grey),
@@ -552,14 +551,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             },
           ),
 
-          ListTile(
-            leading: const Icon(Icons.help, color: Colors.grey),
-            title: const Text('Help & Support'),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: Navigate to help screen
-            },
-          ),
+
 
           const Divider(),
 

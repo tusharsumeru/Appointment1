@@ -571,8 +571,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       // Fetch upcoming appointments
       final upcomingResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
-      // Fetch appointment history
-      final historyResult = await ActionService.getAppointmentHistoryByUser(userId: userId);
+      // Use local appointment data instead of API call for appointment history
+      // Get statusHistory from appointmentStatus object
+      final historyResult = {
+        'success': true,
+        'data': _getStatusHistoryFromAppointment(),
+      };
       
 
       
@@ -597,21 +601,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _upcomingAppointments = [];
           }
           
-          if (historyResult['success'] && historyResult['data'] != null) {
-            final List<dynamic> historyData = historyResult['data'];
-            if (historyData is List) {
-              _appointmentHistory = historyData.map((item) {
-                if (item is Map<String, dynamic>) {
-                  return item;
-                } else if (item is Map) {
-                  return Map<String, dynamic>.from(item);
-                } else {
-                  return <String, dynamic>{};
-                }
-              }).toList();
-            } else {
-              _appointmentHistory = [];
-            }
+          if (historyResult['success'] == true && historyResult['data'] != null) {
+            final historyData = historyResult['data'] as List<Map<String, dynamic>>;
+            _appointmentHistory = historyData;
           } else {
             _appointmentHistory = [];
           }
@@ -636,6 +628,49 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         );
       }
     }
+  }
+
+  List<Map<String, dynamic>> _getStatusHistoryFromAppointment() {
+    // Get statusHistory from appointmentStatus object
+    final appointmentStatus = widget.appointment['appointmentStatus'];
+    if (appointmentStatus is Map<String, dynamic>) {
+      final statusHistory = appointmentStatus['statusHistory'];
+      if (statusHistory is List) {
+        // Convert statusHistory to the format expected by the UI
+        return statusHistory.map((statusItem) {
+          if (statusItem is Map<String, dynamic>) {
+            final changedBy = statusItem['changedBy'];
+            String changedByName = 'Unknown';
+            String changedByEmail = '';
+            
+            if (changedBy is Map<String, dynamic>) {
+              changedByName = changedBy['fullName']?.toString() ?? 'Unknown';
+              changedByEmail = changedBy['email']?.toString() ?? '';
+            }
+            
+            return {
+              'status': statusItem['status']?.toString() ?? 'Unknown',
+              'changedAt': statusItem['changedAt']?.toString() ?? '',
+              'changedBy': {
+                'fullName': changedByName,
+                'email': changedByEmail,
+                'userId': changedBy?['userId']?.toString() ?? '',
+                'updatedTimestamp': changedBy?['updatedTimestamp']?.toString() ?? '',
+              },
+              'appointmentId': widget.appointment['appointmentId']?.toString() ?? '',
+              'createdBy': widget.appointment['createdBy'],
+              'appointmentStatus': widget.appointment['appointmentStatus'],
+              'createdAt': statusItem['createdAt']?.toString() ?? '',
+              'updatedAt': statusItem['updatedAt']?.toString() ?? '',
+            };
+          }
+          return <String, dynamic>{};
+        }).toList();
+      }
+    }
+    
+    // Fallback to empty list if no status history found
+    return [];
   }
 
   Future<void> _refreshAppointmentsOverview() async {
@@ -819,6 +854,31 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     return false;
   }
 
+  String _formatStatusHistoryDateTime(Map<String, dynamic> statusItem) {
+    try {
+      // Use updatedTimestamp from changedBy object
+      final changedBy = statusItem['changedBy'];
+      if (changedBy is Map<String, dynamic>) {
+        final updatedTimestamp = changedBy['updatedTimestamp']?.toString();
+        if (updatedTimestamp != null && updatedTimestamp.isNotEmpty) {
+          final date = DateTime.parse(updatedTimestamp);
+          return '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        }
+      }
+      
+      // Fallback to changedAt if updatedTimestamp is not available
+      final changedAt = statusItem['changedAt']?.toString();
+      if (changedAt != null && changedAt.isNotEmpty) {
+        final date = DateTime.parse(changedAt);
+        return '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      }
+      
+      return 'Date not specified';
+    } catch (e) {
+      return 'Date not specified';
+    }
+  }
+
   String _formatAppointmentDateTime(Map<String, dynamic> appointment) {
     try {
       // Try to get scheduled date and time
@@ -986,7 +1046,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _getCreatedByDesignation(),
+                      _getAppointmentRole(),
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[600],
@@ -1140,7 +1200,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         : Colors.grey[300],
                     ),
                     child: Text(
-                      '${index}',
+                      '${index + 1}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -2004,10 +2064,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                               children: _appointmentHistory.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
                                 try {
                                   return _buildAppointmentItem(
-                                    appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
-                                    _formatAppointmentDateTime(appointment),
-                                    appointment['appointmentStatus']?['status']?.toString() ?? 'Completed',
-                                    _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'completed'),
+                                    appointment['changedBy']?['fullName']?.toString() ?? 'Unknown User',
+                                    _formatStatusHistoryDateTime(appointment),
+                                    appointment['status']?.toString() ?? 'Unknown',
+                                    _getStatusColor(appointment['status']?.toString() ?? 'unknown'),
                                   );
                                 } catch (e) {
                                   return _buildAppointmentItem(

@@ -8,14 +8,13 @@ import 'reminder_form.dart';
 import 'call_form.dart';
 import 'assign_form.dart';
 import 'star_form.dart';
-import 'delete_form.dart';
+
 import '../../action/action.dart';
 
 class AppointmentCard extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final VoidCallback? onTap;
   final Function(bool)? onStarToggle;
-  final VoidCallback? onDelete;
   final VoidCallback? onRefresh; // Add refresh callback
 
   const AppointmentCard({
@@ -23,7 +22,6 @@ class AppointmentCard extends StatefulWidget {
     required this.appointment,
     this.onTap,
     this.onStarToggle,
-    this.onDelete,
     this.onRefresh, // Add refresh callback parameter
   });
 
@@ -207,64 +205,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     ),
                   ),
 
-                  // Star button
-                  IconButton(
-                    onPressed: () async {
-                      // Show loading indicator
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Updating starred status...'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      }
 
-                      // Call the API to update starred status
-                      final result = await ActionService.updateStarred(id);
-
-                      if (result['success']) {
-                        // Update local state and notify parent
-                        final newStarredStatus =
-                            result['data']?['starred'] ?? !isStarred;
-                        widget.onStarToggle?.call(newStarredStatus);
-
-                        // Show success message
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                newStarredStatus
-                                    ? 'Added to favorites'
-                                    : 'Removed from favorites',
-                              ),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      } else {
-                        // Show error message
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                result['message'] ??
-                                    'Failed to update starred status',
-                              ),
-                              backgroundColor: Colors.red,
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: Icon(
-                      isStarred ? Icons.star : Icons.star_border,
-                      color: isStarred ? Colors.amber : Colors.grey,
-                      size: 24,
-                    ),
-                  ),
                 ],
               ),
 
@@ -318,10 +259,59 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     onTap: () => _showActionBottomSheet(context, 'assign'),
                   ),
                   _buildActionButton(
-                    icon: Icons.delete,
-                    label: 'Delete',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'delete'),
+                    icon: isStarred ? Icons.star : Icons.star_border,
+                    label: 'Star',
+                    color: isStarred ? Colors.amber : Colors.black,
+                    onTap: () async {
+                      // Show loading indicator
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Updating starred status...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
+
+                      // Call the API to update starred status
+                      final result = await ActionService.updateStarred(id);
+
+                      if (result['success']) {
+                        // Update local state and notify parent
+                        final newStarredStatus =
+                            result['data']?['starred'] ?? !isStarred;
+                        widget.onStarToggle?.call(newStarredStatus);
+
+                        // Show success message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                newStarredStatus
+                                    ? 'Added to favorites'
+                                    : 'Removed from favorites',
+                              ),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } else {
+                        // Show error message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                result['message'] ??
+                                    'Failed to update starred status',
+                              ),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ],
               ),
@@ -606,8 +596,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return _buildCallContent();
       case 'assign':
         return _buildAssignContent();
-      case 'delete':
-        return _buildDeleteContent();
       default:
         return const SizedBox.shrink();
     }
@@ -698,26 +686,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
     );
   }
 
-  Widget _buildDeleteContent() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          _buildActionHeader('Delete Appointment'),
-          Expanded(
-            child: DeleteForm(
-              appointment: widget.appointment,
-              onDelete: widget.onDelete,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildActionHeader(String title) {
     return Container(
@@ -758,8 +727,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
         return Icons.call;
       case 'assign appointment':
         return Icons.assignment_ind;
-      case 'delete appointment':
-        return Icons.delete;
       default:
         return Icons.info;
     }
@@ -778,8 +745,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
       case 'make call':
         return Colors.black;
       case 'assign appointment':
-        return Colors.black;
-      case 'delete appointment':
         return Colors.black;
       default:
         return Colors.black;

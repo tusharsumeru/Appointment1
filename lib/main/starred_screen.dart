@@ -240,15 +240,7 @@ class _StarredScreenState extends State<StarredScreen> {
                                 );
                               }
                             },
-                            onDelete: () {
-                              _deleteAppointment(appointment['_id']?.toString() ?? '');
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${appointment['name']?.toString() ?? ''} deleted'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            },
+
                           );
                         },
                       ),
