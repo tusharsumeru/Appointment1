@@ -498,7 +498,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           // Dashboard Navigation Item
           ListTile(
             leading: const Icon(Icons.dashboard, color: Colors.deepPurple),
-            title: const Text('Dashboard'),
+            title: const Text('Darshan Line'),
             onTap: () {
               Navigator.pop(context); // Close drawer
               Navigator.pushReplacement(
@@ -511,17 +511,17 @@ class _SidebarComponentState extends State<SidebarComponent> {
           ),
 
           // User Profile Navigation Item
-          ListTile(
-            leading: const Icon(Icons.person, color: Colors.deepPurple),
-            title: const Text('User Profile'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const UserScreen()),
-              );
-            },
-          ),
+          // ListTile(
+          //   leading: const Icon(Icons.person, color: Colors.deepPurple),
+          //   title: const Text('User Profile'),
+          //   onTap: () {
+          //     Navigator.pop(context); // Close drawer
+          //     Navigator.pushReplacement(
+          //       context,
+          //       MaterialPageRoute(builder: (context) => const UserScreen()),
+          //     );
+          //   },
+          // ),
           const Divider(),
 
           // Settings and other options

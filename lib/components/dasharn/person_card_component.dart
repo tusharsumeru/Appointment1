@@ -6,6 +6,7 @@ class PersonCardComponent extends StatelessWidget {
   final String darshanLineDate;
   final String requestedDate;
   final int peopleCount;
+  final String status;
   final VoidCallback? onBellPressed;
   final VoidCallback? onMessagePressed;
   final VoidCallback? onAddPressed;
@@ -21,6 +22,7 @@ class PersonCardComponent extends StatelessWidget {
     required this.darshanLineDate,
     required this.requestedDate,
     required this.peopleCount,
+    required this.status,
     this.onBellPressed,
     this.onMessagePressed,
     this.onAddPressed,
@@ -59,6 +61,10 @@ class PersonCardComponent extends StatelessWidget {
           _buildLabelValue('Requested Date', requestedDate),
           const SizedBox(height: 8),
           _buildLabelValue('No. of People', peopleCount.toString()),
+          const SizedBox(height: 8),
+          _buildLabelValue('Status', status),
+          const SizedBox(height: 8),
+          _buildLabelValue('Email', 'Not Sent'),
           const SizedBox(height: 16),
           // Action icons
           Row(

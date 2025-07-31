@@ -29,6 +29,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   String? _selectedSecretary;
   PlatformFile? _selectedFile;
   bool _isAttendingProgram = false;
+  
+  // Guest information state
+  List<Map<String, TextEditingController>> _guestControllers = [];
 
   final List<String> _secretaries = [
     'Select a secretary',
@@ -50,16 +53,61 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     _peopleCountController.dispose();
     _fromDateController.dispose();
     _toDateController.dispose();
+    
+    // Dispose guest controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
     super.dispose();
   }
 
+  void _updateGuestControllers() {
+    int peopleCount = int.tryParse(_peopleCountController.text) ?? 0;
+    int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
+    
+    // Dispose existing controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    
+    // Create new controllers
+    _guestControllers.clear();
+    for (int i = 0; i < guestCount; i++) {
+      _guestControllers.add({
+        'name': TextEditingController(),
+        'phone': TextEditingController(text: '+91'),
+        'age': TextEditingController(),
+      });
+    }
+    
+    setState(() {});
+    _validateForm();
+  }
+
   void _validateForm() {
+    bool basicFormValid = _locationController.text.isNotEmpty &&
+        _purposeController.text.isNotEmpty &&
+        _peopleCountController.text.isNotEmpty &&
+        _fromDateController.text.isNotEmpty &&
+        _toDateController.text.isNotEmpty;
+    
+    // Validate guest information if any
+    bool guestFormValid = true;
+    for (var guest in _guestControllers) {
+      if (guest['name']?.text.isEmpty == true ||
+          guest['phone']?.text.isEmpty == true ||
+          guest['age']?.text.isEmpty == true) {
+        guestFormValid = false;
+        break;
+      }
+    }
+    
     setState(() {
-      _isFormValid = _locationController.text.isNotEmpty &&
-          _purposeController.text.isNotEmpty &&
-          _peopleCountController.text.isNotEmpty &&
-          _fromDateController.text.isNotEmpty &&
-          _toDateController.text.isNotEmpty;
+      _isFormValid = basicFormValid && guestFormValid;
     });
   }
 
@@ -155,6 +203,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'path': _selectedFile!.path,
         'extension': _selectedFile!.extension,
       } : null,
+      'guests': _guestControllers.map((guest) => {
+        'name': guest['name']?.text,
+        'phone': guest['phone']?.text,
+        'age': guest['age']?.text,
+      }).toList(),
     };
 
     print('Form Data: $formData');
@@ -265,9 +318,39 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     controller: _peopleCountController,
                     placeholder: 'Number of people (including yourself)',
                     keyboardType: TextInputType.number,
-                    onChanged: (value) => _validateForm(),
+                    onChanged: (value) {
+                      _updateGuestControllers();
+                      _validateForm();
+                    },
                   ),
                   const SizedBox(height: 20),
+
+                  // Guest Information Cards
+                  if (_guestControllers.isNotEmpty) ...[
+                    const Text(
+                      'Additional Person Details',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please provide details for additional persons',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ..._guestControllers.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      Map<String, TextEditingController> guest = entry.value;
+                      return _buildGuestCard(index + 1, guest);
+                    }).toList(),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Attachment
                   _buildFileUpload(),
@@ -598,6 +681,188 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestCard(int guestNumber, Map<String, TextEditingController> guest) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Guest $guestNumber',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Full Name
+            _buildGuestTextField(
+              label: 'Full Name',
+              controller: guest['name']!,
+              placeholder: "Enter guest's full name",
+              onChanged: (value) => _validateForm(),
+            ),
+            const SizedBox(height: 16),
+            
+            // Contact Number
+            _buildGuestPhoneField(
+              label: 'Contact Number',
+              controller: guest['phone']!,
+              onChanged: (value) => _validateForm(),
+            ),
+            const SizedBox(height: 16),
+            
+            // Age
+            _buildGuestTextField(
+              label: 'Age',
+              controller: guest['age']!,
+              placeholder: 'Enter age',
+              keyboardType: TextInputType.number,
+              onChanged: (value) => _validateForm(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuestTextField({
+    required String label,
+    required TextEditingController controller,
+    required String placeholder,
+    TextInputType? keyboardType,
+    Function(String)? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+            filled: true,
+            fillColor: Colors.grey[50],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.deepPurple),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestPhoneField({
+    required String label,
+    required TextEditingController controller,
+    Function(String)? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Country Code Dropdown
+            Container(
+              width: 80,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 4),
+                  const Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Phone Number Field
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                onChanged: onChanged,
+                decoration: InputDecoration(
+                  hintText: 'Enter phone number',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.deepPurple),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

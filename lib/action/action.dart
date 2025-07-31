@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://c85dc7df20e5.ngrok-free.app/api/v3'; // API base URL
+      'https://7edf2f9e0240.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -1721,6 +1721,117 @@ class ActionService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  // Fetch appointments for darshan line with filtering
+  static Future<List<Map<String, dynamic>>> fetchAppointments({
+    String? search,
+    String? darshanType,
+    String? emailStatus,
+    String? fromDate,
+    String? toDate,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found. Please login again.');
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'pageSize': pageSize.toString(),
+      };
+
+      // Add optional parameters
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (darshanType != null && darshanType.isNotEmpty) {
+        queryParams['darshanType'] = darshanType;
+      }
+      if (emailStatus != null && emailStatus.isNotEmpty) {
+        queryParams['emailStatus'] = emailStatus;
+      }
+      if (fromDate != null && fromDate.isNotEmpty) {
+        queryParams['fromDate'] = fromDate;
+      }
+      if (toDate != null && toDate.isNotEmpty) {
+        queryParams['toDate'] = toDate;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse('$baseUrl/appointment/darshan-line')
+          .replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final List<dynamic> appointments = responseData['data'] ?? [];
+        return List<Map<String, dynamic>>.from(appointments);
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        throw Exception('Session expired. Please login again.');
+      } else {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to fetch appointments');
+      }
+    } catch (error) {
+      if (error is Exception) {
+        rethrow;
+      }
+      throw Exception('Network error. Please check your connection and try again.');
+    }
+  }
+
+  // Alternative method that returns the same format as other methods in this class
+  static Future<Map<String, dynamic>> fetchAppointmentsWithResponse({
+    String? search,
+    String? darshanType,
+    String? emailStatus,
+    String? fromDate,
+    String? toDate,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      final appointments = await fetchAppointments(
+        search: search,
+        darshanType: darshanType,
+        emailStatus: emailStatus,
+        fromDate: fromDate,
+        toDate: toDate,
+        page: page,
+        pageSize: pageSize,
+      );
+
+      return {
+        'success': true,
+        'statusCode': 200,
+        'data': appointments,
+        'message': 'Appointments fetched successfully',
+      };
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': error.toString(),
+      };
     }
   }
 }
