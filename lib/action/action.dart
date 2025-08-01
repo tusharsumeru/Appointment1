@@ -3008,4 +3008,79 @@ class ActionService {
       return {'success': false, 'statusCode': 500, 'message': error.toString()};
     }
   }
+
+  // Send appointment email action
+  static Future<Map<String, dynamic>> sendAppointmentEmailAction({
+    required String appointeeEmail,
+    String? referenceEmail,
+    String? cc,
+    String? bcc,
+    String? subject,
+    String? body,
+    String? selectedTemplateId,
+    Map<String, String>? templateData,
+    bool useAppointee = true,
+    bool useReference = true,
+    String? otherEmail,
+  }) async {
+    final Uri url = Uri.parse('$baseUrl/appointment/send-email');
+
+    final Map<String, dynamic> requestBody = {
+      'appointeeEmail': appointeeEmail,
+      if (referenceEmail != null) 'referenceEmail': referenceEmail,
+      if (cc != null) 'cc': cc,
+      if (bcc != null) 'bcc': bcc,
+      if (subject != null) 'subject': subject,
+      if (body != null) 'body': body,
+      if (selectedTemplateId != null) 'selectedTemplateId': selectedTemplateId,
+      'useAppointee': useAppointee,
+      'useReference': useReference,
+      if (otherEmail != null) 'otherEmail': otherEmail,
+      'templateData': templateData ?? {}, // 👈 Ensure it's always an object
+    };
+
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found. Please login again.');
+      }
+
+      print('🌐 Making API call to: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+      
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response headers: ${response.headers}');
+      print('📥 Response body: ${response.body}');
+
+      // Check if response is JSON
+      if (response.headers['content-type']?.contains('application/json') == true) {
+        final data = jsonDecode(response.body);
+        if (response.statusCode == 200 && data['success'] == true) {
+          print('✅ Email sent: ${data["data"]}');
+          return {'success': true, 'message': data['message'], 'data': data['data']};
+        } else {
+          print('❌ Failed: ${data['message']}');
+          return {'success': false, 'message': data['message']};
+        }
+      } else {
+        // Response is not JSON (probably HTML error page)
+        print('❌ Response is not JSON. Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
+        return {'success': false, 'message': 'Server returned invalid response. Status: ${response.statusCode}'};
+      }
+    } catch (e) {
+      print('❌ Error sending email: $e');
+      return {'success': false, 'message': 'Something went wrong. Please try again.'};
+    }
+  }
 }
