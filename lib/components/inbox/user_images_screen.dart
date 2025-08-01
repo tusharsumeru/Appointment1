@@ -28,41 +28,7 @@ class UserImagesScreen extends StatefulWidget {
 class _UserImagesScreenState extends State<UserImagesScreen> {
   
   String _getUserImageUrl(int index) {
-    // For main user, handle profile image and API matches
-    if (widget.userIndex == 0) {
-      if (index == 0) {
-        // First image is always the profile image
-        return widget.userImageUrl ?? 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
-      } else {
-        // Subsequent images are from API matches
-        if (widget.faceMatchData.isNotEmpty) {
-          final result = widget.faceMatchData[0]; // Get first result
-          
-          // Check if this is the main result object with apiResult
-          if (result['apiResult'] != null) {
-            final apiResult = result['apiResult'];
-            
-            // Get matches from all time periods
-            final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-            final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-            final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-            
-            // Combine all matches
-            final allMatches = [...matches30, ...matches60, ...matches90];
-            
-            // Adjust index to account for profile image
-            final matchIndex = index - 1;
-            if (matchIndex < allMatches.length) {
-              final match = allMatches[matchIndex];
-              return match['image_name']?.toString() ?? 
-                     'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
-            }
-          }
-        }
-      }
-    }
-    
-    // For accompanying users, return only face match result images (no profile image)
+    // For all users (main user and accompanying users), return only face match result images (no profile image)
     if (widget.faceMatchData.isNotEmpty) {
       final result = widget.faceMatchData[0]; // Get first result
       
@@ -91,53 +57,12 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
   }
 
   String _getImageDate(int index) {
-    if (widget.userIndex == 0) {
-      if (index == 0) {
-        return 'Profile Image';
-      } else {
-        return 'Match ${index}'; // Keep as is since index 0 is profile image, index 1+ are matches
-      }
-    }
-    
-    // For accompanying users, show "Match X" format
+    // For all users, show "Match X" format (no profile image)
     return 'Match ${index + 1}';
   }
 
   double _getMatchConfidence(int index) {
-    if (widget.userIndex == 0) {
-      if (index == 0) {
-        return 100.0; // Profile image always has 100% confidence
-      } else {
-        // For API matches, calculate confidence
-        if (widget.faceMatchData.isNotEmpty) {
-          final result = widget.faceMatchData[0]; // Get first result
-          
-          if (result['apiResult'] != null) {
-            final apiResult = result['apiResult'];
-            
-            // Get matches from all time periods
-            final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-            final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-            final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-            
-            // Combine all matches
-            final allMatches = [...matches30, ...matches60, ...matches90];
-            
-            // Adjust index to account for profile image
-            final matchIndex = index - 1;
-            if (matchIndex < allMatches.length) {
-              final match = allMatches[matchIndex];
-              final score = match['score']?.toDouble() ?? 0.0;
-              // Convert score to percentage (assuming score is 0-1, multiply by 100)
-              return (score * 100).clamp(0.0, 100.0);
-            }
-          }
-        }
-        return 0.0;
-      }
-    }
-    
-    // For accompanying users, calculate confidence
+    // For all users, calculate confidence from API matches
     if (widget.faceMatchData.isNotEmpty) {
       final result = widget.faceMatchData[0]; // Get first result
       
@@ -165,31 +90,7 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
   }
 
   int _getActualImageCount() {
-    if (widget.userIndex == 0) {
-      // For main user, count profile image + API matches
-      int totalCount = 1; // Always include profile image
-      
-      // Add API matches if available
-      if (widget.faceMatchData.isNotEmpty) {
-        final result = widget.faceMatchData[0]; // Get first result
-        
-        if (result['apiResult'] != null) {
-          final apiResult = result['apiResult'];
-          
-          // Get matches from all time periods
-          final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-          final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-          final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-          
-          // Add total count of all matches
-          totalCount += matches30.length + matches60.length + matches90.length;
-        }
-      }
-      
-      return totalCount;
-    }
-    
-    // For accompanying users, count matches from API result
+    // For all users, count only API matches (no profile image)
     if (widget.faceMatchData.isNotEmpty) {
       final result = widget.faceMatchData[0]; // Get first result
       
@@ -201,12 +102,12 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
         final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
         final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
         
-        // Return total count of all matches
+        // Return total count of all matches (no profile image)
         return matches30.length + matches60.length + matches90.length;
       }
     }
     
-    return 0; // No matches found for this user
+    return 0; // No matches found
   }
 
   @override
@@ -504,64 +405,34 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
         child: Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(16),
-          child: Stack(
-            children: [
-              // Image only
-              InteractiveViewer(
-                panEnabled: true,
-                boundaryMargin: const EdgeInsets.all(20),
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: Image.network(
-                  _getUserImageUrl(index),
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.image, size: 80, color: Colors.grey),
-                      ),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              
-              // Close button (X) at top right
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(4),
+          child: InteractiveViewer(
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Image.network(
+              _getUserImageUrl(index),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(Icons.image, size: 80, color: Colors.grey),
                   ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    padding: const EdgeInsets.all(4),
-                    constraints: const BoxConstraints(
-                      minWidth: 12,
-                      minHeight: 12,
+                );
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
                     ),
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),

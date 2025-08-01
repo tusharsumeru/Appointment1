@@ -7,6 +7,8 @@ class PersonCardComponent extends StatefulWidget {
   final String requestedDate;
   final int peopleCount;
   final String status;
+  final bool isSelected;
+  final Function(bool)? onSelectionChanged;
   final VoidCallback? onBellPressed;
   final VoidCallback? onMessagePressed;
   final VoidCallback? onAddPressed;
@@ -23,6 +25,8 @@ class PersonCardComponent extends StatefulWidget {
     required this.requestedDate,
     required this.peopleCount,
     required this.status,
+    this.isSelected = false,
+    this.onSelectionChanged,
     this.onBellPressed,
     this.onMessagePressed,
     this.onAddPressed,
@@ -63,11 +67,9 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
           Row(
             children: [
               Checkbox(
-                value: _isChecked,
+                value: widget.isSelected,
                 onChanged: (bool? value) {
-                  setState(() {
-                    _isChecked = value ?? false;
-                  });
+                  widget.onSelectionChanged?.call(value ?? false);
                 },
                 activeColor: Colors.deepPurple,
               ),
@@ -97,9 +99,9 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildActionIcon(Icons.phone, 'Call', widget.onCallPressed),
-              _buildActionIcon(Icons.email, 'Email', widget.onMessagePressed),
-              _buildActionIcon(Icons.add, 'Sms', widget.onAddPressed),
+              _buildActionIcon(Icons.email, 'Email', widget.onBellPressed),
+              _buildActionIcon(Icons.message, 'Message', widget.onMessagePressed),
+              _buildActionIcon(Icons.phone, 'Call', widget.onAddPressed),
             ],
           ),
         ],

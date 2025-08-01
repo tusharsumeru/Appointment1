@@ -18,6 +18,11 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
   String? _error;
   Map<String, dynamic>? _currentUser;
   String? _currentUserId;
+  
+  // Pagination state
+  int _currentPage = 1;
+  bool _hasMoreAppointments = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -98,6 +103,57 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
     }
   }
 
+  Future<void> _loadMoreAppointments() async {
+    if (_isLoadingMore || !_hasMoreAppointments) return;
+    
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = _currentPage + 1;
+      final result = await ActionService.getAssignedToMeAppointments(
+        page: nextPage,
+        limit: 10,
+      );
+      
+      if (result['success']) {
+        final List<dynamic> newData = result['data'] ?? [];
+        if (newData.isNotEmpty) {
+          setState(() {
+            _appointments.addAll(newData.cast<Map<String, dynamic>>());
+            _currentPage = nextPage;
+            _hasMoreAppointments = newData.length >= 10; // Assuming 10 is the page size
+          });
+        } else {
+          setState(() {
+            _hasMoreAppointments = false;
+          });
+        }
+      } else {
+        setState(() {
+          _hasMoreAppointments = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load more appointments: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
   Future<void> _toggleStar(String appointmentId) async {
     // Call the API to update starred status
     final result = await ActionService.updateStarred(appointmentId);
@@ -128,6 +184,112 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
     setState(() {
       _appointments.removeWhere((appointment) => appointment['_id'] == appointmentId);
     });
+  }
+
+  Widget _buildLoadMoreButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey[200]!),
+        ),
+        color: Colors.white.withOpacity(0.5),
+        backgroundBlendMode: BlendMode.overlay,
+      ),
+      child: Container(
+        width: double.infinity,
+        height: 44, // h-11 equivalent
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2563EB), Color(0xFF4F46E5)], // from-blue-600 to-indigo-600
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12), // rounded-xl
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF3B82F6).withOpacity(0.2), // shadow-blue-500/20
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _isLoadingMore ? null : _loadMoreAppointments,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: _isLoadingMore 
+                    ? const LinearGradient(
+                        colors: [Color(0xFF1D4ED8), Color(0xFF4338CA)], // disabled state
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5)], // from-blue-600 to-indigo-600
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Ink(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isLoadingMore) ...[
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Loading more...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ] else ...[
+                        const Text(
+                          'Load More Appointments',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Dot indicator
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -198,8 +360,15 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
                 )
               : ListView.builder(
                   padding: EdgeInsets.zero,
-                  itemCount: _appointments.length,
+                  itemCount: _appointments.length + (_hasMoreAppointments ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // Show load more button at the end
+                    if (index == _appointments.length) {
+                      return _hasMoreAppointments
+                          ? _buildLoadMoreButton()
+                          : const SizedBox.shrink();
+                    }
+                    
                     final appointment = _appointments[index];
                     return AppointmentCard(
                       appointment: appointment,
@@ -223,7 +392,6 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
                           );
                         }
                       },
-
                     );
                   },
                 ),

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/dasharn/filter_button_component.dart';
 import '../components/dasharn/person_card_component.dart';
 import '../components/dasharn/filter_modal_component.dart';
 import '../components/common/search_bar_component.dart';
+import '../components/inbox/email_form.dart';
+import '../components/inbox/message_form.dart';
+import '../components/inbox/call_form.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 class DashboardScreen extends StatefulWidget {
@@ -13,7 +17,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
   bool _showFilterModal = false;
   final TextEditingController _searchController = TextEditingController();
 
@@ -28,15 +32,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime? _fromDate;
   DateTime? _toDate;
 
+  // Select all functionality
+  bool _selectAll = false;
+  Set<String> _selectedAppointments = {};
+
+  // Animation controllers
+  late AnimationController _buttonAnimationController;
+  late Animation<double> _buttonScaleAnimation;
+  late Animation<double> _buttonOpacityAnimation;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controllers
+    _buttonAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _buttonScaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeOutBack,
+    ));
+    
+    _buttonOpacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
     _fetchAppointments(); // Fetch on load
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _buttonAnimationController.dispose();
     super.dispose();
   }
 
@@ -153,20 +190,267 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).toList();
   }
 
-  void _bulkUpload() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Bulk Upload pressed')),
+  // void _bulkUpload() {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Bulk Upload pressed')),
+  //   );
+  // }
+
+  // void _zoomLink() {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Zoom Link pressed')),
+  //   );
+  // }
+
+  void _toggleSelectAll() {
+    setState(() {
+      _selectAll = !_selectAll;
+      if (_selectAll) {
+        // Select all filtered appointments
+        _selectedAppointments = _filteredAppointments
+            .map((appointment) => appointment['_id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+      } else {
+        // Deselect all
+        _selectedAppointments.clear();
+      }
+    });
+    
+    // Animate button
+    _animateButton();
+  }
+
+  void _toggleAppointmentSelection(String appointmentId) {
+    setState(() {
+      if (_selectedAppointments.contains(appointmentId)) {
+        _selectedAppointments.remove(appointmentId);
+        _selectAll = false; // Uncheck select all if any item is unchecked
+      } else {
+        _selectedAppointments.add(appointmentId);
+        // Check if all items are now selected
+        final allIds = _filteredAppointments
+            .map((appointment) => appointment['_id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+        _selectAll = _selectedAppointments.length == allIds.length;
+      }
+    });
+    
+    // Animate button
+    _animateButton();
+  }
+
+  void _animateButton() {
+    if (_selectedAppointments.isNotEmpty) {
+      _buttonAnimationController.forward();
+    } else {
+      _buttonAnimationController.reverse();
+    }
+  }
+
+  // Call functionality
+  Future<void> _makePhoneCall(Map<String, dynamic> appointment) async {
+    // Get the phone number from appointment data
+    final phoneNumber = _getAppointeeMobile(appointment);
+    
+    if (phoneNumber.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No phone number available for this appointment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Create the phone URL
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not launch phone app'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error making call: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getAppointeeMobile(Map<String, dynamic> appointment) {
+    final phoneNumber = appointment['phoneNumber'];
+    if (phoneNumber is Map<String, dynamic>) {
+      final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+      final number = phoneNumber['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode$number';
+      }
+    }
+    return phoneNumber?.toString() ?? '';
+  }
+
+  // Email functionality
+  void _showEmailForm(Map<String, dynamic> appointment) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            _buildActionHeader('Send Email'),
+            Expanded(child: EmailForm(appointment: appointment)),
+          ],
+        ),
+      ),
     );
   }
 
-  void _zoomLink() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Zoom Link pressed')),
+  // SMS functionality
+  void _showMessageForm(Map<String, dynamic> appointment) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            _buildActionHeader('Send SMS'),
+            Expanded(child: MessageForm(appointment: appointment)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Call form functionality
+  void _showCallForm(Map<String, dynamic> appointment) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            _buildActionHeader('Make Call'),
+            Expanded(child: CallForm(appointment: appointment)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+            color: Colors.grey[600],
+          ),
+        ],
+      ),
     );
   }
 
   void _performSearch(String query) {
     _fetchAppointments(search: query);
+  }
+
+  void _sendBulkEmail() {
+    if (_selectedAppointments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one appointment'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Get selected appointments
+    final selectedAppointments = _filteredAppointments
+        .where((appointment) => _selectedAppointments.contains(appointment['_id']?.toString() ?? ''))
+        .toList();
+
+    // Show bulk email form - use first appointment as template
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            _buildActionHeader('Send Bulk Email (${selectedAppointments.length} recipients)'),
+            Expanded(
+              child: EmailForm(
+                appointment: selectedAppointments.first, // Pass first appointment as template
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDate(dynamic dateValue) {
@@ -268,54 +552,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               children: [
                 // Action buttons
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _bulkUpload,
-                          icon: const Icon(Icons.upload, color: Colors.white),
-                          label: const Text(
-                            'Bulk Upload',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _zoomLink,
-                          icon: const Icon(Icons.video_call, color: Colors.white),
-                          label: const Text(
-                            'Zoom Link',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Padding(
+                //   padding: const EdgeInsets.all(16),
+                //   child: Row(
+                //     children: [
+                //       Expanded(
+                //         child: ElevatedButton.icon(
+                //           onPressed: () {},
+                //           icon: const Icon(Icons.upload, color: Colors.white),
+                //           label: const Text(
+                //             'Bulk Upload',
+                //             style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal),
+                //           ),
+                //           style: ElevatedButton.styleFrom(
+                //             backgroundColor: Colors.deepPurple,
+                //             foregroundColor: Colors.white,
+                //             padding: const EdgeInsets.symmetric(vertical: 12),
+                //             shape: RoundedRectangleBorder(
+                //               borderRadius: BorderRadius.circular(8),
+                //             ),
+                //           ),
+                //         ),
+                //       ),
+                //       const SizedBox(width: 12),
+                //       Expanded(
+                //         child: ElevatedButton.icon(
+                //           onPressed: () {},
+                //           icon: const Icon(Icons.video_call, color: Colors.white),
+                //           label: const Text(
+                //             'Zoom Link',
+                //             style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal),
+                //           ),
+                //           style: ElevatedButton.styleFrom(
+                //             backgroundColor: Colors.deepPurple,
+                //             foregroundColor: Colors.white,
+                //             padding: const EdgeInsets.symmetric(vertical: 12),
+                //             shape: RoundedRectangleBorder(
+                //               borderRadius: BorderRadius.circular(8),
+                //             ),
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
 
                 // Search bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                   child: CommonSearchBarComponent(
                     controller: _searchController,
                     onSearch: _performSearch,
@@ -325,60 +609,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 12),
 
-                                 // Filter button
-                 Padding(
-                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                   child: Row(
-                     mainAxisAlignment: MainAxisAlignment.end,
-                     children: [
-                       // Clear Filter Button
-                       if (_selectedEmailStatus.isNotEmpty || 
-                           _selectedDarshanType.isNotEmpty || 
-                           _fromDate != null || 
-                           _toDate != null)
-                         GestureDetector(
-                           onTap: _clearFilters,
-                           child: Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                             decoration: BoxDecoration(
-                               color: Colors.red.shade100,
-                               borderRadius: BorderRadius.circular(8),
-                               border: Border.all(color: Colors.red.shade300),
-                             ),
-                             child: Row(
-                               mainAxisSize: MainAxisSize.min,
-                               children: [
-                                 Icon(
-                                   Icons.clear,
-                                   size: 16,
-                                   color: Colors.red.shade700,
-                                 ),
-                                 const SizedBox(width: 4),
-                                 Text(
-                                   'Clear',
-                                   style: TextStyle(
-                                     fontSize: 12,
-                                     fontWeight: FontWeight.w500,
-                                     color: Colors.red.shade700,
-                                   ),
-                                 ),
-                               ],
-                             ),
-                           ),
-                         ),
-                       if (_selectedEmailStatus.isNotEmpty || 
-                           _selectedDarshanType.isNotEmpty || 
-                           _fromDate != null || 
-                           _toDate != null)
-                         const SizedBox(width: 8),
-                       // Filter Button
-                       GestureDetector(
-                         onTap: _showFilter,
-                         child: const FilterButtonComponent(),
-                       ),
-                     ],
-                   ),
-                 ),
+                // Select All and Filter section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      // Select All Checkbox
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _selectAll,
+                            onChanged: (value) => _toggleSelectAll(),
+                            activeColor: Colors.deepPurple,
+                          ),
+                          const Text(
+                            'Select All',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      // Filter button
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          // Clear Filter Button
+                          if (_selectedEmailStatus.isNotEmpty || 
+                              _selectedDarshanType.isNotEmpty || 
+                              _fromDate != null || 
+                              _toDate != null)
+                            GestureDetector(
+                              onTap: _clearFilters,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade300),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.clear,
+                                      size: 16,
+                                      color: Colors.red.shade700,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Clear',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          if (_selectedEmailStatus.isNotEmpty || 
+                              _selectedDarshanType.isNotEmpty || 
+                              _fromDate != null || 
+                              _toDate != null)
+                            const SizedBox(width: 8),
+                          // Filter Button
+                          GestureDetector(
+                            onTap: _showFilter,
+                            child: const FilterButtonComponent(),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: 8),
 
@@ -399,13 +707,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   requestedDate: _formatPreferredDateRange(item['preferredDateRange']),
                                   peopleCount: _getPeopleCount(item),
                                   status: _getAppointmentStatus(item),
-                                  onBellPressed: () {},
-                                  onMessagePressed: () {},
-                                  onAddPressed: () {},
-                                  onCallPressed: () {},
-                                  onGroupPressed: () {},
-                                  onStarPressed: () {},
-                                  onDeletePressed: () {},
+                                  isSelected: _selectedAppointments.contains(item['_id']?.toString() ?? ''),
+                                  onSelectionChanged: (isSelected) {
+                                    _toggleAppointmentSelection(item['_id']?.toString() ?? '');
+                                  },
+                                  onBellPressed: () {
+                                    // Show email form (first icon)
+                                    _showEmailForm(item);
+                                  },
+                                  onMessagePressed: () {
+                                    // Show SMS form (second icon)
+                                    _showMessageForm(item);
+                                  },
+                                  onAddPressed: () {
+                                    // Direct call functionality (third icon)
+                                    _makePhoneCall(item);
+                                  },
+                                  onCallPressed: () {
+                                    // Direct call functionality - opens phone dialer
+                                    _makePhoneCall(item);
+                                  },
+                                  onGroupPressed: () {
+                                    // Show email form
+                                    _showEmailForm(item);
+                                  },
+                                  onStarPressed: () {
+                                    // Star functionality (placeholder)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Star functionality coming soon')),
+                                    );
+                                  },
+                                  onDeletePressed: () {
+                                    // Delete functionality (placeholder)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Delete functionality coming soon')),
+                                    );
+                                  },
                                 );
                               },
                             ),
@@ -436,6 +773,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
              ),
         ],
       ),
+      // Floating bottom button for bulk actions
+      floatingActionButton: AnimatedBuilder(
+        animation: _buttonAnimationController,
+        builder: (context, child) {
+          return AnimatedOpacity(
+            opacity: _buttonOpacityAnimation.value,
+            duration: const Duration(milliseconds: 200),
+            child: Transform.scale(
+              scale: _buttonScaleAnimation.value,
+              child: _selectedAppointments.isNotEmpty
+                  ? Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue[600],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue[700]!),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Count text
+                            Text(
+                              '${_selectedAppointments.length} items selected',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Email button
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _sendBulkEmail,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.email,
+                                          size: 16,
+                                          color: Colors.blue[600],
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Send Bulk Email',
+                                          style: TextStyle(
+                                            color: Colors.blue[600],
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          );
+        },
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

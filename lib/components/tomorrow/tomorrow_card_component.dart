@@ -86,8 +86,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       // Get selected date in YYYY-MM-DD format
       final dateString = ActionService.formatDateForAPI(widget.selectedDate);
 
-      print('📅 Fetching appointments for date: $dateString');
-
       final result = await ActionService.getAppointmentsByScheduledDate(
         date: dateString,
       );
@@ -105,32 +103,12 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           });
 
           _tomorrowAppointments = sortedAppointments;
-
-          // Debug: Print first appointment data to understand structure
-          if (_tomorrowAppointments.isNotEmpty) {
-            print('🔍 Debug: First appointment data:');
-            print('ID: ${_tomorrowAppointments[0]['_id']}');
-            print('All fields: ${_tomorrowAppointments[0].keys.toList()}');
-            print(
-              'Scheduled Time: ${_tomorrowAppointments[0]['scheduledTime']}',
-            );
-            print(
-              'Preferred Time: ${_tomorrowAppointments[0]['preferredTime']}',
-            );
-            print('Created At: ${_tomorrowAppointments[0]['createdAt']}');
-            print('Status: ${_tomorrowAppointments[0]['status']}');
-            print('Location: ${_getLocation(_tomorrowAppointments[0])}');
-            print(
-              'User Designation: ${_tomorrowAppointments[0]['userCurrentDesignation']}',
-            );
-            print('---');
-          }
         } else {
           _tomorrowAppointments = [];
         }
         _error = null;
       } else {
-        _error = result['message'] ?? 'Failed to fetch appointments';
+        _error = result['message'] ?? 'Failed to fetch tomorrow\'s appointments';
         _tomorrowAppointments = [];
       }
     } catch (e) {
@@ -197,9 +175,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           }
 
           if (timeString == null) {
-            print(
-              '❌ No time field found for appointment: ${appointment['_id']}',
-            );
             return false;
           }
 
@@ -224,15 +199,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                 ? (hour >= start && hour < end)
                 : (hour >= start || hour < end);
 
-            if (isInRange) {
-              print(
-                '✅ ${categoryKey.toUpperCase()}: Appointment ${appointment['_id']} at hour: $hour',
-              );
-            }
-
             return isInRange;
           } catch (e) {
-            print('❌ Error parsing time "$timeString": $e');
             return false;
           }
         }).toList();
@@ -262,11 +230,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
           final isTbsReq = isStatusTbsReq || isCommunicationTbsReq;
 
-          if (isTbsReq) {
-            print(
-              '✅ TBS/REQ: Appointment ${appointment['_id']} with status: $status, communicationPreferences: $communicationPreferences',
-            );
-          }
           return isTbsReq;
         }).toList();
 
@@ -274,11 +237,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
         return _tomorrowAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           final isDone = status == 'completed' || status == 'done';
-          if (isDone) {
-            print(
-              '✅ DONE: Appointment ${appointment['_id']} with status: $status',
-            );
-          }
           return isDone;
         }).toList();
 
@@ -293,11 +251,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           final location = _getLocation(appointment).toLowerCase();
           final isSatsangBackstage =
               location.contains('satsang') && location.contains('backstage');
-          if (isSatsangBackstage) {
-            print(
-              '✅ SATSANG BACKSTAGE: Appointment ${appointment['_id']} at location: $location',
-            );
-          }
           return isSatsangBackstage;
         }).toList();
 
@@ -311,11 +264,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
           final location = _getLocation(appointment).toLowerCase();
           final isGurukul = location.contains('gurukul');
-          if (isGurukul) {
-            print(
-              '✅ GURUKUL: Appointment ${appointment['_id']} at location: $location',
-            );
-          }
           return isGurukul;
         }).toList();
 
@@ -325,21 +273,21 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // Try to get mainStatus from checkInStatus object first
-    final checkInStatus = appointment['checkInStatus'];
-    if (checkInStatus is Map<String, dynamic>) {
-      final mainStatus = checkInStatus['mainStatus']?.toString();
-      if (mainStatus != null && mainStatus.isNotEmpty) {
-        return mainStatus;
-      }
-    }
-
-    // Fallback to appointmentStatus.status
+    // First check appointmentStatus.status (this is what gets updated by Done API)
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
       final status = appointmentStatus['status']?.toString();
       if (status != null && status.isNotEmpty) {
         return status;
+      }
+    }
+
+    // Fallback to mainStatus from checkInStatus object
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is Map<String, dynamic>) {
+      final mainStatus = checkInStatus['mainStatus']?.toString();
+      if (mainStatus != null && mainStatus.isNotEmpty) {
+        return mainStatus;
       }
     }
 
@@ -510,9 +458,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   Color _getStatusColor(String? status) {
     if (status == null) return Colors.grey;
-    print(
-      'Tomorrow Screen - Status Color: $status',
-    ); // Log status for debugging
     
     // Convert status to display text and get appropriate color
     switch (status.toLowerCase()) {
@@ -529,7 +474,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   String _getStatusText(String? status) {
     if (status == null) return 'Unknown';
-    print('Tomorrow Screen - Status Text: $status'); // Log status for debugging
     
     // Convert status to display text
     switch (status.toLowerCase()) {
@@ -994,7 +938,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                       Row(
                         children: [
                           Text(
-                            'Accompany: ',
+                            'Accompany User: ',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
@@ -1002,7 +946,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                             ),
                           ),
                           Text(
-                            'accompanyusers${_getAccompanyUsersCount(appointment)}',
+                            '${_getAccompanyUsersCount(appointment)}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1145,6 +1089,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       }
 
       final appointmentStatusId = appointmentStatus['_id'].toString();
+      final appointmentId = appointment['_id'].toString();
 
       // Show loading indicator
       _showSnackBar('Marking appointment as done...', isError: false);
@@ -1160,6 +1105,26 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           result['message'] ?? 'Appointment marked as completed successfully',
           isError: false,
         );
+
+        // Update the local appointment data immediately
+        setState(() {
+          final index = _tomorrowAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          if (index != -1) {
+            // Update the appointment status to 'completed' (prioritize appointmentStatus.status)
+            if (_tomorrowAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['appointmentStatus']['status'] = 'completed';
+            }
+            // Also update checkInStatus if it exists (fallback)
+            if (_tomorrowAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] = 'completed';
+            }
+            // Update direct mainStatus field as well (fallback)
+            _tomorrowAppointments[index]['mainStatus'] = 'completed';
+          }
+        });
+
+        // Add a small delay to ensure server has updated the data
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
         await _fetchTomorrowAppointments();
@@ -1185,6 +1150,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       }
 
       final appointmentStatusId = appointmentStatus['_id'].toString();
+      final appointmentId = appointment['_id'].toString();
 
       // Show loading indicator
       _showSnackBar('Undoing appointment status...', isError: false);
@@ -1200,6 +1166,26 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           result['message'] ?? 'Appointment status reverted successfully',
           isError: false,
         );
+
+        // Update the local appointment data immediately
+        setState(() {
+          final index = _tomorrowAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          if (index != -1) {
+            // Update the appointment status back to 'not_arrived' (prioritize appointmentStatus.status)
+            if (_tomorrowAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['appointmentStatus']['status'] = 'not_arrived';
+            }
+            // Also update checkInStatus if it exists (fallback)
+            if (_tomorrowAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] = 'not_arrived';
+            }
+            // Update direct mainStatus field as well (fallback)
+            _tomorrowAppointments[index]['mainStatus'] = 'not_arrived';
+          }
+        });
+
+        // Add a small delay to ensure server has updated the data
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
         await _fetchTomorrowAppointments();

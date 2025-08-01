@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 import 'auth/splash_screen.dart';
+import 'main/home_screen.dart';
+import 'main/inbox_screen.dart';
+import 'main/dashboard_screen.dart';
+import 'main/assigned_to_me_screen.dart';
+import 'main/starred_screen.dart';
+import 'main/upcoming_screen.dart';
+import 'main/today_screen.dart';
+import 'main/tomorrow_screen.dart';
+import 'main/add_new_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,6 +25,17 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const SplashScreen(),
+      routes: {
+        '/home': (context) => const HomeScreen(),
+        '/inbox': (context) => const InboxScreen(),
+        '/dashboard': (context) => const DashboardScreen(),
+        '/assigned-to-me': (context) => const AssignedToMeScreen(),
+        '/starred': (context) => const StarredScreen(),
+        '/upcoming': (context) => const UpcomingScreen(),
+        '/today': (context) => const TodayScreen(),
+        '/tomorrow': (context) => const TomorrowScreen(),
+        '/add-new': (context) => const AddNewScreen(),
+      },
     );
   }
 }
@@ -97,13 +117,6 @@ class _MyHomePageState extends State<MyHomePage> {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Firebase is now connected! 🎉',
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
           ],
         ),
       ),

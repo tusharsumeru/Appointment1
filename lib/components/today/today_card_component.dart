@@ -76,8 +76,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       // Get today's date in YYYY-MM-DD format
       final todayString = ActionService.formatDateForAPI(DateTime.now());
 
-      print('📅 Fetching appointments for today: $todayString');
-
       final result = await ActionService.getAppointmentsByScheduledDate(
         date: todayString,
       );
@@ -95,22 +93,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
           });
 
           _todayAppointments = sortedAppointments;
-
-          // Debug: Print first appointment data to understand structure
-          if (_todayAppointments.isNotEmpty) {
-            print('🔍 Debug: First appointment data:');
-            print('ID: ${_todayAppointments[0]['_id']}');
-            print('All fields: ${_todayAppointments[0].keys.toList()}');
-            print('Scheduled Time: ${_todayAppointments[0]['scheduledTime']}');
-            print('Preferred Time: ${_todayAppointments[0]['preferredTime']}');
-            print('Created At: ${_todayAppointments[0]['createdAt']}');
-            print('Status: ${_todayAppointments[0]['status']}');
-            print('Location: ${_getLocation(_todayAppointments[0])}');
-            print(
-              'User Designation: ${_todayAppointments[0]['userCurrentDesignation']}',
-            );
-            print('---');
-          }
         } else {
           _todayAppointments = [];
         }
@@ -183,9 +165,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
           }
 
           if (timeString == null) {
-            print(
-              '❌ No time field found for appointment: ${appointment['_id']}',
-            );
             return false;
           }
 
@@ -210,15 +189,8 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                 ? (hour >= start && hour < end)
                 : (hour >= start || hour < end);
 
-            if (isInRange) {
-              print(
-                '✅ ${categoryKey.toUpperCase()}: Appointment ${appointment['_id']} at hour: $hour',
-              );
-            }
-
             return isInRange;
           } catch (e) {
-            print('❌ Error parsing time "$timeString": $e');
             return false;
           }
         }).toList();
@@ -248,11 +220,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
           final isTbsReq = isStatusTbsReq || isCommunicationTbsReq;
 
-          if (isTbsReq) {
-            print(
-              '✅ TBS/REQ: Appointment ${appointment['_id']} with status: $status, communicationPreferences: $communicationPreferences',
-            );
-          }
           return isTbsReq;
         }).toList();
 
@@ -260,11 +227,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         return _todayAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           final isDone = status == 'completed' || status == 'done';
-          if (isDone) {
-            print(
-              '✅ DONE: Appointment ${appointment['_id']} with status: $status',
-            );
-          }
           return isDone;
         }).toList();
 
@@ -297,11 +259,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
           final location = _getLocation(appointment).toLowerCase();
           final isGurukul = location.contains('gurukul');
-          if (isGurukul) {
-            print(
-              '✅ GURUKUL: Appointment ${appointment['_id']} at location: $location',
-            );
-          }
           return isGurukul;
         }).toList();
 
@@ -1001,21 +958,21 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
   }
 
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // Try to get mainStatus from checkInStatus object first
-    final checkInStatus = appointment['checkInStatus'];
-    if (checkInStatus is Map<String, dynamic>) {
-      final mainStatus = checkInStatus['mainStatus']?.toString();
-      if (mainStatus != null && mainStatus.isNotEmpty) {
-        return mainStatus;
-      }
-    }
-
-    // Fallback to appointmentStatus.status
+    // First check appointmentStatus.status (this is what gets updated by Done API)
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
       final status = appointmentStatus['status']?.toString();
       if (status != null && status.isNotEmpty) {
         return status;
+      }
+    }
+
+    // Fallback to mainStatus from checkInStatus object
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is Map<String, dynamic>) {
+      final mainStatus = checkInStatus['mainStatus']?.toString();
+      if (mainStatus != null && mainStatus.isNotEmpty) {
+        return mainStatus;
       }
     }
 
@@ -1025,7 +982,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
   Color _getStatusColor(String? status) {
     if (status == null) return Colors.grey;
-    print('Today Screen - Status Color: $status'); // Log status for debugging
     
     // Convert status to display text and get appropriate color
     switch (status.toLowerCase()) {
@@ -1042,7 +998,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
   String _getStatusText(String? status) {
     if (status == null) return 'Unknown';
-    print('Today Screen - Status Text: $status'); // Log status for debugging
     
     // Convert status to display text
     switch (status.toLowerCase()) {
@@ -1075,6 +1030,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       }
 
       final appointmentStatusId = appointmentStatus['_id'].toString();
+      final appointmentId = appointment['_id'].toString();
 
       // Show loading indicator
       _showSnackBar('Marking appointment as done...', isError: false);
@@ -1090,6 +1046,26 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
           result['message'] ?? 'Appointment marked as completed successfully',
           isError: false,
         );
+
+        // Update the local appointment data immediately
+        setState(() {
+          final index = _todayAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          if (index != -1) {
+            // Update the appointment status to 'completed' (prioritize appointmentStatus.status)
+            if (_todayAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _todayAppointments[index]['appointmentStatus']['status'] = 'completed';
+            }
+            // Also update checkInStatus if it exists (fallback)
+            if (_todayAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _todayAppointments[index]['checkInStatus']['mainStatus'] = 'completed';
+            }
+            // Update direct mainStatus field as well (fallback)
+            _todayAppointments[index]['mainStatus'] = 'completed';
+          }
+        });
+
+        // Add a small delay to ensure server has updated the data
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
         await _fetchTodayAppointments();
@@ -1180,6 +1156,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       }
 
       final appointmentStatusId = appointmentStatus['_id'].toString();
+      final appointmentId = appointment['_id'].toString();
 
       // Show loading indicator
       _showSnackBar('Undoing appointment status...', isError: false);
@@ -1195,6 +1172,26 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
           result['message'] ?? 'Appointment status reverted successfully',
           isError: false,
         );
+
+        // Update the local appointment data immediately
+        setState(() {
+          final index = _todayAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          if (index != -1) {
+            // Update the appointment status back to 'not_arrived' (prioritize appointmentStatus.status)
+            if (_todayAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _todayAppointments[index]['appointmentStatus']['status'] = 'not_arrived';
+            }
+            // Also update checkInStatus if it exists (fallback)
+            if (_todayAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _todayAppointments[index]['checkInStatus']['mainStatus'] = 'not_arrived';
+            }
+            // Update direct mainStatus field as well (fallback)
+            _todayAppointments[index]['mainStatus'] = 'not_arrived';
+          }
+        });
+
+        // Add a small delay to ensure server has updated the data
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
         await _fetchTodayAppointments();

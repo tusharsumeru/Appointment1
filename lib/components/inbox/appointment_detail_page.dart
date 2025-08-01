@@ -138,32 +138,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   int _getUserMatches(int index) {
-    // For main user (index 0), always return at least 1 for profile image
-    if (index == 0) {
-      // Check if we have face match data for main user
-      final faceMatchResults = _faceMatchData[index] ?? [];
-      
-      if (faceMatchResults.isNotEmpty) {
-        final result = faceMatchResults[0]; // Get first result
-        
-        if (result['apiResult'] != null) {
-          final apiResult = result['apiResult'];
-          
-          // Get matches from all time periods
-          final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-          final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-          final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-          
-          // Return total count of all matches + 1 for profile image
-          return matches30.length + matches60.length + matches90.length + 1;
-        }
-      }
-      
-      // If no face match data available, return 1 for profile image
-      return 1;
-    }
-    
-    // For accompanying users, count matches from API result + 1 for profile image
+    // Check if we have face match data for this user
     final faceMatchResults = _faceMatchData[index] ?? [];
     
     if (faceMatchResults.isNotEmpty) {
@@ -177,13 +152,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
         final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
         
-        // Return total count of all matches + 1 for profile image
-        return matches30.length + matches60.length + matches90.length + 1;
+        // Return total count of all matches (no +1 for profile image)
+        return matches30.length + matches60.length + matches90.length;
       }
     }
     
-    // If no face match data available, return 1 for profile image (same as main user)
-    return 1;
+    // If no face match data available, return 0 (no matches found)
+    return 0;
   }
 
   String _extractAge(String label) {
@@ -284,12 +259,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         });
         
         // Debug: Print the results
-        print('User $userIndex: Found ${faceMatchResults.length} face match results');
-        if (faceMatchResults.isNotEmpty) {
-          print('User $userIndex: First result userType: ${faceMatchResults[0]['userType']}');
-        } else {
-          print('User $userIndex: No face match results found - this is normal for users without face match data');
-        }
+        // print('User $userIndex: Found ${faceMatchResults.length} face match results');
+        // if (faceMatchResults.isNotEmpty) {
+        //   print('User $userIndex: First result userType: ${faceMatchResults[0]['userType']}');
+        // } else {
+        //   print('User $userIndex: No face match results found - this is normal for users without face match data');
+        // }
       } else {
         setState(() {
           _faceMatchErrors[userIndex] = result['message'] ?? 'Failed to fetch face match results';
@@ -311,10 +286,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // Use existing face match data without fetching new data
     // Only fetch data when refresh button is clicked
     
-    // For all users, ensure we have at least 1 image count (profile image)
+    // Pass the actual match count (no +1 for profile image)
     int finalImageCount = imageCount;
-    final currentMatches = _getUserMatches(userIndex);
-    finalImageCount = currentMatches > 0 ? currentMatches : 1; // At least show profile image
     
     Navigator.push(
       context,
@@ -496,10 +469,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     try {
       // Refresh face match data for all users including main user
       final attendeeCount = _getAttendeeCount();
-      print('Refresh: Starting refresh for $attendeeCount users');
+      // print('Refresh: Starting refresh for $attendeeCount users');
       
       for (int i = 0; i < attendeeCount; i++) {
-        print('Refresh: Fetching data for user $i');
+        // print('Refresh: Fetching data for user $i');
         await _fetchFaceMatchData(i);
       }
       
@@ -821,7 +794,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // Check if guest exists in new structure
     final guest = widget.appointment['guest'];
     if (guest != null) {
-      print('Attendee count: Found guest, returning 2');
       return 2; // Main user + guest
     }
     
@@ -829,28 +801,195 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
       final count = accompanyUsers['numberOfUsers'] ?? 1;
-      print('Attendee count: Using accompanyUsers, returning $count');
       return count;
     }
-    print('Attendee count: No guest or accompanyUsers, returning 1');
     return 1;
   }
 
 
 
   String _getTeacherCode() {
+    // Check direct aolTeacher field first
     final aolTeacher = widget.appointment['aolTeacher'];
     if (aolTeacher is Map<String, dynamic>) {
-      return aolTeacher['teacherCode']?.toString() ?? '';
+      final teacherCode = aolTeacher['teacherCode']?.toString();
+      if (teacherCode != null && teacherCode.isNotEmpty) {
+        return teacherCode;
+      }
     }
+    
+    // Check nested structure in createdBy.aol_teacher
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      if (aolTeacherNested is Map<String, dynamic>) {
+        final nestedAolTeacher = aolTeacherNested['aolTeacher'];
+        if (nestedAolTeacher is Map<String, dynamic>) {
+          final teacherCode = nestedAolTeacher['teacherCode']?.toString();
+          if (teacherCode != null && teacherCode.isNotEmpty) {
+            return teacherCode;
+          }
+        }
+      }
+    }
+    
     return '';
   }
 
-  bool _isTeacher() {
-    final aolTeacher = widget.appointment['aolTeacher'];
-    if (aolTeacher is Map<String, dynamic>) {
-      return aolTeacher['isTeacher'] == true;
+  String _getTeacherName() {
+    // Check nested structure in createdBy.aol_teacher
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      if (aolTeacherNested is Map<String, dynamic>) {
+        final atolValidationData = aolTeacherNested['atolValidationData'];
+        if (atolValidationData is Map<String, dynamic>) {
+          final data = atolValidationData['data'];
+          if (data is Map<String, dynamic>) {
+            final teacherDetails = data['teacherdetails'];
+            if (teacherDetails is Map<String, dynamic>) {
+              return teacherDetails['name']?.toString() ?? '';
+            }
+          }
+        }
+      }
     }
+    
+    // Fallback to createdBy fullName
+    return _getCreatedByName();
+  }
+
+  String _getTeacherType() {
+    // Check nested structure in createdBy.aol_teacher
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      if (aolTeacherNested is Map<String, dynamic>) {
+        // Check teacher_type field
+        final teacherType = aolTeacherNested['teacher_type']?.toString();
+        if (teacherType != null && teacherType.isNotEmpty) {
+          return teacherType;
+        }
+        
+        // Check atolValidationData.data.teacherdetails.teacher_type
+        final atolValidationData = aolTeacherNested['atolValidationData'];
+        if (atolValidationData is Map<String, dynamic>) {
+          final data = atolValidationData['data'];
+          if (data is Map<String, dynamic>) {
+            final teacherDetails = data['teacherdetails'];
+            if (teacherDetails is Map<String, dynamic>) {
+              final detailsTeacherType = teacherDetails['teacher_type']?.toString();
+              if (detailsTeacherType != null && detailsTeacherType.isNotEmpty) {
+                return detailsTeacherType;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return 'TAOL Teacher';
+  }
+
+  String _getTeacherPrograms() {
+    // Check nested structure in createdBy.aol_teacher
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      if (aolTeacherNested is Map<String, dynamic>) {
+        final atolValidationData = aolTeacherNested['atolValidationData'];
+        if (atolValidationData is Map<String, dynamic>) {
+          final data = atolValidationData['data'];
+          if (data is Map<String, dynamic>) {
+            final teacherDetails = data['teacherdetails'];
+            if (teacherDetails is Map<String, dynamic>) {
+              return teacherDetails['program_types_can_teach']?.toString() ?? 'Happiness Program';
+            }
+          }
+        }
+      }
+    }
+    
+    return 'Happiness Program';
+  }
+
+  List<String> _getUserTags() {
+    // Check createdBy.userTags
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final userTags = createdBy['userTags'];
+      if (userTags is List) {
+        return userTags.map((tag) => tag.toString()).toList();
+      }
+    }
+    
+    return [];
+  }
+
+  bool _isTeacher() {
+    // Check multiple possible fields for teacher status
+    final aolTeacher = widget.appointment['aolTeacher'];
+    final createdBy = widget.appointment['createdBy'];
+    final userCurrentDesignation = widget.appointment['userCurrentDesignation']?.toString().toLowerCase();
+    final appointmentPurpose = widget.appointment['appointmentPurpose']?.toString().toLowerCase();
+    
+    // Check aolTeacher.isTeacher field (direct field)
+    if (aolTeacher is Map<String, dynamic>) {
+      final isTeacher = aolTeacher['isTeacher'] == true;
+      if (isTeacher) {
+        return true;
+      }
+    }
+    
+    // Check createdBy.aol_teacher structure (nested structure)
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      
+      if (aolTeacherNested is Map<String, dynamic>) {
+        // Check aolTeacher.isTeacher in nested structure
+        final nestedAolTeacher = aolTeacherNested['aolTeacher'];
+        if (nestedAolTeacher is Map<String, dynamic>) {
+          final isTeacher = nestedAolTeacher['isTeacher'] == true;
+          if (isTeacher) {
+            return true;
+          }
+        }
+        
+        // Check atolValidationData.verified
+        final atolValidationData = aolTeacherNested['atolValidationData'];
+        if (atolValidationData is Map<String, dynamic>) {
+          final verified = atolValidationData['verified'] == true;
+          if (verified) {
+            return true;
+          }
+        }
+        
+        // Check teacher_type
+        final teacherType = aolTeacherNested['teacher_type']?.toString().toLowerCase();
+        if (teacherType != null && (teacherType.contains('teacher') || teacherType.contains('aol'))) {
+          return true;
+        }
+      }
+    }
+    
+    // Check if designation contains teacher-related keywords
+    if (userCurrentDesignation != null) {
+      if (userCurrentDesignation.contains('teacher') || 
+          userCurrentDesignation.contains('aol') ||
+          userCurrentDesignation.contains('art of living')) {
+        return true;
+      }
+    }
+    
+    // Check if appointment purpose indicates teacher status
+    if (appointmentPurpose != null) {
+      if (appointmentPurpose.contains('teacher') || 
+          appointmentPurpose.contains('aol') ||
+          appointmentPurpose.contains('art of living')) {
+        return true;
+      }
+    }
+    
     return false;
   }
 
@@ -971,8 +1110,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Main User Information Section
             _buildMainUserSection(),
             
-            // Accompanying Users Section
-            _buildAccompanyingUsersSection(),
+            // Accompanying Users Section - Only show if 10 or fewer users
+            if (_getAttendeeCount() <= 10) ...[
+              _buildAccompanyingUsersSection(),
+            ],
             
             // Teacher Verification Section - Only show if user is verified
             if (_isTeacher()) ...[
@@ -1170,8 +1311,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     final userLabel = _getUserLabel(actualIndex);
                     final userMatches = _getUserMatches(actualIndex);
                     
-                    print('Building user card $index: actualIndex=$actualIndex, name="$userName", label="$userLabel", matches=$userMatches');
-                    
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: _buildUserCard(
@@ -1187,30 +1326,45 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
               const SizedBox(height: 16),
               // Number Indicators (dynamic based on filtered attendee count)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_getFilteredAttendeeCount(), (index) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: _currentPage == index 
-                        ? Colors.blue 
-                        : Colors.grey[300],
-                    ),
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _currentPage == index 
-                          ? Colors.white 
-                          : Colors.grey[600],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_getFilteredAttendeeCount(), (index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _currentPage = index;
+                        });
+                        _pageController.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: _currentPage == index 
+                            ? Colors.blue 
+                            : Colors.grey[300],
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _currentPage == index 
+                              ? Colors.white 
+                              : Colors.grey[600],
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ],
           ),
@@ -1220,8 +1374,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildUserCard(String name, String label, int matches, bool isMainUser, int userIndex) {
-    // Determine if card should be clickable - all users are clickable since they have at least 1 image (profile)
-    bool isClickable = matches > 0; // All users have at least 1 image (profile image)
+    // Only make cards clickable if there are matches (count > 0)
+    bool isClickable = matches > 0;
     
     return GestureDetector(
       onTap: isClickable ? () => _navigateToUserImages(name, matches, userIndex) : null,
@@ -1232,12 +1386,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isClickable ? Colors.grey[300]! : Colors.grey[200]!,
+            color: Colors.grey[300]!, // Keep normal border for all cards
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(isClickable ? 0.1 : 0.05),
+              color: Colors.grey.withOpacity(0.1), // Keep normal shadow for all cards
               spreadRadius: 1,
               blurRadius: 4,
               offset: const Offset(0, 2),
@@ -1245,7 +1399,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ],
         ),
         child: Opacity(
-          opacity: isClickable ? 1.0 : 0.6,
+          opacity: 1.0, // Keep full opacity for all cards
           child: Row(
             children: [
               // Profile Image (Square)
@@ -1303,14 +1457,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                             _isLoadingFaceMatch[userIndex] == true
                               ? 'Loading matches...'
                               : _faceMatchData[userIndex]?.isNotEmpty == true
-                                ? 'Total Matches Found : $matches'
+                                ? matches > 0 
+                                  ? 'Total Matches Found : $matches'
+                                  : 'No matches found'
                                 : 'No face match data available',
                             style: TextStyle(
                               fontSize: 12,
                               color: _isLoadingFaceMatch[userIndex] == true
                                 ? Colors.blue[600]
                                 : _faceMatchData[userIndex]?.isNotEmpty == true
-                                  ? Colors.grey[600]
+                                  ? matches > 0
+                                    ? Colors.grey[600]
+                                    : Colors.grey[500]
                                   : Colors.grey[500],
                             ),
                             overflow: TextOverflow.visible,
@@ -1438,66 +1596,44 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.green[200]!),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profile Image
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.red, width: 2),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: _buildNetworkImage(_getAppointmentImageUrl(), 30),
+                Text(
+                  _getTeacherName(),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 16),
-                
-                // Teacher Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getAppointmentName(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.verified,
+                      color: Colors.green,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Verified By TAOL',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.w500,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.verified,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Verified By TAOL',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.green[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (teacherCode.isNotEmpty) ...[
-                        _buildTeacherDetail('Teacher Code', teacherCode),
-                        _buildTeacherDetail('Teacher Type', 'TAOL Teacher'),
-                        _buildTeacherDetail('Can Teach', 'Happiness Program'),
-                      ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 8),
+                if (teacherCode.isNotEmpty) ...[
+                  _buildTeacherDetail('Teacher Code', teacherCode),
+                  _buildTeacherDetail('Teacher Type', _getTeacherType()),
+                  _buildTeacherDetail('Programs eligible to teach', _getTeacherPrograms()),
+                ],
               ],
             ),
           ),
@@ -1506,10 +1642,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           // Additional Details
           _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
-          _buildDetailRow('Are you an Art Of Living teacher', 'Yes, Part Time AOL Teacher', Icons.school),
-          _buildDetailRow('Programs eligible to teach', 'Happiness Program', Icons.book),
+          _buildDetailRow('Are you an Art Of Living teacher', 'Yes, ${_getTeacherType()}', Icons.school),
+          _buildDetailRow('Programs eligible to teach', _getTeacherPrograms(), Icons.book),
           _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
-          _buildDetailRow('Tags', 'No tags', Icons.label),
+          _buildUserTagsRow(),
         ],
       ),
     );
@@ -1542,6 +1678,56 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildUserTagsRow() {
+    final userTags = _getUserTags();
+    if (userTags.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.label, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  'Tags',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: userTags.map((tag) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildNotesRemarksSection() {

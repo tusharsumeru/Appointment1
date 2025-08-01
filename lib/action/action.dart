@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://119cd3e3ad08.ngrok-free.app/api/v3'; // API base URL
+      'https://91597e2ec7c9.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -1695,8 +1695,6 @@ class ActionService {
     }
   }
 
-
-
   // Get appointment by ID (for QR scanner)
   static Future<Map<String, dynamic>> getAppointmentById(
     String appointmentId,
@@ -3006,6 +3004,116 @@ class ActionService {
       };
     } catch (error) {
       return {'success': false, 'statusCode': 500, 'message': error.toString()};
+    }
+  }
+
+  // Create quick appointment without validation
+  static Future<Map<String, dynamic>> createQuickAppointment({
+    required String fullName,
+    required String emailId,
+    required String phoneNumber,
+    required String designation,
+    String? company,
+    bool isTeacher = false,
+    Map<String, dynamic>? photo,
+    Map<String, dynamic>? referenceDetails,
+    String? location,
+    String? purpose,
+    String? remarksForGurudev,
+    int numberOfPeople = 1,
+    required String preferredDate,
+    String? preferredTime,
+    bool tbsRequired = false,
+    bool dontSendNotifications = false,
+    Map<String, dynamic>? attachment,
+    Map<String, dynamic>? programDetails,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'appointmentType': 'myself',
+        'fullName': fullName,
+        'emailId': emailId,
+        'phoneNumber': phoneNumber,
+        'designation': designation,
+        'company': company,
+        'isTeacher': isTeacher,
+        'photo': photo,
+        'referenceDetails': referenceDetails,
+        'location': location,
+        'purpose': purpose,
+        'remarksForGurudev': remarksForGurudev,
+        'numberOfPeople': numberOfPeople,
+        'preferredDate': preferredDate,
+        'preferredTime': preferredTime,
+        'tbsRequired': tbsRequired,
+        'dontSendNotifications': dontSendNotifications,
+        'attachment': attachment,
+        'programDetails': programDetails,
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment/quick'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201) {
+        // Successful creation
+        return {
+          'success': true,
+          'statusCode': 201,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Quick appointment created successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Validation error
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Validation failed',
+          'error': responseData['error'],
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to create appointment',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
     }
   }
 }

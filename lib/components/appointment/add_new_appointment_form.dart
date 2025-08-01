@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import '../../action/action.dart';
 
 class AddNewAppointmentForm extends StatefulWidget {
   final VoidCallback? onSave;
@@ -115,7 +117,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     return '${country['name']} (${country['code']})';
   }
 
-  void _showCountryCodeBottomSheet(BuildContext context, bool isMobile) {
+  void _showCountryCodeBottomSheet(BuildContext context, int phoneFieldIndex) {
     List<Map<String, dynamic>> filteredCountries = List.from(_countryCodes);
     String searchQuery = '';
     
@@ -183,9 +185,14 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     itemCount: filteredCountries.length,
                     itemBuilder: (context, index) {
                       final country = filteredCountries[index];
-                      final isSelected = isMobile 
-                          ? _selectedCountryCode == country['code']
-                          : _selectedRefCountryCode == country['code'];
+                      String currentCountryCode;
+                      if (phoneFieldIndex == 0) {
+                        currentCountryCode = _selectedCountryCode;
+                      } else {
+                        currentCountryCode = _selectedRefCountryCode;
+                      }
+                      
+                      final isSelected = currentCountryCode == country['code'];
                       
                       return ListTile(
                         leading: Text(
@@ -202,7 +209,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                         trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
                         onTap: () {
                           this.setState(() {
-                            if (isMobile) {
+                            if (phoneFieldIndex == 0) {
                               _selectedCountryCode = country['code'] as String;
                             } else {
                               _selectedRefCountryCode = country['code'] as String;
@@ -319,35 +326,92 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     });
   }
 
-  void _saveAppointment() {
+  void _saveAppointment() async {
     if (_formKey.currentState!.validate()) {
-      // Here you would typically send the data to your backend
-      final appointmentData = {
-        'fullName': _fullNameController.text,
-        'noPeople': _noPeopleController.text,
-        'designation': _designationController.text,
-        'company': _companyController.text,
-        'countryCode': _selectedCountryCode,
-        'mobileNo': _mobileNoController.text,
-        'email': _emailController.text,
-        'isTeacher': _isTeacher,
-        'refName': _refNameController.text,
-        'refCountryCode': _selectedRefCountryCode,
-        'refMobileNo': _refMobileNoController.text,
-        'refEmail': _refEmailController.text,
-        'venue': _selectedVenue,
-        'purpose': _purposeController.text,
-        'gurudevRemark': _gurudevRemarkController.text,
-        'date': _dateController.text,
-        'time': _timeController.text,
-        'isAttendingProgram': _isAttendingProgram,
-        'toBeOpt': _toBeOpt,
-        'stopSendEmailMessage': _stopSendEmailMessage,
-        'image': _selectedImage?.path,
-      };
-      
-      print('Appointment Data: $appointmentData');
-      widget.onSave?.call();
+      try {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+
+        // Call the ActionService to create the appointment
+        final result = await ActionService.createQuickAppointment(
+          fullName: _fullNameController.text,
+          emailId: _emailController.text,
+          phoneNumber: '$_selectedCountryCode${_mobileNoController.text}',
+          designation: _designationController.text,
+          company: _companyController.text,
+          isTeacher: _isTeacher,
+          photo: _selectedImage != null ? {
+            'url': _selectedImage!.path,
+            'filename': _selectedImage!.path.split('/').last,
+          } : null,
+          referenceDetails: {
+            'name': _refNameController.text,
+            'email': _refEmailController.text,
+            'phone': '$_selectedRefCountryCode${_refMobileNoController.text}',
+          },
+          location: _selectedVenue,
+          purpose: _purposeController.text,
+          remarksForGurudev: _gurudevRemarkController.text,
+          numberOfPeople: int.tryParse(_noPeopleController.text) ?? 1,
+          preferredDate: _dateController.text,
+          preferredTime: _timeController.text,
+          tbsRequired: _toBeOpt,
+          dontSendNotifications: _stopSendEmailMessage,
+          attachment: null, // TODO: Implement file upload if needed
+          programDetails: {
+            'isAttending': _isAttendingProgram,
+          },
+        );
+
+        // Close loading dialog
+        Navigator.of(context).pop();
+
+        if (result['success']) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Appointment created successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to inbox screen after successful creation
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/inbox',
+            (route) => false, // Remove all previous routes
+          );
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to create appointment'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+
+      } catch (error) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating appointment: ${error.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        
+        print('Error creating appointment: $error');
+      }
     }
   }
 
@@ -1017,10 +1081,10 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-              child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
-          child: Column(
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Card 1: Personal Information
@@ -1045,84 +1109,6 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Email Field
-                  _buildInputField(
-                    label: 'Email Address',
-                    controller: _emailController,
-                    placeholder: 'email@example.com',
-                    keyboardType: TextInputType.emailAddress,
-                    prefixIcon: const Icon(Icons.email, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Phone Number
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Phone Number',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF374151), // gray-700
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: Row(
-                          children: [
-                                                                                                  // Country code flag button
-                                   GestureDetector(
-                                     onTap: () => _showCountryCodeBottomSheet(context, true),
-                                     child: Container(
-                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                       decoration: BoxDecoration(
-                                         border: Border(
-                                           right: BorderSide(color: Colors.grey[200]!),
-                                         ),
-                                       ),
-                                       child: Text(
-                                         _getCountryFlag(_getSelectedCountryIso(_selectedCountryCode)),
-                                         style: const TextStyle(fontSize: 18),
-                                       ),
-                                     ),
-                                   ),
-                                   // Country code display
-                                   Container(
-                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                     child: Text(
-                                       _selectedCountryCode,
-                                       style: const TextStyle(
-                                         fontSize: 16,
-                                         fontWeight: FontWeight.w500,
-                                         color: Color(0xFF374151), // gray-700
-                                       ),
-                                     ),
-                                   ),
-                                   // Phone number field
-                                   Expanded(
-                                     child: TextFormField(
-                                       controller: _mobileNoController,
-                                       decoration: const InputDecoration(
-                                         hintText: '',
-                                         border: InputBorder.none,
-                                         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                       ),
-                                       keyboardType: TextInputType.phone,
-                                     ),
-                                   ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
                   // Designation Field
                   _buildInputField(
                     label: 'Designation',
@@ -1139,164 +1125,21 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Company/Organization Field
+                  // Reference Name Field
                   _buildInputField(
-                    label: 'Company/Organization',
-                    controller: _companyController,
-                    placeholder: 'Organization name',
-                    prefixIcon: const Icon(Icons.business, color: Colors.grey),
+                    label: 'Reference Name',
+                    controller: _refNameController,
+                    placeholder: 'Name of the person who referred',
+                    prefixIcon: const Icon(Icons.person_outline, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
                   
-                  // Is Teacher Radio Group
-                  _buildRadioGroup(
-                    label: 'Is this person an Art Of Living teacher?',
-                    option1: 'No',
-                    option2: 'Yes',
-                    value: _isTeacher,
-                    onChanged: (value) {
-                      setState(() {
-                        _isTeacher = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Photo Upload
-                  _buildPhotoUpload(),
-                  const SizedBox(height: 24),
-                  
-                  // Reference Details
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Reference Details',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF374151), // gray-700
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Information about the person who referred this appointee (if applicable)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                                                 // Reference Name Field
-                         _buildInputField(
-                           label: 'Reference Name',
-                           controller: _refNameController,
-                           placeholder: 'Name of the person who referred',
-                           prefixIcon: const Icon(Icons.person_outline, color: Colors.grey),
-                         ),
-                         const SizedBox(height: 16),
-                         
-                         // Reference Email Field
-                         _buildInputField(
-                           label: 'Reference Email',
-                           controller: _refEmailController,
-                           placeholder: 'email@example.com',
-                           keyboardType: TextInputType.emailAddress,
-                           prefixIcon: const Icon(Icons.email, color: Colors.grey),
-                         ),
-                        const SizedBox(height: 16),
-                                                 // Reference Phone Field
-                         Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             const Text(
-                               'Reference Phone',
-                               style: TextStyle(
-                                 fontSize: 14,
-                                 fontWeight: FontWeight.w500,
-                                 color: Color(0xFF374151), // gray-700
-                               ),
-                             ),
-                             const SizedBox(height: 8),
-                             Container(
-                               decoration: BoxDecoration(
-                                 color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
-                                 borderRadius: BorderRadius.circular(8),
-                                 border: Border.all(color: Colors.grey[200]!),
-                               ),
-                               child: Row(
-                                 children: [
-                                   // Country code flag button
-                                   GestureDetector(
-                                     onTap: () => _showCountryCodeBottomSheet(context, false),
-                                     child: Container(
-                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                       decoration: BoxDecoration(
-                                         border: Border(
-                                           right: BorderSide(color: Colors.grey[200]!),
-                                         ),
-                                       ),
-                                       child: Text(
-                                         _getCountryFlag(_getSelectedCountryIso(_selectedRefCountryCode)),
-                                         style: const TextStyle(fontSize: 18),
-                                       ),
-                                     ),
-                                   ),
-                                   // Country code display
-                                   Container(
-                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                     child: Text(
-                                       _selectedRefCountryCode,
-                                       style: const TextStyle(
-                                         fontSize: 16,
-                                         fontWeight: FontWeight.w500,
-                                         color: Color(0xFF374151), // gray-700
-                                       ),
-                                     ),
-                                   ),
-                                   // Phone number field
-                                   Expanded(
-                                     child: TextFormField(
-                                       controller: _refMobileNoController,
-                                       decoration: const InputDecoration(
-                                         hintText: '',
-                                         border: InputBorder.none,
-                                         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                       ),
-                                       keyboardType: TextInputType.phone,
-                                     ),
-                                   ),
-                                 ],
-                               ),
-                             ),
-                           ],
-                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Card 2: Appointment Details
-            _buildCard(
-              title: 'Appointment Details',
-              subtitle: 'Provide details about the appointment',
-              child: Column(
-                children: [
                   // Venue Selection
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Appointment Location',
+                        'Select Venue',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -1334,6 +1177,183 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   ),
                   const SizedBox(height: 16),
                   
+                  // Number of People
+                  _buildInputField(
+                    label: 'Number of People',
+                    controller: _noPeopleController,
+                    placeholder: 'Total number of attendees',
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Phone Number
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Phone Number',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF374151), // gray-700
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            // Country code flag button
+                            GestureDetector(
+                              onTap: () => _showCountryCodeBottomSheet(context, 0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    right: BorderSide(color: Colors.grey[200]!),
+                                  ),
+                                ),
+                                child: Text(
+                                  _getCountryFlag(_getSelectedCountryIso(_selectedCountryCode)),
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ),
+                            // Country code display
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              child: Text(
+                                _selectedCountryCode,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF374151), // gray-700
+                                ),
+                              ),
+                            ),
+                            // Phone number field
+                            Expanded(
+                              child: TextFormField(
+                                controller: _mobileNoController,
+                                decoration: const InputDecoration(
+                                  hintText: '',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                ),
+                                keyboardType: TextInputType.phone,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Phone Number 2
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Reference Phone Number',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF374151), // gray-700
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            // Country code flag button
+                            GestureDetector(
+                              onTap: () => _showCountryCodeBottomSheet(context, 2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    right: BorderSide(color: Colors.grey[200]!),
+                                  ),
+                                ),
+                                child: Text(
+                                  _getCountryFlag(_getSelectedCountryIso(_selectedRefCountryCode)),
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ),
+                            // Country code display
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              child: Text(
+                                _selectedRefCountryCode,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF374151), // gray-700
+                                ),
+                              ),
+                            ),
+                            // Phone number field
+                            Expanded(
+                              child: TextFormField(
+                                controller: _refMobileNoController,
+                                decoration: const InputDecoration(
+                                  hintText: '',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                ),
+                                keyboardType: TextInputType.phone,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Photo Upload
+                  _buildPhotoUpload(),
+                  const SizedBox(height: 16),
+                  
+                  // Email Field
+                  _buildInputField(
+                    label: 'Email Address',
+                    controller: _emailController,
+                    placeholder: 'email@example.com',
+                    keyboardType: TextInputType.emailAddress,
+                    prefixIcon: const Icon(Icons.email, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Reference Email Field
+                  _buildInputField(
+                    label: 'Reference Email',
+                    controller: _refEmailController,
+                    placeholder: 'email@example.com',
+                    keyboardType: TextInputType.emailAddress,
+                    prefixIcon: const Icon(Icons.email, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+
+            // Card 2: Appointment Details
+            _buildCard(
+              title: 'Appointment Details',
+              subtitle: 'Provide details about the appointment',
+              child: Column(
+                children: [
                   // Purpose Field
                   _buildInputField(
                     label: 'Purpose of Meeting',
@@ -1350,49 +1370,11 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     placeholder: 'Any special remarks or notes for Gurudev',
                     maxLines: 4,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Special notes, context, or important information for Gurudev\'s attention',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   
-                  // Number of People
-                  _buildInputField(
-                    label: 'Number of People',
-                    controller: _noPeopleController,
-                    placeholder: 'Total number of attendees',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Is Attending Program Radio Group
-                  _buildRadioGroup(
-                    label: 'Is the appointee attending any program at the ashram during the preferred dates?',
-                    option1: 'No',
-                    option2: 'Yes',
-                    value: _isAttendingProgram,
-                    onChanged: (value) {
-                      setState(() {
-                        _isAttendingProgram = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Card 3: Preferred Date & Time
-            _buildCard(
-              title: 'Preferred Date & Time',
-              subtitle: 'Select the preferred appointment schedule',
-              child: Column(
-                children: [
+                  // Date and Time
                   _buildDateTimeField(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   
                   // Options Section
                   const Text(
@@ -1429,8 +1411,8 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
 
             // Submit Button
             Container(
-                              width: double.infinity,
-                height: 64,
+              width: double.infinity,
+              height: 64,
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: ElevatedButton(
                 onPressed: _saveAppointment,
