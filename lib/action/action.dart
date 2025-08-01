@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://91597e2ec7c9.ngrok-free.app/api/v3'; // API base URL
+      'https://divinepicrecognition.sumerudigital.com/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,

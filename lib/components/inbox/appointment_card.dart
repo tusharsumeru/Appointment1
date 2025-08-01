@@ -568,7 +568,12 @@ class _AppointmentCardState extends State<AppointmentCard> {
       child: Column(
         children: [
           _buildActionHeader('Schedule Appointment'),
-          Expanded(child: ReminderForm(appointment: widget.appointment)),
+          Expanded(
+            child: ReminderForm(
+              appointment: widget.appointment,
+              onRefresh: widget.onRefresh, // Pass refresh callback
+            ),
+          ),
         ],
       ),
     );

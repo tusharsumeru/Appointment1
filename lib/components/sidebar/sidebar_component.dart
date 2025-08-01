@@ -228,16 +228,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
                       : null,
                 ),
                 const SizedBox(height: 8),
-                // Greeting
-                Text(
-                  'Hi User!',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
                 // User Name
                 Flexible(
                   child: Text(
@@ -266,28 +256,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // User Role (if available)
-                if (_userData?['role'] != null) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _userData!['role'].toString().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
