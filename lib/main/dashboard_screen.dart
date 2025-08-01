@@ -8,6 +8,7 @@ import '../components/common/search_bar_component.dart';
 import '../components/inbox/email_form.dart';
 import '../components/inbox/message_form.dart';
 import '../components/inbox/call_form.dart';
+import '../components/inbox/bulk_email_form.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 class DashboardScreen extends StatefulWidget {
@@ -37,9 +38,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   Set<String> _selectedAppointments = {};
 
   // Animation controllers
-  late AnimationController _buttonAnimationController;
-  late Animation<double> _buttonScaleAnimation;
-  late Animation<double> _buttonOpacityAnimation;
+  AnimationController? _buttonAnimationController;
+  Animation<double>? _buttonScaleAnimation;
+  Animation<double>? _buttonOpacityAnimation;
 
   @override
   void initState() {
@@ -55,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       begin: 0.8,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
+      parent: _buttonAnimationController!,
       curve: Curves.easeOutBack,
     ));
     
@@ -63,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
+      parent: _buttonAnimationController!,
       curve: Curves.easeInOut,
     ));
     
@@ -73,7 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   void dispose() {
     _searchController.dispose();
-    _buttonAnimationController.dispose();
+    _buttonAnimationController?.dispose();
     super.dispose();
   }
 
@@ -242,10 +243,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   void _animateButton() {
-    if (_selectedAppointments.isNotEmpty) {
-      _buttonAnimationController.forward();
-    } else {
-      _buttonAnimationController.reverse();
+    if (_buttonAnimationController != null) {
+      if (_selectedAppointments.isNotEmpty) {
+        _buttonAnimationController!.forward();
+      } else {
+        _buttonAnimationController!.reverse();
+      }
     }
   }
 
@@ -428,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         .where((appointment) => _selectedAppointments.contains(appointment['_id']?.toString() ?? ''))
         .toList();
 
-    // Show bulk email form - use first appointment as template
+    // Show bulk email form
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -441,10 +444,20 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         ),
         child: Column(
           children: [
-            _buildActionHeader('Send Bulk Email (${selectedAppointments.length} recipients)'),
+            _buildActionHeader('Bulk Email (${selectedAppointments.length} recipients)'),
             Expanded(
-              child: EmailForm(
-                appointment: selectedAppointments.first, // Pass first appointment as template
+              child: BulkEmailForm(
+                appointments: selectedAppointments,
+                onSend: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bulk email sent successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                },
+                onClose: () => Navigator.pop(context),
               ),
             ),
           ],
@@ -774,96 +787,98 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         ],
       ),
       // Floating bottom button for bulk actions
-      floatingActionButton: AnimatedBuilder(
-        animation: _buttonAnimationController,
-        builder: (context, child) {
-          return AnimatedOpacity(
-            opacity: _buttonOpacityAnimation.value,
-            duration: const Duration(milliseconds: 200),
-            child: Transform.scale(
-              scale: _buttonScaleAnimation.value,
-              child: _selectedAppointments.isNotEmpty
-                  ? Container(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue[600],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue[700]!),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Count text
-                            Text(
-                              '${_selectedAppointments.length} items selected',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Email button
-                            Container(
+      floatingActionButton: _buttonAnimationController != null
+          ? AnimatedBuilder(
+              animation: _buttonAnimationController!,
+              builder: (context, child) {
+                return AnimatedOpacity(
+                  opacity: _buttonOpacityAnimation?.value ?? 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Transform.scale(
+                    scale: _buttonScaleAnimation?.value ?? 1.0,
+                    child: _selectedAppointments.isNotEmpty
+                        ? Container(
+                            margin: const EdgeInsets.only(bottom: 24),
+                            child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.blue[600],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue[700]!),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 1),
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: _sendBulkEmail,
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.email,
-                                          size: 16,
-                                          color: Colors.blue[600],
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Send Bulk Email',
-                                          style: TextStyle(
-                                            color: Colors.blue[600],
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Count text
+                                  Text(
+                                    '${_selectedAppointments.length} items selected',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  // Email button
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 2,
+                                          offset: const Offset(0, 1),
                                         ),
                                       ],
                                     ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: _sendBulkEmail,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.email,
+                                                size: 16,
+                                                color: Colors.blue[600],
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Send Bulk Email',
+                                                style: TextStyle(
+                                                  color: Colors.blue[600],
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          );
-        },
-      ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                );
+              },
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
