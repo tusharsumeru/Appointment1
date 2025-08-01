@@ -16,6 +16,7 @@ class MessageForm extends StatefulWidget {
 class _MessageFormState extends State<MessageForm> {
   final TextEditingController _otherSmsController = TextEditingController();
   final TextEditingController _smsContentController = TextEditingController();
+  final TextEditingController _templateDisplayController = TextEditingController();
   
   // State variables for appointment data
   late Map<String, dynamic> _appointmentData;
@@ -330,9 +331,110 @@ Appointment Details:
     setState(() {
       _selectedTemplate = template;
       if (template != null) {
+        _templateDisplayController.text = template;
         _smsContentController.text = _getTemplateContent(template);
       }
     });
+  }
+
+  void _showSmsTemplateModal() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95, // Made even wider
+            height: MediaQuery.of(context).size.height * 0.6, // Made more rectangular
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Select SMS Template',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        Icons.close,
+                        color: Colors.grey.shade600,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Divider
+                Divider(color: Colors.grey.shade300, height: 1),
+                const SizedBox(height: 20),
+                // Template list
+                Expanded(
+                  child: Scrollbar(
+                    child: ListView.builder(
+                      itemCount: smsTemplateNames.length,
+                      itemBuilder: (context, index) {
+                        final template = smsTemplateNames[index];
+                        final isSelected = template == _selectedTemplate;
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.blue.shade50 : Colors.white,
+                            border: Border.all(
+                              color: isSelected ? Colors.blue.shade300 : Colors.grey.shade300,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            title: Text(
+                              template,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                            trailing: isSelected 
+                              ? Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue.shade700,
+                                  size: 24,
+                                )
+                              : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedTemplate = template;
+                                _templateDisplayController.text = template;
+                                _smsContentController.text = _getTemplateContent(template);
+                              });
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _getTemplateContent(String template) {
@@ -586,21 +688,35 @@ Appointment Details:
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedTemplate,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          if (_isLoading)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 16),
+                    Text('Loading SMS templates...'),
+                  ],
+                ),
+              ),
+            )
+          else
+            TextFormField(
+              readOnly: true,
+              onTap: _showSmsTemplateModal,
+              controller: _templateDisplayController,
+              decoration: const InputDecoration(
+                labelText: 'SMS Template',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.sms_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down),
+              ),
             ),
-            hint: _isLoading ? const Text('Loading templates...') : const Text('Select Template'),
-            items: smsTemplateNames.map((template) {
-              return DropdownMenuItem(
-                value: template,
-                child: Text(template),
-              );
-            }).toList(),
-            onChanged: _isLoading ? null : _onTemplateChanged,
-          ),
           
           const SizedBox(height: 16),
           
@@ -683,6 +799,7 @@ Appointment Details:
   void dispose() {
     _otherSmsController.dispose();
     _smsContentController.dispose();
+    _templateDisplayController.dispose();
     super.dispose();
   }
 } 

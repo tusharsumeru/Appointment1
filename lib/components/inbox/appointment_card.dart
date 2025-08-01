@@ -263,54 +263,11 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     label: 'Star',
                     color: isStarred ? Colors.amber : Colors.black,
                     onTap: () async {
-                      // Show loading indicator
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Updating starred status...'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      }
-
-                      // Call the API to update starred status
-                      final result = await ActionService.updateStarred(id);
-
-                      if (result['success']) {
-                        // Update local state and notify parent
-                        final newStarredStatus =
-                            result['data']?['starred'] ?? !isStarred;
-                        widget.onStarToggle?.call(newStarredStatus);
-
-                        // Show success message
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                newStarredStatus
-                                    ? 'Added to favorites'
-                                    : 'Removed from favorites',
-                              ),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      } else {
-                        // Show error message
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                result['message'] ??
-                                    'Failed to update starred status',
-                              ),
-                              backgroundColor: Colors.red,
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
-                        }
-                      }
+                      print('🔍 Star Button - clicked for appointment: $id');
+                      print('🔍 Star Button - current starred status: $isStarred');
+                      print('🔍 Star Button - calling onStarToggle with: ${!isStarred}');
+                      // Notify parent to handle the star toggle
+                      widget.onStarToggle?.call(!isStarred);
                     },
                   ),
                 ],

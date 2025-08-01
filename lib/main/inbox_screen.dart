@@ -61,21 +61,31 @@ class _InboxScreenState extends State<InboxScreen> {
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
         
+        // Filter out starred appointments
+        final nonStarredAppointments = appointmentsData.where((appointment) {
+          if (appointment is Map<String, dynamic>) {
+            return appointment['starred'] != true;
+          }
+          return true;
+        }).toList();
+        
+        print('🔍 Fetch - total appointments: ${appointmentsData.length}, non-starred: ${nonStarredAppointments.length}');
+        
         if (isLoadMore) {
           // Append new data to existing list
-          if (appointmentsData.isNotEmpty) {
-            _appointments.addAll(appointmentsData.cast<Map<String, dynamic>>());
+          if (nonStarredAppointments.isNotEmpty) {
+            _appointments.addAll(nonStarredAppointments.cast<Map<String, dynamic>>());
             _currentPage++;
-            _hasMoreData = appointmentsData.length >= _pageSize;
+            _hasMoreData = appointmentsData.length >= _pageSize; // Use original count for pagination
           } else {
             _hasMoreData = false;
           }
         } else {
           // Replace existing data
-          if (appointmentsData.isNotEmpty) {
-            _appointments = appointmentsData.cast<Map<String, dynamic>>();
+          if (nonStarredAppointments.isNotEmpty) {
+            _appointments = nonStarredAppointments.cast<Map<String, dynamic>>();
             _currentPage = 1;
-            _hasMoreData = appointmentsData.length >= _pageSize;
+            _hasMoreData = appointmentsData.length >= _pageSize; // Use original count for pagination
           } else {
             _appointments = [];
             _currentPage = 1;
@@ -117,24 +127,110 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _toggleStar(String appointmentId) async {
-    // Call the API to update starred status
-    final result = await ActionService.updateStarred(appointmentId);
+    print('🔍 Toggle Star - appointmentId: $appointmentId');
+    print('🔍 Toggle Star - total appointments: ${_appointments.length}');
     
-    if (result['success']) {
-      setState(() {
-        final index = _appointments.indexWhere((appointment) => appointment['_id'] == appointmentId);
-        if (index != -1) {
-          // Update the starred status based on API response
-          final newStarredStatus = result['data']?['starred'] ?? false;
-          _appointments[index]['starred'] = newStarredStatus;
-        }
-      });
-    } else {
-      // Show error message
+    // Find the appointment index
+    final index = _appointments.indexWhere((appointment) {
+      final appId = appointment['appointmentId']?.toString();
+      final appMongoId = appointment['_id']?.toString();
+      print('🔍 Toggle Star - checking appointment: appId=$appId, appMongoId=$appMongoId');
+      return appId == appointmentId || appMongoId == appointmentId;
+    });
+    
+    print('🔍 Toggle Star - found index: $index');
+    
+    if (index == -1) {
+      print('🔍 Toggle Star - appointment not found!');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to update starred status'),
+          const SnackBar(
+            content: Text('Appointment not found'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Get current starred status
+    final currentStarredStatus = _appointments[index]['starred'] == true;
+    print('🔍 Toggle Star - current starred status: $currentStarredStatus');
+    
+    // Optimistically update UI first
+    setState(() {
+      _appointments[index]['starred'] = !currentStarredStatus;
+    });
+    print('🔍 Toggle Star - optimistically updated to: ${!currentStarredStatus}');
+
+    try {
+      // Call the API to update starred status
+      final desiredStarredStatus = !currentStarredStatus;
+      final result = await ActionService.updateStarred(appointmentId, starred: desiredStarredStatus);
+      print('🔍 Toggle Star - API result: $result');
+      
+      if (result['success']) {
+        // Update with the actual response from API
+        final newStarredStatus = result['data']?['starred'] ?? !currentStarredStatus;
+        print('🔍 Toggle Star - new starred status from API: $newStarredStatus');
+        
+        // Check if the API response matches our expected toggle
+        // If API returns the same status as before, it means the toggle didn't work as expected
+        // In this case, we'll use our optimistic update
+        final expectedNewStatus = !currentStarredStatus;
+        final finalStatus = (newStarredStatus == expectedNewStatus) ? newStarredStatus : expectedNewStatus;
+        
+        print('🔍 Toggle Star - expected status: $expectedNewStatus, final status: $finalStatus');
+        
+        setState(() {
+          if (finalStatus) {
+            // If appointment is now starred, remove it from inbox
+            _appointments.removeAt(index);
+            print('🔍 Toggle Star - removed starred appointment from inbox');
+          } else {
+            // If appointment is unstarred, update the status
+            if (index < _appointments.length) {
+              _appointments[index]['starred'] = finalStatus;
+            }
+          }
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(finalStatus ? 'Added to favorites' : 'Removed from favorites'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Revert the optimistic update on failure
+        print('🔍 Toggle Star - API failed, reverting to: $currentStarredStatus');
+        setState(() {
+          _appointments[index]['starred'] = currentStarredStatus;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to update starred status'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Revert the optimistic update on error
+      print('🔍 Toggle Star - Exception occurred: $e');
+      setState(() {
+        _appointments[index]['starred'] = currentStarredStatus;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Network error. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -532,24 +628,11 @@ class _InboxScreenState extends State<InboxScreen> {
             return AppointmentCard(
               appointment: appointment,
               onStarToggle: (isStarred) async {
+                print('🔍 Inbox onStarToggle - received isStarred: $isStarred');
                 final appointmentId = appointment['appointmentId']?.toString() ?? 
                                     appointment['_id']?.toString() ?? '';
+                print('🔍 Inbox onStarToggle - appointmentId: $appointmentId');
                 await _toggleStar(appointmentId);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isStarred ? 'Added to favorites' : 'Removed from favorites'),
-                      backgroundColor: Colors.green,
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        textColor: Colors.white,
-                        onPressed: () async {
-                          await _toggleStar(appointmentId);
-                        },
-                      ),
-                    ),
-                  );
-                }
               },
 
               onRefresh: () {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:html/parser.dart' as html;
 import '../../action/action.dart';
 
 class EmailForm extends StatefulWidget {
@@ -26,16 +27,13 @@ class _EmailFormState extends State<EmailForm> {
   // Form controllers
   final TextEditingController _ccEmailController = TextEditingController();
   final TextEditingController _bccEmailController = TextEditingController();
-  final TextEditingController _darshanLineDateController = TextEditingController();
-  final TextEditingController _darshanLineTimeController = TextEditingController();
   final TextEditingController _emailSubjectController = TextEditingController();
   final TextEditingController _emailTemplateController = TextEditingController();
+  final TextEditingController _templateDisplayController = TextEditingController();
   
   // Focus nodes for keyboard management
   final FocusNode _ccEmailFocus = FocusNode();
   final FocusNode _bccEmailFocus = FocusNode();
-  final FocusNode _darshanLineDateFocus = FocusNode();
-  final FocusNode _darshanLineTimeFocus = FocusNode();
   final FocusNode _emailSubjectFocus = FocusNode();
   final FocusNode _emailTemplateFocus = FocusNode();
   
@@ -43,7 +41,6 @@ class _EmailFormState extends State<EmailForm> {
   String _selectedTemplate = '';
   bool _includeAppointeeEmail = true;
   bool _includeReferenceEmail = false;
-  bool _showDarshanLineFields = false;
   
   // Email templates from API
   List<Map<String, String>> _emailTemplates = [
@@ -75,11 +72,14 @@ class _EmailFormState extends State<EmailForm> {
         isActive: true, // Only get active templates
       );
 
+      // Debug: Test HTML conversion (uncomment to test)
+      // _testHtmlConversion();
+
       if (result['success']) {
         final List<dynamic> templates = result['data'] ?? [];
         
-        // Clear existing templates and add default
-        _emailTemplates = [{'value': '', 'label': 'Select Template'}];
+        // Clear existing templates
+        _emailTemplates = [];
         _templateData.clear();
         
         // Add templates from API
@@ -98,7 +98,8 @@ class _EmailFormState extends State<EmailForm> {
             // Store template data for later use
             _templateData[id] = {
               'subject': template['subject'] ?? template['templateSubject'] ?? '',
-              'content': template['content'] ?? template['templateData'] ?? template['body'] ?? '',
+              'content': _htmlToRichText(template['content'] ?? template['templateData'] ?? template['body'] ?? ''),
+              'originalHtml': template['content'] ?? template['templateData'] ?? template['body'] ?? '', // Store original HTML for backend
               'category': template['category'] ?? '',
               'tags': template['tags'] ?? [],
               'region': template['region'] ?? '',
@@ -131,11 +132,29 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   String _getAppointmentName() {
+    // Try to get name from statusInfo first (most accurate)
+    final statusInfo = widget.appointment['statusInfo'];
+    if (statusInfo is Map<String, dynamic>) {
+      final statusHistory = statusInfo['statusHistory'] as List<dynamic>?;
+      if (statusHistory != null && statusHistory.isNotEmpty) {
+        final lastStatus = statusHistory.last;
+        if (lastStatus is Map<String, dynamic>) {
+          final changedBy = lastStatus['changedBy'];
+          if (changedBy is Map<String, dynamic>) {
+            final fullName = changedBy['fullName']?.toString();
+            if (fullName != null && fullName.isNotEmpty) {
+              return fullName;
+            }
+          }
+        }
+      }
+    }
+    
     // Try multiple possible fields for the name
-    return widget.appointment['userCurrentDesignation']?.toString() ?? 
-           widget.appointment['fullName']?.toString() ??
+    return widget.appointment['fullName']?.toString() ??
            widget.appointment['name']?.toString() ??
            widget.appointment['userName']?.toString() ??
+           widget.appointment['userCurrentDesignation']?.toString() ?? 
            widget.appointment['email']?.toString() ?? 'Unknown';
   }
 
@@ -144,21 +163,25 @@ class _EmailFormState extends State<EmailForm> {
     // Primary: email field (from the actual data structure)
     final email = widget.appointment['email']?.toString();
     if (email != null && email.isNotEmpty) {
+      print('📧 Found appointee email: $email');
       return email;
     }
     
     // Secondary: userEmail field
     final userEmail = widget.appointment['userEmail']?.toString();
     if (userEmail != null && userEmail.isNotEmpty) {
+      print('📧 Found appointee userEmail: $userEmail');
       return userEmail;
     }
     
     // Fallback: appointeeEmail field
     final appointeeEmail = widget.appointment['appointeeEmail']?.toString();
     if (appointeeEmail != null && appointeeEmail.isNotEmpty) {
+      print('📧 Found appointee appointeeEmail: $appointeeEmail');
       return appointeeEmail;
     }
     
+    print('❌ No appointee email found');
     return '';
   }
 
@@ -169,6 +192,7 @@ class _EmailFormState extends State<EmailForm> {
     if (referencePerson is Map<String, dynamic>) {
       final email = referencePerson['email']?.toString();
       if (email != null && email.isNotEmpty) {
+        print('📧 Found reference email: $email');
         return email;
       }
     }
@@ -176,25 +200,30 @@ class _EmailFormState extends State<EmailForm> {
     // Secondary: referenceEmail field
     final referenceEmail = widget.appointment['referenceEmail']?.toString();
     if (referenceEmail != null && referenceEmail.isNotEmpty) {
+      print('📧 Found reference referenceEmail: $referenceEmail');
       return referenceEmail;
     }
     
     // Fallback: other possible field names
     final refEmail = widget.appointment['refEmail']?.toString();
     if (refEmail != null && refEmail.isNotEmpty) {
+      print('📧 Found reference refEmail: $refEmail');
       return refEmail;
     }
     
     final refByEmail = widget.appointment['refByEmail']?.toString();
     if (refByEmail != null && refByEmail.isNotEmpty) {
+      print('📧 Found reference refByEmail: $refByEmail');
       return refByEmail;
     }
     
     final referenceByEmail = widget.appointment['referenceByEmail']?.toString();
     if (referenceByEmail != null && referenceByEmail.isNotEmpty) {
+      print('📧 Found reference referenceByEmail: $referenceByEmail');
       return referenceByEmail;
     }
     
+    print('❌ No reference email found');
     return '';
   }
 
@@ -269,6 +298,41 @@ class _EmailFormState extends State<EmailForm> {
       return refByPhone;
     }
     
+     return '';
+   }
+
+       String _getNumberOfPeople() {
+      // Use the same source as appointment_card.dart
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'];
+        if (numberOfUsers != null) {
+          return numberOfUsers.toString();
+        }
+      }
+      
+      // Fallback to other fields if accompanyUsers not available
+      final noOfPeople = widget.appointment['noOfPeople']?.toString();
+      if (noOfPeople != null && noOfPeople.isNotEmpty) {
+        return noOfPeople;
+      }
+      
+      final numberOfPeople = widget.appointment['numberOfPeople']?.toString();
+      if (numberOfPeople != null && numberOfPeople.isNotEmpty) {
+        return numberOfPeople;
+      }
+      
+      final peopleCount = widget.appointment['peopleCount']?.toString();
+      if (peopleCount != null && peopleCount.isNotEmpty) {
+        return peopleCount;
+      }
+      
+      final count = widget.appointment['count']?.toString();
+      if (count != null && count.isNotEmpty) {
+        return count;
+      }
+      
+      // Return empty string if no data found
     return '';
   }
 
@@ -305,6 +369,18 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   Map<String, dynamic> _getEmailData() {
+    // Get the original HTML content for the selected template
+    String originalHtmlContent = '';
+    if (_selectedTemplate.isNotEmpty && _templateData.containsKey(_selectedTemplate)) {
+      final templateData = _templateData[_selectedTemplate];
+      if (templateData != null) {
+        originalHtmlContent = templateData['originalHtml'] ?? '';
+      }
+    }
+    
+    // Apply placeholder replacements to the original HTML content
+    String processedHtmlContent = _replacePlaceholdersInHtml(originalHtmlContent);
+    
     return {
       'recipients': _getRecipientEmails(),
       'bcc': _bccEmailController.text.isNotEmpty 
@@ -315,13 +391,13 @@ class _EmailFormState extends State<EmailForm> {
               .toList()
           : [],
       'subject': _emailSubjectController.text,
-      'content': _emailTemplateController.text,
+      'content': processedHtmlContent, // Use the processed HTML content for backend
       'templateId': _selectedTemplate.isNotEmpty ? _selectedTemplate : null,
       'appointmentId': _getAppointmentId(),
       'includeAppointeeEmail': _includeAppointeeEmail,
       'includeReferenceEmail': _includeReferenceEmail,
-      'darshanLineDate': _darshanLineDateController.text,
-      'darshanLineTime': _darshanLineTimeController.text,
+      'darshanLineDate': widget.appointment['scheduledDate']?.toString(),
+      'darshanLineTime': widget.appointment['scheduledTime']?.toString(),
     };
   }
 
@@ -329,17 +405,14 @@ class _EmailFormState extends State<EmailForm> {
   void dispose() {
     _ccEmailController.dispose();
     _bccEmailController.dispose();
-    _darshanLineDateController.dispose();
-    _darshanLineTimeController.dispose();
     _emailSubjectController.dispose();
     _emailTemplateController.dispose();
+    _templateDisplayController.dispose();
     _scrollController.dispose();
     
     // Dispose focus nodes
     _ccEmailFocus.dispose();
     _bccEmailFocus.dispose();
-    _darshanLineDateFocus.dispose();
-    _darshanLineTimeFocus.dispose();
     _emailSubjectFocus.dispose();
     _emailTemplateFocus.dispose();
     
@@ -350,7 +423,12 @@ class _EmailFormState extends State<EmailForm> {
     if (value != null) {
       setState(() {
         _selectedTemplate = value;
-        _showDarshanLineFields = value == '5'; // Show darshan line fields for DARSHAN LINE template
+        // Update display controller
+        final selectedTemplate = _emailTemplates.firstWhere(
+          (template) => template['value'] == value,
+          orElse: () => {'value': '', 'label': 'Select Template'},
+        );
+        _templateDisplayController.text = selectedTemplate['label']!;
       });
     }
   }
@@ -358,35 +436,80 @@ class _EmailFormState extends State<EmailForm> {
   String _replacePlaceholders(String text) {
     String result = text;
     
+    // First convert HTML to plain text if it contains HTML
+    if (_containsHtml(text)) {
+      result = _htmlToPlainText(text);
+    }
+    
     // Get appointment data
     final appointment = widget.appointment;
     final appointmentId = _getAppointmentId();
     final fullName = _getAppointmentName();
     final email = _getAppointeeEmail();
+    final numberOfPeople = _getNumberOfPeople();
+    
+         // Minimal debug log
+     print('Replacing placeholders - numberOfPeople: "$numberOfPeople"');
     
     // Replace placeholders with actual appointment data
     result = result.replaceAll('{\$AID}', appointmentId);
     result = result.replaceAll('{\$full_name}', fullName);
     result = result.replaceAll('{\$ji}', 'Ji');
-    result = result.replaceAll('{\$date}', _darshanLineDateController.text.isNotEmpty 
-        ? _darshanLineDateController.text 
-        : appointment['scheduledDate']?.toString() ?? 'TBD');
-    result = result.replaceAll('{\$time}', _darshanLineTimeController.text.isNotEmpty 
-        ? _darshanLineTimeController.text 
-        : appointment['scheduledTime']?.toString() ?? 'TBD');
-    result = result.replaceAll('{\$no_people}', appointment['noOfPeople']?.toString() ?? '1');
-    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? 'Bangalore Ashram');
+    result = result.replaceAll('{\$date}', appointment['scheduledDate']?.toString() ?? '');
+    result = result.replaceAll('{\$time}', appointment['scheduledTime']?.toString() ?? '');
+    result = result.replaceAll('{\$no_people}', numberOfPeople);
+    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? '');
     result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
-    result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? 'Main Hall');
-    result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? 'Guest');
-    result = result.replaceAll('{\$mobile}', appointment['mobile']?.toString() ?? '+91 9876543210');
+    result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? '');
+    result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? '');
+    result = result.replaceAll('{\$mobile}', appointment['mobile']?.toString() ?? '');
     result = result.replaceAll('{\$email}', email);
     result = result.replaceAll('{\$ref_by}', _getReferenceName());
     result = result.replaceAll('{\$ref_phone}', _getReferencePhone());
     result = result.replaceAll('{\$subject}', _emailSubjectController.text.isNotEmpty 
         ? _emailSubjectController.text 
         : appointment['subject']?.toString() ?? 'Meeting with Gurudev');
-    result = result.replaceAll('{\$purpose}', appointment['purpose']?.toString() ?? 'Seeking guidance on spiritual matters');
+    result = result.replaceAll('{\$purpose}', appointment['purpose']?.toString() ?? 'Seeking guidance from gurudev');
+    result = result.replaceAll('{\$ref_name}', _getReferenceName());
+    result = result.replaceAll('{\$appointee_name}', fullName);
+    result = result.replaceAll('{\$appointeeName}', fullName);
+    
+         // Removed verbose logging
+    
+    return result;
+  }
+
+  String _replacePlaceholdersInHtml(String htmlContent) {
+    // Get appointment data
+    final appointment = widget.appointment;
+    final appointmentId = _getAppointmentId();
+    final fullName = _getAppointmentName();
+    final email = _getAppointeeEmail();
+    final numberOfPeople = _getNumberOfPeople();
+    
+    // Minimal debug log
+    print('Replacing placeholders in HTML - numberOfPeople: "$numberOfPeople"');
+    
+    // Replace placeholders with actual appointment data in HTML content
+    String result = htmlContent;
+    result = result.replaceAll('{\$AID}', appointmentId);
+    result = result.replaceAll('{\$full_name}', fullName);
+    result = result.replaceAll('{\$ji}', 'Ji');
+    result = result.replaceAll('{\$date}', appointment['scheduledDate']?.toString() ?? '');
+    result = result.replaceAll('{\$time}', appointment['scheduledTime']?.toString() ?? '');
+    result = result.replaceAll('{\$no_people}', numberOfPeople);
+    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? '');
+    result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
+    result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? '');
+    result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? '');
+    result = result.replaceAll('{\$mobile}', appointment['mobile']?.toString() ?? '');
+    result = result.replaceAll('{\$email}', email);
+    result = result.replaceAll('{\$ref_by}', _getReferenceName());
+    result = result.replaceAll('{\$ref_phone}', _getReferencePhone());
+    result = result.replaceAll('{\$subject}', _emailSubjectController.text.isNotEmpty 
+        ? _emailSubjectController.text 
+        : appointment['subject']?.toString() ?? 'Meeting with Gurudev');
+    result = result.replaceAll('{\$purpose}', appointment['purpose']?.toString() ?? 'Seeking guidance from gurudev');
     result = result.replaceAll('{\$ref_name}', _getReferenceName());
     result = result.replaceAll('{\$appointee_name}', fullName);
     result = result.replaceAll('{\$appointeeName}', fullName);
@@ -394,11 +517,385 @@ class _EmailFormState extends State<EmailForm> {
     return result;
   }
 
+  // Helper method for month names
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
+  }
+
+  // Helper method to convert HTML to rich text with images
+  String _htmlToRichText(String htmlString) {
+    if (htmlString.isEmpty) return '';
+    
+    try {
+      // Parse HTML
+      final document = html.parse(htmlString);
+      
+      // Extract text content with better structure preservation
+      String text = '';
+      
+      // Process each element to preserve paragraph breaks and handle images
+      void processElement(dynamic element) {
+        if (element.nodeType == 3) { // TEXT_NODE
+          text += element.text ?? '';
+        } else if (element.nodeType == 1) { // ELEMENT_NODE
+          final tagName = element.localName?.toLowerCase();
+          
+          // Handle images - add placeholder text
+          if (tagName == 'img') {
+            final src = element.attributes['src'] ?? '';
+            final alt = element.attributes['alt'] ?? 'Image';
+            if (src.isNotEmpty) {
+              text += '\n[IMAGE: $alt - $src]\n';
+            }
+          }
+          
+          // Add line breaks for block elements
+          if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || 
+              tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6' || 
+              tagName == 'br' || tagName == 'li') {
+            if (text.isNotEmpty && !text.endsWith('\n')) {
+              text += '\n';
+            }
+          }
+          
+          // Process child nodes
+          for (var child in element.nodes) {
+            processElement(child);
+          }
+          
+          // Add line breaks after block elements
+          if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || 
+              tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6' || 
+              tagName == 'li') {
+            if (!text.endsWith('\n')) {
+              text += '\n';
+            }
+          }
+        }
+      }
+      
+      // Process the document body
+      if (document.body != null) {
+        for (var child in document.body!.nodes) {
+          processElement(child);
+        }
+      }
+      
+      // Clean up common HTML entities and formatting
+      text = text
+          .replaceAll('&nbsp;', ' ')
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .replaceAll('&#39;', "'")
+          .replaceAll('&apos;', "'")
+          .replaceAll('&ldquo;', '"')
+          .replaceAll('&rdquo;', '"')
+          .replaceAll('&lsquo;', "'")
+          .replaceAll('&rsquo;', "'")
+          .replaceAll('&hellip;', '...')
+          .replaceAll('&mdash;', '—')
+          .replaceAll('&ndash;', '–')
+          .replaceAll('&copy;', '©');
+      
+      // Clean up multiple line breaks and normalize spacing
+      text = text
+          .replaceAll(RegExp(r'\n\s*\n\s*\n'), '\n\n') // Replace 3+ line breaks with 2
+          .replaceAll(RegExp(r'[ \t]+'), ' ') // Replace multiple spaces/tabs with single space
+          .replaceAll(RegExp(r'\n[ \t]+'), '\n') // Remove leading spaces after line breaks
+          .replaceAll(RegExp(r'[ \t]+\n'), '\n') // Remove trailing spaces before line breaks
+          .trim();
+      
+      // Add specific formatting for better readability
+      text = text
+          .replaceAll(RegExp(r'\nDear'), '\n\nDear') // Double line break before "Dear"
+          .replaceAll(RegExp(r'\nWarm Regards,'), '\n\nWarm Regards,') // Double line break before "Warm Regards"
+          .replaceAll(RegExp(r'\nNOTE:'), '\n\nNOTE:') // Double line break before "NOTE"
+          .replaceAll(RegExp(r'\nFollow'), '\n\nFollow'); // Double line break before "Follow"
+      
+      return text;
+    } catch (e) {
+      // If HTML parsing fails, return the original string
+      print('Error parsing HTML: $e');
+      return htmlString;
+    }
+  }
+
+  // Helper method to convert HTML to plain text (for backward compatibility)
+  String _htmlToPlainText(String htmlString) {
+    if (htmlString.isEmpty) return '';
+    
+    try {
+      // Parse HTML
+      final document = html.parse(htmlString);
+      
+      // Extract text content with better structure preservation
+      String text = '';
+      
+      // Process each element to preserve paragraph breaks
+      void processElement(dynamic element) {
+        if (element.nodeType == 3) { // TEXT_NODE
+          text += element.text ?? '';
+        } else if (element.nodeType == 1) { // ELEMENT_NODE
+          final tagName = element.localName?.toLowerCase();
+          
+          // Add line breaks for block elements
+          if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || 
+              tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6' || 
+              tagName == 'br' || tagName == 'li') {
+            if (text.isNotEmpty && !text.endsWith('\n')) {
+              text += '\n';
+            }
+          }
+          
+          // Process child nodes
+          for (var child in element.nodes) {
+            processElement(child);
+          }
+          
+          // Add line breaks after block elements
+          if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || 
+              tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6' || 
+              tagName == 'li') {
+            if (!text.endsWith('\n')) {
+              text += '\n';
+            }
+          }
+        }
+      }
+      
+      // Process the document body
+      if (document.body != null) {
+        for (var child in document.body!.nodes) {
+          processElement(child);
+        }
+      }
+      
+      // Clean up common HTML entities and formatting
+      text = text
+          .replaceAll('&nbsp;', ' ')
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .replaceAll('&#39;', "'")
+          .replaceAll('&apos;', "'")
+          .replaceAll('&ldquo;', '"')
+          .replaceAll('&rdquo;', '"')
+          .replaceAll('&lsquo;', "'")
+          .replaceAll('&rsquo;', "'")
+          .replaceAll('&hellip;', '...')
+          .replaceAll('&mdash;', '—')
+          .replaceAll('&ndash;', '–')
+          .replaceAll('&copy;', '©');
+      
+      // Clean up multiple line breaks and normalize spacing
+      text = text
+          .replaceAll(RegExp(r'\n\s*\n\s*\n'), '\n\n') // Replace 3+ line breaks with 2
+          .replaceAll(RegExp(r'[ \t]+'), ' ') // Replace multiple spaces/tabs with single space
+          .replaceAll(RegExp(r'\n[ \t]+'), '\n') // Remove leading spaces after line breaks
+          .replaceAll(RegExp(r'[ \t]+\n'), '\n') // Remove trailing spaces before line breaks
+          .trim();
+      
+      // Add specific formatting for better readability
+      text = text
+          .replaceAll(RegExp(r'\nDear'), '\n\nDear') // Double line break before "Dear"
+          .replaceAll(RegExp(r'\nWarm Regards,'), '\n\nWarm Regards,') // Double line break before "Warm Regards"
+          .replaceAll(RegExp(r'\nNOTE:'), '\n\nNOTE:') // Double line break before "NOTE"
+          .replaceAll(RegExp(r'\nFollow'), '\n\nFollow'); // Double line break before "Follow"
+      
+      return text;
+    } catch (e) {
+      // If HTML parsing fails, return the original string
+      print('Error parsing HTML: $e');
+      return htmlString;
+    }
+  }
+
+  // Helper method to check if image is a social media icon
+  bool _isSocialMediaIcon(String altText, String imageUrl) {
+    final socialMediaKeywords = [
+      'twitter', 'facebook', 'youtube', 'instagram', 'linkedin',
+      'tw.png', 'fb.png', 'yt.png', 'inst.png', 'in.png'
+    ];
+    
+    final lowerAlt = altText.toLowerCase();
+    final lowerUrl = imageUrl.toLowerCase();
+    
+    return socialMediaKeywords.any((keyword) => 
+        lowerAlt.contains(keyword) || lowerUrl.contains(keyword));
+  }
+
+  // Helper method to check if string contains HTML
+  bool _containsHtml(String text) {
+    return text.contains('<') && text.contains('>') && 
+           (text.contains('<p>') || text.contains('<div>') || text.contains('<br>') || 
+            text.contains('<h') || text.contains('<span>') || text.contains('<strong>') ||
+            text.contains('<b>') || text.contains('<i>') || text.contains('<em>'));
+  }
+
+    // Minimal debug method - only log essential info
+  void _logAppointmentFields() {
+    print('EmailForm: Loading appointment data');
+    print('Appointment ID: ${_getAppointmentId()}');
+    print('Full Name: ${_getAppointmentName()}');
+    print('People Count: ${_getNumberOfPeople()}');
+  }
+
+  // Build email content widget with images
+  Widget _buildEmailContentWidget(String content) {
+    if (content.isEmpty) {
+      return const Text(
+        'Enter email content here...',
+        style: TextStyle(color: Colors.grey),
+      );
+    }
+
+    // Split content by image placeholders
+    final parts = content.split(RegExp(r'\[IMAGE: .*? - .*?\]'));
+    final imageMatches = RegExp(r'\[IMAGE: (.*?) - (.*?)\]').allMatches(content);
+    
+    List<Widget> widgets = [];
+    
+    for (int i = 0; i < parts.length; i++) {
+      // Add text part
+      if (parts[i].isNotEmpty) {
+        widgets.add(
+          Text(
+            parts[i],
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+        );
+      }
+      
+      // Add image if available
+      if (i < imageMatches.length) {
+        final match = imageMatches.elementAt(i);
+        final altText = match.group(1) ?? '';
+        final imageUrl = match.group(2) ?? '';
+        
+        if (imageUrl.isNotEmpty) {
+          // Check if it's a social media icon
+          bool isSocialMediaIcon = _isSocialMediaIcon(altText, imageUrl);
+          
+          widgets.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (altText.isNotEmpty && !isSocialMediaIcon)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4.0),
+                      child: Text(
+                        altText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  Container(
+                    width: isSocialMediaIcon ? 20 : double.infinity,
+                    height: isSocialMediaIcon ? 20 : 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(isSocialMediaIcon ? 4 : 8),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(isSocialMediaIcon ? 4 : 8),
+                      child: Image.network(
+                        imageUrl,
+                        fit: isSocialMediaIcon ? BoxFit.contain : BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: SizedBox(
+                              width: isSocialMediaIcon ? 12 : 24,
+                              height: isSocialMediaIcon ? 12 : 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: isSocialMediaIcon ? 1.5 : 2.0,
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade100,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  size: isSocialMediaIcon ? 12 : 48,
+                                  color: Colors.grey.shade400,
+                                ),
+                                if (!isSocialMediaIcon) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Image not available',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    imageUrl,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                      fontSize: 10,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+
+
   void _sendEmail() {
+    print('🔵 Send button clicked - Starting validation...');
+    
     if (_formKey.currentState!.validate()) {
+      print('✅ Form validation passed');
+      
       // Validate that at least one recipient is selected
       final recipients = _getRecipientEmails();
+      print('📧 Recipients: $recipients');
+      print('📧 Include appointee: $_includeAppointeeEmail');
+      print('📧 Include reference: $_includeReferenceEmail');
+      
       if (recipients.isEmpty) {
+        print('❌ No recipients found');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select at least one recipient (Appointee or Reference email)'),
@@ -409,7 +906,14 @@ class _EmailFormState extends State<EmailForm> {
       }
 
       // Validate that subject and content are not empty
-      if (_emailSubjectController.text.trim().isEmpty) {
+      final subject = _emailSubjectController.text.trim();
+      final content = _emailTemplateController.text.trim();
+      
+      print('📝 Subject: "$subject"');
+      print('📝 Content length: ${content.length}');
+      
+      if (subject.isEmpty) {
+        print('❌ Subject is empty');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please enter an email subject'),
@@ -419,27 +923,33 @@ class _EmailFormState extends State<EmailForm> {
         return;
       }
 
-      if (_emailTemplateController.text.trim().isEmpty) {
+      if (content.isEmpty) {
+        print('❌ Content is empty');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please enter email content'),
+             content: Text('Please select an email template'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
 
+      print('✅ All validations passed - Getting email data...');
+      
       // Get email data
       final emailData = _getEmailData();
+      print('📦 Email data: $emailData');
       
       // Show confirmation dialog
       _showEmailConfirmationDialog(emailData);
+    } else {
+      print('❌ Form validation failed');
     }
   }
 
   void _showEmailConfirmationDialog(Map<String, dynamic> emailData) {
-    final recipients = emailData['recipients'] as List<String>;
-    final bcc = emailData['bcc'] as List<String>;
+    final recipients = (emailData['recipients'] as List<dynamic>).cast<String>();
+    final bcc = (emailData['bcc'] as List<dynamic>).cast<String>();
     
     showDialog(
       context: context,
@@ -468,7 +978,9 @@ class _EmailFormState extends State<EmailForm> {
             ),
             ElevatedButton(
               onPressed: () {
+                print('🔵 Confirmation dialog Send button clicked');
                 Navigator.of(context).pop();
+                print('🔵 Calling _sendEmailToBackend...');
                 _sendEmailToBackend(emailData);
               },
               child: const Text('Send'),
@@ -484,37 +996,99 @@ class _EmailFormState extends State<EmailForm> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.7,
-            height: MediaQuery.of(context).size.height * 0.5,
-            padding: const EdgeInsets.all(16),
-            child: Scrollbar(
-              child: ListView.builder(
-                itemCount: _emailTemplates.length,
-                itemBuilder: (context, index) {
-                  final template = _emailTemplates[index];
-                  final isSelected = template['value'] == _selectedTemplate;
-                  
-                  return ListTile(
-                    title: Text(template['label']!),
-                    selected: isSelected,
-                    onTap: () {
-                      if (template['value']?.isNotEmpty ?? false) {
-                        setState(() {
-                          _selectedTemplate = template['value']!;
-                          // Populate subject and content if template is selected
-                          if (_templateData.containsKey(template['value'])) {
-                            final templateData = _templateData[template['value']]!;
-                            _emailSubjectController.text = _replacePlaceholders(templateData['subject'] ?? '');
-                            _emailTemplateController.text = _replacePlaceholders(templateData['content'] ?? '');
-                          }
-                        });
-                        Navigator.of(context).pop();
-                      }
-                    },
-                  );
-                },
-              ),
+            width: MediaQuery.of(context).size.width * 0.95, // Made even wider
+            height: MediaQuery.of(context).size.height * 0.6, // Made more rectangular
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Select Email Template',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        Icons.close,
+                        color: Colors.grey.shade600,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Divider
+                Divider(color: Colors.grey.shade300, height: 1),
+                const SizedBox(height: 20),
+                // Template list
+                Expanded(
+                  child: Scrollbar(
+                    child: ListView.builder(
+                      itemCount: _emailTemplates.length,
+                      itemBuilder: (context, index) {
+                        final template = _emailTemplates[index];
+                        final isSelected = template['value'] == _selectedTemplate;
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.blue.shade50 : Colors.white,
+                            border: Border.all(
+                              color: isSelected ? Colors.blue.shade300 : Colors.grey.shade300,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            title: Text(
+                              template['label']!,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                            trailing: isSelected 
+                              ? Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue.shade700,
+                                  size: 24,
+                                )
+                              : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedTemplate = template['value']!;
+                                _templateDisplayController.text = template['label']!;
+                                // Populate subject and content if template is selected
+                                if (_templateData.containsKey(template['value'])) {
+                                  final templateData = _templateData[template['value']]!;
+                                  _emailSubjectController.text = _replacePlaceholders(templateData['subject'] ?? '');
+                                  _emailTemplateController.text = _replacePlaceholders(templateData['content'] ?? '');
+                                }
+                              });
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -522,20 +1096,104 @@ class _EmailFormState extends State<EmailForm> {
     );
   }
 
-  void _sendEmailToBackend(Map<String, dynamic> emailData) {
-      // Here you would typically send the email data to your backend
-    // For now, we'll just call the callback and close the form
-    print('Sending email with data: $emailData');
+  Future<void> _sendEmailToBackend(Map<String, dynamic> emailData) async {
+    print('🚀 _sendEmailToBackend called with data: $emailData');
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email sent successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-    
-    widget.onSend?.call();
+    try {
+      print('🔄 Showing loading indicator...');
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      // Extract data from emailData
+      final recipients = (emailData['recipients'] as List<dynamic>).cast<String>();
+      final bcc = (emailData['bcc'] as List<dynamic>).cast<String>();
+      final subject = emailData['subject'] as String;
+      final content = emailData['content'] as String;
+      final templateId = emailData['templateId'] as String?;
+      final includeAppointeeEmail = emailData['includeAppointeeEmail'] as bool;
+      final includeReferenceEmail = emailData['includeReferenceEmail'] as bool;
+
+      // Get appointee email
+      final appointeeEmail = _getAppointeeEmail();
+      
+      // Get reference email
+      final referenceEmail = _getReferenceEmail();
+
+      print('📤 Preparing API call with:');
+      print('  - appointeeEmail: $appointeeEmail');
+      print('  - referenceEmail: $referenceEmail');
+      print('  - subject: $subject');
+      print('  - content length: ${content.length}');
+      print('  - templateId: $templateId');
+      print('  - bcc: $bcc');
+      print('  - useAppointee: $includeAppointeeEmail');
+      print('  - useReference: $includeReferenceEmail');
+      
+      // Call the API
+      print('🌐 Calling ActionService.sendAppointmentEmailAction...');
+      final result = await ActionService.sendAppointmentEmailAction(
+        appointeeEmail: appointeeEmail,
+        referenceEmail: referenceEmail.isNotEmpty ? referenceEmail : null,
+        cc: null, // Not currently used in the form
+        bcc: bcc.isNotEmpty ? bcc.join(',') : null,
+        subject: subject,
+        body: content,
+        selectedTemplateId: templateId,
+        templateData: {}, // Add any additional template data if needed
+        useAppointee: includeAppointeeEmail,
+        useReference: includeReferenceEmail,
+        otherEmail: null, // Not currently used in the form
+      );
+      
+      print('📥 API response: $result');
+
+      // Close loading dialog
       Navigator.of(context).pop();
+
+      if (result['success'] == true) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Email sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Call the callback and close the form
+        widget.onSend?.call();
+        Navigator.of(context).pop();
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to send email. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Exception caught in _sendEmailToBackend: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sending email: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Dismiss keyboard when tapping outside
@@ -666,6 +1324,8 @@ class _EmailFormState extends State<EmailForm> {
                       
                       const SizedBox(height: 16),
                       
+                      
+                      
                       // Email Template Selection
                       if (_isLoadingTemplates)
                         const Card(
@@ -730,12 +1390,7 @@ class _EmailFormState extends State<EmailForm> {
                         TextFormField(
                           readOnly: true,
                           onTap: _showEmailTemplateModal,
-                          controller: TextEditingController(
-                            text: _emailTemplates.firstWhere(
-                              (template) => template['value'] == _selectedTemplate,
-                              orElse: () => {'value': '', 'label': 'Select Template'},
-                            )['label'],
-                          ),
+                          controller: _templateDisplayController,
                         decoration: const InputDecoration(
                           labelText: 'Email Template',
                           border: OutlineInputBorder(),
@@ -768,23 +1423,36 @@ class _EmailFormState extends State<EmailForm> {
                       const SizedBox(height: 16),
                       
                       // Email Template Content
-                      TextFormField(
-                        controller: _emailTemplateController,
-                        focusNode: _emailTemplateFocus,
-                        onTap: () => _scrollToFocusedField(_emailTemplateFocus),
-                                                 decoration: const InputDecoration(
-                           labelText: 'Email Body',
-                           hintText: 'Enter email content here...',
-                           border: OutlineInputBorder(),
-                           alignLabelWithHint: true,
+                       Container(
+                         width: double.infinity,
+                         decoration: BoxDecoration(
+                           border: Border.all(color: Colors.grey.shade400),
+                           borderRadius: BorderRadius.circular(4),
                          ),
-                        maxLines: 8,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter email content';
-                          }
-                          return null;
-                        },
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                             Padding(
+                               padding: const EdgeInsets.all(12.0),
+                               child: Text(
+                                 'Email Body',
+                                 style: TextStyle(
+                                   color: Colors.grey.shade700,
+                                   fontSize: 16,
+                                   fontWeight: FontWeight.w500,
+                                 ),
+                               ),
+                             ),
+                             Container(
+                               height: 300,
+                               width: double.infinity,
+                               padding: const EdgeInsets.all(12.0),
+                               child: SingleChildScrollView(
+                                 child: _buildEmailContentWidget(_emailTemplateController.text),
+                               ),
+                             ),
+                           ],
+                         ),
                       ),
                     ],
                   ),
@@ -817,6 +1485,7 @@ class _EmailFormState extends State<EmailForm> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: const Text('Send'),
                     ),
