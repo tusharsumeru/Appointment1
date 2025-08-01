@@ -191,6 +191,66 @@ class ActionService {
     }
   }
 
+  // Helper method to process appointment data and format user fields
+  static Map<String, dynamic> _processAppointmentData(
+    Map<String, dynamic> appointment,
+  ) {
+    // Create a copy of the appointment data
+    final Map<String, dynamic> processedAppointment = Map<String, dynamic>.from(
+      appointment,
+    );
+
+    // Process userMobile field - handle both object and string formats
+    final userMobile = appointment['userMobile'];
+    if (userMobile is Map<String, dynamic>) {
+      final countryCode = userMobile['countryCode']?.toString() ?? '';
+      final number = userMobile['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        processedAppointment['userMobile'] = '$countryCode $number';
+      }
+    }
+
+    // Ensure userEmail is properly set
+    if (processedAppointment['userEmail'] == null ||
+        processedAppointment['userEmail'].toString().isEmpty) {
+      // Fallback to email field if userEmail is not available
+      final email = appointment['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        processedAppointment['userEmail'] = email;
+      }
+    }
+
+    // Ensure referencePhoneNumber is properly set
+    if (processedAppointment['referencePhoneNumber'] == null ||
+        processedAppointment['referencePhoneNumber'].toString().isEmpty) {
+      // Try alternative field names
+      final refPhone =
+          appointment['referencePhone']?.toString() ??
+          appointment['refPhone']?.toString() ??
+          appointment['emergencyPhone']?.toString() ??
+          appointment['contactPhone']?.toString();
+      if (refPhone != null && refPhone.isNotEmpty) {
+        processedAppointment['referencePhoneNumber'] = refPhone;
+      }
+    }
+
+    // Ensure referenceEmail is properly set
+    if (processedAppointment['referenceEmail'] == null ||
+        processedAppointment['referenceEmail'].toString().isEmpty) {
+      // Try alternative field names
+      final refEmail =
+          appointment['referenceEmail']?.toString() ??
+          appointment['refEmail']?.toString() ??
+          appointment['emergencyEmail']?.toString() ??
+          appointment['contactEmail']?.toString();
+      if (refEmail != null && refEmail.isNotEmpty) {
+        processedAppointment['referenceEmail'] = refEmail;
+      }
+    }
+
+    return processedAppointment;
+  }
+
   // Get appointments for secretary with advanced filtering
   static Future<Map<String, dynamic>> getAppointmentsForSecretary({
     int page = 1,
@@ -300,16 +360,26 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - save appointments data to local storage and return
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         // No caching for inbox and assigned to me screens - always fetch fresh data
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -572,14 +642,24 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - return appointments data
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -1244,14 +1324,24 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - return appointments data
-        final List<dynamic> appointments =
+        // Success - process appointments data with enhanced user fields
+        final List<dynamic> rawAppointments =
             responseData['data']?['appointments'] ?? [];
+
+        // Process appointments to ensure all user fields are properly formatted
+        final List<Map<String, dynamic>> processedAppointments = rawAppointments
+            .map((appointment) {
+              if (appointment is Map<String, dynamic>) {
+                return _processAppointmentData(appointment);
+              }
+              return <String, dynamic>{};
+            })
+            .toList();
 
         return {
           'success': true,
           'statusCode': 200,
-          'data': appointments,
+          'data': processedAppointments,
           'statusBreakdown': responseData['data']?['statusBreakdown'] ?? {},
           'dateRangeSummary': responseData['data']?['dateRangeSummary'] ?? {},
           'filters': responseData['data']?['filters'] ?? {},
@@ -1605,51 +1695,7 @@ class ActionService {
     }
   }
 
-  // Get appointment history by user ID
-  static Future<Map<String, dynamic>> getAppointmentHistoryByUser({
-    required String userId,
-  }) async {
-    try {
-      // Get token from storage
-      final token = await StorageService.getToken();
 
-      if (token == null) {
-        return {
-          'success': false,
-          'statusCode': 401,
-          'message': 'No authentication token found. Please login again.',
-        };
-      }
-
-      // Validate userId
-      if (userId.isEmpty) {
-        return {
-          'success': false,
-          'statusCode': 400,
-          'message': 'User ID is required',
-        };
-      }
-
-      // Use the existing appointments filtering system with past=true
-      return await getAppointmentsWithFilters(
-        page: 1,
-        limit: 50, // Get more history items
-        sortBy: "createdAt",
-        sortOrder: "desc",
-        dateType: "created",
-        past: true, // This will get past appointments
-        additionalFilters: {
-          '_id': userId, // Filter by the MongoDB _id
-        },
-      );
-    } catch (error) {
-      return {
-        'success': false,
-        'statusCode': 500,
-        'message': 'Network error: $error',
-      };
-    }
-  }
 
   // Get appointment by ID (for QR scanner)
   static Future<Map<String, dynamic>> getAppointmentById(
@@ -1667,7 +1713,7 @@ class ActionService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/appointment/$appointmentId'),
+        Uri.parse('$baseUrl/check-in-status/appointment/$appointmentId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -1705,6 +1751,109 @@ class ActionService {
     }
   }
 
+  // Get appointment by ID with full details (new comprehensive endpoint)
+  static Future<Map<String, dynamic>> getAppointmentByIdDetailed(
+    String appointmentId,
+  ) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate appointmentId
+      if (appointmentId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Appointment ID is required',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$appointmentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return comprehensive appointment data
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Appointment details retrieved successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid appointment ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment not found',
+        };
+      } else if (response.statusCode == 500) {
+        // Server error
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to fetch appointment details',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
   // Extract appointment ID from QR code URL
   static String? extractAppointmentIdFromUrl(String url) {
     try {
@@ -1721,6 +1870,1032 @@ class ActionService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  // Change password
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate input
+      if (currentPassword.isEmpty || newPassword.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Current password and new password are required',
+        };
+      }
+
+      // Validate new password requirements
+      if (newPassword.length < 8) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'New password must be at least 8 characters long',
+        };
+      }
+
+      if (!RegExp(
+        r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])',
+      ).hasMatch(newPassword)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message':
+              'New password must contain uppercase, lowercase, number, and special character',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - password changed, user needs to login again
+        await StorageService.logout(); // Clear stored data and tokens
+        return {
+          'success': true,
+          'statusCode': 200,
+          'message':
+              responseData['message'] ??
+              'Password changed successfully. Please log in again.',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request - validation errors
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request parameters',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // User not found
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'User not found',
+        };
+      } else if (response.statusCode == 500) {
+        // Server error
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to change password',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Email Template Functions
+  // Get all email templates with filtering
+  static Future<Map<String, dynamic>> getAllEmailTemplates({
+    bool? isActive,
+    List<String>? tags,
+    String? category,
+    List<String>? region,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {};
+      if (isActive != null) {
+        queryParams['isActive'] = isActive.toString();
+      }
+      if (category != null) {
+        queryParams['category'] = category;
+      }
+      if (region != null && region.isNotEmpty) {
+        queryParams['region'] = region.join(',');
+      }
+      if (tags != null && tags.isNotEmpty) {
+        queryParams['tags'] = tags.join(',');
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse(
+        '$baseUrl/email-templates',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Email templates retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve email templates',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get all email template IDs with filtering
+  static Future<Map<String, dynamic>> getAllEmailTemplateIds({
+    bool? isActive,
+    List<String>? tags,
+    String? category,
+    List<String>? region,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {};
+      if (isActive != null) {
+        queryParams['isActive'] = isActive.toString();
+      }
+      if (category != null) {
+        queryParams['category'] = category;
+      }
+      if (region != null && region.isNotEmpty) {
+        queryParams['region'] = region.join(',');
+      }
+      if (tags != null && tags.isNotEmpty) {
+        queryParams['tags'] = tags.join(',');
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse(
+        '$baseUrl/email-templates/ids',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Email template IDs retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve email template IDs',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get single email template by ID
+  static Future<Map<String, dynamic>> getEmailTemplateById(String id) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate ID
+      if (id.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Email template ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/email-templates/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Email template retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Template not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Email template not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve email template',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get email template options (categories, regions, tags)
+  static Future<Map<String, dynamic>> getEmailTemplateOptions() async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/email-templates/options'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Email template options retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve email template options',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Update check-in status for appointment (for guard actions)
+  static Future<Map<String, dynamic>> updateCheckInStatus({
+    required String checkInStatusId,
+    String? mainStatus,
+    List<Map<String, dynamic>>? users,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {};
+      if (mainStatus != null) {
+        requestBody['mainStatus'] = mainStatus;
+      }
+      if (users != null) {
+        requestBody['users'] = users;
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/check-in-status/$checkInStatusId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Check-in status updated successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to update check-in status',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get all SMS templates with optional filters
+  static Future<Map<String, dynamic>> getAllSmsTemplates({
+    bool? isActive,
+    List<String>? tags,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {};
+      if (isActive != null) {
+        queryParams['isActive'] = isActive.toString();
+      }
+      if (tags != null && tags.isNotEmpty) {
+        queryParams['tags'] = tags.join(',');
+      }
+
+      final uri = Uri.parse(
+        '$baseUrl/sms-templates',
+      ).replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'SMS templates retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve SMS templates',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get single SMS template by ID
+  static Future<Map<String, dynamic>> getSmsTemplateById(String id) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/sms-templates/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'SMS template retrieved successfully',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': 'SMS template not found',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve SMS template',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get available tags for SMS templates
+  static Future<Map<String, dynamic>> getSmsTemplateOptions() async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/sms-templates/options'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'SMS template options retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve SMS template options',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Send appointment SMS
+  static Future<Map<String, dynamic>> sendAppointmentSms({
+    required String appointeeMobile,
+    required String referenceMobile,
+    required bool useAppointee,
+    required bool useReference,
+    String? otherSms,
+    String? selectedTemplateId,
+    String? smsContent,
+    Map<String, dynamic>? templateData,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'appointeeMobile': appointeeMobile,
+        'referenceMobile': referenceMobile,
+        'useAppointee': useAppointee,
+        'useReference': useReference,
+      };
+
+      // Add optional fields
+      if (otherSms != null && otherSms.isNotEmpty) {
+        requestBody['otherSms'] = otherSms;
+      }
+      if (selectedTemplateId != null && selectedTemplateId.isNotEmpty) {
+        requestBody['selectedTemplateId'] = selectedTemplateId;
+      }
+      if (smsContent != null && smsContent.isNotEmpty) {
+        requestBody['smsContent'] = smsContent;
+      }
+      if (templateData != null) {
+        requestBody['templateData'] = templateData;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment/send-sms'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'SMS sent successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request data',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to send SMS',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get assigned secretaries by ashram location
+  static Future<Map<String, dynamic>> getAssignedSecretariesByAshramLocation({
+    required String locationId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate locationId
+      if (locationId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Location ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$locationId/secretaries'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return secretaries data
+        final List<dynamic> secretaries = responseData['data'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': secretaries,
+          'message':
+              responseData['message'] ?? 'Secretaries fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid location ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Location not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Ashram location not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch secretaries',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Update assigned secretary for an appointment
+  static Future<Map<String, dynamic>> updateAssignedSecretary({
+    required String appointmentId,
+    required String secretaryId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate inputs
+      if (appointmentId.isEmpty || secretaryId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Both appointment ID and secretary ID are required',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {'secretaryId': secretaryId};
+
+      // Make API call
+      final response = await http.put(
+        Uri.parse('$baseUrl/appointment/$appointmentId/assign-secretary'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Assigned secretary updated successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request data',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to update assigned secretary',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
     }
   }
 
@@ -1766,8 +2941,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/darshan-line')
-          .replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$baseUrl/appointment/darshan-line',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -1795,7 +2971,9 @@ class ActionService {
       if (error is Exception) {
         rethrow;
       }
-      throw Exception('Network error. Please check your connection and try again.');
+      throw Exception(
+        'Network error. Please check your connection and try again.',
+      );
     }
   }
 
@@ -1827,11 +3005,7 @@ class ActionService {
         'message': 'Appointments fetched successfully',
       };
     } catch (error) {
-      return {
-        'success': false,
-        'statusCode': 500,
-        'message': error.toString(),
-      };
+      return {'success': false, 'statusCode': 500, 'message': error.toString()};
     }
   }
 }

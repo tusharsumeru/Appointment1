@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import '../../action/action.dart';
 
 class EmailForm extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -44,202 +45,85 @@ class _EmailFormState extends State<EmailForm> {
   bool _includeReferenceEmail = false;
   bool _showDarshanLineFields = false;
   
-  // Email templates from JSON
+  // Email templates from API
   List<Map<String, String>> _emailTemplates = [
     {'value': '', 'label': 'Select Template'},
-    {'value': '1', 'label': 'APPOINTMENT CONFIRMATION'},
-    {'value': '2', 'label': 'APPOINTMENT RESCHEDULED'},
-    {'value': '3', 'label': 'APPOINTMENT REMINDER'},
-    {'value': '5', 'label': 'DARSHAN LINE'},
-    {'value': '10', 'label': 'EMAIL FORWARD REQUEST'},
-    {'value': '13', 'label': 'GUEST GUIDELINES'},
-    {'value': '14', 'label': 'INFORM VDS'},
-    {'value': '15', 'label': 'UNABLE TO PROCESS YOUR REQUEST'},
-    {'value': '21', 'label': 'Customized Email'},
-    {'value': '38', 'label': 'TB R/S Special Enclosure'},
-    {'value': '39', 'label': 'TB R/S Rescheduled'},
-    {'value': '40', 'label': 'Europe - Appointment & TBS confirmation'},
-    {'value': '41', 'label': 'Europe - Appointment & TBS Rescheduling'},
-    {'value': '42', 'label': 'SATSANG BACKSTAGE'},
   ];
   
-  // Template data from JSON
-  Map<String, Map<String, dynamic>> _templateData = {
-    '1': {
-      'subject': r'Confirmation of your appointment {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
+  // Template data from API
+  Map<String, Map<String, dynamic>> _templateData = {};
+  
+  // Loading state
+  bool _isLoadingTemplates = false;
+  String? _errorMessage;
 
-This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below:
+  @override
+  void initState() {
+    super.initState();
+    _loadEmailTemplates();
+  }
 
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
+  Future<void> _loadEmailTemplates() async {
+    setState(() {
+      _isLoadingTemplates = true;
+      _errorMessage = null;
+    });
 
-{$email_note}'''
-    },
-    '2': {
-      'subject': r'IMP: Appointment rescheduled {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
+    try {
+      // Get email templates from API
+      final result = await ActionService.getAllEmailTemplates(
+        isActive: true, // Only get active templates
+      );
 
-This is to inform you that your appointment {$AID} has been rescheduled. Please find the new details below:
+      if (result['success']) {
+        final List<dynamic> templates = result['data'] ?? [];
+        
+        // Clear existing templates and add default
+        _emailTemplates = [{'value': '', 'label': 'Select Template'}];
+        _templateData.clear();
+        
+        // Add templates from API
+        for (var template in templates) {
+          final String id = template['_id']?.toString() ?? '';
+          final String name = template['name'] ?? template['templateName'] ?? 'Unknown Template';
+          final bool isActive = template['isActive'] ?? true;
+          
+          // Only add active templates
+          if (isActive && id.isNotEmpty) {
+            _emailTemplates.add({
+              'value': id,
+              'label': name,
+            });
+            
+            // Store template data for later use
+            _templateData[id] = {
+              'subject': template['subject'] ?? template['templateSubject'] ?? '',
+              'content': template['content'] ?? template['templateData'] ?? template['body'] ?? '',
+              'category': template['category'] ?? '',
+              'tags': template['tags'] ?? [],
+              'region': template['region'] ?? '',
+            };
+          }
+        }
+        
+        setState(() {});
+      } else {
+        setState(() {
+          _errorMessage = result['message'] ?? 'Failed to load email templates';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading email templates: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingTemplates = false;
+      });
+    }
+  }
 
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
 
-{$email_note}'''
-    },
-    '3': {
-      'subject': r'Gentle reminder of your appointment {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is a reminder email. Kindly note that your appointment request {$AID} is scheduled for today. Please find the details below:
-
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
-
-{$email_note}'''
-    },
-    '5': {
-      'subject': r'Response to your appointment request {$AID} with Gurudev',
-      'content': r'''Dear {$full_name} {$ji},
-
-You can come for Gurudev's darshan at {$time} on {$date}. Kindly collect your Darshan pass from Secretariat office on the same day.
-
-Requested for: {$no_people}
-Area: {$area}
-Location: {$app_location}
-
-NOTE: Please note that our official photographer will be taking your pictures with Gurudev which will be uploaded on www.soulbook.me.'''
-    },
-    '10': {
-      'subject': r'Inputs required for this request',
-      'content': r'''Dear One,
-
-Can you please provide inputs for following appointment request.
-
-Name: {$full_name}
-Designation: {$designation}
-Mobile: {$mobile}
-Email: {$email}
-Reference Name: {$ref_by}
-Reference Phone: {$ref_phone}
-Subject: {$subject}
-Purpose: {$purpose}
-Preferred date: {$date}
-Number of People: {$no_people}
-
-NOTE: Please share your inputs on secretariat@artofliving.org, emails to this ID are not monitored.'''
-    },
-    '13': {
-      'subject': r'Appointment guest guidelines',
-      'content': r'''Dear {$ref_name} {$ji},
-
-Your appointment with Gurudev (for {$appointee_name}) is scheduled on {$date} at {$time}. Total People: {$no_people}
-
-Kindly come to secretariat office 15 mins prior to allotted time and meet with Shabnam/Chandrakant who will guide you.
-
-We request you to ensure that the guests have had an ashram tour and have watched Love moves the world prior to Gurudev's appointment.
-
-NOTE: Videography or photography (using mobile phones) would not be needed from your side as the Art of Living official photographer will take pictures which will be emailed the following day of the appointment.'''
-    },
-    '14': {
-      'subject': r'Information regarding Pujas & Homas on your special occasion',
-      'content': r'''Dear {$appointee_name} {$ji},
-
-The Vaidic Dharma Sansthan desk (in cc) organizes Pujas & Homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on +91 9538186844 (M) / +91 80 67262639 (O).'''
-    },
-    '15': {
-      'subject': r'Unable to process your appointment request',
-      'content': r'''Dear {$appointee_name} {$ji},
-
-We are unable to process your request at the moment. It could be due to the following reason(s):
-
-1. Purpose not clear - We will need complete details of the reason for your appointment stating the context of the issue and the questions you have for Gurudev.
-
-2. Details of contact person not complete - Please make sure the name, designation and contact details of the person wanting to meet and the reference person are clearly filled.
-
-Request you to kindly re-fill in the appointment request.'''
-    },
-    '21': {
-      'subject': r'Art of Living, Appointment',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is a customized email for your appointment.
-
-{$email_note}'''
-    },
-    '38': {
-      'subject': r'IMP: Appointment {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is to inform you that your request {$AID} has been confirmed. Please show this message to the security guard near front enclosure at Shiva Temple.
-
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
-
-{$email_note}'''
-    },
-    '39': {
-      'subject': r'IMP: Appointment {$AID} Rescheduled',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is to inform you that your request {$AID} has been rescheduled. Please find the details below:
-
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
-
-{$email_note}'''
-    },
-    '40': {
-      'subject': r'Confirmation of your appointment {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is to inform you that your appointment request {$AID} has been confirmed. Please find the details below:
-
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
-
-NOTE: Please come to the above location 15 minutes prior to your scheduled time.
-
-Warm Regards,
-The Art of Living Team Europe'''
-    },
-    '41': {
-      'subject': r'IMP: Appointment rescheduled {$AID}',
-      'content': r'''Dear {$full_name} {$ji},
-
-This is to inform you that your appointment request {$AID} has been rescheduled. Please find the details below:
-
-Date: {$date}
-Time: {$time}
-Requested for: {$no_people}
-Location: {$app_location}
-
-NOTE: Please come to the above location 15 minutes prior to your scheduled time.
-
-Warm Regards,
-The Art of Living Team Europe'''
-    },
-    '42': {
-      'subject': r'Response to appointment request {$AID} with Gurudev',
-      'content': r'''Dear {$full_name} {$ji},
-
-An appointment may not be possible. However, you may take blessings from Gurudev when he enters/exits satsang. Please contact Shabnam/Chandrakanth at Secretariat office 15 mins before beginning of Satsang on that day.
-
-Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various occasions. You may contact them directly in case you are interested. You may contact VDS via phone on - +91 9538186844 (M) / +91 80 67262639 (O).'''
-    },
-  };
 
   String _getAppointmentId() {
     return widget.appointment['appointmentId']?.toString() ?? 
@@ -247,66 +131,199 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
   }
 
   String _getAppointmentName() {
+    // Try multiple possible fields for the name
     return widget.appointment['userCurrentDesignation']?.toString() ?? 
+           widget.appointment['fullName']?.toString() ??
+           widget.appointment['name']?.toString() ??
+           widget.appointment['userName']?.toString() ??
            widget.appointment['email']?.toString() ?? 'Unknown';
   }
 
   String _getAppointeeEmail() {
-    return widget.appointment['email']?.toString() ?? '';
-  }
-
-  String _getReferenceEmail() {
-    final referencePerson = widget.appointment['referencePerson'];
-    if (referencePerson is Map<String, dynamic>) {
-      return referencePerson['email']?.toString() ?? '';
+    // Try multiple possible fields for the appointee email
+    // Primary: email field (from the actual data structure)
+    final email = widget.appointment['email']?.toString();
+    if (email != null && email.isNotEmpty) {
+      return email;
     }
+    
+    // Secondary: userEmail field
+    final userEmail = widget.appointment['userEmail']?.toString();
+    if (userEmail != null && userEmail.isNotEmpty) {
+      return userEmail;
+    }
+    
+    // Fallback: appointeeEmail field
+    final appointeeEmail = widget.appointment['appointeeEmail']?.toString();
+    if (appointeeEmail != null && appointeeEmail.isNotEmpty) {
+      return appointeeEmail;
+    }
+    
     return '';
   }
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _loadEmailTemplates();
-  // }
+  String _getReferenceEmail() {
+    // Try multiple possible fields for the reference email
+    // Primary: referencePerson.email (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final email = referencePerson['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    }
+    
+    // Secondary: referenceEmail field
+    final referenceEmail = widget.appointment['referenceEmail']?.toString();
+    if (referenceEmail != null && referenceEmail.isNotEmpty) {
+      return referenceEmail;
+    }
+    
+    // Fallback: other possible field names
+    final refEmail = widget.appointment['refEmail']?.toString();
+    if (refEmail != null && refEmail.isNotEmpty) {
+      return refEmail;
+    }
+    
+    final refByEmail = widget.appointment['refByEmail']?.toString();
+    if (refByEmail != null && refByEmail.isNotEmpty) {
+      return refByEmail;
+    }
+    
+    final referenceByEmail = widget.appointment['referenceByEmail']?.toString();
+    if (referenceByEmail != null && referenceByEmail.isNotEmpty) {
+      return referenceByEmail;
+    }
+    
+    return '';
+  }
 
-  // Future<void> _loadEmailTemplates() async {
-  //   try {
-  //     // Load JSON file
-  //     final String jsonString = await rootBundle.loadString('emailtemplate.json');
-  //     final Map<String, dynamic> jsonData = json.decode(jsonString);
-  //     
-  //     // Get email templates
-  //     final List<dynamic> emailTemplates = jsonData['Email'] ?? [];
-  //     
-  //     // Clear existing templates and add default
-  //     _emailTemplates = [{'value': '', 'label': 'Select Template'}];
-  //     
-  //     // Add templates from JSON
-  //     for (var template in emailTemplates) {
-  //       final String id = template['id'].toString();
-  //       final String name = template['template_name'];
-  //       final int status = template['status'] ?? 0;
-  //       
-  //       // Only add active templates (status = 1)
-  //       if (status == 1) {
-  //         _emailTemplates.add({
-  //           'value': id,
-  //           'label': name,
-  //         });
-  //         
-  //         // Store template data for later use
-  //         _templateData[id] = {
-  //           'subject': template['template_subject'] ?? '',
-  //           'content': template['template_data'] ?? '',
-  //         };
-  //       }
-  //     }
-  //     
-  //     setState(() {});
-  //   } catch (e) {
-  //     print('Error loading email templates: $e');
-  //   }
-  // }
+  String _getReferenceName() {
+    // Try multiple possible fields for the reference name
+    // Primary: referencePerson.name (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final name = referencePerson['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+    }
+    
+    // Secondary: other possible field names
+    final refName = widget.appointment['refName']?.toString();
+    if (refName != null && refName.isNotEmpty) {
+      return refName;
+    }
+    
+    final refBy = widget.appointment['refBy']?.toString();
+    if (refBy != null && refBy.isNotEmpty) {
+      return refBy;
+    }
+    
+    final referenceName = widget.appointment['referenceName']?.toString();
+    if (referenceName != null && referenceName.isNotEmpty) {
+      return referenceName;
+    }
+    
+    final referenceBy = widget.appointment['referenceBy']?.toString();
+    if (referenceBy != null && referenceBy.isNotEmpty) {
+      return referenceBy;
+    }
+    
+    return 'Unknown Reference';
+  }
+
+  String _getReferencePhone() {
+    // Try multiple possible fields for the reference phone
+    // Primary: referencePerson.phoneNumber (from the actual data structure)
+    final referencePerson = widget.appointment['referencePerson'];
+    if (referencePerson is Map<String, dynamic>) {
+      final phoneNumber = referencePerson['phoneNumber'];
+      if (phoneNumber is Map<String, dynamic>) {
+        final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+        final number = phoneNumber['number']?.toString() ?? '';
+        if (countryCode.isNotEmpty && number.isNotEmpty) {
+          return '$countryCode $number';
+        }
+      }
+      
+      // Handle phoneNumber as a string
+      if (phoneNumber is String && phoneNumber.isNotEmpty) {
+        return phoneNumber;
+      }
+    }
+    
+    // Secondary: other possible field names
+    final refPhone = widget.appointment['refPhone']?.toString();
+    if (refPhone != null && refPhone.isNotEmpty) {
+      return refPhone;
+    }
+    
+    final referencePhone = widget.appointment['referencePhone']?.toString();
+    if (referencePhone != null && referencePhone.isNotEmpty) {
+      return referencePhone;
+    }
+    
+    final refByPhone = widget.appointment['refByPhone']?.toString();
+    if (refByPhone != null && refByPhone.isNotEmpty) {
+      return refByPhone;
+    }
+    
+    return '';
+  }
+
+  List<String> _getRecipientEmails() {
+    List<String> recipients = [];
+    
+    // Add appointee email if selected
+    if (_includeAppointeeEmail) {
+      final appointeeEmail = _getAppointeeEmail();
+      if (appointeeEmail.isNotEmpty) {
+        recipients.add(appointeeEmail);
+      }
+    }
+    
+    // Add reference email if selected
+    if (_includeReferenceEmail) {
+      final referenceEmail = _getReferenceEmail();
+      if (referenceEmail.isNotEmpty) {
+        recipients.add(referenceEmail);
+      }
+    }
+    
+    // Add CC emails if provided
+    if (_ccEmailController.text.isNotEmpty) {
+      final ccEmails = _ccEmailController.text
+          .split(',')
+          .map((email) => email.trim())
+          .where((email) => email.isNotEmpty)
+          .toList();
+      recipients.addAll(ccEmails);
+    }
+    
+    return recipients;
+  }
+
+  Map<String, dynamic> _getEmailData() {
+    return {
+      'recipients': _getRecipientEmails(),
+      'bcc': _bccEmailController.text.isNotEmpty 
+          ? _bccEmailController.text
+              .split(',')
+              .map((email) => email.trim())
+              .where((email) => email.isNotEmpty)
+              .toList()
+          : [],
+      'subject': _emailSubjectController.text,
+      'content': _emailTemplateController.text,
+      'templateId': _selectedTemplate.isNotEmpty ? _selectedTemplate : null,
+      'appointmentId': _getAppointmentId(),
+      'includeAppointeeEmail': _includeAppointeeEmail,
+      'includeReferenceEmail': _includeReferenceEmail,
+      'darshanLineDate': _darshanLineDateController.text,
+      'darshanLineTime': _darshanLineTimeController.text,
+    };
+  }
 
   @override
   void dispose() {
@@ -341,46 +358,38 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
   String _replacePlaceholders(String text) {
     String result = text;
     
-    // Extract data from appointment object
+    // Get appointment data
+    final appointment = widget.appointment;
     final appointmentId = _getAppointmentId();
-    final fullName = _getFullName();
-    final ji = _getJi();
-    final date = _getAppointmentDate();
-    final time = _getAppointmentTime();
-    final noPeople = _getNumberOfPeople();
-    final appLocation = _getAppointmentLocation();
-    final emailNote = _getEmailNote();
-    final area = _getArea();
-    final designation = _getDesignation();
-    final mobile = _getMobile();
-    final email = _getEmail();
-    final refBy = _getReferenceBy();
-    final refPhone = _getReferencePhone();
-    final subject = _getSubject();
-    final purpose = _getPurpose();
-    final refName = _getReferenceName();
-    final appointeeName = _getAppointeeName();
+    final fullName = _getAppointmentName();
+    final email = _getAppointeeEmail();
     
-    // Replace placeholders with dynamic values
+    // Replace placeholders with actual appointment data
     result = result.replaceAll('{\$AID}', appointmentId);
     result = result.replaceAll('{\$full_name}', fullName);
-    result = result.replaceAll('{\$ji}', ji);
-    result = result.replaceAll('{\$date}', date);
-    result = result.replaceAll('{\$time}', time);
-    result = result.replaceAll('{\$no_people}', noPeople);
-    result = result.replaceAll('{\$app_location}', appLocation);
-    result = result.replaceAll('{\$email_note}', emailNote);
-    result = result.replaceAll('{\$area}', area);
-    result = result.replaceAll('{\$designation}', designation);
-    result = result.replaceAll('{\$mobile}', mobile);
+    result = result.replaceAll('{\$ji}', 'Ji');
+    result = result.replaceAll('{\$date}', _darshanLineDateController.text.isNotEmpty 
+        ? _darshanLineDateController.text 
+        : appointment['scheduledDate']?.toString() ?? 'TBD');
+    result = result.replaceAll('{\$time}', _darshanLineTimeController.text.isNotEmpty 
+        ? _darshanLineTimeController.text 
+        : appointment['scheduledTime']?.toString() ?? 'TBD');
+    result = result.replaceAll('{\$no_people}', appointment['noOfPeople']?.toString() ?? '1');
+    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? 'Bangalore Ashram');
+    result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
+    result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? 'Main Hall');
+    result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? 'Guest');
+    result = result.replaceAll('{\$mobile}', appointment['mobile']?.toString() ?? '+91 9876543210');
     result = result.replaceAll('{\$email}', email);
-    result = result.replaceAll('{\$ref_by}', refBy);
-    result = result.replaceAll('{\$ref_phone}', refPhone);
-    result = result.replaceAll('{\$subject}', subject);
-    result = result.replaceAll('{\$purpose}', purpose);
-    result = result.replaceAll('{\$ref_name}', refName);
-    result = result.replaceAll('{\$appointee_name}', appointeeName);
-    result = result.replaceAll('{\$appointeeName}', appointeeName);
+    result = result.replaceAll('{\$ref_by}', _getReferenceName());
+    result = result.replaceAll('{\$ref_phone}', _getReferencePhone());
+    result = result.replaceAll('{\$subject}', _emailSubjectController.text.isNotEmpty 
+        ? _emailSubjectController.text 
+        : appointment['subject']?.toString() ?? 'Meeting with Gurudev');
+    result = result.replaceAll('{\$purpose}', appointment['purpose']?.toString() ?? 'Seeking guidance on spiritual matters');
+    result = result.replaceAll('{\$ref_name}', _getReferenceName());
+    result = result.replaceAll('{\$appointee_name}', fullName);
+    result = result.replaceAll('{\$appointeeName}', fullName);
     
     return result;
   }
@@ -571,10 +580,146 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
 
   void _sendEmail() {
     if (_formKey.currentState!.validate()) {
-      // Here you would typically send the email data to your backend
-      widget.onSend?.call();
-      Navigator.of(context).pop();
+      // Validate that at least one recipient is selected
+      final recipients = _getRecipientEmails();
+      if (recipients.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select at least one recipient (Appointee or Reference email)'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Validate that subject and content are not empty
+      if (_emailSubjectController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter an email subject'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (_emailTemplateController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter email content'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Get email data
+      final emailData = _getEmailData();
+      
+      // Show confirmation dialog
+      _showEmailConfirmationDialog(emailData);
     }
+  }
+
+  void _showEmailConfirmationDialog(Map<String, dynamic> emailData) {
+    final recipients = emailData['recipients'] as List<String>;
+    final bcc = emailData['bcc'] as List<String>;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Email'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('To: ${recipients.join(', ')}'),
+              if (bcc.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('BCC: ${bcc.join(', ')}'),
+              ],
+              const SizedBox(height: 8),
+              Text('Subject: ${emailData['subject']}'),
+              const SizedBox(height: 8),
+              const Text('Are you sure you want to send this email?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _sendEmailToBackend(emailData);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEmailTemplateModal() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.7,
+            height: MediaQuery.of(context).size.height * 0.5,
+            padding: const EdgeInsets.all(16),
+            child: Scrollbar(
+              child: ListView.builder(
+                itemCount: _emailTemplates.length,
+                itemBuilder: (context, index) {
+                  final template = _emailTemplates[index];
+                  final isSelected = template['value'] == _selectedTemplate;
+                  
+                  return ListTile(
+                    title: Text(template['label']!),
+                    selected: isSelected,
+                    onTap: () {
+                      if (template['value']?.isNotEmpty ?? false) {
+                        setState(() {
+                          _selectedTemplate = template['value']!;
+                          // Populate subject and content if template is selected
+                          if (_templateData.containsKey(template['value'])) {
+                            final templateData = _templateData[template['value']]!;
+                            _emailSubjectController.text = _replacePlaceholders(templateData['subject'] ?? '');
+                            _emailTemplateController.text = _replacePlaceholders(templateData['content'] ?? '');
+                          }
+                        });
+                        Navigator.of(context).pop();
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _sendEmailToBackend(Map<String, dynamic> emailData) {
+      // Here you would typically send the email data to your backend
+    // For now, we'll just call the callback and close the form
+    print('Sending email with data: $emailData');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email sent successfully!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    
+    widget.onSend?.call();
+      Navigator.of(context).pop();
   }
 
   // Dismiss keyboard when tapping outside
@@ -645,6 +790,7 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
                         value: _includeAppointeeEmail,
                         onChanged: (value) => setState(() => _includeAppointeeEmail = value ?? true),
                         title: 'Appointee Email: ${_getAppointeeEmail()}',
+                        subtitle: _getAppointeeEmail().isNotEmpty ? null : 'No email available',
                       ),
                       
                       // Reference Email Checkbox
@@ -652,6 +798,7 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
                         value: _includeReferenceEmail,
                         onChanged: (value) => setState(() => _includeReferenceEmail = value ?? false),
                         title: 'Reference Email: ${_getReferenceEmail()}',
+                        subtitle: _getReferenceEmail().isNotEmpty ? null : 'No reference email available',
                       ),
                       
                       const SizedBox(height: 16),
@@ -703,35 +850,82 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
                       
                       const SizedBox(height: 16),
                       
-                      // Email Template Dropdown
-                      DropdownButtonFormField<String>(
-                        value: _selectedTemplate.isEmpty ? null : _selectedTemplate,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedTemplate = value ?? '';
-                            // Populate subject and content if template is selected
-                            if (value != null && value.isNotEmpty && _templateData.containsKey(value)) {
-                              final template = _templateData[value]!;
-                              _emailSubjectController.text = _replacePlaceholders(template['subject'] ?? '');
-                              _emailTemplateController.text = _replacePlaceholders(template['content'] ?? '');
-                            }
-                          });
-                        },
+                      // Email Template Selection
+                      if (_isLoadingTemplates)
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 16),
+                                Text('Loading email templates...'),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (_errorMessage != null)
+                        Card(
+                          color: Colors.red.shade50,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.error_outline, color: Colors.red.shade700),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Error loading templates',
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: Colors.red.shade700),
+                                ),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  onPressed: _loadEmailTemplates,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade700,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        TextFormField(
+                          readOnly: true,
+                          onTap: _showEmailTemplateModal,
+                          controller: TextEditingController(
+                            text: _emailTemplates.firstWhere(
+                              (template) => template['value'] == _selectedTemplate,
+                              orElse: () => {'value': '', 'label': 'Select Template'},
+                            )['label'],
+                          ),
                         decoration: const InputDecoration(
                           labelText: 'Email Template',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.description_outlined),
-                        ),
-                        isExpanded: true,
-                        items: _emailTemplates.map((template) {
-                          return DropdownMenuItem<String>(
-                            value: template['value'],
-                            child: Text(
-                              template['label']!,
-                              overflow: TextOverflow.ellipsis,
+                            suffixIcon: Icon(Icons.arrow_drop_down),
                             ),
-                          );
-                        }).toList(),
                       ),
                       
                       const SizedBox(height: 16),
@@ -762,12 +956,12 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
                         controller: _emailTemplateController,
                         focusNode: _emailTemplateFocus,
                         onTap: () => _scrollToFocusedField(_emailTemplateFocus),
-                        decoration: const InputDecoration(
-                          labelText: 'Email Template',
-                          hintText: 'Enter email content here...',
-                          border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
-                        ),
+                                                 decoration: const InputDecoration(
+                           labelText: 'Email Body',
+                           hintText: 'Enter email content here...',
+                           border: OutlineInputBorder(),
+                           alignLabelWithHint: true,
+                         ),
                         maxLines: 8,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -824,10 +1018,12 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
     required bool value,
     required ValueChanged<bool?> onChanged,
     required String title,
+    String? subtitle,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Checkbox(
             value: value,
@@ -836,9 +1032,25 @@ Ps: The Vaidic Dharma Sansthan desk (in cc) organizes pujas & homas for various 
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           Expanded(
-            child: Text(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
               title,
               style: const TextStyle(fontSize: 16),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

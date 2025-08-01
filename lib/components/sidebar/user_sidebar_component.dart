@@ -274,33 +274,6 @@ class _UserSidebarComponentState extends State<UserSidebarComponent> {
 
                   const Divider(color: Colors.white24),
 
-                  // Settings
-                  ListTile(
-                    leading: const Icon(Icons.settings, color: Colors.white70),
-                    title: const Text(
-                      'Settings',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Navigate to settings screen
-                    },
-                  ),
-
-                  ListTile(
-                    leading: const Icon(Icons.help_outline, color: Colors.white70),
-                    title: const Text(
-                      'Help & Support',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Navigate to help screen
-                    },
-                  ),
-
-                  const Divider(color: Colors.white24),
-
                   // Logout
                   ListTile(
                     leading: const Icon(Icons.logout, color: Colors.redAccent),

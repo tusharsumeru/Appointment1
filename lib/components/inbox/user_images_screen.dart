@@ -95,7 +95,7 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (index == 0) {
         return 'Profile Image';
       } else {
-        return 'Match ${index}'; // Adjust numbering since index 0 is profile image
+        return 'Match ${index}'; // Keep as is since index 0 is profile image, index 1+ are matches
       }
     }
     
