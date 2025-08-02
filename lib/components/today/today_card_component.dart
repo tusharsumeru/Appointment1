@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../action/action.dart';
 
 class TodayCardComponent extends StatefulWidget {
-  const TodayCardComponent({super.key});
+  final VoidCallback? onRefresh;
+
+  const TodayCardComponent({super.key, this.onRefresh});
 
   @override
   State<TodayCardComponent> createState() => _TodayCardComponentState();
@@ -111,6 +113,12 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     }
   }
 
+  // Public method to refresh data
+  Future<void> refresh() async {
+    await _fetchTodayAppointments();
+    widget.onRefresh?.call();
+  }
+
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
     if (_todayAppointments.isEmpty) return [];
 
@@ -143,6 +151,8 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
               location.contains('satsang') && location.contains('backstage');
           final isGurukul = location.contains('gurukul');
 
+          // If venue is satsang backstage or gurukul, exclude from time-based categories
+          // Otherwise, continue to check time
           if (isSatsangBackstage || isGurukul) {
             return false; // Don't show location-based appointments in time categories
           }

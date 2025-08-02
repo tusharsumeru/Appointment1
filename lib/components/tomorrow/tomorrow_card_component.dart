@@ -3,8 +3,13 @@ import '../../action/action.dart';
 
 class TomorrowCardComponent extends StatefulWidget {
   final DateTime selectedDate;
+  final VoidCallback? onRefresh;
 
-  const TomorrowCardComponent({super.key, required this.selectedDate});
+  const TomorrowCardComponent({
+    super.key, 
+    required this.selectedDate,
+    this.onRefresh,
+  });
 
   @override
   State<TomorrowCardComponent> createState() => _TomorrowCardComponentState();
@@ -28,13 +33,13 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       'title': 'Evening',
       'icon': Icons.wb_sunny_outlined,
       'color': Colors.deepPurple,
-      'timeRange': {'start': 15, 'end': 18.5}, // 3 PM to 6:30 PM
+      'timeRange': {'start': 15, 'end': 18.5}, // 3 PM to 8 PM
     },
     'night': {
       'title': 'Night',
       'icon': Icons.nightlight_round,
       'color': Colors.deepPurple,
-      'timeRange': {'start': 20, 'end': 22}, // 8 PM to 10 PM
+      'timeRange': {'start': 20, 'end': 22}, // 8 PM to 12 AM
     },
     'tbs_req': {
       'title': 'TBS/Req',
@@ -121,6 +126,12 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     }
   }
 
+  // Public method to refresh data
+  Future<void> refresh() async {
+    await _fetchTomorrowAppointments();
+    widget.onRefresh?.call();
+  }
+
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
     if (_tomorrowAppointments.isEmpty) return [];
 
@@ -153,6 +164,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
               location.contains('satsang') && location.contains('backstage');
           final isGurukul = location.contains('gurukul');
 
+          // If venue is satsang backstage or gurukul, exclude from time-based categories
+          // Otherwise, continue to check time
           if (isSatsangBackstage || isGurukul) {
             return false; // Don't show location-based appointments in time categories
           }
@@ -386,6 +399,10 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
         appointment['country']?.toString();
 
     if (locationString != null && locationString.isNotEmpty) {
+      // If it's a venue ID (24 character hex string), return a default location
+      if (locationString.length == 24 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(locationString)) {
+        return 'Secretariat Office A1'; // Default venue name for venue IDs
+      }
       return locationString;
     }
 

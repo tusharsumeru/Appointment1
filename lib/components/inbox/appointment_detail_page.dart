@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'user_images_screen.dart';
+import 'edit_appointment_screen.dart';
 import '../../action/action.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
   final Map<String, dynamic> appointment;
+  final bool isFromDeletedAppointments;
 
   const AppointmentDetailPage({
     super.key,
     required this.appointment,
+    this.isFromDeletedAppointments = false,
   });
 
   @override
@@ -1110,8 +1113,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Main User Information Section
             _buildMainUserSection(),
             
-            // Accompanying Users Section - Only show if 10 or fewer users
-            if (_getAttendeeCount() <= 10) ...[
+            // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
+            if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
               _buildAccompanyingUsersSection(),
             ],
             
@@ -1184,6 +1187,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1192,6 +1197,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         fontSize: 16,
                         color: Colors.grey[600],
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1200,6 +1207,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         fontSize: 14,
                         color: Colors.grey[500],
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ],
                 ),
@@ -1214,6 +1223,61 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           _buildDetailRow('Date Range', _getDateRange(), Icons.calendar_today),
           _buildDetailRow('Location', _getLocation(), Icons.location_on),
           _buildDetailRow('Number of People', '${_getAttendeeCount()} People', Icons.people),
+          
+          const SizedBox(height: 20),
+          
+          // Action Buttons Section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Edit Button
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: TextButton(
+                  onPressed: _handleEdit,
+                  child: Text(
+                    'Edit',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(0, 24),
+                  ),
+                ),
+              ),
+              // Delete/Restore Button
+              Container(
+                decoration: BoxDecoration(
+                  color: widget.isFromDeletedAppointments ? Colors.green[50] : Colors.red[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: widget.isFromDeletedAppointments ? Colors.green[200]! : Colors.red[200]!),
+                ),
+                child: TextButton(
+                  onPressed: _handleDelete,
+                  child: Text(
+                    widget.isFromDeletedAppointments ? 'Restore' : 'Delete',
+                    style: TextStyle(
+                      color: widget.isFromDeletedAppointments ? Colors.green[700] : Colors.red[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(0, 24),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -2374,5 +2438,324 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ],
       ),
     );
+  }
+
+  // Edit appointment handler
+  void _handleEdit() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditAppointmentScreen(
+          appointment: widget.appointment,
+        ),
+      ),
+    ).then((result) async {
+      // Handle the result when returning from edit screen
+      if (result != null) {
+        if (result is Map<String, dynamic>) {
+          // Fetch fresh appointment data from API
+          await _fetchUpdatedAppointmentData();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Appointment updated successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else if (result == true) {
+          // Fallback for boolean result - also fetch fresh data
+          await _fetchUpdatedAppointmentData();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Appointment updated successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  // Fetch updated appointment data from API
+  Future<void> _fetchUpdatedAppointmentData() async {
+    try {
+      final appointmentId = _getAppointmentId();
+      if (appointmentId.isEmpty) {
+        print('DEBUG: No appointment ID found for fetching updated data');
+        return;
+      }
+
+      print('DEBUG: Fetching updated appointment data for ID: $appointmentId');
+      
+      // Show loading indicator
+      setState(() {
+        // You can add a loading state here if needed
+      });
+
+      // Fetch the updated appointment data
+      final result = await ActionService.getAppointmentByIdDetailed(appointmentId);
+      
+      if (result['success'] && result['data'] != null) {
+        // Update the appointment data with fresh data from API
+        setState(() {
+          widget.appointment.clear();
+          widget.appointment.addAll(result['data']);
+        });
+        
+        print('DEBUG: Successfully fetched updated appointment data');
+      } else {
+        print('DEBUG: Failed to fetch updated appointment data: ${result['message']}');
+        // Optionally show error message to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Warning: Could not refresh appointment data: ${result['message']}'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error fetching updated appointment data: $e');
+      // Optionally show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Warning: Could not refresh appointment data: $e'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // Delete appointment handler
+  void _handleDelete() {
+    if (widget.isFromDeletedAppointments) {
+      // Show restore dialog for deleted appointments
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Restore Appointment'),
+            content: const Text('Are you sure you want to restore this appointment?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _performRestore();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Restore'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      // Show delete dialog for regular appointments
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Delete Appointment'),
+            content: const Text('Are you sure you want to delete this appointment? This action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _performSoftDelete();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  // Perform soft delete operation
+  Future<void> _performSoftDelete() async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Deleting appointment...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Get appointment ID
+      final appointmentId = _getAppointmentId();
+      if (appointmentId.isEmpty) {
+        Navigator.of(context).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Appointment ID not found'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      // Call the soft delete API
+      final result = await ActionService.softDeleteAppointment(
+        appointmentId: appointmentId,
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (result['success']) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Appointment deleted successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate back to inbox screen
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushReplacementNamed('/inbox');
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to delete appointment'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  // Perform restore operation
+  Future<void> _performRestore() async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Restoring appointment...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Get appointment ID
+      final appointmentId = _getAppointmentId();
+      if (appointmentId.isEmpty) {
+        Navigator.of(context).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Appointment ID not found'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      // Call the restore API
+      final result = await ActionService.restoreDeletedAppointment(
+        appointmentId: appointmentId,
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (result['success']) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Appointment restored successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate back to deleted appointments screen
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushReplacementNamed('/deleted-appointments');
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to restore appointment'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 } 

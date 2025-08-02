@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'login_screen.dart';
 import '../main/home_screen.dart';
+import '../main/inbox_screen.dart';
 import '../action/storage_service.dart';
 import '../action/action.dart';
 import '../guard/guard_screen.dart';
@@ -141,7 +142,7 @@ class _SplashScreenState extends State<SplashScreen>
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  const HomeScreen(),
+                  const InboxScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },

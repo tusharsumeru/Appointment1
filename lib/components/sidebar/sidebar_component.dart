@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../main/home_screen.dart';
 import '../../main/inbox_screen.dart';
 import '../../main/today_screen.dart';
 import '../../main/tomorrow_screen.dart';
 import '../../main/upcoming_screen.dart';
 import '../../main/dashboard_screen.dart';
-import '../../main/bulk_email_sms_screen.dart';
+// import '../../main/bulk_email_sms_screen.dart';
 import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
 import '../../main/change_password_screen.dart';
-import '../../main/export_data_screen.dart';
-import '../../main/forward_request_logs_screen.dart';
+// import '../../main/export_data_screen.dart';
+// import '../../main/forward_request_logs_screen.dart';
+import '../../main/deleted_appointments_screen.dart';
 import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
@@ -228,16 +228,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
                       : null,
                 ),
                 const SizedBox(height: 8),
-                // Greeting
-                Text(
-                  'Hi User!',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
                 // User Name
                 Flexible(
                   child: Text(
@@ -266,43 +256,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // User Role (if available)
-                if (_userData?['role'] != null) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _userData!['role'].toString().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
-          ),
-
-          // Navigation Items
-          ListTile(
-            leading: const Icon(Icons.home, color: Colors.deepPurple),
-            title: const Text('Home'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-            },
           ),
 
           // Secretary-specific menu items
@@ -391,6 +346,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.deepPurple),
+              title: const Text('Deleted Appointments'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeletedAppointmentsScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
               leading: const Icon(
                 Icons.add_circle_outline,
                 color: Colors.deepPurple,
@@ -465,20 +434,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
           //     );
           //   },
           // ),
-          // Send Bulk Email & SMS Navigation Item
-          ListTile(
-            leading: const Icon(Icons.email, color: Colors.deepPurple),
-            title: const Text('Send Bulk Email & SMS'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BulkEmailSmsScreen(),
-                ),
-              );
-            },
-          ),
+          // Send Bulk Email & SMS Navigation Item - Commented out
+          // ListTile(
+          //   leading: const Icon(Icons.email, color: Colors.deepPurple),
+          //   title: const Text('Send Bulk Email & SMS'),
+          //   onTap: () {
+          //     Navigator.pop(context); // Close drawer
+          //     Navigator.pushReplacement(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => const BulkEmailSmsScreen(),
+          //       ),
+          //     );
+          //   },
+          // ),
 
           // Dashboard Navigation Item
           ListTile(
@@ -523,33 +492,35 @@ class _SidebarComponentState extends State<SidebarComponent> {
             },
           ),
 
-          ListTile(
-            leading: const Icon(Icons.file_download, color: Colors.grey),
-            title: const Text('Export Data'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ExportDataScreen(),
-                ),
-              );
-            },
-          ),
+          // Export Data Navigation Item - Commented out
+          // ListTile(
+          //   leading: const Icon(Icons.file_download, color: Colors.grey),
+          //   title: const Text('Export Data'),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => const ExportDataScreen(),
+          //       ),
+          //     );
+          //   },
+          // ),
 
-          ListTile(
-            leading: const Icon(Icons.forward, color: Colors.grey),
-            title: const Text('Forward Request Logs'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ForwardRequestLogsScreen(),
-                ),
-              );
-            },
-          ),
+          // Forward Request Logs Navigation Item - Commented out
+          // ListTile(
+          //   leading: const Icon(Icons.forward, color: Colors.grey),
+          //   title: const Text('Forward Request Logs'),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => const ForwardRequestLogsScreen(),
+          //       ),
+          //     );
+          //   },
+          // ),
 
 
 

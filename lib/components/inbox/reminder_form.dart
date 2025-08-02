@@ -5,12 +5,14 @@ class ReminderForm extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final VoidCallback? onSave;
   final VoidCallback? onClose;
+  final VoidCallback? onRefresh; // Add refresh callback
 
   const ReminderForm({
     Key? key,
     required this.appointment,
     this.onSave,
     this.onClose,
+    this.onRefresh, // Add refresh callback parameter
   }) : super(key: key);
 
   @override
@@ -33,7 +35,7 @@ class _ReminderFormState extends State<ReminderForm> {
   String _selectedArrivalTime = '17:15';
   String _selectedScheduleDate = '';
   String _selectedScheduleTime = '';
-  String? _selectedMeetingType; // Changed to nullable and no initial value
+  String _selectedMeetingType = 'in_person'; // Set default to 'in_person'
   String _selectedVenueId = '507f1f77bcf86cd799439011'; // Default venue ID
   String _selectedVenueName = 'Secretariat Office A1';
   
@@ -152,7 +154,7 @@ class _ReminderFormState extends State<ReminderForm> {
           scheduledDate: _selectedDate,
           scheduledTime: _selectedTime,
           options: options,
-          meetingType: _selectedMeetingType ?? 'in_person', // Provide default if null
+          meetingType: _selectedMeetingType, // Now has default value
           venueId: _selectedVenueId, // Use venue ID instead of venue name
           arrivalTime: _sendArrivalTime ? _selectedArrivalTime : null,
           scheduleConfirmation: scheduleConfirmation,
@@ -171,6 +173,7 @@ class _ReminderFormState extends State<ReminderForm> {
           
           // Call onSave callback
           widget.onSave?.call();
+          widget.onRefresh?.call(); // Call onRefresh callback
           
           // Close the form
           if (mounted) {
@@ -220,7 +223,7 @@ class _ReminderFormState extends State<ReminderForm> {
     });
   }
 
-  void _onMeetingTypeChanged(String? value) {
+  void _onMeetingTypeChanged(String value) {
     setState(() {
       _selectedMeetingType = value;
       _showOfflineVenue = _selectedMeetingType == 'in_person';
@@ -473,7 +476,11 @@ class _ReminderFormState extends State<ReminderForm> {
                         DropdownMenuItem(value: 'in_person', child: Text('In Person')),
                         DropdownMenuItem(value: 'zoom', child: Text('Zoom Meeting')),
                       ],
-                      onChanged: _isLoading ? null : _onMeetingTypeChanged,
+                      onChanged: _isLoading ? null : (value) {
+                        if (value != null) {
+                          _onMeetingTypeChanged(value);
+                        }
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please select a meeting type';

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/tomorrow/tomorrow_card_component.dart';
+import 'today_screen.dart';
+import 'upcoming_screen.dart';
 
 class TomorrowScreen extends StatefulWidget {
   const TomorrowScreen({super.key});
@@ -11,6 +13,7 @@ class TomorrowScreen extends StatefulWidget {
 
 class _TomorrowScreenState extends State<TomorrowScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+  int _refreshCounter = 0;
 
   String _getFormattedDate(DateTime date) {
     final months = [
@@ -64,9 +67,47 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       },
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      // Get today's date (without time)
+      final DateTime today = DateTime.now();
+      final DateTime todayOnly = DateTime(today.year, today.month, today.day);
+      
+      // Get tomorrow's date
+      final DateTime tomorrow = todayOnly.add(const Duration(days: 1));
+      
+      // Get the picked date (without time)
+      final DateTime pickedOnly = DateTime(picked.year, picked.month, picked.day);
+      
+      // Navigate to appropriate screen based on selected date
+      if (pickedOnly.isAtSameMomentAs(todayOnly)) {
+        // Selected today - navigate to today screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TodayScreen(),
+          ),
+        );
+      } else if (pickedOnly.isAtSameMomentAs(tomorrow)) {
+        // Selected tomorrow - stay in tomorrow screen
+        setState(() {
+          _selectedDate = picked;
+        });
+      } else if (pickedOnly.isAfter(tomorrow)) {
+        // Selected date after tomorrow - navigate to upcoming screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const UpcomingScreen(),
+          ),
+        );
+      } else {
+        // Selected date in the past - navigate to today screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TodayScreen(),
+          ),
+        );
+      }
     }
   }
 
@@ -90,54 +131,95 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       drawer: const SidebarComponent(),
       body: Column(
         children: [
-          // Tomorrow's date section with calendar icon
+          // Header with refresh button and calendar icon
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Date on the left
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getFormattedDate(_selectedDate),
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getFormattedDay(_selectedDate),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Calendar icon on the right
+                // Date selector button on the left
                 GestureDetector(
                   onTap: () => _selectDate(context),
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    width: 192, // w-48 equivalent (48 * 4 = 192)
+                    height: 44, // h-11 equivalent (11 * 4 = 44)
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.deepPurple.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white,
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.calendar_today,
-                      color: Colors.deepPurple,
-                      size: 24,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _getFormattedDate(_selectedDate),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                        Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 20,
+                          color: Colors.grey.shade600,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Refresh button on the right
+                GestureDetector(
+                  onTap: () {
+                    // Refresh the tomorrow card component
+                    setState(() {
+                      _refreshCounter++;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[600],
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.refresh,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Refresh',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -146,7 +228,10 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
           ),
 
           // Tomorrow card component
-          Expanded(child: TomorrowCardComponent(selectedDate: _selectedDate)),
+          Expanded(child: TomorrowCardComponent(
+            key: ValueKey(_refreshCounter),
+            selectedDate: _selectedDate,
+          )),
         ],
       ),
     );

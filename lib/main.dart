@@ -9,6 +9,7 @@ import 'main/upcoming_screen.dart';
 import 'main/today_screen.dart';
 import 'main/tomorrow_screen.dart';
 import 'main/add_new_screen.dart';
+import 'main/deleted_appointments_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +36,7 @@ class MyApp extends StatelessWidget {
         '/today': (context) => const TodayScreen(),
         '/tomorrow': (context) => const TomorrowScreen(),
         '/add-new': (context) => const AddNewScreen(),
+        '/deleted-appointments': (context) => const DeletedAppointmentsScreen(),
       },
     );
   }
