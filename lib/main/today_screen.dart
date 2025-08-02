@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/today/today_card_component.dart';
 import '../action/action.dart';
+import 'tomorrow_screen.dart';
+import 'upcoming_screen.dart';
 
 class TodayScreen extends StatefulWidget {
   final DateTime? selectedDate;
@@ -74,9 +76,44 @@ class _TodayScreenState extends State<TodayScreen> {
       },
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      // Get today's date (without time)
+      final DateTime today = DateTime.now();
+      final DateTime todayOnly = DateTime(today.year, today.month, today.day);
+      
+      // Get tomorrow's date
+      final DateTime tomorrow = todayOnly.add(const Duration(days: 1));
+      
+      // Get the picked date (without time)
+      final DateTime pickedOnly = DateTime(picked.year, picked.month, picked.day);
+      
+      // Navigate to appropriate screen based on selected date
+      if (pickedOnly.isAtSameMomentAs(todayOnly)) {
+        // Selected today - stay in today screen
+        setState(() {
+          _selectedDate = picked;
+        });
+      } else if (pickedOnly.isAtSameMomentAs(tomorrow)) {
+        // Selected tomorrow - navigate to tomorrow screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TomorrowScreen(),
+          ),
+        );
+      } else if (pickedOnly.isAfter(tomorrow)) {
+        // Selected date after tomorrow - navigate to upcoming screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const UpcomingScreen(),
+          ),
+        );
+      } else {
+        // Selected date in the past - stay in today screen but update the date
+        setState(() {
+          _selectedDate = picked;
+        });
+      }
     }
   }
 

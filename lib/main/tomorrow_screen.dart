@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/tomorrow/tomorrow_card_component.dart';
+import 'today_screen.dart';
+import 'upcoming_screen.dart';
 
 class TomorrowScreen extends StatefulWidget {
   const TomorrowScreen({super.key});
@@ -65,9 +67,47 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       },
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      // Get today's date (without time)
+      final DateTime today = DateTime.now();
+      final DateTime todayOnly = DateTime(today.year, today.month, today.day);
+      
+      // Get tomorrow's date
+      final DateTime tomorrow = todayOnly.add(const Duration(days: 1));
+      
+      // Get the picked date (without time)
+      final DateTime pickedOnly = DateTime(picked.year, picked.month, picked.day);
+      
+      // Navigate to appropriate screen based on selected date
+      if (pickedOnly.isAtSameMomentAs(todayOnly)) {
+        // Selected today - navigate to today screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TodayScreen(),
+          ),
+        );
+      } else if (pickedOnly.isAtSameMomentAs(tomorrow)) {
+        // Selected tomorrow - stay in tomorrow screen
+        setState(() {
+          _selectedDate = picked;
+        });
+      } else if (pickedOnly.isAfter(tomorrow)) {
+        // Selected date after tomorrow - navigate to upcoming screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const UpcomingScreen(),
+          ),
+        );
+      } else {
+        // Selected date in the past - navigate to today screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TodayScreen(),
+          ),
+        );
+      }
     }
   }
 

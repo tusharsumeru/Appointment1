@@ -3145,7 +3145,8 @@ class ActionService {
       if (response.headers['content-type']?.contains('application/json') ==
           true) {
         final data = jsonDecode(response.body);
-        if (response.statusCode == 200 && data['success'] == true) {
+        if (response.statusCode == 200 &&
+            (data['success'] == true || data['error'] == null)) {
           print('✅ Bulk email sent successfully: ${data["data"]}');
           return {
             'success': true,
@@ -3511,7 +3512,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/appointments/deleted').replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$baseUrl/appointment/appointments/deleted',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -3531,7 +3534,9 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Deleted appointments retrieved successfully',
+          'message':
+              responseData['message'] ??
+              'Deleted appointments retrieved successfully',
           'pagination': responseData['data']?['pagination'],
         };
       } else if (response.statusCode == 401) {
@@ -3547,7 +3552,9 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve deleted appointments',
+          'message':
+              responseData['message'] ??
+              'Failed to retrieve deleted appointments',
         };
       }
     } catch (error) {
@@ -3590,7 +3597,8 @@ class ActionService {
         return {
           'success': true,
           'statusCode': 200,
-          'message': responseData['message'] ?? 'Appointment deleted successfully',
+          'message':
+              responseData['message'] ?? 'Appointment deleted successfully',
         };
       } else if (response.statusCode == 401) {
         // Token expired or invalid
@@ -3655,7 +3663,8 @@ class ActionService {
         return {
           'success': true,
           'statusCode': 200,
-          'message': responseData['message'] ?? 'Appointment restored successfully',
+          'message':
+              responseData['message'] ?? 'Appointment restored successfully',
           'data': responseData['data'],
         };
       } else if (response.statusCode == 401) {
