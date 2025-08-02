@@ -272,37 +272,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return 'checked_in_partial';
   }
 
-  void _showImageModal(String imageUrl, String userName) {
-    showDialog(
-      context: context,
-      barrierDismissible: true, // Allow tapping outside to close
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(), // Tap anywhere to close
-            onDoubleTap: () => Navigator.of(context).pop(), // Double tap to close
-            child: InteractiveViewer(
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Icon(
-                      Icons.person,
-                      size: 200,
-                      color: Colors.grey,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+
 
   // Admit/Reject functionality
   Future<void> _admitUser(Map<String, dynamic> user) async {
@@ -509,6 +479,38 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  void _showImageModal(String imageUrl, String userName) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            onDoubleTap: () => Navigator.of(context).pop(),
+            child: InteractiveViewer(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Icon(
+                      Icons.person,
+                      size: 200,
+                      color: Colors.grey,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildUserCard(Map<String, dynamic> user, int index) {
     final fullName = user['fullName'] ?? 'Unknown';
     final userType = user['userType'] ?? 'unknown';
@@ -547,7 +549,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Second line: Full size image
+          // Second line: Profile Image
           GestureDetector(
             onTap: () {
               if (profilePhotoUrl != null) {
@@ -556,37 +558,89 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             },
             child: Container(
               width: double.infinity,
-              height: 200,
+              height: 250,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFF1a237e).withOpacity(0.2),
+                  color: const Color(0xFF1a237e).withOpacity(0.3),
                   width: 2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: profilePhotoUrl != null
                     ? Image.network(
                         profilePhotoUrl,
                         fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 250,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFF1a237e).withOpacity(0.1),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / 
+                                      loadingProgress.expectedTotalBytes!
+                                    : null,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1a237e)),
+                              ),
+                            ),
+                          );
+                        },
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             color: const Color(0xFF1a237e).withOpacity(0.1),
-                            child: const Icon(
-                              Icons.person,
-                              size: 80,
-                              color: Color(0xFF1a237e),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.person,
+                                  size: 100,
+                                  color: Color(0xFF1a237e),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: const Color(0xFF1a237e).withOpacity(0.7),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         },
                       )
                     : Container(
                         color: const Color(0xFF1a237e).withOpacity(0.1),
-                        child: const Icon(
-                          Icons.person,
-                          size: 80,
-                          color: Color(0xFF1a237e),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.person,
+                              size: 100,
+                              color: Color(0xFF1a237e),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No profile photo',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: const Color(0xFF1a237e).withOpacity(0.7),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
               ),
