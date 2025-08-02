@@ -3100,6 +3100,85 @@ class ActionService {
     }
   }
 
+  // Send bulk email to multiple appointments
+  static Future<Map<String, dynamic>> sendBulkEmail({
+    required String templateId,
+    required List<Map<String, dynamic>> recipients,
+    List<String>? tags,
+    String? subject,
+    String? content,
+  }) async {
+    final Uri url = Uri.parse('$baseUrl/email-templates/bulk');
+
+    final Map<String, dynamic> requestBody = {
+      'templateId': templateId,
+      'recipients': recipients,
+      'tags': tags ?? ['bulk-email', 'appointment'],
+    };
+
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found. Please login again.');
+      }
+
+      print('🌐 Making bulk email API call to: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response headers: ${response.headers}');
+      print('📥 Response body: ${response.body}');
+
+      // Check if response is JSON
+      if (response.headers['content-type']?.contains('application/json') ==
+          true) {
+        final data = jsonDecode(response.body);
+        if (response.statusCode == 200 && data['success'] == true) {
+          print('✅ Bulk email sent successfully: ${data["data"]}');
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Bulk email sent successfully',
+            'data': data['data'],
+          };
+        } else {
+          print('❌ Bulk email failed: ${data['message']}');
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Failed to send bulk email',
+          };
+        }
+      } else {
+        // Response is not JSON (probably HTML error page)
+        print(
+          '❌ Response is not JSON. Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...',
+        );
+        return {
+          'success': false,
+          'message':
+              'Server returned invalid response. Status: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ Error sending bulk email: $e');
+      return {
+        'success': false,
+        'message':
+            'Something went wrong while sending bulk email. Please try again.',
+      };
+    }
+  }
+
   // Create quick appointment without validation
   static Future<Map<String, dynamic>> createQuickAppointment({
     required String fullName,
