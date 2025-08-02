@@ -192,8 +192,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             }
 
             final category = _categories[categoryKey]!;
-            final start = category['timeRange']['start'] as int;
-            final end = category['timeRange']['end'] as int;
+            final start = category['timeRange']['start'] as num;
+            final end = category['timeRange']['end'] as num;
 
             final isInRange = start <= end
                 ? (hour >= start && hour < end)
@@ -248,6 +248,18 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             return false;
           }
 
+          // Exclude TBS/Req appointments from location-based categories
+          final communicationPreferences =
+              appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any(
+              (pref) => pref.toString() == 'TBS/Req',
+            );
+            if (hasTbsReq) {
+              return false; // Don't show TBS/Req appointments in location categories
+            }
+          }
+
           final location = _getLocation(appointment).toLowerCase();
           final isSatsangBackstage =
               location.contains('satsang') && location.contains('backstage');
@@ -262,6 +274,18 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             return false;
           }
 
+          // Exclude TBS/Req appointments from location-based categories
+          final communicationPreferences =
+              appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any(
+              (pref) => pref.toString() == 'TBS/Req',
+            );
+            if (hasTbsReq) {
+              return false; // Don't show TBS/Req appointments in location categories
+            }
+          }
+
           final location = _getLocation(appointment).toLowerCase();
           final isGurukul = location.contains('gurukul');
           return isGurukul;
@@ -273,16 +297,28 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // First check appointmentStatus.status (this is what gets updated by Done API)
+    // Check appointmentStatus.status first
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
       final status = appointmentStatus['status']?.toString();
       if (status != null && status.isNotEmpty) {
-        return status;
+        // If status is "not_arrived", return it
+        if (status.toLowerCase() == 'not_arrived') {
+          return status;
+        }
+        // For other statuses, check if checkInStatus.mainStatus is "not_arrived"
+        final checkInStatus = appointment['checkInStatus'];
+        if (checkInStatus is Map<String, dynamic>) {
+          final mainStatus = checkInStatus['mainStatus']?.toString();
+          if (mainStatus != null && mainStatus.isNotEmpty && mainStatus.toLowerCase() == 'not_arrived') {
+            return mainStatus; // Return "not_arrived" from checkInStatus
+          }
+        }
+        return status; // Return the appointmentStatus.status
       }
     }
 
-    // Fallback to mainStatus from checkInStatus object
+    // Check checkInStatus.mainStatus
     final checkInStatus = appointment['checkInStatus'];
     if (checkInStatus is Map<String, dynamic>) {
       final mainStatus = checkInStatus['mainStatus']?.toString();
@@ -467,6 +503,10 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
         return Colors.grey; // Grey for Not Arrived
       case 'checked_in_partial':
         return Colors.orange; // Orange for Admitted Partial
+      case 'scheduled':
+        return Colors.blue; // Blue for Scheduled
+      case 'completed':
+        return Colors.green; // Green for Completed
       default:
         return Colors.blue; // Default color for other statuses
     }
@@ -483,6 +523,10 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
         return 'Not Arrived';
       case 'checked_in_partial':
         return 'Admitted Partial';
+      case 'scheduled':
+        return 'Scheduled';
+      case 'completed':
+        return 'Completed';
       default:
         return status; // Display exactly what comes from API for other statuses
     }

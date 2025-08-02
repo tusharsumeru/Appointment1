@@ -5,7 +5,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://4a60756cf3b7.ngrok-free.app/api/v3'; // API base URL
+      'https://580088914e22.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
