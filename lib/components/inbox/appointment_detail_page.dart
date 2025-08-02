@@ -1219,7 +1219,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           const SizedBox(height: 20),
           
           // Request Details
-          _buildDetailRow('Request ID', _getAppointmentId(), Icons.tag),
+          _buildDetailRow('Requestttttttttt ID', _getAppointmentId(), Icons.tag),
           _buildDetailRow('Date Range', _getDateRange(), Icons.calendar_today),
           _buildDetailRow('Location', _getLocation(), Icons.location_on),
           _buildDetailRow('Number of People', '${_getAttendeeCount()} People', Icons.people),
@@ -1228,51 +1228,47 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           // Action Buttons Section
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Edit Button
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.blue[200]!),
-                ),
-                child: TextButton(
+              // Edit Button - Half width
+              Expanded(
+                child: ElevatedButton(
                   onPressed: _handleEdit,
-                  child: Text(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
                     'Edit',
                     style: TextStyle(
-                      color: Colors.blue[700],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: const Size(0, 24),
                   ),
                 ),
               ),
-              // Delete/Restore Button
-              Container(
-                decoration: BoxDecoration(
-                  color: widget.isFromDeletedAppointments ? Colors.green[50] : Colors.red[50],
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: widget.isFromDeletedAppointments ? Colors.green[200]! : Colors.red[200]!),
-                ),
-                child: TextButton(
+              const SizedBox(width: 12),
+              // Delete/Restore Button - Half width
+              Expanded(
+                child: ElevatedButton(
                   onPressed: _handleDelete,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.isFromDeletedAppointments ? Colors.green : Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                   child: Text(
                     widget.isFromDeletedAppointments ? 'Restore' : 'Delete',
-                    style: TextStyle(
-                      color: widget.isFromDeletedAppointments ? Colors.green[700] : Colors.red[700],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: const Size(0, 24),
                   ),
                 ),
               ),
@@ -1924,8 +1920,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25), // Fully rounded
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
-                  child: const Text('Save'),
+                  child: const Text(
+                    'Save',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
               ] else ...[
@@ -1938,8 +1944,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25), // Fully rounded
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
-                  child: const Text('Edit'),
+                  child: const Text(
+                    'Edit',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
               ],
@@ -1970,8 +1986,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                             foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25), // Fully rounded
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
-                          child: const Text('Delete'),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1980,8 +2006,18 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25), // Fully rounded
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                child: const Text('Delete'),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),

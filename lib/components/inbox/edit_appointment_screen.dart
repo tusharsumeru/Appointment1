@@ -1687,169 +1687,176 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildLocationSelectionContent() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Select Appointment Location',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-
-          // Location list
-          Flexible(
-            child: _isLoadingLocations
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Loading locations...'),
-                        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Select Appointment Location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  )
-                : _locationErrorMessage != null
-                    ? Center(
+                    const Spacer(),
+                  ],
+                ),
+              ),
+
+              // Location list
+              Flexible(
+                child: _isLoadingLocations
+                    ? const Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(32),
+                          padding: EdgeInsets.all(32),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.error_outline, size: 48, color: Colors.red),
-                              const SizedBox(height: 16),
-                              Text(
-                                _locationErrorMessage!,
-                                style: TextStyle(color: Colors.red),
-                                textAlign: TextAlign.center,
-                              ),
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Loading locations...'),
                             ],
                           ),
                         ),
                       )
-                    : _availableLocations.isEmpty
-                        ? const Center(
+                    : _locationErrorMessage != null
+                        ? Center(
                             child: Padding(
-                              padding: EdgeInsets.all(32),
+                              padding: const EdgeInsets.all(32),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.location_off, size: 48, color: Colors.grey),
-                                  SizedBox(height: 16),
+                                  Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    'No locations available',
-                                    style: TextStyle(color: Colors.grey),
+                                    _locationErrorMessage!,
+                                    style: TextStyle(color: Colors.red),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
                             ),
                           )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: _availableLocations.map((location) {
-                                final isSelected = location['id']?.toString() == _selectedLocation;
-                                
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected 
-                                        ? Colors.blue.withOpacity(0.1)
-                                        : Colors.grey.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? Colors.blue.withOpacity(0.5)
-                                          : Colors.grey.withOpacity(0.3),
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: InkWell(
-                                    onTap: () {
-                                      print('DEBUG: Tapped location: ${location['name']} with ID: ${location['id']}');
-                                      _updateSelectedLocation(location['id']?.toString());
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.location_on,
-                                            color: isSelected ? Colors.blue : Colors.grey[600],
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              location['name']?.toString() ?? 'Unknown',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: isSelected ? Colors.blue[700] : Colors.black87,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                        : _availableLocations.isEmpty
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.location_off, size: 48, color: Colors.grey),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'No locations available',
+                                        style: TextStyle(color: Colors.grey),
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-          ),
-          
-          // Done button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: _availableLocations.map((location) {
+                                    final isSelected = location['id']?.toString() == _selectedLocation;
+                                    
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected 
+                                            ? Colors.blue.withOpacity(0.1)
+                                            : Colors.grey.withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.blue.withOpacity(0.5)
+                                              : Colors.grey.withOpacity(0.3),
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          print('DEBUG: Tapped location: ${location['name']} with ID: ${location['id']}');
+                                          setState(() {
+                                            _selectedLocation = location['id']?.toString();
+                                          });
+                                          setModalState(() {}); // Rebuild the modal
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on,
+                                                color: isSelected ? Colors.blue : Colors.grey[600],
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  location['name']?.toString() ?? 'Unknown',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: isSelected ? Colors.blue[700] : Colors.black87,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+              ),
+              
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2035,220 +2042,227 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildSecretarySelectionContent() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Available secretaries for this location',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                if (_isLoadingSecretaries)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-
-          // Error message if any
-          if (_secretaryErrorMessage != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(Icons.error, color: Colors.red, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _secretaryErrorMessage!,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                        ),
+                    const Text(
+                      'Available secretaries for this location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const Spacer(),
+                    if (_isLoadingSecretaries)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                   ],
                 ),
               ),
-            ),
 
-          // Secretary list
-          Flexible(
-            child: _isLoadingSecretaries
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Loading secretaries...'),
-                        ],
-                      ),
+              // Error message if any
+              if (_secretaryErrorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
                     ),
-                  )
-                : _availableAssignees.isEmpty
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _secretaryErrorMessage!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Secretary list
+              Flexible(
+                child: _isLoadingSecretaries
                     ? const Center(
                         child: Padding(
                           padding: EdgeInsets.all(32),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                              CircularProgressIndicator(),
                               SizedBox(height: 16),
-                              Text(
-                                'No secretaries available for this location',
-                                style: TextStyle(color: Colors.grey),
-                                textAlign: TextAlign.center,
-                              ),
+                              Text('Loading secretaries...'),
                             ],
                           ),
                         ),
                       )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _availableAssignees.map((assignee) {
-                            final isAssigned = assignee['isAssigned'] == true;
-                            final isSelected = assignee['id']?.toString() == _selectedSecretary;
-                            print('DEBUG: Secretary ${assignee['name']} - ID: ${assignee['id']}, Selected: $isSelected, Assigned: $isAssigned');
-                            
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? Colors.blue.withOpacity(0.1)
-                                    : isAssigned 
-                                        ? Colors.green.withOpacity(0.1)
-                                        : Colors.grey.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.blue.withOpacity(0.5)
-                                      : isAssigned 
-                                          ? Colors.green.withOpacity(0.5)
-                                          : Colors.grey.withOpacity(0.3),
-                                  width: isSelected ? 2 : 1,
-                                ),
-                              ),
-                              child: InkWell(
-                                onTap: () {
-                                  print('DEBUG: Tapped secretary: ${assignee['name']} with ID: ${assignee['id']}');
-                                  _updateSelectedSecretary(assignee['id']?.toString());
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  child: Row(
-                                    children: [
-
-                                      CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: isSelected
-                                            ? Colors.blue[100]
-                                            : isAssigned 
-                                                ? Colors.green[100]
-                                                : Colors.indigo[100],
-                                        child: Text(
-                                          _getInitials(assignee['name']),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected
-                                                ? Colors.blue
-                                                : isAssigned ? Colors.green : Colors.indigo,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          assignee['name'],
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: isSelected
-                                                ? Colors.blue[700]
-                                                : isAssigned ? Colors.green[700] : Colors.black87,
-                                          ),
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.blue,
-                                          size: 20,
-                                        )
-                                      else if (isAssigned)
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                          size: 20,
-                                        ),
-                                    ],
+                    : _availableAssignees.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No secretaries available for this location',
+                                    style: TextStyle(color: Colors.grey),
+                                    textAlign: TextAlign.center,
                                   ),
-                                ),
+                                ],
                               ),
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: _availableAssignees.map((assignee) {
+                                final isAssigned = assignee['isAssigned'] == true;
+                                final isSelected = assignee['id']?.toString() == _selectedSecretary;
+                                print('DEBUG: Secretary ${assignee['name']} - ID: ${assignee['id']}, Selected: $isSelected, Assigned: $isAssigned');
+                                
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected 
+                                        ? Colors.blue.withOpacity(0.1)
+                                        : isAssigned 
+                                            ? Colors.green.withOpacity(0.1)
+                                            : Colors.grey.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? Colors.blue.withOpacity(0.5)
+                                          : isAssigned 
+                                              ? Colors.green.withOpacity(0.5)
+                                              : Colors.grey.withOpacity(0.3),
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () {
+                                      print('DEBUG: Tapped secretary: ${assignee['name']} with ID: ${assignee['id']}');
+                                      setState(() {
+                                        _selectedSecretary = assignee['id']?.toString();
+                                      });
+                                      setModalState(() {}); // Rebuild the modal
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      child: Row(
+                                        children: [
+
+                                          CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor: isSelected
+                                                ? Colors.blue[100]
+                                                : isAssigned 
+                                                    ? Colors.green[100]
+                                                    : Colors.indigo[100],
+                                            child: Text(
+                                              _getInitials(assignee['name']),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: isSelected
+                                                    ? Colors.blue
+                                                    : isAssigned ? Colors.green : Colors.indigo,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              assignee['name'],
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: isSelected
+                                                    ? Colors.blue[700]
+                                                    : isAssigned ? Colors.green[700] : Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isSelected)
+                                            const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.blue,
+                                              size: 20,
+                                            )
+                                          else if (isAssigned)
+                                            const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                              size: 20,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+              ),
+              
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-          ),
-          
-          // Done button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
