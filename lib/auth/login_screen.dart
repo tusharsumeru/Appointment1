@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main/home_screen.dart';
+import '../main/inbox_screen.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
@@ -114,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
+            builder: (context) => const InboxScreen(),
           ),
         );
       } else if (userRole == 'admin') {

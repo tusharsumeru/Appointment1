@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../main/home_screen.dart';
 import '../../main/inbox_screen.dart';
 import '../../main/today_screen.dart';
 import '../../main/tomorrow_screen.dart';
@@ -12,6 +11,7 @@ import '../../main/add_new_screen.dart';
 import '../../main/change_password_screen.dart';
 import '../../main/export_data_screen.dart';
 import '../../main/forward_request_logs_screen.dart';
+import '../../main/deleted_appointments_screen.dart';
 import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
@@ -260,19 +260,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ),
 
-          // Navigation Items
-          ListTile(
-            leading: const Icon(Icons.home, color: Colors.deepPurple),
-            title: const Text('Home'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-            },
-          ),
-
           // Secretary-specific menu items
           if (isSecretary) ...[
             ListTile(
@@ -353,6 +340,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const StarredScreen(),
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.deepPurple),
+              title: const Text('Deleted Appointments'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeletedAppointmentsScreen(),
                   ),
                 );
               },

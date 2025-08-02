@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
 import 'storage_service.dart';
 import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://divinepicrecognition.sumerudigital.com/api/v3'; // API base URL
+      'https://d67a440af4c1.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -3280,6 +3281,404 @@ class ActionService {
           'success': false,
           'statusCode': response.statusCode,
           'message': responseData['message'] ?? 'Failed to create appointment',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get ashram locations
+  static Future<Map<String, dynamic>> getAshramLocations({
+    int page = 1,
+    int limit = 20,
+    String sortBy = "createdAt",
+    String sortOrder = "desc",
+    String? status,
+    String? search,
+    bool includeInactive = false,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+        'includeInactive': includeInactive.toString(),
+      };
+
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse(
+        '$baseUrl/ashram-locations',
+      ).replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful response
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Ashram locations retrieved successfully',
+          'pagination': responseData['pagination'],
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve ashram locations',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Update appointment enhanced
+  static Future<Map<String, dynamic>> updateAppointmentEnhanced({
+    required String appointmentId,
+    required Map<String, dynamic> updateData,
+    PlatformFile? attachmentFile,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Remove empty fields from updateData
+      final cleanUpdateData = <String, dynamic>{};
+      updateData.forEach((key, value) {
+        if (value != null) {
+          // Special handling for empty strings - only include if they're not empty
+          if (value is String && value.isEmpty) {
+            return; // Skip empty strings
+          }
+          // Special handling for empty maps/objects
+          if (value is Map && value.isEmpty) {
+            return; // Skip empty maps
+          }
+          cleanUpdateData[key] = value;
+        }
+      });
+
+      print('DEBUG API: Clean update data: $cleanUpdateData');
+
+      // Try JSON request instead of multipart for now
+      final uri = Uri.parse('$baseUrl/appointment/$appointmentId/enhanced');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(cleanUpdateData),
+      );
+
+      print('DEBUG API: Response status code: ${response.statusCode}');
+      print('DEBUG API: Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': data['data'],
+          'message': data['message'] ?? 'Appointment updated successfully',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': errorData['message'] ?? 'Failed to update appointment',
+          'error': errorData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get deleted appointments
+  static Future<Map<String, dynamic>> getDeletedAppointments({
+    int page = 1,
+    int limit = 10,
+    String sortBy = "deletedAt",
+    String sortOrder = "desc",
+    String? search,
+    String? meetingType,
+    String? appointmentType,
+    String? startDate,
+    String? endDate,
+    String? deletedBy,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+      };
+
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (meetingType != null && meetingType.isNotEmpty) {
+        queryParams['meetingType'] = meetingType;
+      }
+      if (appointmentType != null && appointmentType.isNotEmpty) {
+        queryParams['appointmentType'] = appointmentType;
+      }
+      if (startDate != null && startDate.isNotEmpty) {
+        queryParams['startDate'] = startDate;
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        queryParams['endDate'] = endDate;
+      }
+      if (deletedBy != null && deletedBy.isNotEmpty) {
+        queryParams['deletedBy'] = deletedBy;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse('$baseUrl/appointment/appointments/deleted').replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful response
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Deleted appointments retrieved successfully',
+          'pagination': responseData['data']?['pagination'],
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve deleted appointments',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Soft delete appointment
+  static Future<Map<String, dynamic>> softDeleteAppointment({
+    required String appointmentId,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment/$appointmentId/soft-delete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful response
+        return {
+          'success': true,
+          'statusCode': 200,
+          'message': responseData['message'] ?? 'Appointment deleted successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Appointment not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to delete appointment',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Restore deleted appointment
+  static Future<Map<String, dynamic>> restoreDeletedAppointment({
+    required String appointmentId,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment/$appointmentId/restore'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful response
+        return {
+          'success': true,
+          'statusCode': 200,
+          'message': responseData['message'] ?? 'Appointment restored successfully',
+          'data': responseData['data'],
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Appointment not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Deleted appointment not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to restore appointment',
         };
       }
     } catch (error) {
