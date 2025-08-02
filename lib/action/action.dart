@@ -3143,7 +3143,7 @@ class ActionService {
       // Check if response is JSON
       if (response.headers['content-type']?.contains('application/json') == true) {
         final data = jsonDecode(response.body);
-        if (response.statusCode == 200 && data['success'] == true) {
+        if (response.statusCode == 200 && (data['success'] == true || data['error'] == null)) {
           print('✅ Bulk email sent successfully: ${data["data"]}');
           return {
             'success': true,

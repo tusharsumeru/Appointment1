@@ -1159,24 +1159,70 @@ class _EmailFormState extends State<EmailForm> {
       Navigator.of(context).pop();
 
       if (result['success'] == true) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Email sent successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        // Show success dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  const SizedBox(width: 12),
+                  const Text('Success'),
+                ],
+              ),
+              content: Text(result['message'] ?? 'Email sent successfully!'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                    // Use a microtask to ensure dialog is closed before calling callback
+                    Future.microtask(() {
+                      widget.onSend?.call();
+                      // Close form if it's still open and we're still mounted
+                      if (mounted && Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    });
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
         );
-        
-        // Call the callback and close the form
-        widget.onSend?.call();
-        Navigator.of(context).pop();
       } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to send email. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
+        // Show error dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.red, size: 28),
+                  const SizedBox(width: 12),
+                  const Text('Error'),
+                ],
+              ),
+              content: Text(result['message'] ?? 'Failed to send email. Please try again.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
         );
       }
     } catch (e) {
@@ -1186,12 +1232,33 @@ class _EmailFormState extends State<EmailForm> {
       // Close loading dialog
       Navigator.of(context).pop();
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error sending email: $e'),
-          backgroundColor: Colors.red,
-        ),
+      // Show error dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red, size: 28),
+                const SizedBox(width: 12),
+                const Text('Error'),
+              ],
+            ),
+            content: Text('Error sending email: $e'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
       );
     }
   }
