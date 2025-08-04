@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/gear_filter_component.dart';
 import '../components/inbox/appointment_card.dart';
+import '../components/inbox/filter_bottom_sheet.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 
@@ -22,6 +23,11 @@ class _InboxScreenState extends State<InboxScreen> {
   int _currentPage = 1;
   int _pageSize = 10;
   bool _hasMoreData = true;
+  
+  // Filter variables
+  String _selectedFilter = 'All';
+  List<Map<String, dynamic>> _secretaries = [];
+  bool _isLoadingSecretaries = false;
 
   @override
   void initState() {
@@ -39,8 +45,9 @@ class _InboxScreenState extends State<InboxScreen> {
     });
 
     try {
-      // Always fetch fresh data from API
-      await _fetchAppointmentsFromAPI();
+      // Always fetch fresh data from API with current filter
+      final filterValue = _getFilterValueForAPI(_selectedFilter);
+      await _fetchAppointmentsFromAPI(filter: filterValue);
     } catch (error) {
       print('Error loading appointments: $error');
       setState(() {
@@ -49,13 +56,37 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  Future<void> _fetchAppointmentsFromAPI({bool isLoadMore = false}) async {
+  Future<void> _fetchAppointmentsFromAPI({bool isLoadMore = false, String? filter}) async {
     try {
+      // Determine if we should use assignedSecretary, assigned, or unassigned parameters
+      String? assignedSecretary;
+      bool? assigned;
+      bool? unassigned;
+      
+      if (filter != null) {
+        if (filter == 'assigned') {
+          assigned = true;
+          print('🔍 Using assigned=true parameter');
+        } else if (filter == 'unassigned') {
+          unassigned = true;
+          print('🔍 Using unassigned=true parameter');
+        } else {
+          // For secretary names, find the secretary ID
+          assignedSecretary = filter;
+          print('🔍 Using assignedSecretary=$assignedSecretary parameter');
+        }
+      }
+      
+      print('🔍 API Call - assignedSecretary: $assignedSecretary, assigned: $assigned, unassigned: $unassigned');
+      
       final result = await ActionService.getAppointmentsForSecretary(
         status: 'pending',
         screen: 'inbox',
         page: isLoadMore ? _currentPage + 1 : 1,
         limit: _pageSize,
+        assignedSecretary: assignedSecretary, // Use assignedSecretary for secretary filtering
+        assigned: assigned, // Use assigned for assigned appointments
+        unassigned: unassigned, // Use unassigned for unassigned appointments
       );
       
       if (result['success']) {
@@ -123,7 +154,9 @@ class _InboxScreenState extends State<InboxScreen> {
     _currentPage = 1;
     _hasMoreData = true;
 
-    await _fetchAppointmentsFromAPI(isLoadMore: false);
+    // Get current filter value to maintain filter state
+    final filterValue = _getFilterValueForAPI(_selectedFilter);
+    await _fetchAppointmentsFromAPI(isLoadMore: false, filter: filterValue);
   }
 
   Future<void> _toggleStar(String appointmentId) async {
@@ -244,6 +277,100 @@ class _InboxScreenState extends State<InboxScreen> {
     });
   }
 
+  Future<void> _fetchSecretaries() async {
+    if (_isLoadingSecretaries) return;
+    
+    setState(() {
+      _isLoadingSecretaries = true;
+    });
+
+    try {
+      final result = await ActionService.getAllSecretaries(
+        page: 1,
+        limit: 4, // Only get top 4 secretaries
+        isActive: true, // Only active secretaries
+      );
+
+      if (result['success']) {
+        final data = result['data'];
+        if (data != null && data['secretaries'] != null) {
+          final List<dynamic> secretariesData = data['secretaries'];
+          setState(() {
+            _secretaries = secretariesData.cast<Map<String, dynamic>>();
+          });
+          print('Fetched ${_secretaries.length} secretaries (limited to top 4)');
+        }
+      } else {
+        print('Failed to fetch secretaries: ${result['message']}');
+      }
+    } catch (e) {
+      print('Error fetching secretaries: $e');
+    } finally {
+      setState(() {
+        _isLoadingSecretaries = false;
+      });
+    }
+  }
+
+  // Helper method to get filter value for API
+  String? _getFilterValueForAPI(String selectedFilter) {
+    switch (selectedFilter) {
+      case 'All':
+        print('🔍 Filter: All -> null (no filter)');
+        return null; // No filter needed
+      case 'Assigned':
+        print('🔍 Filter: Assigned -> "assigned" (assigned parameter)');
+        return 'assigned'; // Use assigned parameter
+      case 'Unassigned':
+        print('🔍 Filter: Unassigned -> "unassigned" (unassigned parameter)');
+        return 'unassigned'; // Use unassigned parameter
+      default:
+        // For secretary names, find the secretary ID
+        final secretary = _secretaries.firstWhere(
+          (secretary) => secretary['fullName'] == selectedFilter,
+          orElse: () => {},
+        );
+        final secretaryId = secretary['_id']?.toString();
+        print('🔍 Filter: $selectedFilter -> $secretaryId (assignedSecretary parameter)');
+        return secretaryId; // Return secretary ID for assignedSecretary parameter
+    }
+  }
+
+  void _showFilterBottomSheet() async {
+    // Pre-load secretaries before showing bottom sheet
+    if (_secretaries.isEmpty && !_isLoadingSecretaries) {
+      await _fetchSecretaries();
+    }
+    
+    // Use the reusable component
+    showFilterBottomSheet(
+      context: context,
+      selectedFilter: _selectedFilter,
+      secretaries: _secretaries,
+      onFilterSelected: (option) async {
+        setState(() {
+          _selectedFilter = option;
+          _isLoading = true; // Show loading while filtering
+        });
+        
+        // Get filter value for API
+        final filterValue = _getFilterValueForAPI(option);
+        print('Filter changed to: $option, API filter value: $filterValue');
+        
+        // Reset pagination and fetch filtered data
+        _currentPage = 1;
+        _hasMoreData = true;
+        await _fetchAppointmentsFromAPI(filter: filterValue);
+        
+        setState(() {
+          _isLoading = false;
+        });
+      },
+    );
+  }
+
+
+
   Future<void> _loadMoreAppointments() async {
     if (_isLoadingMore || !_hasMoreData) return;
     
@@ -251,7 +378,9 @@ class _InboxScreenState extends State<InboxScreen> {
       _isLoadingMore = true;
     });
     
-    await _fetchAppointmentsFromAPI(isLoadMore: true);
+    // Get current filter value to maintain filter state
+    final filterValue = _getFilterValueForAPI(_selectedFilter);
+    await _fetchAppointmentsFromAPI(isLoadMore: true, filter: filterValue);
   }
 
   Widget _buildLoadMoreButton() {
@@ -535,41 +664,46 @@ class _InboxScreenState extends State<InboxScreen> {
                     ],
                   ),
                   const SizedBox(width: 16),
-                  // Filter dropdown button
-                  Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey[200]!),
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 2,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Meera P',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 16,
-                          color: Colors.grey[500],
-                        ),
-                      ],
-                    ),
-                  ),
+                                     // Filter dropdown button
+                   GestureDetector(
+                     onTap: () {
+                       _showFilterBottomSheet();
+                     },
+                     child: Container(
+                       height: 36,
+                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                       decoration: BoxDecoration(
+                         color: Colors.white,
+                         border: Border.all(color: Colors.grey[200]!),
+                         borderRadius: BorderRadius.circular(8),
+                         boxShadow: [
+                           BoxShadow(
+                             color: Colors.black.withOpacity(0.05),
+                             blurRadius: 2,
+                             offset: const Offset(0, 1),
+                           ),
+                         ],
+                       ),
+                       child: Row(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           Text(
+                             _selectedFilter,
+                             style: TextStyle(
+                               fontSize: 16,
+                               color: Colors.grey[700],
+                             ),
+                           ),
+                           const SizedBox(width: 8),
+                           Icon(
+                             Icons.keyboard_arrow_down,
+                             size: 16,
+                             color: Colors.grey[500],
+                           ),
+                         ],
+                       ),
+                     ),
+                   ),
                 ],
               ),
               const Spacer(),
