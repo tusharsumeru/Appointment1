@@ -41,41 +41,23 @@ class PersonCardComponent extends StatefulWidget {
 }
 
 class _PersonCardComponentState extends State<PersonCardComponent> {
-  bool _isChecked = false;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Checkbox row
-          Row(
-            children: [
-              Checkbox(
-                value: widget.isSelected,
-                onChanged: (bool? value) {
-                  widget.onSelectionChanged?.call(value ?? false);
-                },
-                activeColor: Colors.deepPurple,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
+      elevation: 2,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Checkbox at top right
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
                   'Select this appointment',
                   style: TextStyle(
                     fontSize: 14,
@@ -83,28 +65,36 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
                     fontWeight: FontWeight.normal,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildLabelValue('Name', widget.name),
-          _buildLabelValue('Darshan Type', widget.darshanType),
-          _buildLabelValue('Darshan Line Date', widget.darshanLineDate),
-          _buildLabelValue('Requested Date', widget.requestedDate),
-          _buildLabelValue('No. of People', widget.peopleCount.toString()),
-          _buildLabelValue('Status', widget.status),
-          _buildLabelValue('Email', 'Not Sent'),
-          const SizedBox(height: 16),
-          // Action icons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildActionIcon(Icons.email, 'Email', widget.onBellPressed),
-              _buildActionIcon(Icons.message, 'Message', widget.onMessagePressed),
-              _buildActionIcon(Icons.phone, 'Call', widget.onAddPressed),
-            ],
-          ),
-        ],
+                Checkbox(
+                  value: widget.isSelected,
+                  onChanged: (bool? value) {
+                    widget.onSelectionChanged?.call(value ?? false);
+                  },
+                  activeColor: Colors.deepPurple,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildLabelValue('Name', widget.name),
+            _buildLabelValue('Darshan Type', widget.darshanType),
+            _buildLabelValue('Darshan Line Date', widget.darshanLineDate),
+            _buildLabelValue('Requested Date', widget.requestedDate),
+            _buildLabelValue('No. of People', widget.peopleCount.toString()),
+            _buildLabelValue('Status', widget.status),
+            _buildLabelValue('Email', 'Not Sent'),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildSimpleActionIcon(Icons.email_outlined, 'Email', widget.onBellPressed),
+                const SizedBox(width: 16),
+                _buildSimpleActionIcon(Icons.message_outlined, 'Message', widget.onMessagePressed),
+                const SizedBox(width: 16),
+                _buildSimpleActionIcon(Icons.phone_outlined, 'Call', widget.onAddPressed),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -116,9 +106,9 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 140, // Fixed width for consistent alignment
+            width: 140,
             child: Text(
-              '$label: ',
+              '$label:',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
@@ -141,24 +131,16 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
     );
   }
 
-  Widget _buildActionIcon(IconData icon, String label, VoidCallback? onPressed) {
+  Widget _buildSimpleActionIcon(IconData icon, String label, VoidCallback? onPressed) {
     return GestureDetector(
       onTap: onPressed,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: Colors.deepPurple,
-            ),
+          Icon(
+            icon,
+            size: 24,
+            color: Colors.black87,
           ),
           const SizedBox(height: 4),
           Text(
@@ -173,4 +155,4 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
       ),
     );
   }
-} 
+}

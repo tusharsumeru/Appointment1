@@ -5,6 +5,7 @@ import '../main/home_screen.dart';
 import '../main/inbox_screen.dart';
 import '../action/storage_service.dart';
 import '../action/action.dart';
+import '../action/jwt_utils.dart';
 import '../guard/guard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -26,13 +27,13 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animation controllers
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
-    
+
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -44,29 +45,18 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     // Create animations
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.3,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     // Start animations
     _fadeController.forward();
@@ -79,15 +69,33 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _checkAuthAndNavigate() async {
     await Future.delayed(const Duration(seconds: 4));
-    
+
     if (mounted) {
       try {
         // Check if user is logged in
         final isLoggedIn = await StorageService.isLoggedIn();
         final token = await StorageService.getToken();
-        
+
         if (isLoggedIn && token != null) {
-          // User is logged in, check role and navigate accordingly
+          // Check if token is expired
+          if (JwtUtils.isTokenExpired(token)) {
+            // Token is expired, logout and redirect to login
+            await StorageService.logout();
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    const LoginScreen(),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                transitionDuration: const Duration(milliseconds: 800),
+              ),
+            );
+            return;
+          }
+          
+          // Token is valid, proceed with role-based navigation
           await _handleRoleBasedNavigation();
         } else {
           // User is not logged in, navigate to login screen
@@ -95,9 +103,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const LoginScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -108,9 +117,10 @@ class _SplashScreenState extends State<SplashScreen>
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 const LoginScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
@@ -122,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Get user data from storage or API
       var userData = await StorageService.getUserData();
-      
+
       if (userData == null) {
         // If no cached user data, fetch from API
         final userResult = await ActionService.getCurrentUser();
@@ -131,11 +141,51 @@ class _SplashScreenState extends State<SplashScreen>
           if (userData != null) {
             await StorageService.saveUserData(userData);
           }
+        } else {
+          // API call failed - check if it's due to session expiration
+          if (userResult['statusCode'] == 401) {
+            // Session expired, logout and redirect to login
+            await StorageService.logout();
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      const LoginScreen(),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                  transitionDuration: const Duration(milliseconds: 800),
+                ),
+              );
+            }
+            return;
+          }
         }
       }
 
-      String? userRole = userData?['role']?.toString().toLowerCase();
-      
+      // Check if we have valid user data
+      if (userData == null) {
+        // No user data available, logout and redirect to login
+        await StorageService.logout();
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const LoginScreen(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        }
+        return;
+      }
+
+      String? userRole = userData['role']?.toString().toLowerCase();
+
       if (mounted) {
         if (userRole == 'secretary') {
           // Secretary role - navigate to appointment management interface
@@ -143,9 +193,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const InboxScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -156,9 +207,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const HomeScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -168,9 +220,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const GuardScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -181,9 +234,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const HomeScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -194,9 +248,10 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const LoginScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -210,9 +265,10 @@ class _SplashScreenState extends State<SplashScreen>
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 const LoginScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
@@ -258,7 +314,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     const SizedBox(height: 40),
-                    
+
                     // App Title with slide animation
                     SlideTransition(
                       position: _slideAnimation,
@@ -276,25 +332,25 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     const SizedBox(height: 15),
-                    
+
                     // Subtitle with fade animation
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: const Text(
-                        'Professional Appointment Management',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Color(0xFF666666),
-                          letterSpacing: 1.0,
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ),
+                    // FadeTransition(
+                    //   opacity: _fadeAnimation,
+                    //   child: const Text(
+                    //     'Professional Appointment Management',
+                    //     style: TextStyle(
+                    //       fontSize: 18,
+                    //       color: Color(0xFF666666),
+                    //       letterSpacing: 1.0,
+                    //       fontWeight: FontWeight.w300,
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
             ),
-            
+
             // Bottom section with loading
             Expanded(
               flex: 1,
@@ -317,14 +373,16 @@ class _SplashScreenState extends State<SplashScreen>
                       child: const Padding(
                         padding: EdgeInsets.all(2.0),
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1a237e)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF1a237e),
+                          ),
                           strokeWidth: 2,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 15),
-                  
+
                   // Loading text
                   FadeTransition(
                     opacity: _fadeAnimation,
@@ -346,4 +404,4 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
-} 
+}

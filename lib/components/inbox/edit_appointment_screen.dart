@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -53,6 +54,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   PlatformFile? _selectedFile;
   bool _isPickingFile = false;
   
+  // Guest information data
+  List<Map<String, dynamic>> _guests = [];
+  
+  // Photo picker for guests
+  final ImagePicker _imagePicker = ImagePicker();
+  
   @override
   void initState() {
     super.initState();
@@ -70,6 +77,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     
     _companyController.text = _getCreatedByCompany();
     _designationController.text = _getCreatedByDesignation();
+    
+    // Initialize guest information
+    _initializeGuestData();
     
     // Get number of people from accompanyUsers object
     String numberOfPeople = '1';
@@ -390,6 +400,126 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
     
     return 'Not specified';
+  }
+
+  void _initializeGuestData() {
+    final accompanyUsers = widget.appointment['accompanyUsers'];
+    if (accompanyUsers is Map<String, dynamic>) {
+      final users = accompanyUsers['users'];
+      if (users is List) {
+        _guests = users.map((user) {
+          final phoneNumber = user['phoneNumber'];
+          String fullPhone = '';
+          if (phoneNumber is Map<String, dynamic>) {
+            final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+            final number = phoneNumber['number']?.toString() ?? '';
+            
+            // Format the phone number properly
+            if (countryCode.isNotEmpty && number.isNotEmpty) {
+              // Remove any existing country code from the number if it's already included
+              String cleanNumber = number;
+              if (number.startsWith(countryCode.replaceAll('+', ''))) {
+                cleanNumber = number.substring(countryCode.replaceAll('+', '').length);
+              }
+              
+              // Format the number with proper spacing
+              if (cleanNumber.length >= 10) {
+                // For Indian numbers (10 digits)
+                if (countryCode == '+91' && cleanNumber.length == 10) {
+                  fullPhone = '$countryCode ${cleanNumber.substring(0, 5)}-${cleanNumber.substring(5)}';
+                } else {
+                  // For other numbers, just add space after country code
+                  fullPhone = '$countryCode $cleanNumber';
+                }
+              } else {
+                fullPhone = '$countryCode $cleanNumber';
+              }
+            } else if (number.isNotEmpty) {
+              fullPhone = number;
+            }
+          }
+          
+          return {
+            'fullName': user['fullName']?.toString() ?? '',
+            'age': user['age']?.toString() ?? '',
+            'phoneNumber': fullPhone,
+            'profilePhotoUrl': user['profilePhotoUrl']?.toString() ?? '',
+            'userId': user['userId']?.toString(),
+            'admissionStatus': user['admissionStatus']?.toString() ?? 'pending',
+            'admittedBy': user['admittedBy'],
+            'relationshipToApplicant': user['relationshipToApplicant'],
+            'admittedAt': user['admittedAt'],
+          };
+        }).toList();
+      }
+    }
+  }
+
+  // Photo picker methods for guests
+  Future<void> _pickGuestImage(int guestIndex, ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _guests[guestIndex]['profilePhotoUrl'] = pickedFile.path;
+          _guests[guestIndex]['localPhotoFile'] = File(pickedFile.path);
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                source == ImageSource.camera 
+                    ? 'Photo captured successfully!' 
+                    : 'Photo uploaded successfully!'
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeGuestPhoto(int guestIndex) {
+    setState(() {
+      _guests[guestIndex]['profilePhotoUrl'] = '';
+      _guests[guestIndex]['localPhotoFile'] = null;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Photo removed successfully!'),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  int _getGuestIndexFromPhotoUrl(String photoUrl) {
+    for (int i = 0; i < _guests.length; i++) {
+      if (_guests[i]['profilePhotoUrl'] == photoUrl) {
+        return i;
+      }
+    }
+    return 0; // Fallback to first guest
   }
 
   String _getAppointmentId() {
@@ -916,6 +1046,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       ),
                       
                       const SizedBox(height: 16),
+                      
+                      // Guest Information Section
+                      if (_guests.isNotEmpty) ...[
+                        _buildGuestInformationSection(),
+                        const SizedBox(height: 16),
+                      ],
                       
                       // Attachment Field
                       _buildAttachmentField(),
@@ -1687,169 +1823,176 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildLocationSelectionContent() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Select Appointment Location',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-
-          // Location list
-          Flexible(
-            child: _isLoadingLocations
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Loading locations...'),
-                        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Select Appointment Location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  )
-                : _locationErrorMessage != null
-                    ? Center(
+                    const Spacer(),
+                  ],
+                ),
+              ),
+
+              // Location list
+              Flexible(
+                child: _isLoadingLocations
+                    ? const Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(32),
+                          padding: EdgeInsets.all(32),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.error_outline, size: 48, color: Colors.red),
-                              const SizedBox(height: 16),
-                              Text(
-                                _locationErrorMessage!,
-                                style: TextStyle(color: Colors.red),
-                                textAlign: TextAlign.center,
-                              ),
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Loading locations...'),
                             ],
                           ),
                         ),
                       )
-                    : _availableLocations.isEmpty
-                        ? const Center(
+                    : _locationErrorMessage != null
+                        ? Center(
                             child: Padding(
-                              padding: EdgeInsets.all(32),
+                              padding: const EdgeInsets.all(32),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.location_off, size: 48, color: Colors.grey),
-                                  SizedBox(height: 16),
+                                  Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    'No locations available',
-                                    style: TextStyle(color: Colors.grey),
+                                    _locationErrorMessage!,
+                                    style: TextStyle(color: Colors.red),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
                             ),
                           )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: _availableLocations.map((location) {
-                                final isSelected = location['id']?.toString() == _selectedLocation;
-                                
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected 
-                                        ? Colors.blue.withOpacity(0.1)
-                                        : Colors.grey.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? Colors.blue.withOpacity(0.5)
-                                          : Colors.grey.withOpacity(0.3),
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: InkWell(
-                                    onTap: () {
-                                      print('DEBUG: Tapped location: ${location['name']} with ID: ${location['id']}');
-                                      _updateSelectedLocation(location['id']?.toString());
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.location_on,
-                                            color: isSelected ? Colors.blue : Colors.grey[600],
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              location['name']?.toString() ?? 'Unknown',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: isSelected ? Colors.blue[700] : Colors.black87,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                        : _availableLocations.isEmpty
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.location_off, size: 48, color: Colors.grey),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'No locations available',
+                                        style: TextStyle(color: Colors.grey),
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-          ),
-          
-          // Done button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: _availableLocations.map((location) {
+                                    final isSelected = location['id']?.toString() == _selectedLocation;
+                                    
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected 
+                                            ? Colors.blue.withOpacity(0.1)
+                                            : Colors.grey.withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.blue.withOpacity(0.5)
+                                              : Colors.grey.withOpacity(0.3),
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          print('DEBUG: Tapped location: ${location['name']} with ID: ${location['id']}');
+                                          setState(() {
+                                            _selectedLocation = location['id']?.toString();
+                                          });
+                                          setModalState(() {}); // Rebuild the modal
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on,
+                                                color: isSelected ? Colors.blue : Colors.grey[600],
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  location['name']?.toString() ?? 'Unknown',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: isSelected ? Colors.blue[700] : Colors.black87,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+              ),
+              
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2035,220 +2178,227 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildSecretarySelectionContent() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Available secretaries for this location',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                if (_isLoadingSecretaries)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-
-          // Error message if any
-          if (_secretaryErrorMessage != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(Icons.error, color: Colors.red, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _secretaryErrorMessage!,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                        ),
+                    const Text(
+                      'Available secretaries for this location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const Spacer(),
+                    if (_isLoadingSecretaries)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                   ],
                 ),
               ),
-            ),
 
-          // Secretary list
-          Flexible(
-            child: _isLoadingSecretaries
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Loading secretaries...'),
-                        ],
-                      ),
+              // Error message if any
+              if (_secretaryErrorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
                     ),
-                  )
-                : _availableAssignees.isEmpty
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _secretaryErrorMessage!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Secretary list
+              Flexible(
+                child: _isLoadingSecretaries
                     ? const Center(
                         child: Padding(
                           padding: EdgeInsets.all(32),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                              CircularProgressIndicator(),
                               SizedBox(height: 16),
-                              Text(
-                                'No secretaries available for this location',
-                                style: TextStyle(color: Colors.grey),
-                                textAlign: TextAlign.center,
-                              ),
+                              Text('Loading secretaries...'),
                             ],
                           ),
                         ),
                       )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _availableAssignees.map((assignee) {
-                            final isAssigned = assignee['isAssigned'] == true;
-                            final isSelected = assignee['id']?.toString() == _selectedSecretary;
-                            print('DEBUG: Secretary ${assignee['name']} - ID: ${assignee['id']}, Selected: $isSelected, Assigned: $isAssigned');
-                            
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? Colors.blue.withOpacity(0.1)
-                                    : isAssigned 
-                                        ? Colors.green.withOpacity(0.1)
-                                        : Colors.grey.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.blue.withOpacity(0.5)
-                                      : isAssigned 
-                                          ? Colors.green.withOpacity(0.5)
-                                          : Colors.grey.withOpacity(0.3),
-                                  width: isSelected ? 2 : 1,
-                                ),
-                              ),
-                              child: InkWell(
-                                onTap: () {
-                                  print('DEBUG: Tapped secretary: ${assignee['name']} with ID: ${assignee['id']}');
-                                  _updateSelectedSecretary(assignee['id']?.toString());
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  child: Row(
-                                    children: [
-
-                                      CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: isSelected
-                                            ? Colors.blue[100]
-                                            : isAssigned 
-                                                ? Colors.green[100]
-                                                : Colors.indigo[100],
-                                        child: Text(
-                                          _getInitials(assignee['name']),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected
-                                                ? Colors.blue
-                                                : isAssigned ? Colors.green : Colors.indigo,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          assignee['name'],
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: isSelected
-                                                ? Colors.blue[700]
-                                                : isAssigned ? Colors.green[700] : Colors.black87,
-                                          ),
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.blue,
-                                          size: 20,
-                                        )
-                                      else if (isAssigned)
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                          size: 20,
-                                        ),
-                                    ],
+                    : _availableAssignees.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No secretaries available for this location',
+                                    style: TextStyle(color: Colors.grey),
+                                    textAlign: TextAlign.center,
                                   ),
-                                ),
+                                ],
                               ),
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: _availableAssignees.map((assignee) {
+                                final isAssigned = assignee['isAssigned'] == true;
+                                final isSelected = assignee['id']?.toString() == _selectedSecretary;
+                                print('DEBUG: Secretary ${assignee['name']} - ID: ${assignee['id']}, Selected: $isSelected, Assigned: $isAssigned');
+                                
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected 
+                                        ? Colors.blue.withOpacity(0.1)
+                                        : isAssigned 
+                                            ? Colors.green.withOpacity(0.1)
+                                            : Colors.grey.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? Colors.blue.withOpacity(0.5)
+                                          : isAssigned 
+                                              ? Colors.green.withOpacity(0.5)
+                                              : Colors.grey.withOpacity(0.3),
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () {
+                                      print('DEBUG: Tapped secretary: ${assignee['name']} with ID: ${assignee['id']}');
+                                      setState(() {
+                                        _selectedSecretary = assignee['id']?.toString();
+                                      });
+                                      setModalState(() {}); // Rebuild the modal
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      child: Row(
+                                        children: [
+
+                                          CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor: isSelected
+                                                ? Colors.blue[100]
+                                                : isAssigned 
+                                                    ? Colors.green[100]
+                                                    : Colors.indigo[100],
+                                            child: Text(
+                                              _getInitials(assignee['name']),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: isSelected
+                                                    ? Colors.blue
+                                                    : isAssigned ? Colors.green : Colors.indigo,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              assignee['name'],
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: isSelected
+                                                    ? Colors.blue[700]
+                                                    : isAssigned ? Colors.green[700] : Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isSelected)
+                                            const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.blue,
+                                              size: 20,
+                                            )
+                                          else if (isAssigned)
+                                            const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                              size: 20,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+              ),
+              
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-          ),
-          
-          // Done button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2496,6 +2646,472 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGuestInformationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Details of Additional People',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...List.generate(_guests.length, (index) {
+          return Column(
+            children: [
+              _buildGuestCard(index),
+              if (index < _guests.length - 1) const SizedBox(height: 16),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildGuestCard(int index) {
+    final guest = _guests[index];
+    final guestNumber = index + 1;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Guest header
+          Row(
+            children: [
+              Text(
+                'Guest $guestNumber',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const Spacer(),
+              if (guest['profilePhotoUrl']?.isNotEmpty == true)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green[600], size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Photo uploaded',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Guest details grid
+          Column(
+            children: [
+              // Full Name
+              _buildGuestField(
+                'Full Name',
+                guest['fullName'] ?? '',
+                isRequired: true,
+              ),
+              const SizedBox(height: 16),
+              
+              // Contact Number
+              _buildGuestField(
+                'Contact Number',
+                guest['phoneNumber'] ?? '',
+                isRequired: true,
+              ),
+              const SizedBox(height: 16),
+              
+              // Age
+              _buildGuestField(
+                'Age',
+                guest['age'] ?? '',
+                isRequired: true,
+                isNumber: true,
+              ),
+              const SizedBox(height: 16),
+              
+              // Photo section
+              _buildGuestPhotoSection(index),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestField(String label, String value, {bool isRequired = false, bool isNumber = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isRequired ? '$label *' : label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestPhotoSection(int index) {
+    final guest = _guests[index];
+    final hasPhoto = guest['profilePhotoUrl']?.isNotEmpty == true;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.grey[50]!,
+                  Colors.white,
+                  Colors.grey[50]!,
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.camera_alt, color: Colors.grey[600], size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Guest ${index + 1} Photo',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                if (hasPhoto) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: TextStyle(
+                      color: Colors.red[500],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: hasPhoto
+                ? _buildPhotoUploadedState(guest['profilePhotoUrl']!, index)
+                : _buildPhotoNotUploadedState(index),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoUploadedState(String photoUrl, int guestIndex) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.green[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green[300]!),
+          ),
+          child: Column(
+            children: [
+              // Photo preview
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: photoUrl.startsWith('http')
+                      ? Image.network(
+                          photoUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.grey[400],
+                                size: 32,
+                              ),
+                            );
+                          },
+                        )
+                      : Image.file(
+                          File(photoUrl),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.grey[400],
+                                size: 32,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // Status text
+              Text(
+                'Photo uploaded',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.yellow[100],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.yellow[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.yellow[800], size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Verified & Uploaded',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.yellow[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Action buttons
+        Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _pickGuestImage(guestIndex, ImageSource.gallery),
+                icon: Icon(Icons.upload, size: 16),
+                label: const Text('Upload Different Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _pickGuestImage(guestIndex, ImageSource.camera),
+                icon: Icon(Icons.camera_alt, size: 16),
+                label: const Text('Take New Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _removeGuestPhoto(guestIndex),
+                icon: Icon(Icons.close, size: 16),
+                label: const Text('Remove'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  foregroundColor: Colors.red[600],
+                  side: BorderSide(color: Colors.red[300]!),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoNotUploadedState(int guestIndex) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.camera_alt_outlined,
+            color: Colors.grey[400],
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No photo uploaded',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Required for guests 12+ years old - Divine pic validation',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          
+          // Action buttons
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickGuestImage(guestIndex, ImageSource.gallery),
+                  icon: Icon(Icons.upload, size: 16),
+                  label: const Text('Upload Photo'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickGuestImage(guestIndex, ImageSource.camera),
+                  icon: Icon(Icons.camera_alt, size: 16),
+                  label: const Text('Take Photo'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

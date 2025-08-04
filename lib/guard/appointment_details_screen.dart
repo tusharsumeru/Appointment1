@@ -579,6 +579,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ? Image.network(
                         profilePhotoUrl,
                         fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
                         width: double.infinity,
                         height: 250,
                         loadingBuilder: (context, child, loadingProgress) {

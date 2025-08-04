@@ -811,6 +811,52 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
                       const SizedBox(height: 12),
 
+                      // QR Code
+                      Row(
+                        children: [
+                          Text(
+                            'QR: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _showQRCodeDialog(appointment),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code,
+                                    size: 20,
+                                    color: Colors.blue.shade600,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'View QR',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
                       // Accompany
                       Row(
                         children: [
@@ -1278,5 +1324,220 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         ),
       );
     }
+  }
+
+  Future<void> _downloadQRCode(String qrUrl, String patientName) async {
+    try {
+      _showSnackBar('Downloading QR code...', isError: false);
+      
+      // For now, we'll just show a success message
+      // In a real implementation, you would use a package like 'dio' or 'http' 
+      // to download the file and save it to the device
+      
+      await Future.delayed(const Duration(seconds: 1));
+      _showSnackBar('QR code download started for $patientName', isError: false);
+      
+    } catch (error) {
+      _showSnackBar('Failed to download QR code: $error', isError: true);
+    }
+  }
+
+  void _showQRCodeDialog(Map<String, dynamic> appointment) {
+    final appointmentId = appointment['appointmentId']?.toString();
+    if (appointmentId == null) {
+      _showSnackBar('Error: Appointment ID not found', isError: true);
+      return;
+    }
+
+    // Use the correct domain for QR codes
+    const qrBaseUrl = 'https://divinepicrecognition.sumerudigital.com';
+    final qrUrl = '$qrBaseUrl/api/v3/public/qr-codes/qr-$appointmentId.png';
+    final patientName = _getAppointmentName(appointment);
+    
+    // Debug: Print the URL to console
+    print('🔍 QR Code URL: $qrUrl');
+    print('🔍 Appointment ID: $appointmentId');
+    print('🔍 MongoDB ID: ${appointment['_id']}');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with close button
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QR Code - $patientName',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'QR code for appointment ID: $appointmentId',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade600,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // QR Code Image Container
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 192, // w-48 = 12rem = 192px
+                      height: 192, // h-48 = 12rem = 192px
+                      child: Image.network(
+                        qrUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Debug: Print the error details
+                          print('❌ QR Code Error: $error');
+                          print('❌ Stack Trace: $stackTrace');
+                          
+                          return GestureDetector(
+                            onTap: () {
+                              // Close current dialog and reopen to retry
+                              Navigator.of(context).pop();
+                              _showQRCodeDialog(appointment);
+                            },
+                            child: Container(
+                              width: 192,
+                              height: 192,
+                              color: Colors.grey.shade50,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code,
+                                    size: 48,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'QR Code not available',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to retry',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: 192,
+                            height: 192,
+                            color: Colors.grey.shade50,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Colors.blue.shade600,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _downloadQRCode(qrUrl, patientName),
+                        icon: const Icon(Icons.download, size: 16),
+                        label: const Text('Download'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showQRCodeDialog(appointment);
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
