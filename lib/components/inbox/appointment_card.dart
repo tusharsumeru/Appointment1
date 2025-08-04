@@ -260,8 +260,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
                   ),
                   _buildActionButton(
                     icon: isStarred ? Icons.star : Icons.star_border,
-                    label: 'Star',
-                    color: isStarred ? Colors.amber : Colors.black,
+                    label: 'Starred',
+                    color: Colors.black,
+                    iconColor: isStarred ? Colors.amber : Colors.black,
+                    textColor: Colors.black,
                     onTap: () async {
                       print('🔍 Star Button - clicked for appointment: $id');
                       print('🔍 Star Button - current starred status: $isStarred');
@@ -429,6 +431,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
     required IconData icon,
     required String label,
     required Color color,
+    Color? iconColor,
+    Color? textColor,
     required VoidCallback onTap,
   }) {
     return Expanded(
@@ -439,13 +443,13 @@ class _AppointmentCardState extends State<AppointmentCard> {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             children: [
-              Icon(icon, color: color, size: 20),
+              Icon(icon, color: iconColor ?? color, size: 20),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 10,
-                  color: color,
+                  color: textColor ?? color,
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,

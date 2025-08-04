@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
 import 'user_images_screen.dart';
 import 'edit_appointment_screen.dart';
+import 'appointment_schedule_form.dart';
+import 'email_form.dart';
+import 'message_form.dart';
+import 'call_form.dart';
+import 'assign_form.dart';
+import 'star_form.dart';
+import 'reminder_form.dart';
 import '../../action/action.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AppointmentDetailPage extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final bool isFromDeletedAppointments;
+  final bool isFromScheduleScreens; // New parameter to control sections
 
   const AppointmentDetailPage({
     super.key,
     required this.appointment,
     this.isFromDeletedAppointments = false,
+    this.isFromScheduleScreens = false, // Default to false
   });
 
   @override
@@ -374,33 +384,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildFilterSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.filter_list, size: 20, color: Colors.grey[600]),
-              const SizedBox(width: 8),
-              Text(
-                'Show Match',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
+    return Row(
+      children: [
+        // Dropdown (reduced size)
+        Expanded(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -459,8 +447,53 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        // Refresh button inline with dropdown
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: InkWell(
+            onTap: _isRefreshing ? null : () => _refreshAccompanyingUsers(),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              height: 32, // Match dropdown height
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_isRefreshing) ...[
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+                      ),
+                    ),
+                  ] else ...[
+                    Icon(Icons.refresh, size: 14, color: Colors.grey[600]),
+                  ],
+                  const SizedBox(width: 6),
+                  Text(
+                    _isRefreshing ? 'Refreshing...' : 'Refresh',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1113,30 +1146,431 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Main User Information Section
             _buildMainUserSection(),
             
-            // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
-            if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
-              _buildAccompanyingUsersSection(),
+            // Action Buttons Section
+            _buildActionButtonsSection(),
+            
+            // Only show additional sections if NOT from schedule screens
+            if (!widget.isFromScheduleScreens) ...[
+              // Proper gap between Quick Actions and Accompanying Users
+              const SizedBox(height: 16),
+              
+              // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
+              if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
+                _buildAccompanyingUsersSection(),
+              ],
+              
+              // Teacher Verification Section - Only show if user is verified
+              if (_isTeacher()) ...[
+                _buildTeacherVerificationSection(),
+              ] else ...[
+                // Basic Information Section for non-verified users
+                _buildBasicInformationSection(),
+              ],
+              
+              // Appointments Overview Section
+              _buildAppointmentsOverviewSection(),
             ],
             
-            // Teacher Verification Section - Only show if user is verified
-            if (_isTeacher()) ...[
-              _buildTeacherVerificationSection(),
-            ] else ...[
-              // Basic Information Section for non-verified users
-              _buildBasicInformationSection(),
-            ],
-            
-            // Notes & Remarks Section
+            // Notes & Remarks Section - Always show
             _buildNotesRemarksSection(),
-            
-            // Appointments Overview Section
-            _buildAppointmentsOverviewSection(),
             
             const SizedBox(height: 20),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildActionButtonsSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          Row(
+            children: [
+              Icon(Icons.touch_app, size: 20, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Text(
+                'Quick Actions',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Perform quick actions for this appointment',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Action buttons - Conditional based on source
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildActionButton(
+                icon: Icons.schedule,
+                label: 'Schedule',
+                color: Colors.black,
+                onTap: () => _showActionBottomSheet(context, 'reminder'),
+              ),
+              _buildActionButton(
+                icon: Icons.email,
+                label: 'Email',
+                color: Colors.black,
+                onTap: () => _showActionBottomSheet(context, 'email'),
+              ),
+              _buildActionButton(
+                icon: Icons.message,
+                label: 'Message',
+                color: Colors.black,
+                onTap: () => _showActionBottomSheet(context, 'message'),
+              ),
+              _buildActionButton(
+                icon: Icons.call,
+                label: 'Call',
+                color: Colors.black,
+                onTap: _makePhoneCall,
+              ),
+              // Show QR button for schedule screens, Assign button for others
+              if (widget.isFromScheduleScreens) ...[
+                _buildActionButton(
+                  icon: Icons.qr_code,
+                  label: 'QR',
+                  color: Colors.black,
+                  onTap: () => _showQRCodeDialog(widget.appointment),
+                ),
+              ] else ...[
+                _buildActionButton(
+                  icon: Icons.assignment_ind,
+                  label: 'Assign',
+                  color: Colors.black,
+                  onTap: () => _showActionBottomSheet(context, 'assign'),
+                ),
+              ],
+              _buildActionButton(
+                icon: _isStarred() ? Icons.star : Icons.star_border,
+                label: 'Starred',
+                color: Colors.black,
+                iconColor: _isStarred() ? Colors.amber : Colors.black,
+                textColor: Colors.black,
+                onTap: _toggleStar,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    Color? iconColor,
+    Color? textColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Icon(icon, color: iconColor ?? color, size: 20),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: textColor ?? color,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showActionBottomSheet(BuildContext context, String action) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildActionContent(action),
+    );
+  }
+
+  Widget _buildActionContent(String action) {
+    switch (action) {
+      case 'reminder':
+        return _buildReminderContent();
+      case 'email':
+        return _buildEmailContent();
+      case 'message':
+        return _buildMessageContent();
+      case 'assign':
+        return _buildAssignContent();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildReminderContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Schedule Appointment'),
+          Expanded(
+            child: ReminderForm(
+              appointment: widget.appointment,
+              onRefresh: () {
+                // Refresh the detail page data
+                _fetchAppointmentsOverview();
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Send Email'),
+          Expanded(child: EmailForm(appointment: widget.appointment)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Send SMS'),
+          Expanded(child: MessageForm(appointment: widget.appointment)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Assign Secretary'),
+          Expanded(child: AssignForm(appointment: widget.appointment)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _makePhoneCall() async {
+    // Get the phone number from appointment data
+    final phoneNumber = _getAppointeeMobile();
+    
+    if (phoneNumber.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No phone number available for this appointment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Create the phone URL
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not launch phone app'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error making call: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getAppointeeMobile() {
+    // Try to get phone number from createdBy object
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final phone = createdBy['phone'];
+      if (phone != null) {
+        return _formatPhoneNumber(phone);
+      }
+    }
+    
+    // Fallback to other phone fields
+    final phone = widget.appointment['phone'] ?? 
+                 widget.appointment['mobile'] ?? 
+                 widget.appointment['contactNumber'];
+    
+    return _formatPhoneNumber(phone);
+  }
+
+  String _formatPhoneNumber(dynamic phoneData) {
+    if (phoneData is Map<String, dynamic>) {
+      final countryCode = phoneData['countryCode']?.toString() ?? '';
+      final number = phoneData['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        return '$countryCode $number';
+      }
+    }
+    return phoneData?.toString() ?? '';
+  }
+
+  bool _isStarred() {
+    // Check if appointment is starred
+    return widget.appointment['starred'] == true;
+  }
+
+  Future<void> _toggleStar() async {
+    try {
+      final appointmentId = _getAppointmentId();
+      if (appointmentId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Appointment ID not found'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Get current starred status
+      final currentStarredStatus = _isStarred();
+      final desiredStarredStatus = !currentStarredStatus;
+
+      // Call the star toggle API
+      final result = await ActionService.updateStarred(appointmentId, starred: desiredStarredStatus);
+      
+      if (result['success']) {
+        // Update the local appointment data
+        setState(() {
+          widget.appointment['starred'] = desiredStarredStatus;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(desiredStarredStatus ? 'Appointment starred!' : 'Appointment unstarred!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to toggle star status'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _buildMainUserSection() {
@@ -1298,56 +1732,30 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with title and refresh button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Header with title
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Accompanying Users',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Users accompanying this appointment. Click refresh to load face match data.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+              Text(
+                'Accompanying Users',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              // Refresh button
-              IconButton(
-                onPressed: _isRefreshing ? null : () => _refreshAccompanyingUsers(),
-                icon: _isRefreshing 
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
-                      ),
-                    )
-                  : const Icon(Icons.refresh),
-                tooltip: _isRefreshing ? 'Refreshing...' : 'Refresh face match data',
-                style: IconButton.styleFrom(
-                  backgroundColor: _isRefreshing ? Colors.grey[100] : Colors.blue[50],
-                  foregroundColor: _isRefreshing ? Colors.grey[400] : Colors.blue[600],
+              const SizedBox(height: 4),
+              Text(
+                'Users accompanying this appointment. Click refresh to load face match data.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
           
-          // Filter Section
+          // Filter Section with refresh button inside
           _buildFilterSection(),
           
           const SizedBox(height: 20),
@@ -2833,5 +3241,241 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ),
       );
     }
+  }
+
+  // QR Code related methods
+  void _showSnackBar(String message, {required bool isError}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red : Colors.green,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            textColor: Colors.white,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _downloadQRCode(String qrUrl, String patientName) async {
+    try {
+      _showSnackBar('Downloading QR code...', isError: false);
+      
+      // For now, we'll just show a success message
+      // In a real implementation, you would use a package like 'dio' or 'http' 
+      // to download the file and save it to the device
+      
+      await Future.delayed(const Duration(seconds: 1));
+      _showSnackBar('QR code download started for $patientName', isError: false);
+      
+    } catch (error) {
+      _showSnackBar('Failed to download QR code: $error', isError: true);
+    }
+  }
+
+  void _showQRCodeDialog(Map<String, dynamic> appointment) {
+    final appointmentId = appointment['appointmentId']?.toString();
+    if (appointmentId == null) {
+      _showSnackBar('Error: Appointment ID not found', isError: true);
+      return;
+    }
+
+    // Use the correct domain for QR codes
+    const qrBaseUrl = 'https://divinepicrecognition.sumerudigital.com';
+    final qrUrl = '$qrBaseUrl/api/v3/public/qr-codes/qr-$appointmentId.png';
+    final patientName = _getAppointmentName();
+    
+    // Debug: Print the URL to console
+    print('🔍 QR Code URL: $qrUrl');
+    print('🔍 Appointment ID: $appointmentId');
+    print('🔍 MongoDB ID: ${appointment['_id']}');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with close button
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QR Code - $patientName',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'QR code for appointment ID: $appointmentId',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade600,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // QR Code Image Container
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 192, // w-48 = 12rem = 192px
+                      height: 192, // h-48 = 12rem = 192px
+                      child: Image.network(
+                        qrUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Debug: Print the error details
+                          print('❌ QR Code Error: $error');
+                          print('❌ Stack Trace: $stackTrace');
+                          
+                          return GestureDetector(
+                            onTap: () {
+                              // Close current dialog and reopen to retry
+                              Navigator.of(context).pop();
+                              _showQRCodeDialog(appointment);
+                            },
+                            child: Container(
+                              width: 192,
+                              height: 192,
+                              color: Colors.grey.shade50,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code,
+                                    size: 48,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'QR Code not available',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to retry',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: 192,
+                            height: 192,
+                            color: Colors.grey.shade50,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Colors.blue.shade600,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _downloadQRCode(qrUrl, patientName),
+                        icon: const Icon(Icons.download, size: 16),
+                        label: const Text('Download'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showQRCodeDialog(appointment);
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 } 

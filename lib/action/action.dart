@@ -6,7 +6,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://divinepicrecognition.sumerudigital.com/api/v3'; // API base URL
+      'https://9e5a38f5b0b1.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -3256,9 +3256,8 @@ class ActionService {
           'success': true,
           'statusCode': 201,
           'data': responseData['data'],
-          'message':
-              responseData['message'] ??
-              'Quick appointment created successfully',
+          'message': responseData['message'] ?? 'Quick appointment created successfully',
+          'error': null,
         };
       } else if (response.statusCode == 400) {
         // Validation error
@@ -3266,6 +3265,7 @@ class ActionService {
           'success': false,
           'statusCode': 400,
           'message': responseData['message'] ?? 'Validation failed',
+          'data': null,
           'error': responseData['error'],
         };
       } else if (response.statusCode == 401) {
@@ -3275,6 +3275,8 @@ class ActionService {
           'success': false,
           'statusCode': 401,
           'message': 'Session expired. Please login again.',
+          'data': null,
+          'error': null,
         };
       } else {
         // Other error
@@ -3282,13 +3284,17 @@ class ActionService {
           'success': false,
           'statusCode': response.statusCode,
           'message': responseData['message'] ?? 'Failed to create appointment',
+          'data': null,
+          'error': responseData['error'],
         };
       }
     } catch (error) {
       return {
         'success': false,
         'statusCode': 500,
-        'message': 'Network error. Please check your connection and try again.',
+        'message': 'Internal server error',
+        'data': null,
+        'error': error.toString(),
       };
     }
   }

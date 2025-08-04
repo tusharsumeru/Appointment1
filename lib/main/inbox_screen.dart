@@ -61,31 +61,24 @@ class _InboxScreenState extends State<InboxScreen> {
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
         
-        // Filter out starred appointments
-        final nonStarredAppointments = appointmentsData.where((appointment) {
-          if (appointment is Map<String, dynamic>) {
-            return appointment['starred'] != true;
-          }
-          return true;
-        }).toList();
-        
-        print('🔍 Fetch - total appointments: ${appointmentsData.length}, non-starred: ${nonStarredAppointments.length}');
+        // Show all appointments including starred ones
+        print('🔍 Fetch - total appointments: ${appointmentsData.length}');
         
         if (isLoadMore) {
           // Append new data to existing list
-          if (nonStarredAppointments.isNotEmpty) {
-            _appointments.addAll(nonStarredAppointments.cast<Map<String, dynamic>>());
+          if (appointmentsData.isNotEmpty) {
+            _appointments.addAll(appointmentsData.cast<Map<String, dynamic>>());
             _currentPage++;
-            _hasMoreData = appointmentsData.length >= _pageSize; // Use original count for pagination
+            _hasMoreData = appointmentsData.length >= _pageSize;
           } else {
             _hasMoreData = false;
           }
         } else {
           // Replace existing data
-          if (nonStarredAppointments.isNotEmpty) {
-            _appointments = nonStarredAppointments.cast<Map<String, dynamic>>();
+          if (appointmentsData.isNotEmpty) {
+            _appointments = appointmentsData.cast<Map<String, dynamic>>();
             _currentPage = 1;
-            _hasMoreData = appointmentsData.length >= _pageSize; // Use original count for pagination
+            _hasMoreData = appointmentsData.length >= _pageSize;
           } else {
             _appointments = [];
             _currentPage = 1;
@@ -183,22 +176,16 @@ class _InboxScreenState extends State<InboxScreen> {
         print('🔍 Toggle Star - expected status: $expectedNewStatus, final status: $finalStatus');
         
         setState(() {
-          if (finalStatus) {
-            // If appointment is now starred, remove it from inbox
-            _appointments.removeAt(index);
-            print('🔍 Toggle Star - removed starred appointment from inbox');
-          } else {
-            // If appointment is unstarred, update the status
-            if (index < _appointments.length) {
-              _appointments[index]['starred'] = finalStatus;
-            }
+          // Update the starred status in the list (keep appointment in inbox)
+          if (index < _appointments.length) {
+            _appointments[index]['starred'] = finalStatus;
           }
         });
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(finalStatus ? 'Added to favorites' : 'Removed from favorites'),
+              content: Text(finalStatus ? 'Appointment starred!' : 'Appointment unstarred!'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),

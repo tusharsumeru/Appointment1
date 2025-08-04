@@ -15,6 +15,7 @@ class AppointmentDetailsScreen extends StatefulWidget {
 
 class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Map<String, dynamic>? appointmentData;
+  Map<String, dynamic>? detailedAppointmentData;
   bool isLoading = true;
   String? errorMessage;
   
@@ -33,8 +34,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         setState(() {
           appointmentData = result['data'];
-          isLoading = false;
         });
+        
+        // Load detailed appointment data for scheduled date, time, and venue
+        final detailedResult = await ActionService.getAppointmentByIdDetailed(widget.appointmentId);
+        if (detailedResult['success']) {
+          setState(() {
+            detailedAppointmentData = detailedResult['data'];
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+        }
       } else {
         setState(() {
           errorMessage = result['message'];
@@ -146,6 +159,52 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'Invalid date';
+    }
+  }
+
+  String _formatScheduledDate() {
+    if (detailedAppointmentData == null || detailedAppointmentData!['scheduledDateTime'] == null) return 'N/A';
+    
+    try {
+      final scheduledData = detailedAppointmentData!['scheduledDateTime'] as Map<String, dynamic>;
+      final dateStr = scheduledData['date'];
+      
+      if (dateStr == null) return 'N/A';
+      
+      final date = DateTime.parse(dateStr);
+      final months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  String _formatScheduledTime() {
+    if (detailedAppointmentData == null || detailedAppointmentData!['scheduledDateTime'] == null) return 'N/A';
+    
+    try {
+      final scheduledData = detailedAppointmentData!['scheduledDateTime'] as Map<String, dynamic>;
+      final timeStr = scheduledData['time'];
+      
+      return timeStr ?? 'N/A';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  String _getScheduledVenue() {
+    if (detailedAppointmentData == null || detailedAppointmentData!['scheduledDateTime'] == null) return 'N/A';
+    
+    try {
+      final scheduledData = detailedAppointmentData!['scheduledDateTime'] as Map<String, dynamic>;
+      final venueLabel = scheduledData['venueLabel'];
+      
+      return venueLabel ?? 'N/A';
+    } catch (e) {
+      return 'N/A';
     }
   }
 
@@ -815,7 +874,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Appointment ID Card with Main Status
+                      // Appointment ID Card with Scheduled Details
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -868,16 +927,50 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                       Row(
                                         children: [
                                           Icon(
-                                            _getMainStatusIcon(),
+                                            Icons.calendar_today,
                                             color: Colors.white,
                                             size: 16,
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'Status: ${_getMainStatusText()}',
+                                            _formatScheduledDate(),
                                             style: TextStyle(
                                               color: Colors.white.withOpacity(0.9),
-                                              fontSize: 14,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Icon(
+                                            Icons.access_time,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _formatScheduledTime(),
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.location_on,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _getScheduledVenue(),
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: 16,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),

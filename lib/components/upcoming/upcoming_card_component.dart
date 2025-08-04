@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import '../../action/action.dart';
 import '../inbox/appointment_detail_page.dart';
 
-class TodayCardComponent extends StatefulWidget {
+class UpcomingCardComponent extends StatefulWidget {
+  final DateTime selectedDate;
   final VoidCallback? onRefresh;
 
-  const TodayCardComponent({super.key, this.onRefresh});
+  const UpcomingCardComponent({
+    super.key, 
+    required this.selectedDate,
+    this.onRefresh,
+  });
 
   @override
-  State<TodayCardComponent> createState() => _TodayCardComponentState();
+  State<UpcomingCardComponent> createState() => _UpcomingCardComponentState();
 }
 
-class _TodayCardComponentState extends State<TodayCardComponent> {
-  List<Map<String, dynamic>> _todayAppointments = [];
+class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
+  List<Map<String, dynamic>> _upcomingAppointments = [];
   bool _isLoading = false;
   String? _error;
   Set<String> _expandedCategories = {};
@@ -66,21 +71,29 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
   @override
   void initState() {
     super.initState();
-    _fetchTodayAppointments();
+    _fetchUpcomingAppointments();
   }
 
-  Future<void> _fetchTodayAppointments() async {
+  @override
+  void didUpdateWidget(UpcomingCardComponent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedDate != widget.selectedDate) {
+      _fetchUpcomingAppointments();
+    }
+  }
+
+  Future<void> _fetchUpcomingAppointments() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      final todayString = ActionService.formatDateForAPI(DateTime.now());
+      // Get selected date in YYYY-MM-DD format
+      final dateString = ActionService.formatDateForAPI(widget.selectedDate);
 
       final result = await ActionService.getAppointmentsByScheduledDate(
-        date: todayString,
+        date: dateString,
       );
 
       if (result['success']) {
@@ -95,18 +108,18 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
             return timeA.compareTo(timeB);
           });
 
-          _todayAppointments = sortedAppointments;
+          _upcomingAppointments = sortedAppointments;
         } else {
-          _todayAppointments = [];
+          _upcomingAppointments = [];
         }
         _error = null;
       } else {
-        _error = result['message'] ?? 'Failed to fetch today\'s appointments';
-        _todayAppointments = [];
+        _error = result['message'] ?? 'Failed to fetch upcoming appointments';
+        _upcomingAppointments = [];
       }
     } catch (e) {
       _error = 'Network error: $e';
-      _todayAppointments = [];
+      _upcomingAppointments = [];
     } finally {
       setState(() {
         _isLoading = false;
@@ -116,18 +129,18 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
   // Public method to refresh data
   Future<void> refresh() async {
-    await _fetchTodayAppointments();
+    await _fetchUpcomingAppointments();
     widget.onRefresh?.call();
   }
 
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
-    if (_todayAppointments.isEmpty) return [];
+    if (_upcomingAppointments.isEmpty) return [];
 
     switch (categoryKey) {
       case 'morning':
       case 'evening':
       case 'night':
-        return _todayAppointments.where((appointment) {
+        return _upcomingAppointments.where((appointment) {
           // First check if appointment is completed/done - if so, exclude it
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -207,7 +220,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'tbs_req':
-        return _todayAppointments.where((appointment) {
+        return _upcomingAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           // Exclude completed/done appointments from TBS/Req category
           if (status == 'completed' || status == 'done') {
@@ -235,14 +248,14 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'done':
-        return _todayAppointments.where((appointment) {
+        return _upcomingAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           final isDone = status == 'completed' || status == 'done';
           return isDone;
         }).toList();
 
       case 'satsang_backstage':
-        return _todayAppointments.where((appointment) {
+        return _upcomingAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -273,7 +286,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         }).toList();
 
       case 'gurukul':
-        return _todayAppointments.where((appointment) {
+        return _upcomingAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -396,7 +409,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchTodayAppointments,
+              onPressed: _fetchUpcomingAppointments,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
                 foregroundColor: Colors.white,
@@ -409,7 +422,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchTodayAppointments,
+      onRefresh: _fetchUpcomingAppointments,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -430,21 +443,24 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.today, color: Colors.deepPurple, size: 20),
+                      Icon(Icons.event, color: Colors.deepPurple, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        'Today\'s Summary',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
+                      Expanded(
+                        child: Text(
+                          'Upcoming Summary',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepPurple,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Total Appointments: ${_todayAppointments.length}',
+                    'Total Appointments: ${_upcomingAppointments.length}',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -735,6 +751,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                                 color: Colors.black87,
                                 letterSpacing: 0.5,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -746,6 +763,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                                 color: Colors.grey.shade600,
                                 fontWeight: FontWeight.w400,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -771,14 +789,17 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          Text(
-                            _getStatusText(
-                              _getAppointmentStatus(appointment),
-                            ).toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade600,
+                          Expanded(
+                            child: Text(
+                              _getStatusText(
+                                _getAppointmentStatus(appointment),
+                              ).toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -797,12 +818,15 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          Text(
-                            _getAppointmentTime(appointment),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                          Expanded(
+                            child: Text(
+                              _getAppointmentTime(appointment),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -838,7 +862,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                       Row(
                         children: [
                           Text(
-                            'Accompany User: ',
+                            'Accompany: ',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
@@ -1127,18 +1151,18 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
         // Update the local appointment data immediately
         setState(() {
-          final index = _todayAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          final index = _upcomingAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
           if (index != -1) {
             // Update the appointment status to 'completed' (prioritize appointmentStatus.status)
-            if (_todayAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
-              _todayAppointments[index]['appointmentStatus']['status'] = 'completed';
+            if (_upcomingAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _upcomingAppointments[index]['appointmentStatus']['status'] = 'completed';
             }
             // Also update checkInStatus if it exists (fallback)
-            if (_todayAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
-              _todayAppointments[index]['checkInStatus']['mainStatus'] = 'completed';
+            if (_upcomingAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _upcomingAppointments[index]['checkInStatus']['mainStatus'] = 'completed';
             }
             // Update direct mainStatus field as well (fallback)
-            _todayAppointments[index]['mainStatus'] = 'completed';
+            _upcomingAppointments[index]['mainStatus'] = 'completed';
           }
         });
 
@@ -1146,7 +1170,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
-        await _fetchTodayAppointments();
+        await _fetchUpcomingAppointments();
       } else {
         // Error - show error message
         _showSnackBar(
@@ -1253,18 +1277,18 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
 
         // Update the local appointment data immediately
         setState(() {
-          final index = _todayAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          final index = _upcomingAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
           if (index != -1) {
             // Update the appointment status back to 'not_arrived' (prioritize appointmentStatus.status)
-            if (_todayAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
-              _todayAppointments[index]['appointmentStatus']['status'] = 'not_arrived';
+            if (_upcomingAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
+              _upcomingAppointments[index]['appointmentStatus']['status'] = 'not_arrived';
             }
             // Also update checkInStatus if it exists (fallback)
-            if (_todayAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
-              _todayAppointments[index]['checkInStatus']['mainStatus'] = 'not_arrived';
+            if (_upcomingAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
+              _upcomingAppointments[index]['checkInStatus']['mainStatus'] = 'not_arrived';
             }
             // Update direct mainStatus field as well (fallback)
-            _todayAppointments[index]['mainStatus'] = 'not_arrived';
+            _upcomingAppointments[index]['mainStatus'] = 'not_arrived';
           }
         });
 
@@ -1272,7 +1296,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         await Future.delayed(const Duration(milliseconds: 500));
 
         // Refresh the appointments list
-        await _fetchTodayAppointments();
+        await _fetchUpcomingAppointments();
       } else {
         // Error - show error message
         _showSnackBar(

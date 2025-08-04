@@ -4,10 +4,7 @@ import '../../action/action.dart';
 class MessageForm extends StatefulWidget {
   final Map<String, dynamic> appointment;
 
-  const MessageForm({
-    super.key,
-    required this.appointment,
-  });
+  const MessageForm({super.key, required this.appointment});
 
   @override
   State<MessageForm> createState() => _MessageFormState();
@@ -16,8 +13,9 @@ class MessageForm extends StatefulWidget {
 class _MessageFormState extends State<MessageForm> {
   final TextEditingController _otherSmsController = TextEditingController();
   final TextEditingController _smsContentController = TextEditingController();
-  final TextEditingController _templateDisplayController = TextEditingController();
-  
+  final TextEditingController _templateDisplayController =
+      TextEditingController();
+
   // State variables for appointment data
   late Map<String, dynamic> _appointmentData;
   late String _firstName;
@@ -32,12 +30,12 @@ class _MessageFormState extends State<MessageForm> {
   late String _designation;
   late String _appointeeMobile;
   late String _referenceMobile;
-  
+
   bool _appointeeMobileChecked = false;
   bool _referenceMobileChecked = false;
   String? _selectedTemplate;
   bool _isLoading = false;
-  
+
   List<Map<String, dynamic>> smsTemplates = [];
   List<String> smsTemplateNames = [];
 
@@ -51,7 +49,7 @@ class _MessageFormState extends State<MessageForm> {
   void _initializeAppointmentData() {
     // Store appointment data in local state for easy access
     _appointmentData = widget.appointment;
-    
+
     // Extract and store all relevant data
     _firstName = _extractFirstName();
     _fullName = _extractFullName();
@@ -65,11 +63,11 @@ class _MessageFormState extends State<MessageForm> {
     _designation = _extractDesignation();
     _appointeeMobile = _extractAppointeeMobile();
     _referenceMobile = _extractReferenceMobile();
-    
+
     // Set default values - unchecked by default
     _appointeeMobileChecked = false;
     _referenceMobileChecked = false;
-    
+
     // Set default SMS content
     _smsContentController.text = _getDefaultSmsContent();
   }
@@ -90,25 +88,26 @@ class _MessageFormState extends State<MessageForm> {
   String _extractFullName() {
     // Try userFullName first (from the actual data structure)
     final userFullName = _appointmentData['userFullName']?.toString();
-    
+
     if (userFullName != null && userFullName.isNotEmpty) {
       return userFullName;
     }
-    
+
     // Fallback to createdBy.fullName
     final createdBy = _appointmentData['createdBy'];
-    
+
     if (createdBy is Map<String, dynamic>) {
       final createdByFullName = createdBy['fullName']?.toString() ?? '';
       return createdByFullName;
     }
-    
+
     return '';
   }
 
   String _extractAppointmentId() {
-    return _appointmentData['appointmentId']?.toString() ?? 
-           _appointmentData['_id']?.toString() ?? '';
+    return _appointmentData['appointmentId']?.toString() ??
+        _appointmentData['_id']?.toString() ??
+        '';
   }
 
   String _extractLocation() {
@@ -164,10 +163,16 @@ class _MessageFormState extends State<MessageForm> {
       final countryCode = phoneNumber['countryCode']?.toString() ?? '';
       final number = phoneNumber['number']?.toString() ?? '';
       if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode$number';
+        // Remove country code (+91) and return only the number
+        return number;
       }
     }
-    return phoneNumber?.toString() ?? '';
+    // If it's a string, try to remove +91 if present
+    final phoneString = phoneNumber?.toString() ?? '';
+    if (phoneString.startsWith('+91')) {
+      return phoneString.substring(3); // Remove +91
+    }
+    return phoneString;
   }
 
   String _extractReferenceMobile() {
@@ -178,10 +183,16 @@ class _MessageFormState extends State<MessageForm> {
         final countryCode = phoneNumber['countryCode']?.toString() ?? '';
         final number = phoneNumber['number']?.toString() ?? '';
         if (countryCode.isNotEmpty && number.isNotEmpty) {
-          return '$countryCode$number';
+          // Remove country code (+91) and return only the number
+          return number;
         }
       }
-      return phoneNumber?.toString() ?? '';
+      // If it's a string, try to remove +91 if present
+      final phoneString = phoneNumber?.toString() ?? '';
+      if (phoneString.startsWith('+91')) {
+        return phoneString.substring(3); // Remove +91
+      }
+      return phoneString;
     }
     return '';
   }
@@ -254,15 +265,18 @@ class _MessageFormState extends State<MessageForm> {
   void _insertAppointmentDataIntoMessage() {
     final currentText = _smsContentController.text;
     final cursorPosition = _smsContentController.selection.baseOffset;
-    
+
     // Example: Insert appointment ID at cursor position
-    final newText = currentText.substring(0, cursorPosition) + 
-                   'Appointment ID: $appointmentId' + 
-                   currentText.substring(cursorPosition);
-    
+    final newText =
+        currentText.substring(0, cursorPosition) +
+        'Appointment ID: $appointmentId' +
+        currentText.substring(cursorPosition);
+
     _smsContentController.text = newText;
     _smsContentController.selection = TextSelection.fromPosition(
-      TextPosition(offset: cursorPosition + 'Appointment ID: $appointmentId'.length),
+      TextPosition(
+        offset: cursorPosition + 'Appointment ID: $appointmentId'.length,
+      ),
     );
   }
 
@@ -292,17 +306,21 @@ Appointment Details:
 
     try {
       final result = await ActionService.getAllSmsTemplates(isActive: true);
-      
+
       if (result['success']) {
         final templates = result['data'] as List<dynamic>;
         setState(() {
           smsTemplates = templates.cast<Map<String, dynamic>>();
-          smsTemplateNames = templates.map((template) => template['name']?.toString() ?? '').toList();
-          
+          smsTemplateNames = templates
+              .map((template) => template['name']?.toString() ?? '')
+              .toList();
+
           // Select the first template by default if available
           if (smsTemplateNames.isNotEmpty) {
             _selectedTemplate = smsTemplateNames.first;
-            _smsContentController.text = _getTemplateContent(_selectedTemplate!);
+            _smsContentController.text = _getTemplateContent(
+              _selectedTemplate!,
+            );
           }
         });
       } else {
@@ -342,12 +360,12 @@ Appointment Details:
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           child: Container(
             width: MediaQuery.of(context).size.width * 0.95, // Made even wider
-            height: MediaQuery.of(context).size.height * 0.6, // Made more rectangular
+            height:
+                MediaQuery.of(context).size.height *
+                0.6, // Made more rectangular
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,39 +405,49 @@ Appointment Details:
                       itemBuilder: (context, index) {
                         final template = smsTemplateNames[index];
                         final isSelected = template == _selectedTemplate;
-                        
+
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.blue.shade50 : Colors.white,
+                            color: isSelected
+                                ? Colors.blue.shade50
+                                : Colors.white,
                             border: Border.all(
-                              color: isSelected ? Colors.blue.shade300 : Colors.grey.shade300,
+                              color: isSelected
+                                  ? Colors.blue.shade300
+                                  : Colors.grey.shade300,
                               width: 2,
                             ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
                             title: Text(
                               template,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                                 color: Colors.grey.shade800,
                               ),
                             ),
-                            trailing: isSelected 
-                              ? Icon(
-                                  Icons.check_circle,
-                                  color: Colors.blue.shade700,
-                                  size: 24,
-                                )
-                              : null,
+                            trailing: isSelected
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color: Colors.blue.shade700,
+                                    size: 24,
+                                  )
+                                : null,
                             onTap: () {
                               setState(() {
                                 _selectedTemplate = template;
                                 _templateDisplayController.text = template;
-                                _smsContentController.text = _getTemplateContent(template);
+                                _smsContentController.text =
+                                    _getTemplateContent(template);
                               });
                               Navigator.of(context).pop();
                             },
@@ -476,17 +504,17 @@ Appointment Details:
 
     String replacer(Match match) {
       final key = match.group(1) ?? '';
-      
+
       // Handle all $ prefixed placeholders (same as regular placeholders)
       if (key.startsWith(r'$')) {
         final normalizedKey = key.substring(1); // Remove the $ prefix
         final value = placeholderMap[normalizedKey];
         return value ?? match.group(0)!;
       }
-      
+
       // Handle regular placeholders (without $)
       final value = placeholderMap[key];
-      
+
       return value ?? match.group(0)!;
     }
 
@@ -496,10 +524,14 @@ Appointment Details:
 
   Future<void> _sendSms() async {
     // Validate inputs
-    if (!_appointeeMobileChecked && !_referenceMobileChecked && _otherSmsController.text.isEmpty) {
+    if (!_appointeeMobileChecked &&
+        !_referenceMobileChecked &&
+        _otherSmsController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one mobile number or enter other SMS numbers'),
+          content: Text(
+            'Please select at least one mobile number or enter other SMS numbers',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -553,7 +585,9 @@ Appointment Details:
         referenceMobile: _referenceMobile,
         useAppointee: _appointeeMobileChecked,
         useReference: _referenceMobileChecked,
-        otherSms: _otherSmsController.text.trim().isNotEmpty ? _otherSmsController.text.trim() : null,
+        otherSms: _otherSmsController.text.trim().isNotEmpty
+            ? _otherSmsController.text.trim()
+            : null,
         selectedTemplateId: selectedTemplateId,
         smsContent: _smsContentController.text.trim(),
         templateData: templateData,
@@ -569,7 +603,7 @@ Appointment Details:
             ),
           );
         }
-        
+
         // Close the form
         if (mounted) {
           Navigator.pop(context);
@@ -617,7 +651,7 @@ Appointment Details:
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          
+
           // Appointee Mobile
           Row(
             children: [
@@ -637,7 +671,7 @@ Appointment Details:
               ),
             ],
           ),
-          
+
           // Reference Mobile
           Row(
             children: [
@@ -657,9 +691,9 @@ Appointment Details:
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Other SMS Numbers
           const Text(
             'Other SMS Numbers:',
@@ -679,9 +713,9 @@ Appointment Details:
             'Note: Please add comma-separated mobile numbers with country code',
             style: TextStyle(fontSize: 12, color: Colors.red),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // SMS Template
           const Text(
             'SMS Template:',
@@ -717,9 +751,9 @@ Appointment Details:
                 suffixIcon: Icon(Icons.arrow_drop_down),
               ),
             ),
-          
+
           const SizedBox(height: 16),
-          
+
           // SMS Content
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -735,7 +769,8 @@ Appointment Details:
             controller: _smsContentController,
             maxLines: 6,
             decoration: const InputDecoration(
-              hintText: 'SMS content will appear here when you select a template, or you can type your own message. Use {firstname}, {appointmentId}, etc. as placeholders.',
+              hintText:
+                  'SMS content will appear here when you select a template, or you can type your own message. Use {firstname}, {appointmentId}, etc. as placeholders.',
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.all(12),
             ),
@@ -745,11 +780,9 @@ Appointment Details:
             'Available placeholders: {firstname}, {fullname}, {appointmentId}, {AID}, {people}, {ji}, {location}, {scheduledDate}, {scheduledTime}, {referenceName}, {secretaryName}, {company}, {designation}',
             style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
-          
 
-          
           const SizedBox(height: 24),
-          
+
           // Action buttons
           Row(
             children: [
@@ -773,21 +806,23 @@ Appointment Details:
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: _isLoading 
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text('Send'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text('Send'),
                 ),
               ),
             ],
           ),
-          
+
           // Add some bottom padding to prevent overflow
           const SizedBox(height: 16),
         ],
@@ -802,4 +837,4 @@ Appointment Details:
     _templateDisplayController.dispose();
     super.dispose();
   }
-} 
+}
