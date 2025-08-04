@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/appointment_card.dart';
+import '../components/inbox/filter_bottom_sheet.dart';
 import '../action/action.dart';
 
 class StarredScreen extends StatefulWidget {
@@ -19,11 +20,17 @@ class _StarredScreenState extends State<StarredScreen> {
   int _currentPage = 1;
   bool _hasMoreAppointments = true;
   bool _isLoadingMore = false;
+  
+  // Filter state
+  String _selectedFilter = 'All Starred';
+  List<Map<String, dynamic>> _secretaries = [];
+  bool _isLoadingSecretaries = false;
 
   @override
   void initState() {
     super.initState();
     _fetchAppointments();
+    _fetchSecretaries();
   }
 
   Future<void> _fetchAppointments() async {
@@ -35,6 +42,7 @@ class _StarredScreenState extends State<StarredScreen> {
     try {
       final result = await ActionService.getAppointmentsForSecretary(
         starred: true,
+        assignedSecretary: _getFilterValueForAPI(),
       );
       
       if (result['success']) {
@@ -73,6 +81,7 @@ class _StarredScreenState extends State<StarredScreen> {
         starred: true,
         page: nextPage,
         limit: 10,
+        assignedSecretary: _getFilterValueForAPI(),
       );
       
       if (result['success']) {
@@ -147,6 +156,94 @@ class _StarredScreenState extends State<StarredScreen> {
     setState(() {
       _appointments.removeWhere((appointment) => appointment['_id'] == appointmentId);
     });
+  }
+
+  Future<void> _fetchSecretaries() async {
+    print('🔍 _fetchSecretaries() called');
+    setState(() {
+      _isLoadingSecretaries = true;
+    });
+
+    try {
+      final result = await ActionService.getAllSecretaries(
+        limit: 4,
+        isActive: true,
+      );
+
+      print('🔍 Secretaries API result: $result');
+
+      if (result['success']) {
+        final data = result['data'];
+        print('🔍 Secretaries data: $data');
+        
+        if (data != null && data['secretaries'] != null) {
+          final List<dynamic> secretariesData = data['secretaries'];
+          print('🔍 Secretaries list: $secretariesData');
+          
+          setState(() {
+            _secretaries = secretariesData.cast<Map<String, dynamic>>();
+          });
+          
+          print('🔍 Final secretaries list: $_secretaries');
+          print('🔍 Secretaries count: ${_secretaries.length}');
+        } else {
+          print('🔍 No secretaries data found in response');
+        }
+      } else {
+        print('🔍 Secretaries API call failed: ${result['message']}');
+      }
+    } catch (e) {
+      print('❌ Error fetching secretaries: $e');
+    } finally {
+      setState(() {
+        _isLoadingSecretaries = false;
+      });
+      print('🔍 _isLoadingSecretaries set to false');
+    }
+  }
+
+  void _showFilterBottomSheet() {
+    print('🔍 _showFilterBottomSheet() called');
+    print('🔍 Current secretaries count: ${_secretaries.length}');
+    print('🔍 Current secretaries: $_secretaries');
+    print('🔍 _isLoadingSecretaries: $_isLoadingSecretaries');
+    
+    // Pre-load secretaries if not already loaded
+    if (_secretaries.isEmpty && !_isLoadingSecretaries) {
+      print('🔍 Fetching secretaries before showing bottom sheet');
+      _fetchSecretaries();
+    }
+
+    print('🔍 Showing bottom sheet with secretaries: $_secretaries');
+    
+    showFilterBottomSheetForStarred(
+      context: context,
+      secretaries: _secretaries,
+      selectedFilter: _selectedFilter,
+      onFilterSelected: (String filter) {
+        print('🔍 Filter selected: $filter');
+        setState(() {
+          _selectedFilter = filter;
+          _currentPage = 1;
+          _hasMoreAppointments = true;
+        });
+        _fetchAppointments();
+      },
+    );
+  }
+
+  String? _getFilterValueForAPI() {
+    switch (_selectedFilter) {
+      case 'All Starred':
+        return null; // No filter needed
+      default:
+        final secretary = _secretaries.firstWhere(
+          (secretary) => secretary['fullName'] == _selectedFilter,
+          orElse: () => {},
+        );
+        final secretaryId = secretary['_id']?.toString();
+        return secretaryId; // Return secretary ID for assignedSecretary parameter
+    }
   }
 
   Widget _buildLoadMoreButton() {
@@ -316,41 +413,55 @@ class _StarredScreenState extends State<StarredScreen> {
                       color: Colors.white,
                       child: Row(
                         children: [
-                          // Filter dropdown button
-                          Container(
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: Colors.grey[200]!),
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Filter',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.keyboard_arrow_down,
-                                  size: 16,
-                                  color: Colors.grey[500],
-                                ),
-                              ],
-                            ),
-                          ),
+                                                     // Filter dropdown button
+                           GestureDetector(
+                             onTap: _isLoadingSecretaries ? null : _showFilterBottomSheet,
+                             child: Container(
+                               height: 36,
+                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                               decoration: BoxDecoration(
+                                 color: Colors.white,
+                                 border: Border.all(color: Colors.grey[200]!),
+                                 borderRadius: BorderRadius.circular(8),
+                                 boxShadow: [
+                                   BoxShadow(
+                                     color: Colors.black.withOpacity(0.05),
+                                     blurRadius: 2,
+                                     offset: const Offset(0, 1),
+                                   ),
+                                 ],
+                               ),
+                               child: Row(
+                                 mainAxisSize: MainAxisSize.min,
+                                 children: [
+                                   if (_isLoadingSecretaries) ...[
+                                     const SizedBox(
+                                       width: 16,
+                                       height: 16,
+                                       child: CircularProgressIndicator(
+                                         strokeWidth: 2,
+                                         valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                       ),
+                                     ),
+                                     const SizedBox(width: 8),
+                                   ],
+                                   Text(
+                                     _isLoadingSecretaries ? 'Loading...' : _selectedFilter,
+                                     style: TextStyle(
+                                       fontSize: 16,
+                                       color: _isLoadingSecretaries ? Colors.grey[500] : Colors.grey[700],
+                                     ),
+                                   ),
+                                   const SizedBox(width: 8),
+                                   Icon(
+                                     Icons.keyboard_arrow_down,
+                                     size: 16,
+                                     color: _isLoadingSecretaries ? Colors.grey[400] : Colors.grey[500],
+                                   ),
+                                 ],
+                               ),
+                             ),
+                           ),
                           const Spacer(),
                           // Refresh button
                           InkWell(

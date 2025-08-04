@@ -3,6 +3,7 @@ import '../action/action.dart';
 import '../components/inbox/appointment_card.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/appointment_detail_page.dart';
+import '../components/inbox/filter_bottom_sheet.dart';
 
 
 class DeletedAppointmentsScreen extends StatefulWidget {
@@ -25,7 +26,10 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
   bool _hasNextPage = false;
   bool _hasPrevPage = false;
   
-
+  // Filter state
+  String _selectedFilter = 'All Deleted';
+  List<Map<String, dynamic>> _secretaries = [];
+  bool _isLoadingSecretaries = false;
   
   // Scroll controller for pagination
   final ScrollController _scrollController = ScrollController();
@@ -34,6 +38,7 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
   void initState() {
     super.initState();
     _loadDeletedAppointments();
+    _fetchSecretaries();
     
     // Add scroll listener for pagination
     _scrollController.addListener(_onScroll);
@@ -70,6 +75,7 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
       final result = await ActionService.getDeletedAppointments(
         page: _currentPage,
         limit: 10,
+        assignedSecretary: _getFilterValueForAPI(),
       );
 
       if (result['success']) {
@@ -134,6 +140,94 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
       setState(() {
         _isLoadingMore = false;
       });
+    }
+  }
+
+  Future<void> _fetchSecretaries() async {
+    print('🔍 _fetchSecretaries() called');
+    setState(() {
+      _isLoadingSecretaries = true;
+    });
+
+    try {
+      final result = await ActionService.getAllSecretaries(
+        limit: 4,
+        isActive: true,
+      );
+
+      print('🔍 Secretaries API result: $result');
+
+      if (result['success']) {
+        final data = result['data'];
+        print('🔍 Secretaries data: $data');
+        
+        if (data != null && data['secretaries'] != null) {
+          final List<dynamic> secretariesData = data['secretaries'];
+          print('🔍 Secretaries list: $secretariesData');
+          
+          setState(() {
+            _secretaries = secretariesData.cast<Map<String, dynamic>>();
+          });
+          
+          print('🔍 Final secretaries list: $_secretaries');
+          print('🔍 Secretaries count: ${_secretaries.length}');
+        } else {
+          print('🔍 No secretaries data found in response');
+        }
+      } else {
+        print('🔍 Secretaries API call failed: ${result['message']}');
+      }
+    } catch (e) {
+      print('❌ Error fetching secretaries: $e');
+    } finally {
+      setState(() {
+        _isLoadingSecretaries = false;
+      });
+      print('🔍 _isLoadingSecretaries set to false');
+    }
+  }
+
+  void _showFilterBottomSheet() {
+    print('🔍 _showFilterBottomSheet() called');
+    print('🔍 Current secretaries count: ${_secretaries.length}');
+    print('🔍 Current secretaries: $_secretaries');
+    print('🔍 _isLoadingSecretaries: $_isLoadingSecretaries');
+    
+    // Pre-load secretaries if not already loaded
+    if (_secretaries.isEmpty && !_isLoadingSecretaries) {
+      print('🔍 Fetching secretaries before showing bottom sheet');
+      _fetchSecretaries();
+    }
+
+    print('🔍 Showing bottom sheet with secretaries: $_secretaries');
+    
+    showFilterBottomSheetForDeleted(
+      context: context,
+      secretaries: _secretaries,
+      selectedFilter: _selectedFilter,
+      onFilterSelected: (String filter) {
+        print('🔍 Filter selected: $filter');
+        setState(() {
+          _selectedFilter = filter;
+          _currentPage = 1;
+          _appointments.clear();
+        });
+        _loadDeletedAppointments(refresh: true);
+      },
+    );
+  }
+
+  String? _getFilterValueForAPI() {
+    switch (_selectedFilter) {
+      case 'All Deleted':
+        return null; // No filter needed
+      default:
+        final secretary = _secretaries.firstWhere(
+          (secretary) => secretary['fullName'] == _selectedFilter,
+          orElse: () => {},
+        );
+        final secretaryId = secretary['_id']?.toString();
+        return secretaryId; // Return secretary ID for assignedSecretary parameter
     }
   }
 
@@ -279,38 +373,52 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
             child: Row(
               children: [
                 // Filter dropdown button
-                Container(
-                  height: 36,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey[200]!),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Filter',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
+                GestureDetector(
+                  onTap: _isLoadingSecretaries ? null : _showFilterBottomSheet,
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.grey[200]!),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: Colors.grey[500],
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isLoadingSecretaries) ...[
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          _isLoadingSecretaries ? 'Loading...' : _selectedFilter,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _isLoadingSecretaries ? Colors.grey[500] : Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 16,
+                          color: _isLoadingSecretaries ? Colors.grey[400] : Colors.grey[500],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const Spacer(),

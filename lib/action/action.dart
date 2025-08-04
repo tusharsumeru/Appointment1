@@ -3540,6 +3540,7 @@ class ActionService {
     String? startDate,
     String? endDate,
     String? deletedBy,
+    String? assignedSecretary,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -3576,6 +3577,9 @@ class ActionService {
       }
       if (deletedBy != null && deletedBy.isNotEmpty) {
         queryParams['deletedBy'] = deletedBy;
+      }
+      if (assignedSecretary != null && assignedSecretary.isNotEmpty) {
+        queryParams['assignedSecretary'] = assignedSecretary;
       }
 
       // Build URI with query parameters
