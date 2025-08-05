@@ -1218,7 +1218,8 @@ class ActionService {
       }
 
       // Make API call to fetch both regular and quick appointments
-      final url = '$baseUrl/appointment/scheduled/date?date=$date&includeQuick=true';
+      final url =
+          '$baseUrl/appointment/scheduled/date?date=$date&includeQuick=true';
       print('🌐 Making API call to: $url');
 
       final response = await http.get(
@@ -1253,7 +1254,8 @@ class ActionService {
           'statusCode': 200,
           'data': appointments,
           'message':
-              responseData['message'] ?? 'Appointments and quick appointments fetched successfully',
+              responseData['message'] ??
+              'Appointments and quick appointments fetched successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -2714,7 +2716,7 @@ class ActionService {
       print('📱 SMS - Reference Mobile: $referenceMobile');
       print('📱 SMS - Use Appointee: $useAppointee');
       print('📱 SMS - Use Reference: $useReference');
-      
+
       // Prepare request body
       final Map<String, dynamic> requestBody = {
         'useAppointee': useAppointee,
@@ -3111,6 +3113,10 @@ class ActionService {
     bool useReference = true,
     String? otherEmail,
     String? appointmentId, // 👈 Added appointmentId parameter
+    String? rescheduleDate,
+    String? rescheduleTime,
+    String? rescheduleVenue,
+    String? rescheduleVenueName,
   }) async {
     final Uri url = Uri.parse('$baseUrl/appointment/send-email');
 
@@ -3128,6 +3134,11 @@ class ActionService {
       if (appointmentId != null)
         'appointmentId':
             appointmentId, // 👈 Added appointmentId to request body
+      if (rescheduleDate != null) 'rescheduleDate': rescheduleDate,
+      if (rescheduleTime != null) 'rescheduleTime': rescheduleTime,
+      if (rescheduleVenue != null) 'rescheduleVenue': rescheduleVenue,
+      if (rescheduleVenueName != null)
+        'rescheduleVenueName': rescheduleVenueName,
       'templateData': templateData ?? {}, // 👈 Ensure it's always an object
     };
 
