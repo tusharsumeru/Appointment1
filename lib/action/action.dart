@@ -6,7 +6,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://538bc59547d2.ngrok-free.app/api/v3'; // API base URL
+      'https://356285be06b5.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -3092,6 +3092,7 @@ class ActionService {
     bool useAppointee = true,
     bool useReference = true,
     String? otherEmail,
+    String? appointmentId, // 👈 Added appointmentId parameter
   }) async {
     final Uri url = Uri.parse('$baseUrl/appointment/send-email');
 
@@ -3106,6 +3107,7 @@ class ActionService {
       'useAppointee': useAppointee,
       'useReference': useReference,
       if (otherEmail != null) 'otherEmail': otherEmail,
+      if (appointmentId != null) 'appointmentId': appointmentId, // 👈 Added appointmentId to request body
       'templateData': templateData ?? {}, // 👈 Ensure it's always an object
     };
 

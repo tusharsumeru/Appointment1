@@ -132,36 +132,19 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   String _getAppointmentName() {
-    print('🔍 _getAppointmentName() called');
-    print('🔍 Appointment data: ${widget.appointment}');
-    
-    // Try to get name from statusInfo first (most accurate)
-    final statusInfo = widget.appointment['statusInfo'];
-    print('🔍 statusInfo: $statusInfo');
-    
-    if (statusInfo is Map<String, dynamic>) {
-      final statusHistory = statusInfo['statusHistory'] as List<dynamic>?;
-      print('🔍 statusHistory: $statusHistory');
-      
-      if (statusHistory != null && statusHistory.isNotEmpty) {
-        final lastStatus = statusHistory.last;
-        print('🔍 lastStatus: $lastStatus');
-        
-        if (lastStatus is Map<String, dynamic>) {
-          final changedBy = lastStatus['changedBy'];
-          print('🔍 changedBy: $changedBy');
-          
-          if (changedBy is Map<String, dynamic>) {
-            final fullName = changedBy['fullName']?.toString();
-            print('🔍 fullName from changedBy: $fullName');
-            
-            if (fullName != null && fullName.isNotEmpty) {
-              print('✅ Using fullName from changedBy: $fullName');
-              return fullName;
-            }
-          }
-        }
+    // Use createdBy.fullName to match backend logic exactly
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final createdByFullName = createdBy['fullName']?.toString();
+      if (createdByFullName != null && createdByFullName.isNotEmpty) {
+        return createdByFullName;
       }
+    }
+    
+    // If createdBy.fullName is not available, use userFullName as fallback
+    final userFullName = widget.appointment['userFullName']?.toString();
+    if (userFullName != null && userFullName.isNotEmpty) {
+      return userFullName;
     }
     
     // Try multiple possible fields for the name
@@ -171,16 +154,7 @@ class _EmailFormState extends State<EmailForm> {
     final userCurrentDesignation = widget.appointment['userCurrentDesignation']?.toString();
     final email = widget.appointment['email']?.toString();
     
-    print('🔍 fullName: $fullName');
-    print('🔍 name: $name');
-    print('🔍 userName: $userName');
-    print('🔍 userCurrentDesignation: $userCurrentDesignation');
-    print('🔍 email: $email');
-    
-    final result = fullName ?? name ?? userName ?? userCurrentDesignation ?? email ?? 'Unknown';
-    print('✅ Final result: $result');
-    
-    return result;
+    return fullName ?? name ?? userName ?? userCurrentDesignation ?? email ?? 'Unknown';
   }
 
   String _getAppointeeEmail() {
@@ -188,25 +162,21 @@ class _EmailFormState extends State<EmailForm> {
     // Primary: email field (from the actual data structure)
     final email = widget.appointment['email']?.toString();
     if (email != null && email.isNotEmpty) {
-      print('📧 Found appointee email: $email');
       return email;
     }
     
     // Secondary: userEmail field
     final userEmail = widget.appointment['userEmail']?.toString();
     if (userEmail != null && userEmail.isNotEmpty) {
-      print('📧 Found appointee userEmail: $userEmail');
       return userEmail;
     }
     
     // Fallback: appointeeEmail field
     final appointeeEmail = widget.appointment['appointeeEmail']?.toString();
     if (appointeeEmail != null && appointeeEmail.isNotEmpty) {
-      print('📧 Found appointee appointeeEmail: $appointeeEmail');
       return appointeeEmail;
     }
     
-    print('❌ No appointee email found');
     return '';
   }
 
@@ -217,7 +187,6 @@ class _EmailFormState extends State<EmailForm> {
     if (referencePerson is Map<String, dynamic>) {
       final email = referencePerson['email']?.toString();
       if (email != null && email.isNotEmpty) {
-        print('📧 Found reference email: $email');
         return email;
       }
     }
@@ -225,30 +194,25 @@ class _EmailFormState extends State<EmailForm> {
     // Secondary: referenceEmail field
     final referenceEmail = widget.appointment['referenceEmail']?.toString();
     if (referenceEmail != null && referenceEmail.isNotEmpty) {
-      print('📧 Found reference referenceEmail: $referenceEmail');
       return referenceEmail;
     }
     
     // Fallback: other possible field names
     final refEmail = widget.appointment['refEmail']?.toString();
     if (refEmail != null && refEmail.isNotEmpty) {
-      print('📧 Found reference refEmail: $refEmail');
       return refEmail;
     }
     
     final refByEmail = widget.appointment['refByEmail']?.toString();
     if (refByEmail != null && refByEmail.isNotEmpty) {
-      print('📧 Found reference refByEmail: $refByEmail');
       return refByEmail;
     }
     
     final referenceByEmail = widget.appointment['referenceByEmail']?.toString();
     if (referenceByEmail != null && referenceByEmail.isNotEmpty) {
-      print('📧 Found reference referenceByEmail: $referenceByEmail');
       return referenceByEmail;
     }
     
-    print('❌ No reference email found');
     return '';
   }
 
@@ -394,27 +358,17 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   Map<String, dynamic> _getEmailData() {
-    print('🔍 _getEmailData() called');
-    print('🔍 _selectedTemplate: $_selectedTemplate');
-    
     // Get the original HTML content for the selected template
     String originalHtmlContent = '';
     if (_selectedTemplate.isNotEmpty && _templateData.containsKey(_selectedTemplate)) {
       final templateData = _templateData[_selectedTemplate];
       if (templateData != null) {
         originalHtmlContent = templateData['originalHtml'] ?? '';
-        print('🔍 Found template data, originalHtml length: ${originalHtmlContent.length}');
       }
-    } else {
-      print('🔍 No template data found for selected template');
     }
-    
-    print('🔍 Original HTML content: $originalHtmlContent');
     
     // Apply placeholder replacements to the original HTML content
     String processedHtmlContent = _replacePlaceholdersInHtml(originalHtmlContent);
-    
-    print('🔍 Processed HTML content: $processedHtmlContent');
     
     return {
       'recipients': _getRecipientEmails(),
@@ -426,7 +380,7 @@ class _EmailFormState extends State<EmailForm> {
               .toList()
           : [],
       'subject': _emailSubjectController.text,
-      'content': processedHtmlContent, // Use the processed HTML content for backend
+      'content': originalHtmlContent, // Send original template content with placeholders
       'templateId': _selectedTemplate.isNotEmpty ? _selectedTemplate : null,
       'appointmentId': _getAppointmentId(),
       'includeAppointeeEmail': _includeAppointeeEmail,
@@ -469,15 +423,11 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   String _replacePlaceholders(String text) {
-    print('🔍 _replacePlaceholders() called');
-    print('🔍 Original text: $text');
-    
     String result = text;
     
     // First convert HTML to plain text if it contains HTML
     if (_containsHtml(text)) {
       result = _htmlToPlainText(text);
-      print('🔍 After HTML to plain text conversion: $result');
     }
     
     // Get appointment data
@@ -487,20 +437,14 @@ class _EmailFormState extends State<EmailForm> {
     final email = _getAppointeeEmail();
     final numberOfPeople = _getNumberOfPeople();
     
-    print('🔍 appointmentId: $appointmentId');
-    print('🔍 fullName: $fullName');
-    print('🔍 email: $email');
-    print('🔍 numberOfPeople: $numberOfPeople');
-    print('🔍 userCurrentDesignation: ${appointment['userCurrentDesignation']?.toString()}');
-    
     // Replace placeholders with actual appointment data
     result = result.replaceAll('{\$AID}', appointmentId);
     result = result.replaceAll('{\$full_name}', fullName);
     result = result.replaceAll('{\$ji}', 'Ji');
-    result = result.replaceAll('{\$date}', appointment['scheduledDate']?.toString() ?? '');
-    result = result.replaceAll('{\$time}', appointment['scheduledTime']?.toString() ?? '');
+    result = result.replaceAll('{\$date}', appointment['scheduledDateTime']?['date']?.toString() ?? '');
+    result = result.replaceAll('{\$time}', appointment['scheduledDateTime']?['time']?.toString() ?? '');
     result = result.replaceAll('{\$no_people}', numberOfPeople);
-    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? '');
+    result = result.replaceAll('{\$app_location}', appointment['scheduledDateTime']?['venueLabel']?.toString() ?? '');
     result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
     result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? '');
     result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? '');
@@ -516,15 +460,10 @@ class _EmailFormState extends State<EmailForm> {
     result = result.replaceAll('{\$appointee_name}', fullName);
     result = result.replaceAll('{\$appointeeName}', fullName);
     
-    print('🔍 After replacement: $result');
-    
     return result;
   }
 
   String _replacePlaceholdersInHtml(String htmlContent) {
-    print('🔍 _replacePlaceholdersInHtml() called');
-    print('🔍 Original HTML content: $htmlContent');
-    
     // Get appointment data
     final appointment = widget.appointment;
     final appointmentId = _getAppointmentId();
@@ -532,24 +471,16 @@ class _EmailFormState extends State<EmailForm> {
     final email = _getAppointeeEmail();
     final numberOfPeople = _getNumberOfPeople();
     
-    print('🔍 appointmentId: $appointmentId');
-    print('🔍 fullName: $fullName');
-    print('🔍 email: $email');
-    print('🔍 numberOfPeople: $numberOfPeople');
-    print('🔍 userCurrentDesignation: ${appointment['userCurrentDesignation']?.toString()}');
-    
     // Replace placeholders with actual appointment data in HTML content
     String result = htmlContent;
-    
-    print('🔍 Before replacement: $result');
     
     result = result.replaceAll('{\$AID}', appointmentId);
     result = result.replaceAll('{\$full_name}', fullName);
     result = result.replaceAll('{\$ji}', 'Ji');
-    result = result.replaceAll('{\$date}', appointment['scheduledDate']?.toString() ?? '');
-    result = result.replaceAll('{\$time}', appointment['scheduledTime']?.toString() ?? '');
+    result = result.replaceAll('{\$date}', appointment['scheduledDateTime']?['date']?.toString() ?? '');
+    result = result.replaceAll('{\$time}', appointment['scheduledDateTime']?['time']?.toString() ?? '');
     result = result.replaceAll('{\$no_people}', numberOfPeople);
-    result = result.replaceAll('{\$app_location}', appointment['venue']?.toString() ?? '');
+    result = result.replaceAll('{\$app_location}', appointment['scheduledDateTime']?['venueLabel']?.toString() ?? '');
     result = result.replaceAll('{\$email_note}', 'Please arrive 15 minutes before your scheduled time.');
     result = result.replaceAll('{\$area}', appointment['area']?.toString() ?? '');
     result = result.replaceAll('{\$designation}', appointment['userCurrentDesignation']?.toString() ?? '');
@@ -564,8 +495,6 @@ class _EmailFormState extends State<EmailForm> {
     result = result.replaceAll('{\$ref_name}', _getReferenceName());
     result = result.replaceAll('{\$appointee_name}', fullName);
     result = result.replaceAll('{\$appointeeName}', fullName);
-    
-    print('🔍 After replacement: $result');
     
     return result;
   }
@@ -792,13 +721,7 @@ class _EmailFormState extends State<EmailForm> {
             text.contains('<b>') || text.contains('<i>') || text.contains('<em>'));
   }
 
-    // Minimal debug method - only log essential info
-  void _logAppointmentFields() {
-    print('EmailForm: Loading appointment data');
-    print('Appointment ID: ${_getAppointmentId()}');
-    print('Full Name: ${_getAppointmentName()}');
-    print('People Count: ${_getNumberOfPeople()}');
-  }
+
 
   // Build email content widget with images
   Widget _buildEmailContentWidget(String content) {
@@ -936,19 +859,11 @@ class _EmailFormState extends State<EmailForm> {
 
 
   void _sendEmail() {
-    print('🔵 Send button clicked - Starting validation...');
-    
     if (_formKey.currentState!.validate()) {
-      print('✅ Form validation passed');
-      
       // Validate that at least one recipient is selected
       final recipients = _getRecipientEmails();
-      print('📧 Recipients: $recipients');
-      print('📧 Include appointee: $_includeAppointeeEmail');
-      print('📧 Include reference: $_includeReferenceEmail');
       
       if (recipients.isEmpty) {
-        print('❌ No recipients found');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select at least one recipient (Appointee or Reference email)'),
@@ -962,11 +877,7 @@ class _EmailFormState extends State<EmailForm> {
       final subject = _emailSubjectController.text.trim();
       final content = _emailTemplateController.text.trim();
       
-      print('📝 Subject: "$subject"');
-      print('📝 Content length: ${content.length}');
-      
       if (subject.isEmpty) {
-        print('❌ Subject is empty');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please enter an email subject'),
@@ -977,7 +888,6 @@ class _EmailFormState extends State<EmailForm> {
       }
 
       if (content.isEmpty) {
-        print('❌ Content is empty');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
              content: Text('Please select an email template'),
@@ -986,17 +896,12 @@ class _EmailFormState extends State<EmailForm> {
         );
         return;
       }
-
-      print('✅ All validations passed - Getting email data...');
       
       // Get email data
       final emailData = _getEmailData();
-      print('📦 Email data: $emailData');
       
       // Show confirmation dialog
       _showEmailConfirmationDialog(emailData);
-    } else {
-      print('❌ Form validation failed');
     }
   }
 
@@ -1031,9 +936,7 @@ class _EmailFormState extends State<EmailForm> {
             ),
             ElevatedButton(
               onPressed: () {
-                print('🔵 Confirmation dialog Send button clicked');
                 Navigator.of(context).pop();
-                print('🔵 Calling _sendEmailToBackend...');
                 _sendEmailToBackend(emailData);
               },
               child: const Text('Send'),
@@ -1123,24 +1026,15 @@ class _EmailFormState extends State<EmailForm> {
                                 )
                               : null,
                             onTap: () {
-                              print('🔍 Template selected: ${template['value']} - ${template['label']}');
                               setState(() {
                                 _selectedTemplate = template['value']!;
                                 _templateDisplayController.text = template['label']!;
                                 // Populate subject and content if template is selected
                                 if (_templateData.containsKey(template['value'])) {
                                   final templateData = _templateData[template['value']]!;
-                                  print('🔍 Template data found: ${templateData.keys}');
-                                  print('🔍 Template subject: ${templateData['subject']}');
-                                  print('🔍 Template content: ${templateData['content']}');
                                   
                                   _emailSubjectController.text = _replacePlaceholders(templateData['subject'] ?? '');
                                   _emailTemplateController.text = _replacePlaceholders(templateData['content'] ?? '');
-                                  
-                                  print('🔍 After replacement - Subject: ${_emailSubjectController.text}');
-                                  print('🔍 After replacement - Content: ${_emailTemplateController.text}');
-                                } else {
-                                  print('🔍 No template data found for selected template');
                                 }
                               });
                               Navigator.of(context).pop();
@@ -1160,10 +1054,7 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   Future<void> _sendEmailToBackend(Map<String, dynamic> emailData) async {
-    print('🚀 _sendEmailToBackend called with data: $emailData');
-    
     try {
-      print('🔄 Showing loading indicator...');
       // Show loading indicator
       showDialog(
         context: context,
@@ -1189,19 +1080,8 @@ class _EmailFormState extends State<EmailForm> {
       
       // Get reference email
       final referenceEmail = _getReferenceEmail();
-
-      print('📤 Preparing API call with:');
-      print('  - appointeeEmail: $appointeeEmail');
-      print('  - referenceEmail: $referenceEmail');
-      print('  - subject: $subject');
-      print('  - content length: ${content.length}');
-      print('  - templateId: $templateId');
-      print('  - bcc: $bcc');
-      print('  - useAppointee: $includeAppointeeEmail');
-      print('  - useReference: $includeReferenceEmail');
       
       // Call the API
-      print('🌐 Calling ActionService.sendAppointmentEmailAction...');
       final result = await ActionService.sendAppointmentEmailAction(
         appointeeEmail: appointeeEmail,
         referenceEmail: referenceEmail.isNotEmpty ? referenceEmail : null,
@@ -1210,13 +1090,30 @@ class _EmailFormState extends State<EmailForm> {
         subject: subject,
         body: content,
         selectedTemplateId: templateId,
-        templateData: {}, // Add any additional template data if needed
+        appointmentId: emailData['appointmentId'], // 👈 Pass appointmentId as separate parameter
+        templateData: {
+          'appointmentId': emailData['appointmentId'],
+          'fullName': _getAppointmentName(), // This now uses createdBy.fullName to match backend
+          'email': _getAppointeeEmail(),
+          'numberOfPeople': _getNumberOfPeople(),
+          'userCurrentDesignation': widget.appointment['userCurrentDesignation']?.toString() ?? '',
+          'purpose': widget.appointment['purpose']?.toString() ?? '',
+          'subject': widget.appointment['subject']?.toString() ?? '',
+          'venue': widget.appointment['scheduledDateTime']?['venueLabel']?.toString() ?? '',
+          'scheduledDate': widget.appointment['scheduledDateTime']?['date']?.toString() ?? '',
+          'scheduledTime': widget.appointment['scheduledDateTime']?['time']?.toString() ?? '',
+          'mobile': widget.appointment['mobile']?.toString() ?? '',
+          'area': widget.appointment['area']?.toString() ?? '',
+          'userCurrentCompany': widget.appointment['userCurrentCompany']?.toString() ?? '',
+          'appointmentType': widget.appointment['appointmentType']?.toString() ?? '',
+          'preferredDateRange': widget.appointment['preferredDateRange']?.toString() ?? '',
+          'referenceName': _getReferenceName(),
+          'referencePhone': _getReferencePhone(),
+        },
         useAppointee: includeAppointeeEmail,
         useReference: includeReferenceEmail,
         otherEmail: null, // Not currently used in the form
       );
-      
-      print('📥 API response: $result');
 
       // Close loading dialog
       Navigator.of(context).pop();
@@ -1289,9 +1186,6 @@ class _EmailFormState extends State<EmailForm> {
         );
       }
     } catch (e) {
-      print('❌ Exception caught in _sendEmailToBackend: $e');
-      print('❌ Stack trace: ${StackTrace.current}');
-      
       // Close loading dialog
       Navigator.of(context).pop();
       
