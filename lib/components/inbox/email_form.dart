@@ -41,6 +41,11 @@ class _EmailFormState extends State<EmailForm> {
   String _selectedTemplate = '';
   bool _includeAppointeeEmail = true;
   bool _includeReferenceEmail = false;
+  bool _showRescheduleForm = false;
+  DateTime? _newDate;
+  TimeOfDay? _newTime;
+  String _newVenue = '';
+  String _newVenueName = '';
   
   // Email templates from API
   List<Map<String, String>> _emailTemplates = [
@@ -88,6 +93,12 @@ class _EmailFormState extends State<EmailForm> {
           final String name = template['name'] ?? template['templateName'] ?? 'Unknown Template';
           final bool isActive = template['isActive'] ?? true;
           
+          // Debug logging for each template
+          print('📋 Template Found:');
+          print('  - ID: $id');
+          print('  - Name: "$name"');
+          print('  - Is Active: $isActive');
+          
           // Only add active templates
           if (isActive && id.isNotEmpty) {
             _emailTemplates.add({
@@ -105,6 +116,12 @@ class _EmailFormState extends State<EmailForm> {
               'region': template['region'] ?? '',
             };
           }
+        }
+        
+        // Debug logging for final template list
+        print('📚 Final Template List:');
+        for (var template in _emailTemplates) {
+          print('  - ${template['value']}: "${template['label']}"');
         }
         
         setState(() {});
@@ -290,39 +307,155 @@ class _EmailFormState extends State<EmailForm> {
      return '';
    }
 
-       String _getNumberOfPeople() {
-      // Use the same source as appointment_card.dart
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final numberOfUsers = accompanyUsers['numberOfUsers'];
-        if (numberOfUsers != null) {
-          return numberOfUsers.toString();
-        }
+         String _getNumberOfPeople() {
+    // Use the same source as appointment_card.dart
+    final accompanyUsers = widget.appointment['accompanyUsers'];
+    if (accompanyUsers is Map<String, dynamic>) {
+      final numberOfUsers = accompanyUsers['numberOfUsers'];
+      if (numberOfUsers != null) {
+        return numberOfUsers.toString();
       }
-      
-      // Fallback to other fields if accompanyUsers not available
-      final noOfPeople = widget.appointment['noOfPeople']?.toString();
-      if (noOfPeople != null && noOfPeople.isNotEmpty) {
-        return noOfPeople;
-      }
-      
-      final numberOfPeople = widget.appointment['numberOfPeople']?.toString();
-      if (numberOfPeople != null && numberOfPeople.isNotEmpty) {
-        return numberOfPeople;
-      }
-      
-      final peopleCount = widget.appointment['peopleCount']?.toString();
-      if (peopleCount != null && peopleCount.isNotEmpty) {
-        return peopleCount;
-      }
-      
-      final count = widget.appointment['count']?.toString();
-      if (count != null && count.isNotEmpty) {
-        return count;
-      }
-      
-      // Return empty string if no data found
+    }
+    
+    // Fallback to other fields if accompanyUsers not available
+    final noOfPeople = widget.appointment['noOfPeople']?.toString();
+    if (noOfPeople != null && noOfPeople.isNotEmpty) {
+      return noOfPeople;
+    }
+    
+    final numberOfPeople = widget.appointment['numberOfPeople']?.toString();
+    if (numberOfPeople != null && numberOfPeople.isNotEmpty) {
+      return numberOfPeople;
+    }
+    
+    final peopleCount = widget.appointment['peopleCount']?.toString();
+    if (peopleCount != null && peopleCount.isNotEmpty) {
+      return peopleCount;
+    }
+    
+    final count = widget.appointment['count']?.toString();
+    if (count != null && count.isNotEmpty) {
+      return count;
+    }
+    
+    // Return empty string if no data found
     return '';
+  }
+
+  bool _isRescheduleTemplate() {
+    // Simple check: if template ID matches the reschedule template ID, show the card
+    final isReschedule = _selectedTemplate == '6885fbc5d64696d83a0d7f16';
+    print('🔍 RESCHEDULE CHECK: $_selectedTemplate == 6885fbc5d64696d83a0d7f16 = $isReschedule');
+    return isReschedule;
+  }
+
+  Future<void> _selectNewDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _newDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && picked != _newDate) {
+      setState(() {
+        _newDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectNewTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _newTime ?? TimeOfDay.now(),
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _newTime) {
+      setState(() {
+        _newTime = picked;
+      });
+    }
+  }
+
+  // Helper method to format time consistently for backend
+  String _formatTimeForBackend(TimeOfDay? time) {
+    if (time == null) return '';
+    
+    // Format as HH:MM (24-hour format) to match existing time format
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  void _showVenueBottomSheet() {
+    // List of venues like in the image
+    final List<String> venues = [
+      'Secretariat Office A1',
+      'Special Enclosure - Shiva Temple',
+      'Yoga School',
+      'Radha Kunj',
+      'Shiva Temple',
+      'Satsang Backstage',
+      'Gurukul',
+      'Pooja Backstage',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Select Venue',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: venues.length,
+                  itemBuilder: (context, index) {
+                    final venue = venues[index];
+                    return ListTile(
+                      title: Text(venue),
+                      onTap: () {
+                        setState(() {
+                          _newVenue = venue; // Use venue name as ID for simplicity
+                          _newVenueName = venue;
+                        });
+                        Navigator.of(context).pop();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   List<String> _getRecipientEmails() {
@@ -344,17 +477,43 @@ class _EmailFormState extends State<EmailForm> {
       }
     }
     
-    // Add CC emails if provided
-    if (_ccEmailController.text.isNotEmpty) {
-      final ccEmails = _ccEmailController.text
-          .split(',')
-          .map((email) => email.trim())
-          .where((email) => email.isNotEmpty)
-          .toList();
-      recipients.addAll(ccEmails);
+    return recipients;
+  }
+
+  List<String> _getAllRecipientsIncludingCC() {
+    List<String> allRecipients = [];
+    
+    // Add main recipients
+    allRecipients.addAll(_getRecipientEmails());
+    
+    // Add CC emails (as a fallback since backend might not handle CC separately)
+    allRecipients.addAll(_getCCEmails());
+    
+    return allRecipients;
+  }
+
+  List<String> _getCCEmails() {
+    if (_ccEmailController.text.isEmpty) {
+      return [];
     }
     
-    return recipients;
+    return _ccEmailController.text
+        .split(',')
+        .map((email) => email.trim())
+        .where((email) => email.isNotEmpty && RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email))
+        .toList();
+  }
+
+  List<String> _getBCCEmails() {
+    if (_bccEmailController.text.isEmpty) {
+      return [];
+    }
+    
+    return _bccEmailController.text
+        .split(',')
+        .map((email) => email.trim())
+        .where((email) => email.isNotEmpty && RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email))
+        .toList();
   }
 
   Map<String, dynamic> _getEmailData() {
@@ -370,23 +529,27 @@ class _EmailFormState extends State<EmailForm> {
     // Apply placeholder replacements to the original HTML content
     String processedHtmlContent = _replacePlaceholdersInHtml(originalHtmlContent);
     
+    // Use the edited content from the controller if available, otherwise use original
+    String finalContent = _emailTemplateController.text.isNotEmpty 
+        ? _emailTemplateController.text 
+        : originalHtmlContent;
+    
     return {
       'recipients': _getRecipientEmails(),
-      'bcc': _bccEmailController.text.isNotEmpty 
-          ? _bccEmailController.text
-              .split(',')
-              .map((email) => email.trim())
-              .where((email) => email.isNotEmpty)
-              .toList()
-          : [],
+      'cc': _getCCEmails(),
+      'bcc': _getBCCEmails(),
       'subject': _emailSubjectController.text,
       'content': originalHtmlContent, // Send original template content with placeholders
       'templateId': _selectedTemplate.isNotEmpty ? _selectedTemplate : null,
       'appointmentId': _getAppointmentId(),
       'includeAppointeeEmail': _includeAppointeeEmail,
       'includeReferenceEmail': _includeReferenceEmail,
-      'darshanLineDate': widget.appointment['scheduledDate']?.toString(),
-      'darshanLineTime': widget.appointment['scheduledTime']?.toString(),
+      'darshanLineDate': widget.appointment['scheduledDateTime']?['date']?.toString() ?? '',
+      'darshanLineTime': widget.appointment['scheduledDateTime']?['time']?.toString() ?? '',
+      'rescheduleDate': _newDate?.toIso8601String(),
+      'rescheduleTime': _formatTimeForBackend(_newTime),
+      'rescheduleVenue': _newVenue,
+      'rescheduleVenueName': _newVenueName,
     };
   }
 
@@ -418,6 +581,28 @@ class _EmailFormState extends State<EmailForm> {
           orElse: () => {'value': '', 'label': 'Select Template'},
         );
         _templateDisplayController.text = selectedTemplate['label']!;
+        
+
+        
+        // Check if this is the reschedule template
+        _showRescheduleForm = _isRescheduleTemplate();
+        print('📧 TEMPLATE SELECTED: $value');
+        print('🔄 SHOW RESCHEDULE FORM: $_showRescheduleForm');
+        
+        // Clear reschedule form if not reschedule template
+        if (!_showRescheduleForm) {
+          _newDate = null;
+        }
+        
+        // Populate email template controller with processed content
+        if (_templateData.containsKey(value)) {
+          final templateData = _templateData[value];
+          if (templateData != null) {
+            final originalHtml = templateData['originalHtml'] ?? '';
+            final processedContent = _replacePlaceholdersInHtml(originalHtml);
+            _emailTemplateController.text = processedContent;
+          }
+        }
       });
     }
   }
@@ -896,6 +1081,39 @@ class _EmailFormState extends State<EmailForm> {
         );
         return;
       }
+
+      // Validate reschedule fields if it's a reschedule template
+      if (_showRescheduleForm) {
+        if (_newDate == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a new date for rescheduling'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        
+        if (_newTime == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a new time for rescheduling'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        
+        if (_newVenueName.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a new venue for rescheduling'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
       
       // Get email data
       final emailData = _getEmailData();
@@ -907,6 +1125,7 @@ class _EmailFormState extends State<EmailForm> {
 
   void _showEmailConfirmationDialog(Map<String, dynamic> emailData) {
     final recipients = (emailData['recipients'] as List<dynamic>).cast<String>();
+    final cc = (emailData['cc'] as List<dynamic>).cast<String>();
     final bcc = (emailData['bcc'] as List<dynamic>).cast<String>();
     
     showDialog(
@@ -919,12 +1138,63 @@ class _EmailFormState extends State<EmailForm> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('To: ${recipients.join(', ')}'),
+              if (cc.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('CC: ${cc.join(', ')}'),
+              ],
               if (bcc.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text('BCC: ${bcc.join(', ')}'),
               ],
               const SizedBox(height: 8),
               Text('Subject: ${emailData['subject']}'),
+              
+              // Show reschedule details if applicable
+              if (_showRescheduleForm && _newDate != null && _newTime != null && _newVenueName.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.schedule, color: Colors.blue.shade700, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Reschedule Details:',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('New Date: ${_newDate!.day}/${_newDate!.month}/${_newDate!.year}'),
+                      Text('New Time: ${_newTime!.format(context)}'),
+                      Text('New Venue: $_newVenueName'),
+                    ],
+                  ),
+                ),
+              ],
+              
+              if (cc.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Note: CC recipients will receive the email as main recipients due to backend limitations.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange.shade700,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text('Are you sure you want to send this email?'),
             ],
@@ -1029,6 +1299,20 @@ class _EmailFormState extends State<EmailForm> {
                               setState(() {
                                 _selectedTemplate = template['value']!;
                                 _templateDisplayController.text = template['label']!;
+                                
+                                // Check if this is the reschedule template
+                                _showRescheduleForm = _isRescheduleTemplate();
+                                print('📧 TEMPLATE SELECTED IN MODAL: ${template['value']}');
+                                print('🔄 SHOW RESCHEDULE FORM: $_showRescheduleForm');
+                                
+                                // Clear reschedule form if not reschedule template
+                                if (!_showRescheduleForm) {
+                                  _newDate = null;
+                                  _newTime = null;
+                                  _newVenue = '';
+                                  _newVenueName = '';
+                                }
+                                
                                 // Populate subject and content if template is selected
                                 if (_templateData.containsKey(template['value'])) {
                                   final templateData = _templateData[template['value']]!;
@@ -1068,6 +1352,7 @@ class _EmailFormState extends State<EmailForm> {
 
       // Extract data from emailData
       final recipients = (emailData['recipients'] as List<dynamic>).cast<String>();
+      final cc = (emailData['cc'] as List<dynamic>).cast<String>();
       final bcc = (emailData['bcc'] as List<dynamic>).cast<String>();
       final subject = emailData['subject'] as String;
       final content = emailData['content'] as String;
@@ -1081,16 +1366,40 @@ class _EmailFormState extends State<EmailForm> {
       // Get reference email
       final referenceEmail = _getReferenceEmail();
       
-      // Call the API
+      // WORKAROUND: Since the backend API doesn't seem to properly process the CC field,
+      // we're including CC emails in the main appointee email field as a fallback.
+      // This ensures CC recipients still receive the email while maintaining the UI separation.
+      // TODO: Remove this workaround once the backend properly supports CC field processing.
+      final allRecipients = _getAllRecipientsIncludingCC();
+      final mainRecipients = _getRecipientEmails();
+      
+      // If we have CC emails and they're not in main recipients, add them
+      String combinedAppointeeEmail = appointeeEmail;
+      if (cc.isNotEmpty && !mainRecipients.contains(cc.first)) {
+        // Add CC emails to the appointee email field as a workaround
+        combinedAppointeeEmail = '$appointeeEmail,${cc.join(',')}';
+      }
+      
+      // Debug logging
+      print('📧 Email sending debug info:');
+      print('Original appointee email: $appointeeEmail');
+      print('CC emails: $cc');
+      print('Combined appointee email: $combinedAppointeeEmail');
+      print('BCC emails: $bcc');
+      
       final result = await ActionService.sendAppointmentEmailAction(
-        appointeeEmail: appointeeEmail,
+        appointeeEmail: combinedAppointeeEmail,
         referenceEmail: referenceEmail.isNotEmpty ? referenceEmail : null,
-        cc: null, // Not currently used in the form
+        cc: cc.isNotEmpty ? cc.join(',') : null, // Still send CC field in case backend fixes it
         bcc: bcc.isNotEmpty ? bcc.join(',') : null,
         subject: subject,
         body: content,
         selectedTemplateId: templateId,
         appointmentId: emailData['appointmentId'], // 👈 Pass appointmentId as separate parameter
+        rescheduleDate: emailData['rescheduleDate'],
+        rescheduleTime: emailData['rescheduleTime'],
+        rescheduleVenue: emailData['rescheduleVenue'],
+        rescheduleVenueName: emailData['rescheduleVenueName'],
         templateData: {
           'appointmentId': emailData['appointmentId'],
           'fullName': _getAppointmentName(), // This now uses createdBy.fullName to match backend
@@ -1135,7 +1444,24 @@ class _EmailFormState extends State<EmailForm> {
                   const Text('Success'),
                 ],
               ),
-              content: Text(result['message'] ?? 'Email sent successfully!'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(result['message'] ?? 'Email sent successfully!'),
+                  if (cc.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Note: CC emails were included in the main recipients due to backend limitations.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -1327,6 +1653,17 @@ class _EmailFormState extends State<EmailForm> {
                           helperText: 'Note: Please Add comma separated email id',
                           helperStyle: TextStyle(color: Colors.red),
                         ),
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty) {
+                            final emails = value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+                            for (String email in emails) {
+                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
+                                return 'Please enter valid email addresses separated by commas';
+                              }
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       
                       const SizedBox(height: 16),
@@ -1344,6 +1681,17 @@ class _EmailFormState extends State<EmailForm> {
                           helperText: 'Note: Please Add comma separated email id',
                           helperStyle: TextStyle(color: Colors.red),
                         ),
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty) {
+                            final emails = value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+                            for (String email in emails) {
+                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
+                                return 'Please enter valid email addresses separated by commas';
+                              }
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       
                       const SizedBox(height: 16),
@@ -1425,6 +1773,147 @@ class _EmailFormState extends State<EmailForm> {
                       
                       const SizedBox(height: 16),
                       
+                      // Reschedule Form (only shown for reschedule template)
+                      if (_showRescheduleForm) ...[
+                        // Debug log for UI
+                        Builder(
+                          builder: (context) {
+                            print('🎨 UI: Showing reschedule form, _showRescheduleForm = $_showRescheduleForm');
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.schedule, color: Colors.blue.shade700),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Reschedule Details',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              
+                              // New Date
+                              InkWell(
+                                onTap: _selectNewDate,
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.calendar_today, color: Colors.grey.shade600),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _newDate != null
+                                              ? 'New Date: ${_newDate!.day}/${_newDate!.month}/${_newDate!.year}'
+                                              : 'Select New Date',
+                                          style: TextStyle(
+                                            color: _newDate != null ? Colors.black : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // New Time
+                              InkWell(
+                                onTap: _selectNewTime,
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.access_time, color: Colors.grey.shade600),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _newTime != null
+                                              ? 'New Time: ${_newTime!.format(context)}'
+                                              : 'Select New Time',
+                                          style: TextStyle(
+                                            color: _newTime != null ? Colors.black : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // New Venue
+                              InkWell(
+                                onTap: _showVenueBottomSheet,
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.location_on, color: Colors.grey.shade600),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _newVenueName.isNotEmpty
+                                              ? 'New Venue: $_newVenueName'
+                                              : 'Select New Venue',
+                                          style: TextStyle(
+                                            color: _newVenueName.isNotEmpty ? Colors.black : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 8),
+                              Text(
+                                'Note: This date will be included in the reschedule email.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      
                       // Subject Field
                       TextFormField(
                         controller: _emailSubjectController,
@@ -1471,8 +1960,16 @@ class _EmailFormState extends State<EmailForm> {
                                height: 300,
                                width: double.infinity,
                                padding: const EdgeInsets.all(12.0),
-                               child: SingleChildScrollView(
-                                 child: _buildEmailContentWidget(_emailTemplateController.text),
+                               child: TextFormField(
+                                 controller: _emailTemplateController,
+                                 maxLines: null,
+                                 expands: true,
+                                 decoration: const InputDecoration(
+                                   hintText: 'Email content will appear here...',
+                                   border: InputBorder.none,
+                                   contentPadding: EdgeInsets.zero,
+                                 ),
+                                 style: const TextStyle(fontSize: 14),
                                ),
                              ),
                            ],

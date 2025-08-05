@@ -3093,6 +3093,10 @@ class ActionService {
     bool useReference = true,
     String? otherEmail,
     String? appointmentId, // 👈 Added appointmentId parameter
+    String? rescheduleDate,
+    String? rescheduleTime,
+    String? rescheduleVenue,
+    String? rescheduleVenueName,
   }) async {
     final Uri url = Uri.parse('$baseUrl/appointment/send-email');
 
@@ -3108,6 +3112,10 @@ class ActionService {
       'useReference': useReference,
       if (otherEmail != null) 'otherEmail': otherEmail,
       if (appointmentId != null) 'appointmentId': appointmentId, // 👈 Added appointmentId to request body
+      if (rescheduleDate != null) 'rescheduleDate': rescheduleDate,
+      if (rescheduleTime != null) 'rescheduleTime': rescheduleTime,
+      if (rescheduleVenue != null) 'rescheduleVenue': rescheduleVenue,
+      if (rescheduleVenueName != null) 'rescheduleVenueName': rescheduleVenueName,
       'templateData': templateData ?? {}, // 👈 Ensure it's always an object
     };
 
