@@ -63,6 +63,10 @@ class _MessageFormState extends State<MessageForm> {
     _designation = _extractDesignation();
     _appointeeMobile = _extractAppointeeMobile();
     _referenceMobile = _extractReferenceMobile();
+    
+    // Debug: Log extracted phone numbers
+    print('📱 Extracted Appointee Mobile: $_appointeeMobile');
+    print('📱 Extracted Reference Mobile: $_referenceMobile');
 
     // Set default values - unchecked by default
     _appointeeMobileChecked = false;
@@ -163,15 +167,12 @@ class _MessageFormState extends State<MessageForm> {
       final countryCode = phoneNumber['countryCode']?.toString() ?? '';
       final number = phoneNumber['number']?.toString() ?? '';
       if (countryCode.isNotEmpty && number.isNotEmpty) {
-        // Remove country code (+91) and return only the number
-        return number;
+        // Return full phone number with country code
+        return '$countryCode$number';
       }
     }
-    // If it's a string, try to remove +91 if present
+    // If it's a string, return as is
     final phoneString = phoneNumber?.toString() ?? '';
-    if (phoneString.startsWith('+91')) {
-      return phoneString.substring(3); // Remove +91
-    }
     return phoneString;
   }
 
@@ -183,15 +184,12 @@ class _MessageFormState extends State<MessageForm> {
         final countryCode = phoneNumber['countryCode']?.toString() ?? '';
         final number = phoneNumber['number']?.toString() ?? '';
         if (countryCode.isNotEmpty && number.isNotEmpty) {
-          // Remove country code (+91) and return only the number
-          return number;
+          // Return full phone number with country code
+          return '$countryCode$number';
         }
       }
-      // If it's a string, try to remove +91 if present
+      // If it's a string, return as is
       final phoneString = phoneNumber?.toString() ?? '';
-      if (phoneString.startsWith('+91')) {
-        return phoneString.substring(3); // Remove +91
-      }
       return phoneString;
     }
     return '';
@@ -580,6 +578,13 @@ Appointment Details:
         'ji': _getJiTitle(),
       };
 
+      // Debug: Log what we're sending
+      print('📤 SMS Form - Appointee Mobile: $_appointeeMobile');
+      print('📤 SMS Form - Reference Mobile: $_referenceMobile');
+      print('📤 SMS Form - Use Appointee: $_appointeeMobileChecked');
+      print('📤 SMS Form - Use Reference: $_referenceMobileChecked');
+      print('📤 SMS Form - Other SMS: ${_otherSmsController.text.trim().isNotEmpty ? _otherSmsController.text.trim() : 'None'}');
+      
       final result = await ActionService.sendAppointmentSms(
         appointeeMobile: _appointeeMobile,
         referenceMobile: _referenceMobile,

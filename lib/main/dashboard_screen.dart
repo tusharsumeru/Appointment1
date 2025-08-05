@@ -203,11 +203,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         }
       }
 
-      // Filter by email status (for now, all show "Not Sent")
+      // Filter by email status
       if (_selectedEmailStatus.isNotEmpty) {
-        // Since all appointments currently show "Not Sent", this filter will work
-        // when email status is actually implemented in the API
-        if (_selectedEmailStatus != 'Not Sent') {
+        final appointmentEmailStatus = _getEmailStatus(appointment);
+        if (appointmentEmailStatus != _selectedEmailStatus) {
           return false;
         }
       }
@@ -219,12 +218,21 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           try {
             final appointmentDate = DateTime.parse(scheduledDate.toString());
             
-            if (_fromDate != null && appointmentDate.isBefore(_fromDate!)) {
-              return false;
+            // Normalize dates to start of day for proper comparison
+            final normalizedAppointmentDate = DateTime(appointmentDate.year, appointmentDate.month, appointmentDate.day);
+            
+            if (_fromDate != null) {
+              final normalizedFromDate = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+              if (normalizedAppointmentDate.isBefore(normalizedFromDate)) {
+                return false;
+              }
             }
             
-            if (_toDate != null && appointmentDate.isAfter(_toDate!)) {
-              return false;
+            if (_toDate != null) {
+              final normalizedToDate = DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
+              if (normalizedAppointmentDate.isAfter(normalizedToDate)) {
+                return false;
+              }
             }
           } catch (e) {
             // If date parsing fails, exclude the appointment
@@ -370,7 +378,15 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         child: Column(
           children: [
             _buildActionHeader('Send Email'),
-            Expanded(child: EmailForm(appointment: appointment)),
+            Expanded(
+              child: EmailForm(
+                appointment: appointment,
+                onSend: () {
+                  // Refresh appointment data after sending email
+                  _fetchAppointments();
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -540,6 +556,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 appointments: selectedAppointments,
                 onSend: () {
                   Navigator.pop(context);
+                  // Refresh appointment data after sending bulk email
+                  _fetchAppointments();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Bulk email sent successfully!'),
@@ -627,6 +645,19 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     
     // Final fallback to direct mainStatus field
     return appointment['mainStatus']?.toString() ?? 'Unknown';
+  }
+
+  String _getEmailStatus(Map<String, dynamic> appointment) {
+    // Get emailStatus from appointment data
+    final emailStatus = appointment['emailStatus']?.toString();
+    
+    // If emailStatus is "sent", show "Email Sent"
+    // If emailStatus is null or empty, show "Not Sent"
+    if (emailStatus == 'sent') {
+      return 'Email Sent';
+    } else {
+      return 'Not Sent';
+    }
   }
 
   @override
@@ -815,6 +846,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                   requestedDate: _formatPreferredDateRange(item['preferredDateRange']),
                                   peopleCount: _getPeopleCount(item),
                                   status: _getAppointmentStatus(item),
+                                  emailStatus: _getEmailStatus(item),
                                   isSelected: _selectedAppointments.contains(item['_id']?.toString() ?? ''),
                                   onSelectionChanged: (isSelected) {
                                     _toggleAppointmentSelection(item['_id']?.toString() ?? '');

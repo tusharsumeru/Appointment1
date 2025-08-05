@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'storage_service.dart';
@@ -6,7 +7,8 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://divinepicrecognition.sumerudigital.com/api/v3'; // API base URL
+      // API base URL
+      'https://1f27bc24155b.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -1190,7 +1192,7 @@ class ActionService {
     }
   }
 
-  // Get appointments by scheduled date
+  // Get appointments by scheduled date (including quick appointments)
   static Future<Map<String, dynamic>> getAppointmentsByScheduledDate({
     required String date, // Format: YYYY-MM-DD
   }) async {
@@ -1215,8 +1217,8 @@ class ActionService {
         };
       }
 
-      // Make API call
-      final url = '$baseUrl/appointment/scheduled/date?date=$date';
+      // Make API call to fetch both regular and quick appointments
+      final url = '$baseUrl/appointment/scheduled/date?date=$date&includeQuick=true';
       print('🌐 Making API call to: $url');
 
       final response = await http.get(
@@ -1243,7 +1245,7 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success - return appointments data
+        // Success - return appointments data (including quick appointments)
         final List<dynamic> appointments = responseData['data'] ?? [];
 
         return {
@@ -1251,7 +1253,7 @@ class ActionService {
           'statusCode': 200,
           'data': appointments,
           'message':
-              responseData['message'] ?? 'Appointments fetched successfully',
+              responseData['message'] ?? 'Appointments and quick appointments fetched successfully',
         };
       } else if (response.statusCode == 400) {
         // Bad request
@@ -2707,13 +2709,25 @@ class ActionService {
         };
       }
 
+      // Debug: Log phone numbers being sent
+      print('📱 SMS - Appointee Mobile: $appointeeMobile');
+      print('📱 SMS - Reference Mobile: $referenceMobile');
+      print('📱 SMS - Use Appointee: $useAppointee');
+      print('📱 SMS - Use Reference: $useReference');
+      
       // Prepare request body
       final Map<String, dynamic> requestBody = {
-        'appointeeMobile': appointeeMobile,
-        'referenceMobile': referenceMobile,
         'useAppointee': useAppointee,
         'useReference': useReference,
       };
+
+      // Only add mobile numbers if they are being used
+      if (useAppointee) {
+        requestBody['appointeeMobile'] = appointeeMobile;
+      }
+      if (useReference) {
+        requestBody['referenceMobile'] = referenceMobile;
+      }
 
       // Add optional fields
       if (otherSms != null && otherSms.isNotEmpty) {
@@ -3096,6 +3110,7 @@ class ActionService {
     bool useAppointee = true,
     bool useReference = true,
     String? otherEmail,
+    String? appointmentId, // 👈 Added appointmentId parameter
   }) async {
     final Uri url = Uri.parse('$baseUrl/appointment/send-email');
 
@@ -3110,6 +3125,9 @@ class ActionService {
       'useAppointee': useAppointee,
       'useReference': useReference,
       if (otherEmail != null) 'otherEmail': otherEmail,
+      if (appointmentId != null)
+        'appointmentId':
+            appointmentId, // 👈 Added appointmentId to request body
       'templateData': templateData ?? {}, // 👈 Ensure it's always an object
     };
 
@@ -3255,23 +3273,19 @@ class ActionService {
   // Create quick appointment without validation
   static Future<Map<String, dynamic>> createQuickAppointment({
     required String fullName,
-    required String emailId,
-    required String phoneNumber,
+    String? emailId,
+    String? phoneNumber,
     required String designation,
-    String? company,
-    bool isTeacher = false,
-    Map<String, dynamic>? photo,
-    Map<String, dynamic>? referenceDetails,
-    String? location,
+    required String venue,
     String? purpose,
     String? remarksForGurudev,
     int numberOfPeople = 1,
     required String preferredDate,
-    String? preferredTime,
+    required String preferredTime,
     bool tbsRequired = false,
     bool dontSendNotifications = false,
-    Map<String, dynamic>? attachment,
-    Map<String, dynamic>? programDetails,
+    File? photo,
+    File? attachment,
   }) async {
     try {
       // Get token from storage
@@ -3285,38 +3299,96 @@ class ActionService {
         };
       }
 
-      // Prepare request body
-      final Map<String, dynamic> requestBody = {
-        'appointmentType': 'myself',
-        'fullName': fullName,
-        'emailId': emailId,
-        'phoneNumber': phoneNumber,
-        'designation': designation,
-        'company': company,
-        'isTeacher': isTeacher,
-        'photo': photo,
-        'referenceDetails': referenceDetails,
-        'location': location,
-        'purpose': purpose,
-        'remarksForGurudev': remarksForGurudev,
-        'numberOfPeople': numberOfPeople,
-        'preferredDate': preferredDate,
-        'preferredTime': preferredTime,
-        'tbsRequired': tbsRequired,
-        'dontSendNotifications': dontSendNotifications,
-        'attachment': attachment,
-        'programDetails': programDetails,
-      };
-
-      // Make API call
-      final response = await http.post(
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
         Uri.parse('$baseUrl/appointment/quick'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(requestBody),
       );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add required fields
+      request.fields['name'] = fullName;
+      request.fields['fullName'] = fullName;
+      request.fields['designation'] = designation;
+      request.fields['preferredDate'] = preferredDate;
+      request.fields['preferredTime'] = preferredTime;
+      request.fields['venue'] = venue;
+
+      // Add optional fields only if they have actual values
+      if (emailId != null && emailId.trim().isNotEmpty) {
+        request.fields['emailId'] = emailId.trim();
+      }
+
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+        request.fields['phoneNumber'] = phoneNumber.trim();
+      }
+
+      if (purpose != null && purpose.trim().isNotEmpty) {
+        request.fields['purpose'] = purpose.trim();
+      }
+
+      if (remarksForGurudev != null && remarksForGurudev.trim().isNotEmpty) {
+        request.fields['remarksForGurudev'] = remarksForGurudev.trim();
+      }
+
+      // Add numberOfPeople only if it's greater than 1 (user actually changed it)
+      if (numberOfPeople > 1) {
+        request.fields['numberOfPeople'] = numberOfPeople.toString();
+      }
+
+      // Add boolean fields only if they are true (user actually selected them)
+      if (tbsRequired) {
+        request.fields['tbsRequired'] = 'true';
+      }
+
+      if (dontSendNotifications) {
+        request.fields['dontSendNotifications'] = 'true';
+      }
+
+      // Debug: Log what fields are being sent
+      print('📤 Fields being sent to backend:');
+      request.fields.forEach((key, value) {
+        print('📤 $key: $value');
+      });
+      print(
+        '📤 Files being sent: ${request.files.map((f) => f.field).toList()}',
+      );
+
+      // Add photo file if provided
+      if (photo != null) {
+        print('📸 Adding photo file: ${photo.path}');
+        final photoStream = http.ByteStream(photo.openRead());
+        final photoLength = await photo.length();
+        print('📸 Photo file size: ${photoLength} bytes');
+        final photoMultipart = http.MultipartFile(
+          'photo',
+          photoStream,
+          photoLength,
+          filename: photo.path.split('/').last,
+        );
+        request.files.add(photoMultipart);
+      }
+
+      // Add attachment file if provided
+      if (attachment != null) {
+        print('📎 Adding attachment file: ${attachment.path}');
+        final attachmentStream = http.ByteStream(attachment.openRead());
+        final attachmentLength = await attachment.length();
+        print('📎 Attachment file size: ${attachmentLength} bytes');
+        final attachmentMultipart = http.MultipartFile(
+          'attachment',
+          attachmentStream,
+          attachmentLength,
+          filename: attachment.path.split('/').last,
+        );
+        request.files.add(attachmentMultipart);
+      }
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
       // Parse response
       final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -3454,6 +3526,89 @@ class ActionService {
           'statusCode': response.statusCode,
           'message':
               responseData['message'] ?? 'Failed to retrieve ashram locations',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get all venues
+  static Future<Map<String, dynamic>> getAllVenues({
+    int page = 1,
+    int limit = 10,
+    String sortBy = "createdAt",
+    String sortOrder = "desc",
+    String? search,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+      };
+
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse(
+        '$baseUrl/venues',
+      ).replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful response
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Venues retrieved successfully',
+          'pagination': responseData['data']['pagination'],
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve venues',
         };
       }
     } catch (error) {

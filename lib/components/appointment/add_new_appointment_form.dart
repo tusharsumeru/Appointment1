@@ -10,11 +10,8 @@ class AddNewAppointmentForm extends StatefulWidget {
   final VoidCallback? onSave;
   final VoidCallback? onCancel;
 
-  const AddNewAppointmentForm({
-    Key? key,
-    this.onSave,
-    this.onCancel,
-  }) : super(key: key);
+  const AddNewAppointmentForm({Key? key, this.onSave, this.onCancel})
+    : super(key: key);
 
   @override
   State<AddNewAppointmentForm> createState() => _AddNewAppointmentFormState();
@@ -23,18 +20,20 @@ class AddNewAppointmentForm extends StatefulWidget {
 class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
-  
+
   // Form controllers
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _designationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _noPeopleController = TextEditingController(text: '1');
+  final TextEditingController _noPeopleController = TextEditingController(
+    text: '1',
+  );
   final TextEditingController _mobileNoController = TextEditingController();
   final TextEditingController _purposeController = TextEditingController();
   final TextEditingController _remarkController = TextEditingController();
-  
+
   // Form values
   String _selectedCountryCode = '+91';
   String _selectedVenue = '';
@@ -42,17 +41,11 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   bool _dontSendNotifications = false;
   File? _selectedImage;
   File? _selectedAttachment;
-  
-  // Venue options
-  final List<String> _venueOptions = [
-    'Secretariat Office A1',
-    'Special Enclosure - Shiva Temple',
-    'Yoga School',
-    'Radha Kunj',
-    'Shiva Temple',
-    'Satsang Backstage',
-    'Gurukul',
-  ];
+
+  // Venue options - will be loaded from API
+  List<Map<String, dynamic>> _venueOptions = [];
+  bool _isLoadingVenues = false;
+  String? _venueError;
 
   // Country codes (using the JSON we created)
   List<Map<String, dynamic>> _countryCodes = [];
@@ -61,12 +54,15 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   void initState() {
     super.initState();
     _loadCountryCodes();
+    _loadVenues();
     _setDefaultDate();
   }
 
   void _loadCountryCodes() async {
     try {
-      final String jsonString = await DefaultAssetBundle.of(context).loadString('lib/data/country_codes.json');
+      final String jsonString = await DefaultAssetBundle.of(
+        context,
+      ).loadString('lib/data/country_codes.json');
       final Map<String, dynamic> jsonData = json.decode(jsonString);
       setState(() {
         _countryCodes = List<Map<String, dynamic>>.from(jsonData['countries']);
@@ -89,9 +85,74 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     _timeController.text = '';
   }
 
+  void _loadVenues() async {
+    setState(() {
+      _isLoadingVenues = true;
+      _venueError = null;
+    });
+
+    try {
+      final result = await ActionService.getAllVenues(
+        limit: 100, // Get more venues
+      );
+
+      print('Venue API Response: $result'); // Debug log
+
+      if (result['success']) {
+        final data = result['data'];
+        if (data != null && data['venues'] != null) {
+          final venuesData = data['venues'] as List<dynamic>;
+          setState(() {
+            _venueOptions = venuesData.cast<Map<String, dynamic>>();
+            _isLoadingVenues = false;
+          });
+          print('Loaded ${_venueOptions.length} venues'); // Debug log
+        } else {
+          setState(() {
+            _venueError = 'Invalid venue data structure';
+            _isLoadingVenues = false;
+            _venueOptions = [];
+          });
+        }
+      } else {
+        setState(() {
+          _venueError = result['message'] ?? 'Failed to load venues';
+          _isLoadingVenues = false;
+          _venueOptions = [];
+        });
+      }
+    } catch (error) {
+      print('Venue loading error: $error'); // Debug log
+      setState(() {
+        _venueError = 'Network error: ${error.toString()}';
+        _isLoadingVenues = false;
+        _venueOptions = [];
+      });
+    }
+  }
+
+  String _getSelectedVenueName() {
+    if (_selectedVenue.isEmpty || _venueOptions.isEmpty) return '';
+
+    try {
+      final selectedVenue = _venueOptions.firstWhere(
+        (venue) => venue['_id']?.toString() == _selectedVenue,
+        orElse: () => <String, dynamic>{},
+      );
+
+      return selectedVenue['name']?.toString() ?? 'Unknown Venue';
+    } catch (e) {
+      return 'Unknown Venue';
+    }
+  }
+
   String _getCountryFlag(String isoCode) {
     // Convert ISO code to flag emoji
-    final codePoints = isoCode.toUpperCase().codeUnits.map((e) => e + 127397).toList();
+    final codePoints = isoCode
+        .toUpperCase()
+        .codeUnits
+        .map((e) => e + 127397)
+        .toList();
     return String.fromCharCodes(codePoints);
   }
 
@@ -106,7 +167,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   void _showCountryCodeBottomSheet(BuildContext context) {
     List<Map<String, dynamic>> filteredCountries = List.from(_countryCodes);
     String searchQuery = '';
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -158,7 +219,8 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                         filteredCountries = _countryCodes.where((country) {
                           final name = country['name'].toString().toLowerCase();
                           final code = country['code'].toString().toLowerCase();
-                          return name.contains(searchQuery) || code.contains(searchQuery);
+                          return name.contains(searchQuery) ||
+                              code.contains(searchQuery);
                         }).toList();
                       }
                     });
@@ -171,8 +233,9 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     itemCount: filteredCountries.length,
                     itemBuilder: (context, index) {
                       final country = filteredCountries[index];
-                      final isSelected = _selectedCountryCode == country['code'];
-                      
+                      final isSelected =
+                          _selectedCountryCode == country['code'];
+
                       return ListTile(
                         leading: Text(
                           _getCountryFlag(country['iso'] as String),
@@ -181,11 +244,15 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                         title: Text(
                           '${country['name']} (${country['code']})',
                           style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             color: isSelected ? Colors.blue : Colors.black87,
                           ),
                         ),
-                        trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: Colors.blue)
+                            : null,
                         onTap: () {
                           this.setState(() {
                             _selectedCountryCode = country['code'] as String;
@@ -205,95 +272,205 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   }
 
   void _showVenueBottomSheet(BuildContext context) {
+    List<Map<String, dynamic>> filteredVenues = List.from(_venueOptions);
+    String searchQuery = '';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Title
-            Text(
-              'Select Venue',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Search field
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search venue...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.6,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              onChanged: (value) {
-                // TODO: Implement search functionality
-              },
-            ),
-            const SizedBox(height: 16),
-            // Venue list
-            Expanded(
-              child: ListView.builder(
-                itemCount: _venueOptions.length,
-                itemBuilder: (context, index) {
-                  final venue = _venueOptions[index];
-                  final isSelected = _selectedVenue == venue;
-                  
-                  return ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.grey),
-                    title: Text(
-                      venue,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.blue : Colors.black87,
-                      ),
+                const SizedBox(height: 16),
+                // Title
+                Text(
+                  'Select Venue',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Search field
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search venue...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
-                    onTap: () {
-                      setState(() {
-                        _selectedVenue = venue;
-                      });
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      searchQuery = value.toLowerCase();
+                      if (searchQuery.isEmpty) {
+                        filteredVenues = List.from(_venueOptions);
+                      } else {
+                        filteredVenues = _venueOptions.where((venue) {
+                          final name =
+                              venue['name']?.toString().toLowerCase() ?? '';
+                          return name.contains(searchQuery);
+                        }).toList();
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Venue list
+                Expanded(
+                  child: _isLoadingVenues
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Loading venues...'),
+                            ],
+                          ),
+                        )
+                      : _venueError != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Failed to load venues',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _venueError!,
+                                style: TextStyle(color: Colors.grey[600]),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _loadVenues();
+                                },
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : filteredVenues.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.location_off,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'No venues found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Try adjusting your search',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: filteredVenues.length,
+                          itemBuilder: (context, index) {
+                            final venue = filteredVenues[index];
+                            final venueName =
+                                venue['name']?.toString() ?? 'Unknown Venue';
+                            final venueId = venue['_id']?.toString() ?? '';
+                            final isSelected = _selectedVenue == venueId;
+
+                            return ListTile(
+                              leading: const Icon(
+                                Icons.location_on,
+                                color: Colors.grey,
+                              ),
+                              title: Text(
+                                venueName,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? Colors.blue
+                                      : Colors.black87,
+                                ),
+                              ),
+                              subtitle: venue['locationId'] != null
+                                  ? Text(
+                                      'ID: ${venue['locationId']}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    )
+                                  : null,
+                              trailing: isSelected
+                                  ? const Icon(Icons.check, color: Colors.blue)
+                                  : null,
+                              onTap: () {
+                                this.setState(() {
+                                  _selectedVenue = venueId;
+                                });
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-
-
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
-    
+
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
       });
+      print('📸 Image selected: ${pickedFile.path}');
     }
   }
 
@@ -308,11 +485,12 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     // In a real app, you'd want to use file_picker package
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (pickedFile != null) {
       setState(() {
         _selectedAttachment = File(pickedFile.path);
       });
+      print('📎 Attachment selected: ${pickedFile.path}');
     }
   }
 
@@ -326,7 +504,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     // Validate all required fields
     bool isValid = true;
     String errorMessage = '';
-    
+
     // Validate name
     if (_fullNameController.text.trim().isEmpty) {
       isValid = false;
@@ -347,23 +525,19 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       isValid = false;
       errorMessage = 'Please select time';
     }
-
     // Validate venue
     else if (_selectedVenue.isEmpty) {
       isValid = false;
       errorMessage = 'Please select venue';
     }
-    
+
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
       return;
     }
-    
+
     if (_formKey.currentState!.validate()) {
       try {
         // Show loading indicator
@@ -371,44 +545,51 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           context: context,
           barrierDismissible: false,
           builder: (BuildContext context) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           },
         );
 
+        // Debug: Log what data is being prepared
+        print('📋 Form data being prepared:');
+        print('📋 Full Name: ${_fullNameController.text}');
+        print('📋 Email: ${_emailController.text.isNotEmpty ? _emailController.text : 'Not provided'}');
+        print('📋 Phone: ${_mobileNoController.text.isNotEmpty ? '$_selectedCountryCode${_mobileNoController.text}' : 'Not provided'}');
+        print('📋 Designation: ${_designationController.text}');
+        print('📋 Venue: ${_selectedVenue}');
+        print('📋 Purpose: ${_purposeController.text.isNotEmpty ? _purposeController.text : 'Not provided'}');
+        print('📋 Remarks: ${_remarkController.text.isNotEmpty ? _remarkController.text : 'Not provided'}');
+        print('📋 Number of People: ${_noPeopleController.text}');
+        print('📋 Date: ${_dateController.text}');
+        print('📋 Time: ${_timeController.text}');
+        print('📋 TBS Required: $_tbsRequired');
+        print('📋 Don\'t Send Notifications: $_dontSendNotifications');
+        print('📋 Photo: ${_selectedImage?.path ?? 'None'}');
+        print('📋 Attachment: ${_selectedAttachment?.path ?? 'None'}');
+        
         // Call the ActionService to create the appointment
         final result = await ActionService.createQuickAppointment(
           fullName: _fullNameController.text,
-          emailId: _emailController.text,
-          phoneNumber: '$_selectedCountryCode${_mobileNoController.text}',
+          emailId: _emailController.text.isNotEmpty
+              ? _emailController.text
+              : null,
+          phoneNumber: _mobileNoController.text.isNotEmpty
+              ? '$_selectedCountryCode${_mobileNoController.text}'
+              : null,
           designation: _designationController.text,
-          company: '', // Company field
-          isTeacher: false, // Is teacher field
-          photo: _selectedImage != null ? {
-            'url': _selectedImage!.path,
-            'filename': _selectedImage!.path.split('/').last,
-          } : null,
-          referenceDetails: {
-            'name': _fullNameController.text, // Use full name as reference
-            'email': _emailController.text,
-            'phone': '$_selectedCountryCode${_mobileNoController.text}',
-          },
-          location: _selectedVenue,
-          purpose: _purposeController.text,
-          remarksForGurudev: _remarkController.text,
+          venue: _selectedVenue,
+          purpose: _purposeController.text.isNotEmpty
+              ? _purposeController.text
+              : null,
+          remarksForGurudev: _remarkController.text.isNotEmpty
+              ? _remarkController.text
+              : null,
           numberOfPeople: int.tryParse(_noPeopleController.text) ?? 1,
           preferredDate: _dateController.text,
           preferredTime: _timeController.text,
           tbsRequired: _tbsRequired,
           dontSendNotifications: _dontSendNotifications,
-          attachment: _selectedAttachment != null ? {
-            'url': _selectedAttachment!.path,
-            'filename': _selectedAttachment!.path.split('/').last,
-          } : null,
-          programDetails: {
-            'isAttending': false, // Default to false
-          },
+          photo: _selectedImage,
+          attachment: _selectedAttachment,
         );
 
         // Close loading dialog
@@ -418,7 +599,9 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Appointment created successfully!'),
+              content: Text(
+                result['message'] ?? 'Appointment created successfully!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -432,16 +615,17 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           // Show error message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Failed to create appointment'),
+              content: Text(
+                result['message'] ?? 'Failed to create appointment',
+              ),
               backgroundColor: Colors.red,
             ),
           );
         }
-
       } catch (error) {
         // Close loading dialog
         Navigator.of(context).pop();
-        
+
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -449,7 +633,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
             backgroundColor: Colors.red,
           ),
         );
-        
+
         print('Error creating appointment: $error');
       }
     }
@@ -497,10 +681,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 ),
               ],
             ),
@@ -573,7 +754,10 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[400]!),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             hintStyle: TextStyle(color: Colors.grey[500]),
           ),
         ),
@@ -586,7 +770,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Mobile Number',
+          'Mobile Number (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -606,21 +790,28 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
               GestureDetector(
                 onTap: () => _showCountryCodeBottomSheet(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
-                    border: Border(
-                      right: BorderSide(color: Colors.grey[200]!),
-                    ),
+                    border: Border(right: BorderSide(color: Colors.grey[200]!)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _getCountryFlag(_getSelectedCountryIso(_selectedCountryCode)),
+                        _getCountryFlag(
+                          _getSelectedCountryIso(_selectedCountryCode),
+                        ),
                         style: const TextStyle(fontSize: 18),
                       ),
                       const SizedBox(width: 2),
-                      const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 16),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.grey,
+                        size: 16,
+                      ),
                     ],
                   ),
                 ),
@@ -645,7 +836,10 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                         decoration: const InputDecoration(
                           hintText: 'Enter mobile number',
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 16),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 0,
+                            vertical: 16,
+                          ),
                           counterText: '', // Remove the character counter
                         ),
                         keyboardType: TextInputType.phone,
@@ -667,7 +861,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Photo',
+          'Photo (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -677,10 +871,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
         const SizedBox(height: 4),
         Text(
           'Upload a clear photo of the appointee or take a new one',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[500],
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
         const SizedBox(height: 16),
         // Upload from Device
@@ -696,26 +887,16 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
             ),
             child: Column(
               children: [
-                Icon(
-                  Icons.cloud_upload,
-                  size: 32,
-                  color: Colors.grey[600],
-                ),
+                Icon(Icons.cloud_upload, size: 32, color: Colors.grey[600]),
                 const SizedBox(height: 12),
                 const Text(
                   'Upload from Device',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Choose an existing photo from your device',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -723,7 +904,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Take Photo
         GestureDetector(
           onTap: () => _pickImage(ImageSource.camera),
@@ -737,26 +918,16 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
             ),
             child: Column(
               children: [
-                Icon(
-                  Icons.camera_alt,
-                  size: 32,
-                  color: Colors.grey[600],
-                ),
+                Icon(Icons.camera_alt, size: 32, color: Colors.grey[600]),
                 const SizedBox(height: 12),
                 const Text(
                   'Take Photo',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Use your device camera to take a new photo',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -799,10 +970,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                       ),
                       Text(
                         'Tap to remove',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -815,11 +983,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                       color: Colors.red[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
-                      Icons.delete,
-                      color: Colors.red[600],
-                      size: 20,
-                    ),
+                    child: Icon(Icons.delete, color: Colors.red[600], size: 20),
                   ),
                 ),
               ],
@@ -835,7 +999,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Attachment',
+          'Attachment (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -845,10 +1009,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
         const SizedBox(height: 4),
         Text(
           'Upload any relevant documents or files',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[500],
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
         const SizedBox(height: 16),
         // Upload Attachment
@@ -864,22 +1025,19 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.attach_file,
-                  size: 20,
-                  color: Colors.grey[600],
-                ),
+                Icon(Icons.attach_file, size: 20, color: Colors.grey[600]),
                 const SizedBox(width: 12),
-                                 Expanded(
-                   child: Text(
-                     'Choose file',
-                     style: TextStyle(
-                       color: Colors.grey[500],
-                       fontSize: 16,
-                     ),
-                   ),
-                 ),
-                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+                Expanded(
+                  child: Text(
+                    'Choose file',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 16),
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.grey,
+                  size: 16,
+                ),
               ],
             ),
           ),
@@ -922,10 +1080,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                       ),
                       Text(
                         _selectedAttachment!.path.split('/').last,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -938,11 +1093,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                       color: Colors.red[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
-                      Icons.delete,
-                      color: Colors.red[600],
-                      size: 20,
-                    ),
+                    child: Icon(Icons.delete, color: Colors.red[600], size: 20),
                   ),
                 ),
               ],
@@ -992,7 +1143,9 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   );
                   if (date != null) {
                     setState(() {
-                      _dateController.text = DateFormat('yyyy-MM-dd').format(date);
+                      _dateController.text = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(date);
                     });
                   }
                 },
@@ -1000,19 +1153,29 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                    color: const Color(
+                      0xFFFAFAFA,
+                    ).withOpacity(0.5), // zinc-50/50
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey[200]!),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.calendar_today, color: Colors.grey[600], size: 20),
+                      Icon(
+                        Icons.calendar_today,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _dateController.text.isEmpty ? 'Select Date' : _dateController.text,
+                          _dateController.text.isEmpty
+                              ? 'Select Date'
+                              : _dateController.text,
                           style: TextStyle(
-                            color: _dateController.text.isEmpty ? Colors.grey[500] : Colors.black87,
+                            color: _dateController.text.isEmpty
+                                ? Colors.grey[500]
+                                : Colors.black87,
                           ),
                         ),
                       ),
@@ -1058,7 +1221,8 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   );
                   if (time != null) {
                     setState(() {
-                      _timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                      _timeController.text =
+                          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
                     });
                   }
                 },
@@ -1066,19 +1230,29 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                    color: const Color(
+                      0xFFFAFAFA,
+                    ).withOpacity(0.5), // zinc-50/50
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey[200]!),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.access_time, color: Colors.grey[600], size: 20),
+                      Icon(
+                        Icons.access_time,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _timeController.text.isEmpty ? 'Select Time' : _timeController.text,
+                          _timeController.text.isEmpty
+                              ? 'Select Time'
+                              : _timeController.text,
                           style: TextStyle(
-                            color: _timeController.text.isEmpty ? Colors.grey[500] : Colors.black87,
+                            color: _timeController.text.isEmpty
+                                ? Colors.grey[500]
+                                : Colors.black87,
                           ),
                         ),
                       ),
@@ -1097,7 +1271,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     required String label,
     required String selectedValue,
     required String placeholder,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     required IconData icon,
     bool isRequired = false,
   }) {
@@ -1127,30 +1301,35 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           ],
         ),
         const SizedBox(height: 8),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: Colors.grey[600], size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    selectedValue.isEmpty ? placeholder : selectedValue,
-                    style: TextStyle(
-                      color: selectedValue.isEmpty ? Colors.grey[500] : Colors.black87,
+        Opacity(
+          opacity: onTap == null ? 0.6 : 1.0,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: Colors.grey[600], size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      selectedValue.isEmpty ? placeholder : selectedValue,
+                      style: TextStyle(
+                        color: selectedValue.isEmpty
+                            ? Colors.grey[500]
+                            : Colors.black87,
+                      ),
                     ),
                   ),
-                ),
-                const Icon(Icons.arrow_drop_down, color: Colors.grey),
-              ],
+                  const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                ],
+              ),
             ),
           ),
         ),
@@ -1162,25 +1341,13 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text(
-              'Select Option',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF374151), // gray-700
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Text(
-              '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        const Text(
+          'Select Option (Optional)',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF374151), // gray-700
+          ),
         ),
         const SizedBox(height: 8),
         Column(
@@ -1198,19 +1365,19 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     width: 16,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: _tbsRequired ? const Color(0xFFF97316) : Colors.white, // orange-600
+                      color: _tbsRequired
+                          ? const Color(0xFFF97316)
+                          : Colors.white, // orange-600
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: _tbsRequired ? const Color(0xFFF97316) : const Color(0xFFCBD5E1), // slate-300
+                        color: _tbsRequired
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFFCBD5E1), // slate-300
                         width: 1,
                       ),
                     ),
                     child: _tbsRequired
-                        ? const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 12,
-                          )
+                        ? const Icon(Icons.check, color: Colors.white, size: 12)
                         : null,
                   ),
                 ),
@@ -1246,19 +1413,19 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     width: 16,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: _dontSendNotifications ? const Color(0xFFF97316) : Colors.white, // orange-600
+                      color: _dontSendNotifications
+                          ? const Color(0xFFF97316)
+                          : Colors.white, // orange-600
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: _dontSendNotifications ? const Color(0xFFF97316) : const Color(0xFFCBD5E1), // slate-300
+                        color: _dontSendNotifications
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFFCBD5E1), // slate-300
                         width: 1,
                       ),
                     ),
                     child: _dontSendNotifications
-                        ? const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 12,
-                          )
+                        ? const Icon(Icons.check, color: Colors.white, size: 12)
                         : null,
                   ),
                 ),
@@ -1286,6 +1453,69 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
     );
   }
 
+  Widget _buildCreateAppointmentButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: ElevatedButton(
+        onPressed: _saveAppointment,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF3B82F6), // blue-500
+                Color(0xFF1D4ED8), // blue-700
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    'Create Appointment',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.add_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Form(
@@ -1307,7 +1537,10 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     label: 'Name',
                     controller: _fullNameController,
                     placeholder: 'Enter full name',
-                    prefixIcon: const Icon(Icons.person_outline, color: Colors.grey),
+                    prefixIcon: const Icon(
+                      Icons.person_outline,
+                      color: Colors.grey,
+                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter name';
@@ -1317,13 +1550,16 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Designation Field
                   _buildInputField(
                     label: 'Designation',
                     controller: _designationController,
                     placeholder: 'Professional title',
-                    prefixIcon: const Icon(Icons.work_outline, color: Colors.grey),
+                    prefixIcon: const Icon(
+                      Icons.work_outline,
+                      color: Colors.grey,
+                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter designation';
@@ -1333,24 +1569,32 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Date and Time
                   _buildDateTimeField(),
                   const SizedBox(height: 16),
-                  
+
                   // Select Option
                   _buildCheckboxOptions(),
                   const SizedBox(height: 16),
-                  
+
                   // Selected Venue
                   _buildSelectionField(
                     label: 'Selected Venue',
-                    selectedValue: _selectedVenue,
-                    placeholder: 'Select venue',
-                    onTap: () => _showVenueBottomSheet(context),
+                    selectedValue: _getSelectedVenueName(),
+                    placeholder: _isLoadingVenues
+                        ? 'Loading venues...'
+                        : 'Select venue',
+                    onTap: _isLoadingVenues
+                        ? null
+                        : () => _showVenueBottomSheet(context),
                     icon: Icons.location_on,
                     isRequired: true,
                   ),
+                  const SizedBox(height: 24),
+
+                  // Create Appointment Button (after venue selection)
+                  _buildCreateAppointmentButton(),
                 ],
               ),
             ),
@@ -1363,28 +1607,31 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                 children: [
                   // Email Field
                   _buildInputField(
-                    label: 'Email',
+                    label: 'Email (Optional)',
                     controller: _emailController,
                     placeholder: 'email@example.com',
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: const Icon(Icons.email, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Number of People
                   _buildInputField(
-                    label: 'No. of People',
+                    label: 'No. of People (Optional)',
                     controller: _noPeopleController,
                     placeholder: 'Total number of attendees',
                     keyboardType: TextInputType.number,
-                    prefixIcon: const Icon(Icons.people_outline, color: Colors.grey),
+                    prefixIcon: const Icon(
+                      Icons.people_outline,
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Photo Upload
                   _buildPhotoUpload(),
                   const SizedBox(height: 16),
-                  
+
                   // Mobile Number
                   _buildPhoneField(),
                 ],
@@ -1399,22 +1646,22 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                 children: [
                   // Purpose Field
                   _buildInputField(
-                    label: 'Purpose',
+                    label: 'Purpose (Optional)',
                     controller: _purposeController,
                     placeholder: 'Describe the purpose of the meeting',
                     maxLines: 4,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Remark Field
                   _buildInputField(
-                    label: 'Remark',
+                    label: 'Remark (Optional)',
                     controller: _remarkController,
                     placeholder: 'Any additional remarks or notes',
                     maxLines: 4,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Attachment Upload
                   _buildAttachmentUpload(),
                 ],
@@ -1458,12 +1705,16 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Create Quick Appointment',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        Flexible(
+                          child: Text(
+                            'Create Full Appointment',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         SizedBox(width: 16),
@@ -1483,4 +1734,4 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       ),
     );
   }
-} 
+}

@@ -940,6 +940,20 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _getAppointmentName(Map<String, dynamic> appointment) {
+    // Check if this is a quick appointment
+    final apptType = appointment['appt_type']?.toString();
+    final quickApt = appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final required = quickApt['required'];
+      if (required is Map<String, dynamic>) {
+        final name = required['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+      }
+    }
+
     // Try to get name from userId object first
     final userId = appointment['userId'];
     if (userId is Map<String, dynamic>) {
@@ -970,6 +984,20 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _getUserDesignation(Map<String, dynamic> appointment) {
+    // Check if this is a quick appointment
+    final apptType = appointment['appt_type']?.toString();
+    final quickApt = appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final required = quickApt['required'];
+      if (required is Map<String, dynamic>) {
+        final designation = required['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
+        }
+      }
+    }
+
     return appointment['userCurrentDesignation']?.toString() ?? '';
   }
 
@@ -1352,10 +1380,8 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     }
 
     // Use the correct domain for QR codes
-    const qrBaseUrl = 'https://divinepicrecognition.sumerudigital.com';
-    final qrUrl = '$qrBaseUrl/api/v3/public/qr-codes/qr-$appointmentId.png';
+    final qrUrl = '${ActionService.baseUrl}/public/qr-codes/qr-$appointmentId.png';
     final patientName = _getAppointmentName(appointment);
-    
     // Debug: Print the URL to console
     print('🔍 QR Code URL: $qrUrl');
     print('🔍 Appointment ID: $appointmentId');

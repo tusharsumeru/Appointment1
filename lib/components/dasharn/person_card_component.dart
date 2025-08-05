@@ -7,6 +7,7 @@ class PersonCardComponent extends StatefulWidget {
   final String requestedDate;
   final int peopleCount;
   final String status;
+  final String emailStatus; // Add email status parameter
   final bool isSelected;
   final Function(bool)? onSelectionChanged;
   final VoidCallback? onBellPressed;
@@ -25,6 +26,7 @@ class PersonCardComponent extends StatefulWidget {
     required this.requestedDate,
     required this.peopleCount,
     required this.status,
+    required this.emailStatus, // Add email status parameter
     this.isSelected = false,
     this.onSelectionChanged,
     this.onBellPressed,
@@ -81,7 +83,7 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
             _buildLabelValue('Requested Date', widget.requestedDate),
             _buildLabelValue('No. of People', widget.peopleCount.toString()),
             _buildLabelValue('Status', widget.status),
-            _buildLabelValue('Email', 'Not Sent'),
+            _buildLabelValue('Email', widget.emailStatus),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -119,9 +121,9 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.black87,
+                color: _getEmailStatusColor(value),
                 fontWeight: FontWeight.normal,
               ),
             ),
@@ -129,6 +131,14 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
         ],
       ),
     );
+  }
+
+  Color _getEmailStatusColor(String emailStatus) {
+    if (emailStatus == 'Email Sent') {
+      return Colors.green;
+    } else {
+      return Colors.black87;
+    }
   }
 
   Widget _buildSimpleActionIcon(IconData icon, String label, VoidCallback? onPressed) {

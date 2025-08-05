@@ -362,11 +362,48 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointmentName() {
+    // Check if this is a quick appointment
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final required = quickApt['required'];
+      if (required is Map<String, dynamic>) {
+        final name = required['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+      }
+    }
+
+    // Try to get name from userId object first
+    final userId = widget.appointment['userId'];
+    if (userId is Map<String, dynamic>) {
+      final fullName = userId['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return fullName;
+      }
+    }
+
     return widget.appointment['userCurrentDesignation']?.toString() ?? 
            widget.appointment['email']?.toString() ?? 'Unknown';
   }
 
   String _getAppointmentRole() {
+    // Check if this is a quick appointment
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final required = quickApt['required'];
+      if (required is Map<String, dynamic>) {
+        final designation = required['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
+        }
+      }
+    }
+
     return widget.appointment['userCurrentDesignation']?.toString() ?? '';
   }
 
@@ -3285,10 +3322,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       _showSnackBar('Error: Appointment ID not found', isError: true);
       return;
     }
-
-    // Use the correct domain for QR codes
-    const qrBaseUrl = 'https://divinepicrecognition.sumerudigital.com';
-    final qrUrl = '$qrBaseUrl/api/v3/public/qr-codes/qr-$appointmentId.png';
+    // Use the correct domain for QR codes from action.dart
+    final qrUrl = '${ActionService.baseUrl}/public/qr-codes/qr-$appointmentId.png';
     final patientName = _getAppointmentName();
     
     // Debug: Print the URL to console
