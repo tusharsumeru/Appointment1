@@ -179,10 +179,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 24.0),
             child: Form(
               key: _formKey,
               child: ConstrainedBox(
@@ -196,11 +197,37 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // App Logo/Title
-                      const Icon(
-                        Icons.calendar_today,
-                        size: 80,
-                        color: Colors.deepPurple,
+                      // AOL Logo
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 32),
+                        child: Image.asset(
+                          'image/aol-logo.jpg',
+                          height: 120,
+                          width: 200,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to text if image fails to load
+                            return Container(
+                              height: 120,
+                              width: 200,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'THE ART OF LIVING',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.deepPurple,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -316,15 +343,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
 
                       // Forgot Password
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Navigate to forgot password page
-                        },
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(color: Colors.deepPurple),
-                        ),
-                      ),
+                      // TextButton(
+                      //   onPressed: () {
+                      //     // TODO: Navigate to forgot password page
+                      //   },
+                      //   child: const Text(
+                      //     'Forgot Password?',
+                      //     style: TextStyle(color: Colors.deepPurple),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

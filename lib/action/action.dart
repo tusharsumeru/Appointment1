@@ -6,7 +6,64 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
-      'https://9e5a38f5b0b1.ngrok-free.app/api/v3'; // API base URL
+      'https://divinepicrecognition.sumerudigital.com/api/v3'; // API base URL
+
+  static Future<Map<String, dynamic>> getAllSecretaries({
+    int page = 1,
+    int limit = 10,
+    String? search,
+    bool? isActive,
+  }) async {
+    try {
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
+      if (isActive != null) {
+        queryParams['isActive'] = isActive.toString();
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/auth/secretaries',
+        ).replace(queryParameters: queryParams),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Successfully retrieved secretaries',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to retrieve secretaries',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -269,8 +326,11 @@ class ActionService {
     bool? past,
     String? assignedSecretary,
     bool? starred,
+    bool? assigned, // Add assigned parameter for filtering
+    bool? unassigned, // Add unassigned parameter for filtering
     Map<String, dynamic>? additionalFilters,
     String? screen, // "inbox" or "assigned_to_me"
+    String? filter, // New filter parameter for secretary filtering
   }) async {
     try {
       // Get token from storage
@@ -323,6 +383,17 @@ class ActionService {
       }
       if (starred != null) {
         queryParams['starred'] = starred.toString();
+      }
+      if (assigned != null) {
+        queryParams['assigned'] = assigned.toString();
+      }
+      if (unassigned != null) {
+        queryParams['unassigned'] = unassigned.toString();
+      }
+
+      // Add filter parameter for secretary filtering
+      if (filter != null) {
+        queryParams['filter'] = filter;
       }
 
       // Add additional filters
@@ -3256,7 +3327,9 @@ class ActionService {
           'success': true,
           'statusCode': 201,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Quick appointment created successfully',
+          'message':
+              responseData['message'] ??
+              'Quick appointment created successfully',
           'error': null,
         };
       } else if (response.statusCode == 400) {
@@ -3479,6 +3552,7 @@ class ActionService {
     String? startDate,
     String? endDate,
     String? deletedBy,
+    String? assignedSecretary,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -3515,6 +3589,9 @@ class ActionService {
       }
       if (deletedBy != null && deletedBy.isNotEmpty) {
         queryParams['deletedBy'] = deletedBy;
+      }
+      if (assignedSecretary != null && assignedSecretary.isNotEmpty) {
+        queryParams['assignedSecretary'] = assignedSecretary;
       }
 
       // Build URI with query parameters

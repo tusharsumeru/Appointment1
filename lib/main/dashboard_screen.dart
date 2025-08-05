@@ -25,7 +25,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   List<Map<String, dynamic>> _appointments = [];
   List<Map<String, dynamic>> _filteredAppointments = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _error;
+  
+  // Pagination variables
+  int _currentPage = 1;
+  int _pageSize = 10;
+  bool _hasMoreData = true;
 
   // Filter variables
   String _selectedEmailStatus = '';
@@ -78,20 +84,53 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     super.dispose();
   }
 
-  Future<void> _fetchAppointments({String? search}) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _fetchAppointments({String? search, bool isLoadMore = false}) async {
+    if (isLoadMore) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    } else {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+        _currentPage = 1;
+        _hasMoreData = true;
+      });
+    }
 
-          try {
-        final data = await ActionService.fetchAppointments(search: search);
+    try {
+      final data = await ActionService.fetchAppointments(
+        search: search,
+        page: isLoadMore ? _currentPage + 1 : 1,
+        pageSize: _pageSize,
+      );
+      
+      if (isLoadMore) {
+        // Append new data to existing list
+        if (data.isNotEmpty) {
+          setState(() {
+            _appointments.addAll(data);
+            _filteredAppointments = _appointments;
+            _currentPage++;
+            _hasMoreData = data.length >= _pageSize;
+          });
+        } else {
+          setState(() {
+            _hasMoreData = false;
+          });
+        }
+      } else {
+        // Replace data for fresh load
         setState(() {
           _appointments = data;
-          _filteredAppointments = data; // Initially show all appointments
+          _filteredAppointments = data;
+          _currentPage = 1;
+          _hasMoreData = data.length >= _pageSize;
         });
-        print("📦 Appointments Fetched: $_appointments");
-      } catch (e) {
+      }
+      
+      print("📦 Appointments Fetched: ${_appointments.length} total");
+    } catch (e) {
       setState(() {
         _error = e.toString();
       });
@@ -99,6 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     } finally {
       setState(() {
         _isLoading = false;
+        _isLoadingMore = false;
       });
     }
   }
@@ -132,6 +172,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       _fromDate = null;
       _toDate = null;
       _filteredAppointments = _appointments; // Show all appointments
+      _currentPage = 1;
+      _hasMoreData = true;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Filters cleared!')),
@@ -139,6 +181,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   void _applyFiltersToData() {
+    // Reset pagination when filters are applied
+    _currentPage = 1;
+    _hasMoreData = true;
+    
     // If no filters are set, show all appointments
     if (_selectedEmailStatus.isEmpty && 
         _selectedDarshanType.isEmpty && 
@@ -413,6 +459,50 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   void _performSearch(String query) {
     _fetchAppointments(search: query);
+  }
+
+  void _loadMore() {
+    if (!_isLoadingMore && _hasMoreData) {
+      _fetchAppointments(isLoadMore: true);
+    }
+  }
+
+  Widget _buildLoadMoreButton() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: _isLoadingMore
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : ElevatedButton(
+              onPressed: _loadMore,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.expand_more, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Load More',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
   }
 
   void _sendBulkEmail() {
@@ -710,8 +800,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                       : _error != null
                           ? Center(child: Text('Error: $_error'))
                                                      : ListView.builder(
-                               itemCount: _filteredAppointments.length,
+                               itemCount: _filteredAppointments.length + (_hasMoreData ? 1 : 0),
                                itemBuilder: (context, index) {
+                                 // Show load more button at the end
+                                 if (index == _filteredAppointments.length) {
+                                   return _buildLoadMoreButton();
+                                 }
+                                 
                                  final item = _filteredAppointments[index];
                                 return PersonCardComponent(
                                   name: item['createdBy']?['fullName'] ?? 'No Name',
