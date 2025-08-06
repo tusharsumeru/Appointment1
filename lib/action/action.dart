@@ -9,7 +9,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://1f27bc24155b.ngrok-free.app/api/v3'; // API base URL
+      'https://5fca9d234d88.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -1071,6 +1071,7 @@ class ActionService {
     Map<String, dynamic>? options,
     String? meetingType,
     String? venueId, // Changed from venue to venueId
+    String? venueLabel, // Added venueLabel parameter
     String? arrivalTime,
     Map<String, dynamic>? scheduleConfirmation,
   }) async {
@@ -1144,17 +1145,32 @@ class ActionService {
         requestBody['meetingType'] = meetingType;
       }
       if (venueId != null) {
-        requestBody['venue'] = venueId; // Send venue ID instead of venue name
+        requestBody['venue'] = venueId; // Send venue ID
+        if (venueLabel != null) {
+          requestBody['venueLabel'] = venueLabel; // Send venue label
+        }
       }
       if (arrivalTime != null) {
         requestBody['arrivalTime'] = arrivalTime;
       }
+      
+      // Handle schedule confirmation - map to sc_date and sc_time
       if (scheduleConfirmation != null) {
-        requestBody['scheduleConfirmation'] = scheduleConfirmation;
+        final date = scheduleConfirmation['date'];
+        final time = scheduleConfirmation['time'];
+        if (date != null) {
+          requestBody['sc_date'] = date;
+        }
+        if (time != null) {
+          requestBody['sc_time'] = time;
+        }
       }
 
-      // Make API call
-      final response = await http.post(
+      // Make API call - Changed from POST to PUT
+      print('🌐 [API] Making PUT request to: $baseUrl/appointment/$appointmentId/schedule');
+      print('📦 [API] Request body: ${jsonEncode(requestBody)}');
+      
+      final response = await http.put(
         Uri.parse('$baseUrl/appointment/$appointmentId/schedule'),
         headers: {
           'Content-Type': 'application/json',
@@ -1162,6 +1178,9 @@ class ActionService {
         },
         body: jsonEncode(requestBody),
       );
+      
+      print('📡 [API] Response status: ${response.statusCode}');
+      print('📄 [API] Response body: ${response.body}');
 
       // Parse response
       Map<String, dynamic> responseData;

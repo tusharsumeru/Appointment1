@@ -1132,8 +1132,8 @@ class _EmailFormState extends State<EmailForm> {
       // Get email data
       final emailData = _getEmailData();
       
-      // Show confirmation dialog
-      _showEmailConfirmationDialog(emailData);
+      // FIXED: Send email directly without confirmation dialog
+      _sendEmailToBackend(emailData);
     }
   }
 

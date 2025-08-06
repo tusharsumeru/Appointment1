@@ -36,16 +36,14 @@ class _ReminderFormState extends State<ReminderForm> {
   String _selectedScheduleDate = '';
   String _selectedScheduleTime = '';
   String _selectedMeetingType = 'in_person'; // Set default to 'in_person'
-  String _selectedVenueId = '507f1f77bcf86cd799439011'; // Default venue ID
-  String _selectedVenueName = 'Secretariat Office A1';
+  String _selectedVenueId = ''; // Will be set from API
+  String _selectedVenueName = 'Select a venue';
   
   // Checkbox states
   bool _tbsReq = true;
   bool _dontSendEmailSms = false;
   bool _sendArrivalTime = false;
   bool _scheduleEmailSms = false;
-  bool _sendVdsEmail = false;
-  bool _stayAvailable = false;
   
   // Visibility states
   bool _showArrivalTime = false;
@@ -56,44 +54,10 @@ class _ReminderFormState extends State<ReminderForm> {
   // Loading state
   bool _isLoading = false;
 
-  // Venue data with IDs
-  static const List<Map<String, String>> _venues = [
-    {
-      'id': '507f1f77bcf86cd799439011',
-      'name': 'Secretariat Office A1',
-      'fullName': 'Secretariat Office A1, Art of Living International Center, Bangalore.'
-    },
-    {
-      'id': '507f1f77bcf86cd799439012',
-      'name': 'Special Enclosure - Shiva Temple',
-      'fullName': 'Special Enclosure - Shiva Temple, next to Yoga school, Art of Living International Center, Bangalore.'
-    },
-    {
-      'id': '507f1f77bcf86cd799439013',
-      'name': 'Yoga School',
-      'fullName': 'Yoga School, next to Maitri Hall, Art of Living International Center, Bangalore.'
-    },
-    {
-      'id': '507f1f77bcf86cd799439014',
-      'name': 'Radha Kunj',
-      'fullName': 'Radha Kunj, Near Sri Sri Tattva Panchakarma Admin Office'
-    },
-    {
-      'id': '507f1f77bcf86cd799439015',
-      'name': 'Shiva Temple',
-      'fullName': 'Shiva Temple, next to Yoga school, Art of Living International Center, Bangalore.'
-    },
-    {
-      'id': '507f1f77bcf86cd799439016',
-      'name': 'Satsang Backstage',
-      'fullName': 'Satsang Backstage'
-    },
-    {
-      'id': '507f1f77bcf86cd799439017',
-      'name': 'Gurukul',
-      'fullName': 'Gurukul'
-    },
-  ];
+  // Venue data from API
+  List<Map<String, dynamic>> _venueOptions = [];
+  bool _isLoadingVenues = false;
+  String? _venueError;
 
   String _getAppointmentName() {
     return widget.appointment['userCurrentDesignation']?.toString() ?? 
@@ -101,15 +65,135 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   String _getAppointmentId() {
-    return widget.appointment['appointmentId']?.toString() ?? 
-           widget.appointment['_id']?.toString() ?? '';
+    final appointmentId = widget.appointment['appointmentId']?.toString();
+    final id = widget.appointment['_id']?.toString();
+    
+    print('🔍 [ID] Available IDs:');
+    print('   📋 appointmentId: $appointmentId');
+    print('   🆔 _id: $id');
+    
+    // FIXED: Use MongoDB _id instead of appointmentId for backend compatibility
+    final result = id ?? appointmentId ?? '';
+    print('   ✅ Using ID: $result (${id != null ? 'MongoDB _id' : 'appointmentId'})');
+    
+    return result;
+  }
+
+  void _loadVenues() async {
+    print('🔄 [VENUE] Starting to load venues...');
+    setState(() {
+      _isLoadingVenues = true;
+      _venueError = null;
+    });
+
+    try {
+      final result = await ActionService.getAllVenues(
+        limit: 100, // Get more venues
+      );
+
+      print('📡 [VENUE] API Response received: ${result['success'] ? 'SUCCESS' : 'FAILED'}');
+
+      if (result['success']) {
+        final data = result['data'];
+        if (data != null && data['venues'] != null) {
+          final venuesData = data['venues'] as List<dynamic>;
+          setState(() {
+            _venueOptions = venuesData.cast<Map<String, dynamic>>();
+            _isLoadingVenues = false;
+            
+            print('✅ [VENUE] Successfully loaded ${_venueOptions.length} venues');
+            
+            // Debug: Check for duplicate IDs
+            final venueIds = _venueOptions.map((v) => v['_id']?.toString()).where((id) => id != null).toList();
+            final uniqueIds = venueIds.toSet();
+            if (venueIds.length != uniqueIds.length) {
+              print('⚠️  [VENUE] WARNING: Duplicate venue IDs found! Total: ${venueIds.length}, Unique: ${uniqueIds.length}');
+            }
+            
+            // Set default venue if venues are available and no venue is selected
+            if (_venueOptions.isNotEmpty) {
+              // Check if current selected venue exists in loaded venues
+              final venueExists = _venueOptions.any((venue) => venue['_id']?.toString() == _selectedVenueId);
+              
+              if (_selectedVenueId.isEmpty || !venueExists) {
+                // Set to first venue if none selected or current selection doesn't exist
+                final firstVenue = _venueOptions.first;
+                _selectedVenueId = firstVenue['_id']?.toString() ?? '';
+                _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
+                print('🎯 [VENUE] Auto-selected first venue: ${_selectedVenueName} (ID: ${_selectedVenueId})');
+              } else {
+                // Update venue name for existing selection
+                final selectedVenue = _venueOptions.firstWhere(
+                  (venue) => venue['_id']?.toString() == _selectedVenueId,
+                  orElse: () => <String, dynamic>{},
+                );
+                _selectedVenueName = selectedVenue['name']?.toString() ?? 'Select a venue';
+                print('🎯 [VENUE] Updated venue name for existing selection: ${_selectedVenueName}');
+              }
+            } else {
+              print('⚠️  [VENUE] No venues available to select');
+            }
+          });
+        } else {
+          print('❌ [VENUE] Invalid venue data structure received');
+          setState(() {
+            _venueError = 'Invalid venue data structure';
+            _isLoadingVenues = false;
+            _venueOptions = [];
+          });
+        }
+      } else {
+        print('❌ [VENUE] API failed: ${result['message']}');
+        setState(() {
+          _venueError = result['message'] ?? 'Failed to load venues';
+          _isLoadingVenues = false;
+          _venueOptions = [];
+        });
+      }
+    } catch (error) {
+      print('💥 [VENUE] Network error: $error');
+      setState(() {
+        _venueError = 'Network error: ${error.toString()}';
+        _isLoadingVenues = false;
+        _venueOptions = [];
+      });
+    }
+  }
+
+  String _getSelectedVenueName() {
+    // If venues are still loading, show placeholder
+    if (_isLoadingVenues) {
+      return 'Loading venues...';
+    }
+    
+    // If no venue is selected or venues are empty, show placeholder
+    if (_selectedVenueId.isEmpty || _venueOptions.isEmpty) {
+      return 'Select a venue';
+    }
+
+    try {
+      final selectedVenue = _venueOptions.firstWhere(
+        (venue) => venue['_id']?.toString() == _selectedVenueId,
+        orElse: () => <String, dynamic>{},
+      );
+
+      return selectedVenue['name']?.toString() ?? 'Select a venue';
+    } catch (e) {
+      return 'Select a venue';
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    print('🚀 [INIT] ReminderForm initialized');
+    print('   📅 Default time: $_selectedTime');
+    print('   ⏰ Default arrival time: $_selectedArrivalTime');
+    print('   🏢 Default meeting type: $_selectedMeetingType');
+    
     _timeController.text = _selectedTime;
     _arrivalTimeController.text = _selectedArrivalTime;
+    _loadVenues(); // Load venues from API
   }
 
   @override
@@ -123,7 +207,9 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   void _saveReminder() async {
+    print('💾 [SAVE] Starting to save reminder...');
     if (_formKey.currentState!.validate()) {
+      print('✅ [SAVE] Form validation passed');
       setState(() {
         _isLoading = true;
       });
@@ -135,9 +221,14 @@ class _ReminderFormState extends State<ReminderForm> {
           'dontSendNotifications': _dontSendEmailSms,
           'sendArrivalTime': _sendArrivalTime,
           'scheduleEmailSmsConfirmation': _scheduleEmailSms,
-          'sendVdsEmail': _sendVdsEmail,
-          'stayAvailable': _stayAvailable,
         };
+
+        print('📋 [SAVE] Form data prepared:');
+        print('   📅 Date: $_selectedDate');
+        print('   🕐 Time: $_selectedTime');
+        print('   🏢 Meeting Type: $_selectedMeetingType');
+        print('   🏛️  Venue: $_selectedVenueName (ID: $_selectedVenueId)');
+        print('   ⚙️  Options: $options');
 
         // Prepare schedule confirmation if enabled
         Map<String, dynamic>? scheduleConfirmation;
@@ -146,8 +237,12 @@ class _ReminderFormState extends State<ReminderForm> {
             'date': _selectedScheduleDate,
             'time': _selectedScheduleTime,
           };
+          print('   📧 Schedule Confirmation: $scheduleConfirmation');
         }
 
+        print('📡 [SAVE] Calling API to schedule appointment...');
+        print('   🔑 Appointment ID: ${_getAppointmentId()}');
+        
         // Call the ActionService method
         final result = await ActionService.scheduleAppointment(
           appointmentId: _getAppointmentId(),
@@ -156,11 +251,17 @@ class _ReminderFormState extends State<ReminderForm> {
           options: options,
           meetingType: _selectedMeetingType, // Now has default value
           venueId: _selectedVenueId, // Use venue ID instead of venue name
+          venueLabel: _selectedVenueName, // Pass venue label
           arrivalTime: _sendArrivalTime ? _selectedArrivalTime : null,
           scheduleConfirmation: scheduleConfirmation,
         );
         
+        print('📡 [SAVE] API Response received: ${result['success'] ? 'SUCCESS' : 'FAILED'}');
+        
         if (result['success']) {
+          print('✅ [SAVE] Appointment scheduled successfully!');
+          print('   📝 Message: ${result['message']}');
+          
           // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +281,10 @@ class _ReminderFormState extends State<ReminderForm> {
             Navigator.of(context).pop();
           }
         } else {
+          print('❌ [SAVE] Failed to schedule appointment');
+          print('   📝 Error: ${result['message']}');
+          print('   🔢 Status Code: ${result['statusCode']}');
+          
           // Show error message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -191,6 +296,7 @@ class _ReminderFormState extends State<ReminderForm> {
           }
         }
       } catch (error) {
+        print('💥 [SAVE] Unexpected error occurred: $error');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -200,6 +306,7 @@ class _ReminderFormState extends State<ReminderForm> {
           );
         }
       } finally {
+        print('🏁 [SAVE] Save operation completed');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -224,11 +331,14 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   void _onMeetingTypeChanged(String value) {
+    print('🔄 [MEETING] Meeting type changed to: $value');
     setState(() {
       _selectedMeetingType = value;
       _showOfflineVenue = _selectedMeetingType == 'in_person';
       _showOnlineVenue = _selectedMeetingType == 'zoom';
     });
+    print('   🏢 Show offline venue: $_showOfflineVenue');
+    print('   💻 Show online venue: $_showOnlineVenue');
   }
 
   @override
@@ -438,29 +548,7 @@ class _ReminderFormState extends State<ReminderForm> {
                       ),
                     ],
                     
-                    // Send VDS Email Checkbox
-                    CheckboxListTile(
-                      title: const Text('Send VDS Email'),
-                      value: _sendVdsEmail,
-                      onChanged: _isLoading ? null : (value) {
-                        setState(() {
-                          _sendVdsEmail = value ?? false;
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
                     
-                    // Stay Available Checkbox
-                    CheckboxListTile(
-                      title: const Text('Stay Available'),
-                      value: _stayAvailable,
-                      onChanged: _isLoading ? null : (value) {
-                        setState(() {
-                          _stayAvailable = value ?? false;
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
                     
                     const SizedBox(height: 16),
                     
@@ -491,35 +579,72 @@ class _ReminderFormState extends State<ReminderForm> {
                     
                     const SizedBox(height: 16),
                     
-                    // Venue Selection
-                    if (_showOfflineVenue) ...[
-                      DropdownButtonFormField<String>(
-                        value: _selectedVenueId, // Use venue ID
-                        decoration: const InputDecoration(
-                          labelText: 'Select Venue',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on),
-                        ),
-                        items: _venues.map((venue) {
-                          return DropdownMenuItem(
-                            value: venue['id'],
-                            child: Text(venue['name']!),
-                          );
-                        }).toList(),
-                        onChanged: _isLoading ? null : (value) {
-                          setState(() {
-                            _selectedVenueId = value ?? _selectedVenueId;
-                            _selectedVenueName = _venues.firstWhere((venue) => venue['id'] == value)['name']!;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select a venue';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
+                                         // Venue Selection
+                     if (_showOfflineVenue) ...[
+                       _isLoadingVenues
+                           ? const Center(
+                               child: Padding(
+                                 padding: EdgeInsets.all(16.0),
+                                 child: CircularProgressIndicator(),
+                               ),
+                             )
+                           : _venueError != null
+                               ? Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     border: Border.all(color: Colors.red),
+                                     borderRadius: BorderRadius.circular(8),
+                                   ),
+                                   child: Column(
+                                     children: [
+                                       Text(
+                                         'Failed to load venues',
+                                         style: TextStyle(color: Colors.red),
+                                       ),
+                                       TextButton(
+                                         onPressed: _loadVenues,
+                                         child: Text('Retry'),
+                                       ),
+                                     ],
+                                   ),
+                                 )
+                               : DropdownButtonFormField<String>(
+                                   value: _selectedVenueId.isNotEmpty && _venueOptions.any((venue) => venue['_id']?.toString() == _selectedVenueId) ? _selectedVenueId : null,
+                                   decoration: const InputDecoration(
+                                     labelText: 'Select Venue',
+                                     border: OutlineInputBorder(),
+                                     prefixIcon: Icon(Icons.location_on),
+                                   ),
+                                   items: _venueOptions.where((venue) => 
+                                     venue['_id']?.toString().isNotEmpty == true
+                                   ).map((venue) {
+                                     return DropdownMenuItem(
+                                       value: venue['_id']?.toString() ?? '',
+                                       child: Text(venue['name']?.toString() ?? 'Unknown Venue'),
+                                     );
+                                   }).toList(),
+                                   onChanged: _isLoading ? null : (value) {
+                                     if (value != null) {
+                                       print('🎯 [VENUE] User selected venue ID: $value');
+                                       setState(() {
+                                         _selectedVenueId = value;
+                                         final selectedVenue = _venueOptions.firstWhere(
+                                           (venue) => venue['_id']?.toString() == value,
+                                           orElse: () => <String, dynamic>{},
+                                         );
+                                         _selectedVenueName = selectedVenue['name']?.toString() ?? 'Select a venue';
+                                       });
+                                       print('   🏛️  Selected venue name: $_selectedVenueName');
+                                     }
+                                   },
+                                   validator: (value) {
+                                     if (value == null || value.isEmpty) {
+                                       return 'Please select a venue';
+                                     }
+                                     return null;
+                                   },
+                                 ),
+                     ],
                     
                     if (_showOnlineVenue) ...[
                       TextFormField(
