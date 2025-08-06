@@ -66,9 +66,11 @@ class StorageService {
       final prefs = await SharedPreferences.getInstance();
       final userDataString = jsonEncode(userData);
       await prefs.setString(_userDataKey, userDataString);
-      print('User data saved successfully: $userData');
+      print('✅ User data saved successfully to storage');
+      print('📋 Saved data: $userData');
+      print('📋 Saved JSON string: $userDataString');
     } catch (e) {
-      print('Error saving user data: $e');
+      print('❌ Error saving user data: $e');
       throw Exception('Failed to save user data: $e');
     }
   }
@@ -78,12 +80,17 @@ class StorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userDataString = prefs.getString(_userDataKey);
+      print('📡 StorageService.getUserData() - Retrieved from storage: $userDataString');
+      
       if (userDataString != null) {
-        return jsonDecode(userDataString);
+        final decodedData = jsonDecode(userDataString);
+        print('✅ StorageService.getUserData() - Successfully decoded: $decodedData');
+        return decodedData;
       }
+      print('⚠️ StorageService.getUserData() - No data found in storage');
       return null;
     } catch (e) {
-      print('Error getting user data: $e');
+      print('❌ Error getting user data: $e');
       return null;
     }
   }

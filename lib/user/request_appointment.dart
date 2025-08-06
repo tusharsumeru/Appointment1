@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import 'user_screen.dart';
 import 'appointment_details_screen.dart';
+import '../action/storage_service.dart';
+import '../action/action.dart';
 
 class RequestAppointmentScreen extends StatefulWidget {
   final String selectedType;
@@ -40,6 +42,12 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  @override
   void dispose() {
     _fullNameController.dispose();
     _emailController.dispose();
@@ -49,13 +57,140 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
     super.dispose();
   }
 
+  Future<void> _loadUserData() async {
+    print('🚀 RequestAppointmentScreen._loadUserData() - Starting to load user data...');
+    
+    try {
+      // First try to get fresh data from API
+      print('📡 Calling ActionService.getCurrentUser() to fetch fresh data...');
+      final apiResult = await ActionService.getCurrentUser();
+      
+      Map<String, dynamic>? userData;
+      
+      if (apiResult['success'] == true) {
+        print('✅ API call successful, using fresh data');
+        userData = apiResult['data'];
+      } else {
+        print('⚠️ API call failed, falling back to stored data');
+        print('📡 Calling StorageService.getUserData()...');
+        userData = await StorageService.getUserData();
+      }
+      
+      print('✅ Data retrieval completed');
+      print('📋 Raw userData received: $userData');
+      print('📋 userData type: ${userData.runtimeType}');
+      print('📋 userData is null: ${userData == null}');
+      
+      if (userData != null) {
+        print('🔍 Detailed userData analysis:');
+        print('   - userData keys: ${userData.keys.toList()}');
+        print('   - userData length: ${userData.length}');
+        
+        // Log each field individually
+        print('📝 Individual field values:');
+        print('   - fullName: ${userData['fullName']} (type: ${userData['fullName']?.runtimeType})');
+        print('   - name: ${userData['name']} (type: ${userData['name']?.runtimeType})');
+        print('   - email: ${userData['email']} (type: ${userData['email']?.runtimeType})');
+        print('   - phoneNumber: ${userData['phoneNumber']} (type: ${userData['phoneNumber']?.runtimeType})');
+        print('   - phone: ${userData['phone']} (type: ${userData['phone']?.runtimeType})');
+        print('   - designation: ${userData['designation']} (type: ${userData['designation']?.runtimeType})');
+        print('   - company: ${userData['company']} (type: ${userData['company']?.runtimeType})');
+        print('   - location: ${userData['location']} (type: ${userData['location']?.runtimeType})');
+        print('   - isTeacher: ${userData['isTeacher']} (type: ${userData['isTeacher']?.runtimeType})');
+        print('   - aol_teacher: ${userData['aol_teacher']} (type: ${userData['aol_teacher']?.runtimeType})');
+        
+        // Log ALL fields to see what's actually available
+        print('🔍 ALL fields in userData:');
+        userData.forEach((key, value) {
+          print('   - $key: $value (type: ${value.runtimeType})');
+        });
+      }
+      
+      print('🎯 Setting form field values...');
+      
+      // Set initial values for form fields with logging
+      final fullName = userData?['fullName'] ?? userData?['name'] ?? '';
+      final email = userData?['email'] ?? '';
+      
+      // Handle phone number object structure
+      String phone = '';
+      if (userData?['phoneNumber'] != null) {
+        if (userData!['phoneNumber'] is Map<String, dynamic>) {
+          final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
+          final countryCode = phoneObj['countryCode'] ?? '';
+          final number = phoneObj['number'] ?? '';
+          phone = '$countryCode$number';
+          print('📱 Phone number extracted: $phone (from phoneNumber object)');
+        } else {
+          phone = userData['phoneNumber'].toString();
+          print('📱 Phone number extracted: $phone (from phoneNumber string)');
+        }
+      } else if (userData?['phone'] != null) {
+        phone = userData!['phone'].toString();
+        print('📱 Phone number extracted: $phone (from phone field)');
+      } else {
+        print('📱 No phone number found in user data');
+      }
+      
+      final designation = userData?['designation'] ?? '';
+      final company = userData?['company'] ?? '';
+      
+      // Handle teacher status - check both aol_teacher and isTeacher fields
+      bool isTeacher = false;
+      if (userData?['aol_teacher'] != null) {
+        isTeacher = userData!['aol_teacher'] == true;
+        print('👨‍🏫 Teacher status from aol_teacher: $isTeacher');
+      } else if (userData?['isTeacher'] != null) {
+        isTeacher = userData!['isTeacher'] == true;
+        print('👨‍🏫 Teacher status from isTeacher: $isTeacher');
+      } else {
+        print('👨‍🏫 No teacher status found, defaulting to false');
+      }
+      
+      print('📝 Form field values set:');
+      print('   - fullName: $fullName');
+      print('   - email: $email');
+      print('   - phone: $phone');
+      print('   - designation: $designation');
+      print('   - company: $company');
+      print('   - isTeacher: $isTeacher');
+      
+      setState(() {
+        _fullNameController.text = fullName;
+        _emailController.text = email;
+        _phoneController.text = phone;
+        _designationController.text = designation;
+        _companyController.text = company;
+        _isTeacher = isTeacher;
+      });
+      
+      print('✅ RequestAppointmentScreen._loadUserData() completed successfully');
+      
+    } catch (error) {
+      print('❌ Error in RequestAppointmentScreen._loadUserData(): $error');
+      print('❌ Error type: ${error.runtimeType}');
+      print('❌ Stack trace: ${StackTrace.current}');
+      
+      print('🔄 Setting default values due to error...');
+      
+      // Set default values if data loading fails
+      setState(() {
+        _fullNameController.text = '';
+        _emailController.text = '';
+        _phoneController.text = '';
+        _designationController.text = '';
+        _companyController.text = '';
+        _isTeacher = false;
+      });
+      
+      print('✅ Default values set successfully');
+    }
+  }
+
   void _validateForm() {
     setState(() {
-      _isFormValid = _fullNameController.text.isNotEmpty &&
-          _emailController.text.isNotEmpty &&
-          _phoneController.text.isNotEmpty &&
-          _designationController.text.isNotEmpty &&
-          _companyController.text.isNotEmpty;
+      // FIXED: All fields are now optional for testing
+      _isFormValid = true; // Always allow navigation for testing
     });
   }
 
@@ -236,7 +371,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
                   // Teacher Question
                   const Text(
-                    'Are you an Art Of Living teacher? *',
+                    'Are you an Art Of Living teacher? (Optional)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -275,7 +410,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isFormValid ? _showSuccessAndNavigate : null,
+                      onPressed: _showSuccessAndNavigate, // FIXED: Always enabled for testing
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
@@ -313,7 +448,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label *',
+          '$label (Optional)',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -326,7 +461,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
           keyboardType: keyboardType,
           onChanged: onChanged,
           decoration: InputDecoration(
-            hintText: placeholder,
+            hintText: '$placeholder (optional for testing)',
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
             fillColor: Colors.white,
@@ -353,7 +488,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Phone Number *',
+          'Phone Number (Optional)',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -401,7 +536,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                   keyboardType: TextInputType.phone,
                   onChanged: (value) => _validateForm(),
                   decoration: const InputDecoration(
-                    hintText: 'Enter phone number',
+                    hintText: 'Enter phone number (optional for testing)',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),

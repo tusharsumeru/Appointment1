@@ -39,25 +39,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
+    print('🚀 ProfileScreen._loadUserData() - Starting to load user data...');
+    
     try {
+      print('📡 Calling StorageService.getUserData()...');
       final userData = await StorageService.getUserData();
+      
+      print('✅ StorageService.getUserData() completed successfully');
+      print('📋 Raw userData received: $userData');
+      print('📋 userData type: ${userData.runtimeType}');
+      print('📋 userData is null: ${userData == null}');
+      
+             if (userData != null) {
+         print('🔍 Detailed userData analysis:');
+         print('   - userData keys: ${userData.keys.toList()}');
+         print('   - userData length: ${userData.length}');
+         
+         // Log each field individually
+         print('📝 Individual field values:');
+         print('   - fullName: ${userData['fullName']} (type: ${userData['fullName']?.runtimeType})');
+         print('   - name: ${userData['name']} (type: ${userData['name']?.runtimeType})');
+         print('   - email: ${userData['email']} (type: ${userData['email']?.runtimeType})');
+         print('   - phoneNumber: ${userData['phoneNumber']} (type: ${userData['phoneNumber']?.runtimeType})');
+         print('   - phone: ${userData['phone']} (type: ${userData['phone']?.runtimeType})');
+         print('   - designation: ${userData['designation']} (type: ${userData['designation']?.runtimeType})');
+         print('   - company: ${userData['company']} (type: ${userData['company']?.runtimeType})');
+         print('   - location: ${userData['location']} (type: ${userData['location']?.runtimeType})');
+         print('   - profilePhoto: ${userData['profilePhoto']} (type: ${userData['profilePhoto']?.runtimeType})');
+         print('   - userTags: ${userData['userTags']} (type: ${userData['userTags']?.runtimeType})');
+         
+         // Log any additional fields that might be present
+         print('🔍 Additional fields found:');
+         userData.forEach((key, value) {
+           if (!['fullName', 'name', 'email', 'phoneNumber', 'phone', 'designation', 'company', 'location', 'profilePhoto', 'userTags'].contains(key)) {
+             print('   - $key: $value (type: ${value.runtimeType})');
+           }
+         });
+       }
+      
       setState(() {
         _userData = userData;
         _isLoading = false;
       });
       
-      // Set initial values for form fields
-      _fullNameController.text = userData?['fullName'] ?? userData?['name'] ?? 'Kaveri B';
-      _emailController.text = userData?['email'] ?? 'kaveri@sumerudigital.com';
-      _phoneController.text = userData?['phoneNumber'] ?? userData?['phone'] ?? '+919347653480';
-      _designationController.text = userData?['designation'] ?? 'Office Operations Specialist';
-      _companyController.text = userData?['company'] ?? 'Sumeru Digital';
-      _locationController.text = userData?['location'] ?? 'Coimbatore, Tamil Nadu, India';
+      print('🎯 Setting form field values...');
+      
+      // Set initial values for form fields with logging
+      final fullName = userData?['fullName'] ?? userData?['name'] ?? '';
+      final email = userData?['email'] ?? '';
+      
+      // Handle phone number object structure
+      String phone = '';
+      if (userData?['phoneNumber'] != null) {
+        if (userData!['phoneNumber'] is Map<String, dynamic>) {
+          final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
+          final countryCode = phoneObj['countryCode'] ?? '';
+          final number = phoneObj['number'] ?? '';
+          phone = '$countryCode$number';
+        } else {
+          phone = userData['phoneNumber'].toString();
+        }
+             } else if (userData?['phone'] != null) {
+         phone = userData!['phone'].toString();
+       }
+      
+      final designation = userData?['designation'] ?? '';
+      final company = userData?['company'] ?? '';
+      
+      // Handle location from full_address
+      String location = '';
+      if (userData?['full_address'] != null && userData!['full_address'] is Map<String, dynamic>) {
+        final addressObj = userData['full_address'] as Map<String, dynamic>;
+        location = addressObj['street'] ?? '';
+      } else {
+        location = userData?['location'] ?? '';
+      }
+      
+      print('📝 Form field values set:');
+      print('   - fullName: $fullName');
+      print('   - email: $email');
+      print('   - phone: $phone');
+      print('   - designation: $designation');
+      print('   - company: $company');
+      print('   - location: $location');
+      
+      _fullNameController.text = fullName;
+      _emailController.text = email;
+      _phoneController.text = phone;
+      _designationController.text = designation;
+      _companyController.text = company;
+      _locationController.text = location;
+      
+      print('✅ ProfileScreen._loadUserData() completed successfully');
+      
     } catch (error) {
-      print('Error loading user data: $error');
+      print('❌ Error in ProfileScreen._loadUserData(): $error');
+      print('❌ Error type: ${error.runtimeType}');
+      print('❌ Stack trace: ${StackTrace.current}');
+      
       setState(() {
         _isLoading = false;
       });
+      
+      print('🔄 Setting default values due to error...');
       
       // Set default values if data loading fails
       _fullNameController.text = 'Kaveri B';
@@ -66,6 +150,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _designationController.text = 'Office Operations Specialist';
       _companyController.text = 'Sumeru Digital';
       _locationController.text = 'Coimbatore, Tamil Nadu, India';
+      
+      print('✅ Default values set successfully');
     }
   }
 
@@ -472,19 +558,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Role Tags
-                          Wrap(
-                            spacing: 8.0,
-                            runSpacing: 8.0,
-                            children: [
-                              _buildRoleTag('State Apex / STC'),
-                              _buildRoleTag('Ashram HOD'),
-                              _buildRoleTag('Ashram Sevak (Short-term)'),
-                              _buildRoleTag('Ashramite'),
-                              _buildRoleTag('Swamiji / Brahmachari'),
-                              _buildRoleTag('Trustee'),
-                            ],
-                          ),
+                                                     // Role Tags
+                           Wrap(
+                             spacing: 8.0,
+                             runSpacing: 8.0,
+                             children: _buildUserTags(),
+                           ),
                         ],
                       ),
                     ),
@@ -722,27 +801,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildRoleTag(String role) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.lightGreen.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.lightGreen.shade300,
-          width: 1,
-        ),
-      ),
-      child: Text(
-        role,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: Colors.green.shade700,
-        ),
-      ),
-    );
-  }
+     List<Widget> _buildUserTags() {
+     // Get userTags from the user data
+     final userTags = _userData?['userTags'];
+     
+     print('🏷️ Building user tags...');
+     print('   - userTags: $userTags');
+     print('   - userTags type: ${userTags.runtimeType}');
+     
+     if (userTags == null) {
+       print('   - userTags is null, showing placeholder');
+       return [
+         _buildRoleTag('No roles assigned'),
+       ];
+     }
+     
+     if (userTags.isEmpty) {
+       print('   - userTags is empty, showing placeholder');
+       return [
+         _buildRoleTag('No roles assigned'),
+       ];
+     }
+     
+     // Convert userTags array to list of widgets
+     final tagWidgets = userTags.map<Widget>((tag) {
+       final tagString = tag.toString();
+       print('   - Creating tag: $tagString');
+       return _buildRoleTag(tagString);
+     }).toList();
+     
+     print('   - Created ${tagWidgets.length} tag widgets');
+     return tagWidgets;
+   }
+
+   Widget _buildRoleTag(String role) {
+     return Container(
+       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+       decoration: BoxDecoration(
+         color: Colors.lightGreen.shade100,
+         borderRadius: BorderRadius.circular(16),
+         border: Border.all(
+           color: Colors.lightGreen.shade300,
+           width: 1,
+         ),
+       ),
+       child: Text(
+         role,
+         style: TextStyle(
+           fontSize: 12,
+           fontWeight: FontWeight.w500,
+           color: Colors.green.shade700,
+         ),
+       ),
+     );
+   }
 
   Widget _buildTeacherDetail(String label, String value) {
     return Row(
@@ -774,6 +886,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditForm(BuildContext context) async {
+    print('🚀 ProfileScreen._showEditForm() - Opening edit form...');
+    print('📋 Current _userData being passed to edit form: $_userData');
+    
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -781,19 +896,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     
+    print('📡 Edit form closed, result received: $result');
+    print('📋 Result type: ${result.runtimeType}');
+    print('📋 Result is null: ${result == null}');
+    
     if (result != null) {
+      print('✅ Processing edit form result...');
+      print('📝 Result data: $result');
+      print('📝 Result keys: ${result.keys.toList()}');
+      
+      // Log each field in the result
+      result.forEach((key, value) {
+        print('   - $key: $value (type: ${value.runtimeType})');
+      });
+      
       // Handle the updated data
+      print('🔄 Merging result with existing _userData...');
+      print('📋 Original _userData: $_userData');
+      
       setState(() {
         _userData = {...?_userData, ...result};
       });
       
+      print('📋 Updated _userData: $_userData');
+      
       // Update the form controllers with new data
-      _fullNameController.text = result['fullName'] ?? _fullNameController.text;
-      _emailController.text = result['email'] ?? _emailController.text;
-      _phoneController.text = result['phoneNumber'] ?? _phoneController.text;
-      _designationController.text = result['designation'] ?? _designationController.text;
-      _companyController.text = result['company'] ?? _companyController.text;
-      _locationController.text = result['location'] ?? _locationController.text;
+      print('🎯 Updating form controllers with new data...');
+      
+      final newFullName = result['fullName'] ?? _fullNameController.text;
+      final newEmail = result['email'] ?? _emailController.text;
+      final newPhone = result['phoneNumber'] ?? _phoneController.text;
+      final newDesignation = result['designation'] ?? _designationController.text;
+      final newCompany = result['company'] ?? _companyController.text;
+      final newLocation = result['location'] ?? _locationController.text;
+      
+      print('📝 New form field values:');
+      print('   - fullName: $newFullName');
+      print('   - email: $newEmail');
+      print('   - phone: $newPhone');
+      print('   - designation: $newDesignation');
+      print('   - company: $newCompany');
+      print('   - location: $newLocation');
+      
+      _fullNameController.text = newFullName;
+      _emailController.text = newEmail;
+      _phoneController.text = newPhone;
+      _designationController.text = newDesignation;
+      _companyController.text = newCompany;
+      _locationController.text = newLocation;
+      
+      print('✅ Form controllers updated successfully');
+    } else {
+      print('ℹ️ No result received from edit form (user cancelled or no changes)');
     }
   }
 }

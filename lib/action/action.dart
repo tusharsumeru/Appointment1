@@ -4271,4 +4271,51 @@ class ActionService {
       );
     }
   }
+////////////////////////////////////////////////////---------------user---------------------////////////////////////////
+  // Create appointment method
+  static Future<Map<String, dynamic>> createAppointment(Map<String, dynamic> appointmentData) async {
+    try {
+      print('🚀 Creating appointment with data: $appointmentData');
+      
+      final token = await StorageService.getToken();
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(appointmentData),
+      );
+
+      print('📡 API Response Status: ${response.statusCode}');
+      print('📡 API Response Body: ${response.body}');
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message': responseData['message'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Failed to create appointment',
+          'error': responseData['error'],
+        };
+      }
+    } catch (e) {
+      print('❌ Error creating appointment: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
 }

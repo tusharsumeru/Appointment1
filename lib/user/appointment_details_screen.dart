@@ -3,6 +3,7 @@ import '../components/sidebar/sidebar_component.dart';
 import 'user_screen.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
@@ -18,16 +19,33 @@ class AppointmentDetailsScreen extends StatefulWidget {
 
 class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Form controllers
-  final TextEditingController _locationController = TextEditingController(text: 'Bengaluru, India');
-  final TextEditingController _purposeController = TextEditingController();
-  final TextEditingController _peopleCountController = TextEditingController();
+  final TextEditingController _appointmentSubjectController = TextEditingController();
+  final TextEditingController _appointmentPurposeController = TextEditingController();
+  final TextEditingController _userCurrentCompanyController = TextEditingController();
+  final TextEditingController _userCurrentDesignationController = TextEditingController();
+  final TextEditingController _numberOfUsersController = TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
+  
+  // Reference Information Controllers
+  final TextEditingController _referenceNameController = TextEditingController(text: 'Kiran');
+  final TextEditingController _referenceEmailController = TextEditingController(text: 'kiran@sumerudigital.com');
+  final TextEditingController _referencePhoneController = TextEditingController(text: '97387-41432');
+  
+  // Guest Information Controllers
+  final TextEditingController _guestNameController = TextEditingController();
+  final TextEditingController _guestEmailController = TextEditingController(text: 'guest@email.com');
+  final TextEditingController _guestPhoneController = TextEditingController();
+  final TextEditingController _guestDesignationController = TextEditingController();
+  final TextEditingController _guestCompanyController = TextEditingController();
+  final TextEditingController _guestLocationController = TextEditingController();
   
   // Form state
   bool _isFormValid = false;
   String? _selectedSecretary;
+  String? _selectedAppointmentLocation;
   PlatformFile? _selectedFile;
+  File? _selectedImage;
   bool _isAttendingProgram = false;
   
   // Guest information state
@@ -48,11 +66,26 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   @override
   void dispose() {
-    _locationController.dispose();
-    _purposeController.dispose();
-    _peopleCountController.dispose();
+    _appointmentSubjectController.dispose();
+    _appointmentPurposeController.dispose();
+    _userCurrentCompanyController.dispose();
+    _userCurrentDesignationController.dispose();
+    _numberOfUsersController.dispose();
     _fromDateController.dispose();
     _toDateController.dispose();
+    
+    // Dispose reference controllers
+    _referenceNameController.dispose();
+    _referenceEmailController.dispose();
+    _referencePhoneController.dispose();
+    
+    // Dispose guest controllers
+    _guestNameController.dispose();
+    _guestEmailController.dispose();
+    _guestPhoneController.dispose();
+    _guestDesignationController.dispose();
+    _guestCompanyController.dispose();
+    _guestLocationController.dispose();
     
     // Dispose guest controllers
     for (var guest in _guestControllers) {
@@ -64,7 +97,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _updateGuestControllers() {
-    int peopleCount = int.tryParse(_peopleCountController.text) ?? 0;
+    int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
     
     // Dispose existing controllers
@@ -89,9 +122,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _validateForm() {
-    bool basicFormValid = _locationController.text.isNotEmpty &&
-        _purposeController.text.isNotEmpty &&
-        _peopleCountController.text.isNotEmpty &&
+    bool basicFormValid = _appointmentSubjectController.text.isNotEmpty &&
+        _appointmentPurposeController.text.isNotEmpty &&
+        _userCurrentCompanyController.text.isNotEmpty &&
+        _userCurrentDesignationController.text.isNotEmpty &&
+        _numberOfUsersController.text.isNotEmpty &&
         _fromDateController.text.isNotEmpty &&
         _toDateController.text.isNotEmpty;
     
@@ -187,38 +222,47 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  void _submitForm() {
-    // Prepare form data
-    final formData = {
-      'location': _locationController.text,
-      'secretary': _selectedSecretary,
-      'purpose': _purposeController.text,
-      'peopleCount': _peopleCountController.text,
-      'fromDate': _fromDateController.text,
-      'toDate': _toDateController.text,
-      'isAttendingProgram': _isAttendingProgram,
-      'attachment': _selectedFile != null ? {
-        'name': _selectedFile!.name,
-        'size': _selectedFile!.size,
-        'path': _selectedFile!.path,
-        'extension': _selectedFile!.extension,
-      } : null,
-      'guests': _guestControllers.map((guest) => {
-        'name': guest['name']?.text,
-        'phone': guest['phone']?.text,
-        'age': guest['age']?.text,
-      }).toList(),
-    };
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
 
-    print('Form Data: $formData');
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+      print('📸 Image selected: ${pickedFile.path}');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Photo "${pickedFile.name}" ${source == ImageSource.camera ? 'captured' : 'selected'} successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Appointment request submitted successfully!'),
+        content: Text('Photo removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _submitForm() async {
+    // Simple form submission without API
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Form submitted successfully!'),
         backgroundColor: Colors.green,
       ),
     );
-    // TODO: Navigate to success screen or back to main
+    Navigator.pop(context);
   }
 
   @override
@@ -261,6 +305,319 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Welcome Card for Guest Appointments
+                  if (widget.personalInfo['appointmentType'] == 'guest') ...[
+                    // Reference Information Section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.blue.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Reference Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Enter the reference details of the person you are requesting the appointment for',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Reference Name
+                          _buildReferenceField(
+                            label: 'Reference Name',
+                            controller: _referenceNameController,
+                            placeholder: 'Kiran',
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Reference Email
+                          _buildReferenceField(
+                            label: 'Reference Email',
+                            controller: _referenceEmailController,
+                            placeholder: 'kiran@sumerudigital.com',
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Reference Phone
+                          _buildReferencePhoneField(
+                            label: 'Reference Phone',
+                            controller: _referencePhoneController,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Guest Information Section
+                    const Text(
+                      'Guest Information',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Enter the details of the person you are requesting the appointment for',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Guest Full Name
+                    _buildReferenceField(
+                      label: 'Full Name of the Guest',
+                      controller: _guestNameController,
+                      placeholder: 'Enter guest\'s full name',
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Guest Email
+                    _buildReferenceField(
+                      label: 'Email ID of the Guest',
+                      controller: _guestEmailController,
+                      placeholder: 'guest@email.com',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Guest Mobile
+                    _buildReferencePhoneField(
+                      label: 'Mobile No. of the Guest',
+                      controller: _guestPhoneController,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Guest Designation
+                    _buildReferenceField(
+                      label: 'Designation',
+                      controller: _guestDesignationController,
+                      placeholder: 'Guest\'s professional title',
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Guest Company/Organization
+                    _buildReferenceField(
+                      label: 'Company/Organization',
+                      controller: _guestCompanyController,
+                      placeholder: 'Guest\'s organization name',
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Guest Location
+                    _buildReferenceField(
+                      label: 'Location',
+                      controller: _guestLocationController,
+                      placeholder: 'Start typing guest\'s location...',
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Guest Photo Section
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.camera_alt,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Guest Photo *',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Required for guests 12+ years old - Divine pic validation',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Photo Upload Options
+                    Column(
+                      children: [
+                        // Upload from Device Card
+                        GestureDetector(
+                          onTap: () => _pickImage(ImageSource.gallery),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.upload_file,
+                                  color: Colors.blue.shade700,
+                                  size: 32,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Upload from Device',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Choose an existing photo',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Take Photo Card
+                        GestureDetector(
+                          onTap: () => _pickImage(ImageSource.camera),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.blue.shade700,
+                                  size: 32,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Take Photo',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Use your device camera',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // Show selected image preview
+                        if (_selectedImage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.green[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: FileImage(_selectedImage!),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Photo uploaded successfully',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Tap to remove',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _removeImage,
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Header
                   const Text(
                     'Appointment Details',
@@ -280,13 +637,53 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Appointment Location
+                  // Appointment Subject
                   _buildTextField(
-                    label: 'Appointment Location',
-                    controller: _locationController,
-                    placeholder: 'Select location',
+                    label: 'Appointment Subject',
+                    controller: _appointmentSubjectController,
+                    placeholder: 'Enter appointment subject',
                     onChanged: (value) => _validateForm(),
-                    hasDropdown: true,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Appointment Purpose
+                  _buildTextArea(
+                    label: 'Appointment Purpose',
+                    controller: _appointmentPurposeController,
+                    placeholder: 'Please describe the purpose of your appointment in detail',
+                    onChanged: (value) => _validateForm(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // User Current Company
+                  _buildTextField(
+                    label: 'Your Current Company',
+                    controller: _userCurrentCompanyController,
+                    placeholder: 'Enter your current company/organization',
+                    onChanged: (value) => _validateForm(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // User Current Designation
+                  _buildTextField(
+                    label: 'Your Current Designation',
+                    controller: _userCurrentDesignationController,
+                    placeholder: 'Enter your current designation/role',
+                    onChanged: (value) => _validateForm(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Appointment Location
+                  _buildDropdownField(
+                    label: 'Appointment Location',
+                    value: _selectedAppointmentLocation,
+                    items: ['Select location', 'Location 1', 'Location 2', 'Location 3'],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedAppointmentLocation = value;
+                      });
+                      _validateForm();
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -303,19 +700,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Purpose of Meeting
-                  _buildTextArea(
-                    label: 'Purpose of Meeting',
-                    controller: _purposeController,
-                    placeholder: 'Please describe the purpose of your meeting in detail',
-                    onChanged: (value) => _validateForm(),
-                  ),
-                  const SizedBox(height: 20),
-
                   // Number of People
                   _buildTextField(
                     label: 'Number of People',
-                    controller: _peopleCountController,
+                    controller: _numberOfUsersController,
                     placeholder: 'Number of people (including yourself)',
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
@@ -859,6 +1247,121 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     borderSide: const BorderSide(color: Colors.deepPurple),
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Helper methods for Reference and Guest Information fields
+  Widget _buildReferenceField({
+    required String label,
+    required TextEditingController controller,
+    required String placeholder,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.deepPurple),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReferencePhoneField({
+    required String label,
+    required TextEditingController controller,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            // Country Code Dropdown
+            Container(
+              width: 80,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('🇮🇳', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 4),
+                  const Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Phone Number Field
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  hintText: 'Enter phone number',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.deepPurple),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 ),
               ),
             ),
