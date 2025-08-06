@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+import 'package:http_parser/http_parser.dart';
 import 'storage_service.dart';
 import 'jwt_utils.dart'; // Added import for JwtUtils
 
@@ -261,22 +262,64 @@ class ActionService {
     );
 
     // Process userMobile field - handle both object and string formats
-    final userMobile = appointment['userMobile'];
-    if (userMobile is Map<String, dynamic>) {
-      final countryCode = userMobile['countryCode']?.toString() ?? '';
-      final number = userMobile['number']?.toString() ?? '';
-      if (countryCode.isNotEmpty && number.isNotEmpty) {
-        processedAppointment['userMobile'] = '$countryCode $number';
+    if (processedAppointment['userMobile'] == null ||
+        processedAppointment['userMobile'].toString().isEmpty) {
+      // Check if this is a quick appointment
+      final apptType = appointment['appt_type']?.toString();
+      final quickApt = appointment['quick_apt'];
+      
+      if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+        final optional = quickApt['optional'];
+        if (optional is Map<String, dynamic>) {
+          final mobileNumber = optional['mobileNumber'];
+          if (mobileNumber is Map<String, dynamic>) {
+            final countryCode = mobileNumber['countryCode']?.toString() ?? '';
+            final number = mobileNumber['number']?.toString() ?? '';
+            if (number.isNotEmpty) {
+              processedAppointment['userMobile'] = '$countryCode$number';
+            }
+          }
+        }
+      }
+      
+      // Fallback to userMobile field
+      if (processedAppointment['userMobile'] == null ||
+          processedAppointment['userMobile'].toString().isEmpty) {
+        final userMobile = appointment['userMobile'];
+        if (userMobile is Map<String, dynamic>) {
+          final countryCode = userMobile['countryCode']?.toString() ?? '';
+          final number = userMobile['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            processedAppointment['userMobile'] = '$countryCode $number';
+          }
+        }
       }
     }
 
     // Ensure userEmail is properly set
     if (processedAppointment['userEmail'] == null ||
         processedAppointment['userEmail'].toString().isEmpty) {
+      // Check if this is a quick appointment
+      final apptType = appointment['appt_type']?.toString();
+      final quickApt = appointment['quick_apt'];
+      
+      if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+        final optional = quickApt['optional'];
+        if (optional is Map<String, dynamic>) {
+          final email = optional['email']?.toString();
+          if (email != null && email.isNotEmpty) {
+            processedAppointment['userEmail'] = email;
+          }
+        }
+      }
+      
       // Fallback to email field if userEmail is not available
-      final email = appointment['email']?.toString();
-      if (email != null && email.isNotEmpty) {
-        processedAppointment['userEmail'] = email;
+      if (processedAppointment['userEmail'] == null ||
+          processedAppointment['userEmail'].toString().isEmpty) {
+        final email = appointment['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          processedAppointment['userEmail'] = email;
+        }
       }
     }
 
@@ -1829,6 +1872,79 @@ class ActionService {
     }
   }
 
+  // Get quick appointment by ID
+  static Future<Map<String, dynamic>> getQuickAppointmentById(
+    String appointmentId,
+  ) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate appointmentId
+      if (appointmentId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Appointment ID is required',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/quick/$appointmentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': 'Quick appointment details retrieved successfully',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': 'Quick appointment not found',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch quick appointment',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // Get appointment by ID with full details (new comprehensive endpoint)
   static Future<Map<String, dynamic>> getAppointmentByIdDetailed(
     String appointmentId,
@@ -3327,79 +3443,144 @@ class ActionService {
       request.fields['preferredTime'] = preferredTime;
       request.fields['venue'] = venue;
 
+      // Always send numberOfPeople (even if it's 1) to ensure backend receives it
+      request.fields['numberOfPeople'] = numberOfPeople.toString();
+
       // Add optional fields only if they have actual values
       if (emailId != null && emailId.trim().isNotEmpty) {
         request.fields['emailId'] = emailId.trim();
       }
-
+      
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
         request.fields['phoneNumber'] = phoneNumber.trim();
       }
-
+      
       if (purpose != null && purpose.trim().isNotEmpty) {
         request.fields['purpose'] = purpose.trim();
       }
-
+      
       if (remarksForGurudev != null && remarksForGurudev.trim().isNotEmpty) {
         request.fields['remarksForGurudev'] = remarksForGurudev.trim();
       }
 
-      // Add numberOfPeople only if it's greater than 1 (user actually changed it)
-      if (numberOfPeople > 1) {
-        request.fields['numberOfPeople'] = numberOfPeople.toString();
-      }
-
-      // Add boolean fields only if they are true (user actually selected them)
-      if (tbsRequired) {
-        request.fields['tbsRequired'] = 'true';
-      }
-
-      if (dontSendNotifications) {
-        request.fields['dontSendNotifications'] = 'true';
-      }
+      // Add boolean fields - send as proper boolean values
+      request.fields['tbsRequired'] = tbsRequired ? 'true' : 'false';
+      request.fields['dontSendNotifications'] = dontSendNotifications ? 'true' : 'false';
 
       // Debug: Log what fields are being sent
       print('📤 Fields being sent to backend:');
       request.fields.forEach((key, value) {
         print('📤 $key: $value');
       });
-      print(
-        '📤 Files being sent: ${request.files.map((f) => f.field).toList()}',
-      );
+      
+      // Debug: Log what files are being sent
+      print('📤 Files being sent to backend:');
+      for (final file in request.files) {
+        print('📤 File: ${file.field} - ${file.filename} - ${file.length} bytes');
+      }
+      
+      // Debug: Log the complete request structure
+      print('📤 Complete request structure:');
+      print('📤 URL: ${request.url}');
+      print('📤 Method: ${request.method}');
+      print('📤 Headers: ${request.headers}');
+      print('📤 Total fields: ${request.fields.length}');
+      print('📤 Total files: ${request.files.length}');
 
       // Add photo file if provided
       if (photo != null) {
-        print('📸 Adding photo file: ${photo.path}');
-        final photoStream = http.ByteStream(photo.openRead());
-        final photoLength = await photo.length();
-        print('📸 Photo file size: ${photoLength} bytes');
-        final photoMultipart = http.MultipartFile(
-          'photo',
-          photoStream,
-          photoLength,
-          filename: photo.path.split('/').last,
-        );
-        request.files.add(photoMultipart);
+        print('📸 Photo provided: ${photo.path}');
+        if (await photo.exists()) {
+          try {
+            print('📸 Adding photo file: ${photo.path}');
+            final photoStream = http.ByteStream(photo.openRead());
+            final photoLength = await photo.length();
+            print('📸 Photo file size: ${photoLength} bytes');
+            
+            // Get file extension
+            final fileName = photo.path.split('/').last;
+            final fileExtension = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+            final mimeType = _getMimeType(fileExtension);
+            
+            final photoMultipart = http.MultipartFile(
+              'photo',
+              photoStream,
+              photoLength,
+              filename: fileName,
+              contentType: MediaType.parse(mimeType),
+            );
+            request.files.add(photoMultipart);
+            print('📸 Photo file added successfully');
+          } catch (photoError) {
+            print('❌ Error adding photo file: $photoError');
+            return {
+              'success': false,
+              'statusCode': 400,
+              'message': 'Error processing photo file: ${photoError.toString()}',
+              'data': null,
+              'error': photoError.toString(),
+            };
+          }
+        } else {
+          print('⚠️ Photo file does not exist: ${photo.path}');
+        }
+      } else {
+        print('📸 No photo provided');
       }
 
       // Add attachment file if provided
       if (attachment != null) {
-        print('📎 Adding attachment file: ${attachment.path}');
-        final attachmentStream = http.ByteStream(attachment.openRead());
-        final attachmentLength = await attachment.length();
-        print('📎 Attachment file size: ${attachmentLength} bytes');
-        final attachmentMultipart = http.MultipartFile(
-          'attachment',
-          attachmentStream,
-          attachmentLength,
-          filename: attachment.path.split('/').last,
-        );
-        request.files.add(attachmentMultipart);
+        print('📎 Attachment provided: ${attachment.path}');
+        if (await attachment.exists()) {
+          try {
+            print('📎 Adding attachment file: ${attachment.path}');
+            final attachmentStream = http.ByteStream(attachment.openRead());
+            final attachmentLength = await attachment.length();
+            print('📎 Attachment file size: ${attachmentLength} bytes');
+            
+            // Get file extension
+            final fileName = attachment.path.split('/').last;
+            final fileExtension = fileName.contains('.') ? fileName.split('.').last : 'pdf';
+            final mimeType = _getMimeType(fileExtension);
+            
+            final attachmentMultipart = http.MultipartFile(
+              'attachment',
+              attachmentStream,
+              attachmentLength,
+              filename: fileName,
+              contentType: MediaType.parse(mimeType),
+            );
+            request.files.add(attachmentMultipart);
+            print('📎 Attachment file added successfully');
+          } catch (attachmentError) {
+            print('❌ Error adding attachment file: $attachmentError');
+            return {
+              'success': false,
+              'statusCode': 400,
+              'message': 'Error processing attachment file: ${attachmentError.toString()}',
+              'data': null,
+              'error': attachmentError.toString(),
+            };
+          }
+        } else {
+          print('⚠️ Attachment file does not exist: ${attachment.path}');
+        }
+      } else {
+        print('📎 No attachment provided');
       }
 
+      print('📤 Total files being sent: ${request.files.length}');
+      request.files.forEach((file) {
+        print('📤 File: ${file.field} - ${file.filename} - ${file.length} bytes');
+      });
+
       // Send the request
+      print('📤 Sending request to: ${request.url}');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
 
       // Parse response
       final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -3445,13 +3626,39 @@ class ActionService {
         };
       }
     } catch (error) {
+      print('❌ Error in createQuickAppointment: $error');
       return {
         'success': false,
         'statusCode': 500,
-        'message': 'Internal server error',
+        'message': 'Internal server error: ${error.toString()}',
         'data': null,
         'error': error.toString(),
       };
+    }
+  }
+
+  // Helper function to get MIME type based on file extension
+  static String _getMimeType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'txt':
+        return 'text/plain';
+      default:
+        return 'application/octet-stream';
     }
   }
 
@@ -3945,6 +4152,104 @@ class ActionService {
         'statusCode': 500,
         'message': 'Network error. Please check your connection and try again.',
       };
+    }
+  }
+
+  // Global search appointments
+  static Future<Map<String, dynamic>> globalSearchAppointments({
+    required String query,
+    String searchMode = 'all',
+    String? status,
+    String? meetingType,
+    String? appointmentType,
+    String? dateFrom,
+    String? dateTo,
+    bool starred = false,
+    String? locationId,
+    String sortBy = 'createdAt',
+    String sortOrder = 'desc',
+    bool includeDeleted = false,
+    String searchFields = 'all',
+    String priority = 'relevance',
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found. Please login again.');
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'q': query.trim(),
+        'searchMode': searchMode,
+        'limit': limit.toString(),
+        'page': page.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+        'includeDeleted': includeDeleted.toString(),
+        'searchFields': searchFields,
+        'priority': priority,
+      };
+
+      // Add optional parameters
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+      if (meetingType != null && meetingType.isNotEmpty) {
+        queryParams['meetingType'] = meetingType;
+      }
+      if (appointmentType != null && appointmentType.isNotEmpty) {
+        queryParams['appointmentType'] = appointmentType;
+      }
+      if (dateFrom != null && dateFrom.isNotEmpty) {
+        queryParams['dateFrom'] = dateFrom;
+      }
+      if (dateTo != null && dateTo.isNotEmpty) {
+        queryParams['dateTo'] = dateTo;
+      }
+      if (starred) {
+        queryParams['starred'] = starred.toString();
+      }
+      if (locationId != null && locationId.isNotEmpty) {
+        queryParams['locationId'] = locationId;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse('$baseUrl/appointment/search/global')
+          .replace(queryParameters: queryParams);
+
+      // Make API call
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        return responseData;
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        throw Exception('Session expired. Please login again.');
+      } else {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Failed to perform global search');
+      }
+    } catch (error) {
+      if (error is Exception) {
+        rethrow;
+      }
+      throw Exception(
+        'Network error. Please check your connection and try again.',
+      );
     }
   }
 }

@@ -162,6 +162,25 @@ class _MessageFormState extends State<MessageForm> {
   }
 
   String _extractAppointeeMobile() {
+    // Check if this is a quick appointment first
+    final apptType = _appointmentData['appt_type']?.toString();
+    final quickApt = _appointmentData['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final mobileNumber = optional['mobileNumber'];
+        if (mobileNumber is Map<String, dynamic>) {
+          final countryCode = mobileNumber['countryCode']?.toString() ?? '';
+          final number = mobileNumber['number']?.toString() ?? '';
+          if (number.isNotEmpty) {
+            return '$countryCode$number';
+          }
+        }
+      }
+    }
+    
+    // Fallback to regular phone fields
     final phoneNumber = _appointmentData['phoneNumber'];
     if (phoneNumber is Map<String, dynamic>) {
       final countryCode = phoneNumber['countryCode']?.toString() ?? '';

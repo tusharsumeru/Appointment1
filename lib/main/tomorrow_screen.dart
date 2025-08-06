@@ -3,6 +3,7 @@ import '../components/sidebar/sidebar_component.dart';
 import '../components/tomorrow/tomorrow_card_component.dart';
 import 'today_screen.dart';
 import 'upcoming_screen.dart';
+import 'global_search_screen.dart';
 
 class TomorrowScreen extends StatefulWidget {
   const TomorrowScreen({super.key});
@@ -127,6 +128,19 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Column(

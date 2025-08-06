@@ -5,6 +5,7 @@ import '../components/inbox/appointment_card.dart';
 import '../components/inbox/filter_bottom_sheet.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
+import 'global_search_screen.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -493,7 +494,19 @@ class _InboxScreenState extends State<InboxScreen> {
             },
           ),
         ),
-        actions: [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: _buildBody(),

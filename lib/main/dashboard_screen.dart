@@ -11,6 +11,7 @@ import '../components/inbox/call_form.dart';
 import '../components/inbox/bulk_email_form.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
+import 'global_search_screen.dart';
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -677,6 +678,19 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Stack(

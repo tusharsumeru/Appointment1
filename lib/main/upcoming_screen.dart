@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/upcoming/upcoming_card_component.dart';
+import 'global_search_screen.dart';
 
 class UpcomingScreen extends StatefulWidget {
   const UpcomingScreen({super.key});
@@ -88,6 +89,19 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Column(

@@ -10,6 +10,7 @@ import 'main/today_screen.dart';
 import 'main/tomorrow_screen.dart';
 import 'main/add_new_screen.dart';
 import 'main/deleted_appointments_screen.dart';
+import 'main/global_search_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -37,6 +38,7 @@ class MyApp extends StatelessWidget {
         '/tomorrow': (context) => const TomorrowScreen(),
         '/add-new': (context) => const AddNewScreen(),
         '/deleted-appointments': (context) => const DeletedAppointmentsScreen(),
+        '/global-search': (context) => const GlobalSearchScreen(),
       },
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../action/storage_service.dart';
 import 'add_new_screen.dart';
+import 'global_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -124,6 +125,19 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Center(

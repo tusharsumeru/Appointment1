@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/common/search_bar_component.dart';
+import 'global_search_screen.dart';
 
 class BulkEmailSmsScreen extends StatefulWidget {
   const BulkEmailSmsScreen({super.key});
@@ -76,6 +77,19 @@ class _BulkEmailSmsScreenState extends State<BulkEmailSmsScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Container(

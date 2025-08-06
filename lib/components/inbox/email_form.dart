@@ -175,6 +175,20 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   String _getAppointeeEmail() {
+    // Check if this is a quick appointment first
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final email = optional['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+    
     // Try multiple possible fields for the appointee email
     // Primary: email field (from the actual data structure)
     final email = widget.appointment['email']?.toString();

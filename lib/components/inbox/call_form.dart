@@ -23,6 +23,25 @@ class _CallFormState extends State<CallForm> {
   }
 
   String _getPhoneNumber() {
+    // Check if this is a quick appointment first
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final mobileNumber = optional['mobileNumber'];
+        if (mobileNumber is Map<String, dynamic>) {
+          final countryCode = mobileNumber['countryCode']?.toString() ?? '';
+          final number = mobileNumber['number']?.toString() ?? '';
+          if (number.isNotEmpty) {
+            return '$countryCode$number';
+          }
+        }
+      }
+    }
+    
+    // Fallback to regular phone fields
     final phoneData = widget.appointment['phoneNumber'];
     if (phoneData is Map<String, dynamic>) {
       final countryCode = phoneData['countryCode']?.toString() ?? '';

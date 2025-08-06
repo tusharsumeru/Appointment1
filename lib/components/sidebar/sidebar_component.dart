@@ -12,6 +12,7 @@ import '../../main/change_password_screen.dart';
 // import '../../main/export_data_screen.dart';
 // import '../../main/forward_request_logs_screen.dart';
 import '../../main/deleted_appointments_screen.dart';
+import '../../main/global_search_screen.dart';
 import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
@@ -370,6 +371,18 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const AddNewScreen()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.search, color: Colors.deepPurple),
+              title: const Text('Global Search'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GlobalSearchScreen()),
                 );
               },
             ),

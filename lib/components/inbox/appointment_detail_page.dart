@@ -51,9 +51,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Initialize with empty text
-    _notesController.text = "";
-    _remarksController.text = "";
+    // Load existing notes and remarks from appointment data
+    // Initialize notes and remarks - check quick appointment data first
+    if (_isQuickAppointment()) {
+      // For quick appointments, show purpose in notes and remarks for gurudev in remarks
+      _notesController.text = _getQuickAppointmentPurpose();
+      _remarksController.text = _getQuickAppointmentRemarks();
+    } else {
+      // For regular appointments, use the standard fields
+      _notesController.text = widget.appointment['secretaryNotes']?.toString() ?? "";
+      _remarksController.text = widget.appointment['gurudevRemarks']?.toString() ?? "";
+    }
+    
+    // Debug quick appointment data
+    _debugQuickAppointmentData();
     
     // Fetch appointments overview data
     _fetchAppointmentsOverview();
@@ -124,6 +135,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       // Final fallback
       return 'User ${index + 1}';
     }
+
   }
 
   String _getUserLabel(int index) {
@@ -412,12 +424,138 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointmentImageUrl() {
+    // Check if this is a quick appointment and has a photo
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final photoUrl = optional['photo']?.toString();
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          return photoUrl;
+        }
+      }
+    }
+    
+    // Fallback to profile photo
     return widget.appointment['profilePhoto']?.toString() ?? 
            'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
   }
 
   String _getAppointmentId() {
     return widget.appointment['appointmentId']?.toString() ?? '';
+  }
+
+  // Get quick appointment email
+  String _getQuickAppointmentEmail() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final email = optional['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get quick appointment phone number
+  String _getQuickAppointmentPhone() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final mobileNumber = optional['mobileNumber'];
+        if (mobileNumber is Map<String, dynamic>) {
+          final countryCode = mobileNumber['countryCode']?.toString() ?? '';
+          final number = mobileNumber['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            // Handle cases where number might not have proper formatting
+            String formattedNumber = number;
+            if (number.startsWith('91') && number.length > 10) {
+              formattedNumber = number.substring(2); // Remove country code if duplicated
+            }
+            return '$countryCode $formattedNumber';
+          }
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get quick appointment purpose
+  String _getQuickAppointmentPurpose() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final details = quickApt['details'];
+      if (details is Map<String, dynamic>) {
+        final purpose = details['purpose']?.toString();
+        if (purpose != null && purpose.isNotEmpty) {
+          return purpose;
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get quick appointment remarks
+  String _getQuickAppointmentRemarks() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final details = quickApt['details'];
+      if (details is Map<String, dynamic>) {
+        final remarks = details['remarksForGurudev']?.toString();
+        if (remarks != null && remarks.isNotEmpty) {
+          return remarks;
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Check if this is a quick appointment
+  bool _isQuickAppointment() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    return apptType == 'quick';
+  }
+
+  // Debug method to print quick appointment data
+  void _debugQuickAppointmentData() {
+    final apptType = widget.appointment['appt_type']?.toString();
+    print('🔍 Debug: Appointment type: $apptType');
+    
+    if (apptType == 'quick') {
+      final quickApt = widget.appointment['quick_apt'];
+      print('🔍 Debug: Quick appointment data: $quickApt');
+      
+      if (quickApt is Map<String, dynamic>) {
+        final optional = quickApt['optional'];
+        final details = quickApt['details'];
+        print('🔍 Debug: Optional data: $optional');
+        print('🔍 Debug: Details data: $details');
+        
+        // Test our helper methods
+        print('🔍 Debug: Email: "${_getQuickAppointmentEmail()}"');
+        print('🔍 Debug: Phone: "${_getQuickAppointmentPhone()}"');
+        print('🔍 Debug: Purpose: "${_getQuickAppointmentPurpose()}"');
+        print('🔍 Debug: Remarks: "${_getQuickAppointmentRemarks()}"');
+      }
+    }
   }
 
   Widget _buildFilterSection() {
@@ -1186,11 +1324,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Action Buttons Section
             _buildActionButtonsSection(),
             
-            // Only show additional sections if NOT from schedule screens
+            // Show additional sections for all screens
+            const SizedBox(height: 16),
+            
+            // Notes & Remarks Section - Always show for all screens
+            _buildNotesRemarksSection(),
+            
+            // Only show other sections if NOT from schedule screens
             if (!widget.isFromScheduleScreens) ...[
-              // Proper gap between Quick Actions and Accompanying Users
-              const SizedBox(height: 16),
-              
               // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
               if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
                 _buildAccompanyingUsersSection(),
@@ -1207,9 +1348,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               // Appointments Overview Section
               _buildAppointmentsOverviewSection(),
             ],
-            
-            // Notes & Remarks Section - Always show
-            _buildNotesRemarksSection(),
             
             const SizedBox(height: 20),
           ],
@@ -1290,22 +1428,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 color: Colors.black,
                 onTap: _makePhoneCall,
               ),
-              // Show QR button for schedule screens, Assign button for others
-              if (widget.isFromScheduleScreens) ...[
-                _buildActionButton(
-                  icon: Icons.qr_code,
-                  label: 'QR',
-                  color: Colors.black,
-                  onTap: () => _showQRCodeDialog(widget.appointment),
-                ),
-              ] else ...[
-                _buildActionButton(
-                  icon: Icons.assignment_ind,
-                  label: 'Assign',
-                  color: Colors.black,
-                  onTap: () => _showActionBottomSheet(context, 'assign'),
-                ),
-              ],
+              // Show Assign button for all screens (no QR button)
+              _buildActionButton(
+                icon: Icons.assignment_ind,
+                label: 'Assign',
+                color: Colors.black,
+                onTap: () => _showActionBottomSheet(context, 'assign'),
+              ),
               _buildActionButton(
                 icon: _isStarred() ? Icons.star : Icons.star_border,
                 label: 'Starred',
@@ -1524,21 +1653,37 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointeeMobile() {
-    // Try to get phone number from createdBy object
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      final phone = createdBy['phone'];
-      if (phone != null) {
-        return _formatPhoneNumber(phone);
+    // Check if this is a quick appointment first (same logic as message form)
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final optional = quickApt['optional'];
+      if (optional is Map<String, dynamic>) {
+        final mobileNumber = optional['mobileNumber'];
+        if (mobileNumber is Map<String, dynamic>) {
+          final countryCode = mobileNumber['countryCode']?.toString() ?? '';
+          final number = mobileNumber['number']?.toString() ?? '';
+          if (number.isNotEmpty) {
+            return '$countryCode$number';
+          }
+        }
       }
     }
     
-    // Fallback to other phone fields
-    final phone = widget.appointment['phone'] ?? 
-                 widget.appointment['mobile'] ?? 
-                 widget.appointment['contactNumber'];
-    
-    return _formatPhoneNumber(phone);
+    // Fallback to regular phone fields (same logic as message form)
+    final phoneNumber = widget.appointment['phoneNumber'];
+    if (phoneNumber is Map<String, dynamic>) {
+      final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+      final number = phoneNumber['number']?.toString() ?? '';
+      if (countryCode.isNotEmpty && number.isNotEmpty) {
+        // Return full phone number with country code
+        return '$countryCode$number';
+      }
+    }
+    // If it's a string, return as is
+    final phoneString = phoneNumber?.toString() ?? '';
+    return phoneString;
   }
 
   String _formatPhoneNumber(dynamic phoneData) {
@@ -1652,7 +1797,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _getCreatedByName(),
+                      _getAppointmentName(),
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -1749,6 +1894,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       ),
     );
   }
+
+
 
   Widget _buildAccompanyingUsersSection() {
     return Container(
@@ -2046,8 +2193,26 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ),
           const SizedBox(height: 20),
           
-          // Basic Details
-          _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+          // Basic Details - Show regular appointment details (quick appointment details are shown in dedicated section)
+          if (!_isQuickAppointment()) ...[
+            if (_getQuickAppointmentEmail().isNotEmpty) ...[
+              _buildDetailRow('Email', _getQuickAppointmentEmail(), Icons.email),
+            ],
+            if (_getQuickAppointmentPhone().isNotEmpty) ...[
+              _buildDetailRow('Phone Number', _getQuickAppointmentPhone(), Icons.phone),
+            ],
+            if (_getQuickAppointmentPurpose().isNotEmpty) ...[
+              _buildDetailRow('Purpose', _getQuickAppointmentPurpose(), Icons.info),
+            ] else ...[
+              _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+            ],
+            if (_getQuickAppointmentRemarks().isNotEmpty) ...[
+              _buildDetailRow('Remarks for Gurudev', _getQuickAppointmentRemarks(), Icons.note),
+            ],
+          ] else ...[
+            // For quick appointments, show basic info without duplicating quick appointment data
+            _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+          ],
           _buildDetailRow('Are you an Art Of Living teacher', 'No', Icons.school),
           _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
         ],
@@ -2275,9 +2440,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Notes',
-                style: TextStyle(
+              Text(
+                _isQuickAppointment() ? 'Purpose' : 'Notes',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2285,10 +2450,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _notesController,
-                enabled: _isEditing,
+                enabled: true,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Enter notes here...',
+                  hintText: _isQuickAppointment() ? 'Purpose of the appointment...' : 'Enter notes here...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.grey[300]!),
@@ -2312,9 +2477,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Remarks',
-                style: TextStyle(
+              Text(
+                _isQuickAppointment() ? 'Gurudev Remarks' : 'Remarks',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2322,10 +2487,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _remarksController,
-                enabled: _isEditing,
+                enabled: true,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Enter remarks here...',
+                  hintText: _isQuickAppointment() ? 'Remarks for Gurudev...' : 'Enter remarks here...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.grey[300]!),
@@ -2345,111 +2510,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           const SizedBox(height: 20),
           
-          // Action Buttons
+          // Save Changes Button
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (_isEditing) ...[
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _isEditing = false;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Changes saved successfully!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25), // Fully rounded
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  child: const Text(
-                    'Save',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ] else ...[
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _isEditing = true;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25), // Fully rounded
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  child: const Text(
-                    'Edit',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
               ElevatedButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Notes'),
-                      content: const Text('Are you sure you want to delete the notes and remarks?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _notesController.clear();
-                            _remarksController.clear();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Notes deleted successfully!'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25), // Fully rounded
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          child: const Text(
-                            'Delete',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                onPressed: () async {
+                  await _saveNotesAndRemarks();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25), // Fully rounded
@@ -2457,7 +2527,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
                 child: const Text(
-                  'Delete',
+                  'Save Changes',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -2466,6 +2536,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
             ],
           ),
+
         ],
       ),
     );
@@ -3513,4 +3584,83 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       },
     );
   }
-} 
+
+  Future<void> _saveNotesAndRemarks() async {
+    try {
+      // Get appointment ID
+      final appointmentId = _getAppointmentId();
+      if (appointmentId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Appointment ID not found'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      // Get notes and remarks from controllers
+      final notes = _notesController.text.trim();
+      final remarks = _remarksController.text.trim();
+
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              SizedBox(width: 16),
+              Text('Saving notes and remarks...'),
+            ],
+          ),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Call the API to update notes and remarks
+      final result = await ActionService.updateStarred(
+        appointmentId,
+        gurudevRemarks: remarks.isNotEmpty ? remarks : null,
+        secretaryNotes: notes.isNotEmpty ? notes : null,
+      );
+
+      if (result['success']) {
+        // Success - show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Notes and remarks saved successfully!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        // Error - show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to save notes and remarks'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Network or other error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+}

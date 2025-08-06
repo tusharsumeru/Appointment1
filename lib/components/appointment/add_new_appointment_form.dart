@@ -1456,59 +1456,63 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
   Widget _buildCreateAppointmentButton() {
     return Container(
       width: double.infinity,
-      height: 56,
+      height: 44, // h-11 equivalent - matching inbox button
       margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ElevatedButton(
-        onPressed: _saveAppointment,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)], // from-blue-600 to-indigo-600
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFF3B82F6), // blue-500
-                Color(0xFF1D4ED8), // blue-700
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(12), // rounded-xl
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3B82F6).withOpacity(0.2), // shadow-blue-500/20
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          child: const Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    'Create Appointment',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _saveAppointment,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2563EB), Color(0xFF4F46E5)], // from-blue-600 to-indigo-600
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Create Appointment',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.add_circle_outline,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.add_circle_outline,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1671,59 +1675,63 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
             // Submit Button
             Container(
               width: double.infinity,
-              height: 64,
+              height: 44, // h-11 equivalent - matching inbox button
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: ElevatedButton(
-                onPressed: _saveAppointment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF97316), Color(0xFFEAB308)], // orange-500 to yellow-500
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFFF97316), // orange-500
-                        Color(0xFFEAB308), // yellow-500
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                borderRadius: BorderRadius.circular(12), // rounded-xl
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF97316).withOpacity(0.2), // shadow-orange-500/20
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  child: const Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Create Full Appointment',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _saveAppointment,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF97316), Color(0xFFEAB308)], // orange-500 to yellow-500
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Create Full Appointment',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ],
                         ),
-                        SizedBox(width: 16),
-                        Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

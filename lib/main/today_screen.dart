@@ -4,6 +4,7 @@ import '../components/today/today_card_component.dart';
 import '../action/action.dart';
 import 'tomorrow_screen.dart';
 import 'upcoming_screen.dart';
+import 'global_search_screen.dart';
 
 class TodayScreen extends StatefulWidget {
   final DateTime? selectedDate;
@@ -133,6 +134,19 @@ class _TodayScreenState extends State<TodayScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: Column(

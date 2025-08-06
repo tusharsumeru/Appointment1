@@ -3,6 +3,7 @@ import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/appointment_card.dart';
 import '../components/inbox/filter_bottom_sheet.dart';
 import '../action/action.dart';
+import 'global_search_screen.dart';
 
 class StarredScreen extends StatefulWidget {
   const StarredScreen({super.key});
@@ -453,7 +454,19 @@ class _StarredScreenState extends State<StarredScreen> {
             },
           ),
         ),
-        actions: [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       drawer: const SidebarComponent(),
       body: _isLoading

@@ -4,6 +4,7 @@ import '../components/inbox/appointment_card.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/inbox/appointment_detail_page.dart';
 import '../components/inbox/filter_bottom_sheet.dart';
+import 'global_search_screen.dart';
 
 
 class DeletedAppointmentsScreen extends StatefulWidget {
@@ -354,7 +355,19 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
             },
           ),
         ),
-        actions: [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchScreen(),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
