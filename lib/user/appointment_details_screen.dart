@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
+import '../action/action.dart';
 import 'user_screen.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -19,10 +20,7 @@ class AppointmentDetailsScreen extends StatefulWidget {
 
 class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Form controllers
-  final TextEditingController _appointmentSubjectController = TextEditingController();
   final TextEditingController _appointmentPurposeController = TextEditingController();
-  final TextEditingController _userCurrentCompanyController = TextEditingController();
-  final TextEditingController _userCurrentDesignationController = TextEditingController();
   final TextEditingController _numberOfUsersController = TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
@@ -44,12 +42,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   bool _isFormValid = false;
   String? _selectedSecretary;
   String? _selectedAppointmentLocation;
+  String? _selectedLocationId; // Store the selected location ID
   PlatformFile? _selectedFile;
   File? _selectedImage;
   bool _isAttendingProgram = false;
   
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
+
+  // Location data
+  List<Map<String, dynamic>> _locations = [];
+  bool _isLoadingLocations = true;
 
   final List<String> _secretaries = [
     'Select a secretary',
@@ -62,14 +65,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   void initState() {
     super.initState();
     _validateForm();
+    _loadLocations();
   }
 
   @override
   void dispose() {
-    _appointmentSubjectController.dispose();
     _appointmentPurposeController.dispose();
-    _userCurrentCompanyController.dispose();
-    _userCurrentDesignationController.dispose();
     _numberOfUsersController.dispose();
     _fromDateController.dispose();
     _toDateController.dispose();
@@ -122,10 +123,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _validateForm() {
-    bool basicFormValid = _appointmentSubjectController.text.isNotEmpty &&
-        _appointmentPurposeController.text.isNotEmpty &&
-        _userCurrentCompanyController.text.isNotEmpty &&
-        _userCurrentDesignationController.text.isNotEmpty &&
+    bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
         _numberOfUsersController.text.isNotEmpty &&
         _fromDateController.text.isNotEmpty &&
         _toDateController.text.isNotEmpty;
@@ -254,15 +252,178 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
+  // Load ashram locations from API
+  Future<void> _loadLocations() async {
+    try {
+      print('🔄 Loading ashram locations...');
+      final result = await ActionService.getAshramLocations();
+      
+      if (result['success']) {
+        final locations = List<Map<String, dynamic>>.from(result['data'] ?? []);
+        print('✅ Loaded ${locations.length} locations from API');
+        
+        setState(() {
+          _locations = locations;
+          _isLoadingLocations = false;
+        });
+        
+        // Log location details for debugging
+        for (var location in locations) {
+          print('📍 Location: ${location['name']} (ID: ${location['_id']})');
+        }
+      } else {
+        print('❌ Failed to load locations: ${result['message']}');
+        setState(() {
+          _isLoadingLocations = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading locations: $e');
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
   void _submitForm() async {
-    // Simple form submission without API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Form submitted successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-    Navigator.pop(context);
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      // Collect all form data
+      Map<String, dynamic> appointmentData = {
+        'meetingType': 'in_person', // Default value
+        'appointmentFor': {
+          'type': widget.personalInfo['appointmentType'] ?? 'myself',
+          'personalInfo': widget.personalInfo,
+        },
+        'userCurrentCompany': widget.personalInfo['company'] ?? 'Sumeru Digital', // Get from user data
+        'userCurrentDesignation': widget.personalInfo['designation'] ?? 'Office Operations Specialist', // Get from user data
+        'appointmentPurpose': _appointmentPurposeController.text.trim(),
+        'appointmentSubject': _appointmentPurposeController.text.trim(), // Use same value as purpose
+        'preferredDateRange': {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        },
+        'appointmentLocation': _selectedLocationId ?? '6889dbd15b943e342f660060', // Use selected location ID or fallback to static
+        'assignedSecretary': '6891a4d3a26a787d5aec5d50', // Static secretary ID
+        'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
+      };
+
+      // Add accompanyUsers if there are additional users
+      if (_guestControllers.isNotEmpty) {
+        List<Map<String, dynamic>> accompanyUsers = [];
+        for (var guest in _guestControllers) {
+          accompanyUsers.add({
+            'name': guest['name']?.text.trim() ?? '',
+            'phone': guest['phone']?.text.trim() ?? '',
+            'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
+          });
+        }
+        appointmentData['accompanyUsers'] = accompanyUsers;
+      }
+
+      // Add guest information if appointment type is guest
+      if (widget.personalInfo['appointmentType'] == 'guest') {
+        appointmentData['guestInformation'] = {
+          'name': _guestNameController.text.trim(),
+          'email': _guestEmailController.text.trim(),
+          'phone': _guestPhoneController.text.trim(),
+          'designation': _guestDesignationController.text.trim(),
+          'company': _guestCompanyController.text.trim(),
+          'location': _guestLocationController.text.trim(),
+        };
+      }
+
+      // Add reference information if appointment type is guest
+      if (widget.personalInfo['appointmentType'] == 'guest') {
+        appointmentData['referenceInformation'] = {
+          'name': _referenceNameController.text.trim(),
+          'email': _referenceEmailController.text.trim(),
+          'phone': _referencePhoneController.text.trim(),
+        };
+      }
+
+      // Add virtual meeting details if applicable
+      if (_selectedAppointmentLocation == 'Virtual Meeting') {
+        appointmentData['virtualMeetingDetails'] = {
+          'platform': 'Zoom', // Default value
+          'link': 'To be provided', // Default value
+        };
+      }
+
+      // Add attending course details if applicable
+      if (_isAttendingProgram) {
+        appointmentData['attendingCourseDetails'] = {
+          'courseName': 'General Program', // Default value
+          'duration': '1 day', // Default value
+        };
+      }
+
+      // Log the date conversion for debugging
+      print('📅 Date conversion:');
+      print('   - Original from date: ${_fromDateController.text}');
+      print('   - Original to date: ${_toDateController.text}');
+      print('   - Converted fromDate: ${appointmentData['preferredDateRange']['fromDate']}');
+      print('   - Converted toDate: ${appointmentData['preferredDateRange']['toDate']}');
+
+      print('📋 Submitting appointment data:');
+      print('   - appointmentType: ${widget.personalInfo['appointmentType']}');
+      print('   - purpose: ${_appointmentPurposeController.text}');
+      print('   - location: $_selectedAppointmentLocation');
+      print('   - locationId: $_selectedLocationId');
+      print('   - numberOfUsers: ${_numberOfUsersController.text}');
+      print('   - guestControllers count: ${_guestControllers.length}');
+
+      // Call the API
+      final result = await ActionService.createAppointment(appointmentData);
+
+      // Hide loading indicator
+      Navigator.pop(context);
+
+      if (result['success']) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Appointment created successfully!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        // Navigate back to the main screen
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to create appointment'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      // Hide loading indicator
+      Navigator.pop(context);
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   @override
@@ -635,56 +796,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                                     const SizedBox(height: 32),
 
-                  // Appointment Subject
-                  _buildTextField(
-                    label: 'Appointment Subject',
-                    controller: _appointmentSubjectController,
-                    placeholder: 'Enter appointment subject',
-                    onChanged: (value) => _validateForm(),
-                  ),
-                  const SizedBox(height: 20),
+                   // Appointment Purpose
+                   _buildTextArea(
+                     label: 'Appointment Purpose',
+                     controller: _appointmentPurposeController,
+                     placeholder: 'Please describe the purpose of your appointment in detail',
+                     onChanged: (value) => _validateForm(),
+                   ),
+                   const SizedBox(height: 20),
 
-                  // Appointment Purpose
-                  _buildTextArea(
-                    label: 'Appointment Purpose',
-                    controller: _appointmentPurposeController,
-                    placeholder: 'Please describe the purpose of your appointment in detail',
-                    onChanged: (value) => _validateForm(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // User Current Company
-                  _buildTextField(
-                    label: 'Your Current Company',
-                    controller: _userCurrentCompanyController,
-                    placeholder: 'Enter your current company/organization',
-                    onChanged: (value) => _validateForm(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // User Current Designation
-                  _buildTextField(
-                    label: 'Your Current Designation',
-                    controller: _userCurrentDesignationController,
-                    placeholder: 'Enter your current designation/role',
-                    onChanged: (value) => _validateForm(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Appointment Location
-                  _buildDropdownField(
-                    label: 'Appointment Location',
-                    value: _selectedAppointmentLocation,
-                    items: ['Select location', 'Location 1', 'Location 2', 'Location 3'],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedAppointmentLocation = value;
-                      });
-                      _validateForm();
-                    },
-                  ),
+                                     // Appointment Location
+                   _buildLocationDropdown(),
                   const SizedBox(height: 20),
 
                   // Secretary Contact
@@ -1367,7 +1491,111 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           ],
         ),
-      ],
-    );
-  }
-} 
+             ],
+     );
+   }
+
+   // Build location dropdown with dynamic data from API
+   Widget _buildLocationDropdown() {
+     return Column(
+       crossAxisAlignment: CrossAxisAlignment.start,
+       children: [
+         const Text(
+           'Appointment Location *',
+           style: TextStyle(
+             fontSize: 16,
+             fontWeight: FontWeight.w500,
+             color: Colors.black87,
+           ),
+         ),
+         const SizedBox(height: 8),
+         Container(
+           decoration: BoxDecoration(
+             border: Border.all(color: Colors.grey[300]!),
+             borderRadius: BorderRadius.circular(8),
+           ),
+           child: _isLoadingLocations
+               ? Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                   child: Row(
+                     children: [
+                       const SizedBox(
+                         width: 16,
+                         height: 16,
+                         child: CircularProgressIndicator(strokeWidth: 2),
+                       ),
+                       const SizedBox(width: 12),
+                       Text(
+                         'Loading locations...',
+                         style: TextStyle(color: Colors.grey[600]),
+                       ),
+                     ],
+                   ),
+                 )
+               : DropdownButtonFormField<String>(
+                   value: _selectedAppointmentLocation,
+                   decoration: const InputDecoration(
+                     border: InputBorder.none,
+                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                   ),
+                   hint: const Text('Select a location'),
+                   items: [
+                     const DropdownMenuItem<String>(
+                       value: null,
+                       child: Text('Select a location'),
+                     ),
+                     ..._locations.map((location) {
+                       return DropdownMenuItem<String>(
+                         value: location['name'],
+                         child: Text(location['name'] ?? 'Unknown Location'),
+                       );
+                     }).toList(),
+                   ],
+                   onChanged: (value) {
+                     setState(() {
+                       _selectedAppointmentLocation = value;
+                       // Find and store the corresponding location ID
+                       if (value != null) {
+                         final selectedLocation = _locations.firstWhere(
+                           (location) => location['name'] == value,
+                           orElse: () => {},
+                         );
+                         _selectedLocationId = selectedLocation['_id'];
+                         print('📍 Selected location: $value (ID: $_selectedLocationId)');
+                       } else {
+                         _selectedLocationId = null;
+                       }
+                     });
+                     _validateForm();
+                   },
+                   icon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                 ),
+         ),
+       ],
+     );
+   }
+
+   // Helper method to parse dd-mm-yyyy format to ISO 8601 format
+   String _parseDateToISO(String dateString) {
+     try {
+       // Parse dd-mm-yyyy format
+       final parts = dateString.split('-');
+       if (parts.length == 3) {
+         final day = int.parse(parts[0]);
+         final month = int.parse(parts[1]);
+         final year = int.parse(parts[2]);
+         
+         // Create DateTime object
+         final date = DateTime(year, month, day);
+         
+         // Convert to ISO 8601 format with timezone
+         return date.toUtc().toIso8601String();
+       }
+     } catch (e) {
+       print('❌ Error parsing date "$dateString": $e');
+     }
+     
+     // Return current date as fallback
+     return DateTime.now().toUtc().toIso8601String();
+   }
+ } 

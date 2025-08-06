@@ -4272,7 +4272,7 @@ class ActionService {
     }
   }
 ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
-  // Create appointment method
+  // Create appointment method using enhanced API
   static Future<Map<String, dynamic>> createAppointment(Map<String, dynamic> appointmentData) async {
     try {
       print('🚀 Creating appointment with data: $appointmentData');
@@ -4281,6 +4281,27 @@ class ActionService {
       if (token == null) {
         throw Exception('No authentication token found');
       }
+
+      // Add default secretary ID if not provided
+      if (appointmentData['assignedSecretary'] == null) {
+        appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
+        print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
+      }
+
+      // Log the final appointment data being sent
+      print('📋 Final appointment data to be sent:');
+      print('   - meetingType: ${appointmentData['meetingType']}');
+      print('   - appointmentFor: ${appointmentData['appointmentFor']}');
+      print('   - userCurrentCompany: ${appointmentData['userCurrentCompany']}');
+      print('   - userCurrentDesignation: ${appointmentData['userCurrentDesignation']}');
+      print('   - appointmentPurpose: ${appointmentData['appointmentPurpose']}');
+      print('   - appointmentSubject: ${appointmentData['appointmentSubject']}');
+      print('   - preferredDateRange: ${appointmentData['preferredDateRange']}');
+      print('   - appointmentLocation: ${appointmentData['appointmentLocation']}');
+      print('   - numberOfUsers: ${appointmentData['numberOfUsers']}');
+      print('   - accompanyUsers: ${appointmentData['accompanyUsers']}');
+      print('   - assignedSecretary: ${appointmentData['assignedSecretary']}');
+      print('   - guestInformation: ${appointmentData['guestInformation']}');
 
       final response = await http.post(
         Uri.parse('$baseUrl/appointment'),
@@ -4296,17 +4317,21 @@ class ActionService {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        print('✅ Appointment created successfully!');
         return {
           'success': true,
           'data': responseData['data'],
-          'message': responseData['message'],
+          'message': responseData['message'] ?? 'Appointment created successfully',
+          'statusCode': response.statusCode,
         };
       } else {
+        print('❌ Failed to create appointment: ${responseData['message']}');
         return {
           'success': false,
           'message': responseData['message'] ?? 'Failed to create appointment',
           'error': responseData['error'],
+          'statusCode': response.statusCode,
         };
       }
     } catch (e) {
