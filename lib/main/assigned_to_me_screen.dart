@@ -548,6 +548,7 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
                           final appointment = _appointments[index];
                           return AppointmentCard(
                             appointment: appointment,
+                            index: index, // Pass the index for alternating colors
                             onStarToggle: (isStarred) async {
                               print('🔍 Assigned to Me onStarToggle - received isStarred: $isStarred');
                               final appointmentId = appointment['appointmentId']?.toString() ?? 

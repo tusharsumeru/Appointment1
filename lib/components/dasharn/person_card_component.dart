@@ -17,6 +17,7 @@ class PersonCardComponent extends StatefulWidget {
   final VoidCallback? onGroupPressed;
   final VoidCallback? onStarPressed;
   final VoidCallback? onDeletePressed;
+  final int index; // Add index parameter for alternating colors
 
   const PersonCardComponent({
     super.key,
@@ -36,6 +37,7 @@ class PersonCardComponent extends StatefulWidget {
     this.onGroupPressed,
     this.onStarPressed,
     this.onDeletePressed,
+    required this.index, // Add index parameter
   });
 
   @override
@@ -48,7 +50,7 @@ class _PersonCardComponentState extends State<PersonCardComponent> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      color: Colors.white,
+      color: widget.index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0), // Alternating colors like inbox
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),

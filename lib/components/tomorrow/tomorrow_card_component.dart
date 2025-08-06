@@ -402,6 +402,44 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     return appointment['mainStatus']?.toString() ?? 'Unknown';
   }
 
+  String _getAppointmentStatusForDone(Map<String, dynamic> appointment) {
+    // For "done" category, always use appointmentStatus.status (not checkInStatus.mainStatus)
+    final appointmentStatus = appointment['appointmentStatus'];
+    if (appointmentStatus is Map<String, dynamic>) {
+      final status = appointmentStatus['status']?.toString();
+      if (status != null && status.isNotEmpty) {
+        return status;
+      }
+    }
+
+    // Fallback to direct mainStatus field if appointmentStatus.status is not available
+    return appointment['mainStatus']?.toString() ?? 'Unknown';
+  }
+
+  String _getMainStatus(Map<String, dynamic> appointment) {
+    // Get checkInStatus.mainStatus specifically
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is Map<String, dynamic>) {
+      final mainStatus = checkInStatus['mainStatus']?.toString();
+      if (mainStatus != null && mainStatus.isNotEmpty) {
+        return mainStatus;
+      }
+    }
+    return 'Unknown';
+  }
+
+  String _getAppointmentStatusOnly(Map<String, dynamic> appointment) {
+    // Get appointmentStatus.status specifically
+    final appointmentStatus = appointment['appointmentStatus'];
+    if (appointmentStatus is Map<String, dynamic>) {
+      final status = appointmentStatus['status']?.toString();
+      if (status != null && status.isNotEmpty) {
+        return status;
+      }
+    }
+    return 'Unknown';
+  }
+
   String _getAppointmentTime(Map<String, dynamic> appointment) {
     // Try to get time from scheduledDateTime object
     final scheduledDateTime = appointment['scheduledDateTime'];
@@ -1174,32 +1212,65 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Status
-                      Row(
-                        children: [
-                          Text(
-                            'Status: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              _getStatusText(
-                                _getAppointmentStatus(appointment),
-                              ).toUpperCase(),
+                      // Main Status (Check-in Status) - Only show for non-completed appointments
+                      if (_getAppointmentStatusForDone(appointment).toLowerCase() != 'completed' && 
+                          _getAppointmentStatusForDone(appointment).toLowerCase() != 'done') ...[
+                        Row(
+                          children: [
+                            Text(
+                              'Appointment Status: ',
                               style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green.shade600,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
+                            Expanded(
+                              child: Text(
+                                _getStatusText(
+                                  _getMainStatus(appointment),
+                                ).toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      // Appointment Status - Only show for completed appointments
+                      if (_getAppointmentStatusForDone(appointment).toLowerCase() == 'completed' || 
+                          _getAppointmentStatusForDone(appointment).toLowerCase() == 'done') ...[
+                        Row(
+                          children: [
+                            Text(
+                              'Appointment Status: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                _getStatusText(
+                                  _getAppointmentStatusOnly(appointment),
+                                ).toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
 
                       const SizedBox(height: 12),
 

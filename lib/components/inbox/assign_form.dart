@@ -60,6 +60,7 @@ class _AssignFormState extends State<AssignForm> {
   }
 
   Future<void> _loadSecretaries() async {
+    print('DEBUG: _loadSecretaries() called');
     try {
       setState(() {
         _isLoading = true;
@@ -68,8 +69,10 @@ class _AssignFormState extends State<AssignForm> {
 
       // Extract location ID from appointment data
       final locationId = _extractLocationId();
+      print('DEBUG: Extracted locationId = $locationId');
       
       if (locationId == null) {
+        print('DEBUG: No location ID found - showing error');
         setState(() {
           _isLoading = false;
           _errorMessage = 'Location information not available';
@@ -78,13 +81,17 @@ class _AssignFormState extends State<AssignForm> {
         return;
       }
 
+      print('DEBUG: Calling API with locationId = $locationId');
       // Call the API to get secretaries for this location
       final result = await ActionService.getAssignedSecretariesByAshramLocation(
         locationId: locationId,
       );
 
+      print('DEBUG: API result = $result');
+
       if (result['success']) {
         final List<dynamic> secretariesData = result['data'] ?? [];
+        print('DEBUG: Secretaries data count = ${secretariesData.length}');
         
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = secretariesData.map((secretary) {
@@ -92,6 +99,8 @@ class _AssignFormState extends State<AssignForm> {
           final secretaryName = secretary['fullName']?.toString() ?? '';
           final isCurrentUser = secretaryId == _currentUserId;
           final isAssigned = secretaryName == _assignedSecretaryId;
+          
+          print('DEBUG: Processing secretary - ID: $secretaryId, Name: $secretaryName, isCurrentUser: $isCurrentUser, isAssigned: $isAssigned');
           
           return {
             'id': secretaryId,
@@ -101,11 +110,13 @@ class _AssignFormState extends State<AssignForm> {
           };
         }).toList();
 
+        print('DEBUG: Final secretaries list count = ${secretaries.length}');
         setState(() {
           _availableAssignees = secretaries;
           _isLoading = false;
         });
       } else {
+        print('DEBUG: API call failed - ${result['message']}');
         setState(() {
           _isLoading = false;
           _errorMessage = result['message'] ?? 'Failed to load secretaries';
@@ -113,6 +124,7 @@ class _AssignFormState extends State<AssignForm> {
         });
       }
     } catch (error) {
+      print('DEBUG: Exception in _loadSecretaries: $error');
       setState(() {
         _isLoading = false;
         _errorMessage = 'Network error: $error';
@@ -122,23 +134,65 @@ class _AssignFormState extends State<AssignForm> {
   }
 
   String? _extractLocationId() {
+    print('DEBUG: _extractLocationId() called');
+    print('DEBUG: Appointment keys: ${widget.appointment.keys.toList()}');
+    
     // Try to get location ID from various possible fields
     final appointmentLocation = widget.appointment['appointmentLocation'];
+    print('DEBUG: appointmentLocation = $appointmentLocation');
     if (appointmentLocation != null) {
+      if (appointmentLocation is Map<String, dynamic>) {
+        final id = appointmentLocation['_id']?.toString();
+        print('DEBUG: Extracted _id from appointmentLocation = $id');
+        return id;
+      }
+      print('DEBUG: Using appointmentLocation as string = ${appointmentLocation.toString()}');
       return appointmentLocation.toString();
     }
 
     final location = widget.appointment['location'];
+    print('DEBUG: location = $location');
     if (location != null) {
+      if (location is Map<String, dynamic>) {
+        final id = location['_id']?.toString();
+        print('DEBUG: Extracted _id from location = $id');
+        return id;
+      }
+      print('DEBUG: Using location as string = ${location.toString()}');
       return location.toString();
     }
 
     final venue = widget.appointment['venue'];
+    print('DEBUG: venue = $venue');
     if (venue != null) {
+      if (venue is Map<String, dynamic>) {
+        final id = venue['_id']?.toString();
+        print('DEBUG: Extracted _id from venue = $id');
+        return id;
+      }
+      print('DEBUG: Using venue as string = ${venue.toString()}');
       return venue.toString();
     }
 
+    // Try scheduledDateTime.venue as well
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    print('DEBUG: scheduledDateTime = $scheduledDateTime');
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final venue = scheduledDateTime['venue'];
+      print('DEBUG: venue from scheduledDateTime = $venue');
+      if (venue != null) {
+        if (venue is Map<String, dynamic>) {
+          final id = venue['_id']?.toString();
+          print('DEBUG: Extracted _id from scheduledDateTime.venue = $id');
+          return id;
+        }
+        print('DEBUG: Using scheduledDateTime.venue as string = ${venue.toString()}');
+        return venue.toString();
+      }
+    }
+
     // If no location ID found, return null
+    print('DEBUG: No location ID found - returning null');
     return null;
   }
 

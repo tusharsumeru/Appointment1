@@ -9,7 +9,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://1f27bc24155b.ngrok-free.app/api/v3'; // API base URL
+      'https://5223a0ce527b.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -267,7 +267,7 @@ class ActionService {
       // Check if this is a quick appointment
       final apptType = appointment['appt_type']?.toString();
       final quickApt = appointment['quick_apt'];
-      
+
       if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
         final optional = quickApt['optional'];
         if (optional is Map<String, dynamic>) {
@@ -281,7 +281,7 @@ class ActionService {
           }
         }
       }
-      
+
       // Fallback to userMobile field
       if (processedAppointment['userMobile'] == null ||
           processedAppointment['userMobile'].toString().isEmpty) {
@@ -302,7 +302,7 @@ class ActionService {
       // Check if this is a quick appointment
       final apptType = appointment['appt_type']?.toString();
       final quickApt = appointment['quick_apt'];
-      
+
       if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
         final optional = quickApt['optional'];
         if (optional is Map<String, dynamic>) {
@@ -312,7 +312,7 @@ class ActionService {
           }
         }
       }
-      
+
       // Fallback to email field if userEmail is not available
       if (processedAppointment['userEmail'] == null ||
           processedAppointment['userEmail'].toString().isEmpty) {
@@ -1933,7 +1933,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to fetch quick appointment',
+          'message':
+              responseData['message'] ?? 'Failed to fetch quick appointment',
         };
       }
     } catch (error) {
@@ -3450,35 +3451,39 @@ class ActionService {
       if (emailId != null && emailId.trim().isNotEmpty) {
         request.fields['emailId'] = emailId.trim();
       }
-      
+
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
         request.fields['phoneNumber'] = phoneNumber.trim();
       }
-      
+
       if (purpose != null && purpose.trim().isNotEmpty) {
         request.fields['purpose'] = purpose.trim();
       }
-      
+
       if (remarksForGurudev != null && remarksForGurudev.trim().isNotEmpty) {
         request.fields['remarksForGurudev'] = remarksForGurudev.trim();
       }
 
       // Add boolean fields - send as proper boolean values
       request.fields['tbsRequired'] = tbsRequired ? 'true' : 'false';
-      request.fields['dontSendNotifications'] = dontSendNotifications ? 'true' : 'false';
+      request.fields['dontSendNotifications'] = dontSendNotifications
+          ? 'true'
+          : 'false';
 
       // Debug: Log what fields are being sent
       print('📤 Fields being sent to backend:');
       request.fields.forEach((key, value) {
         print('📤 $key: $value');
       });
-      
+
       // Debug: Log what files are being sent
       print('📤 Files being sent to backend:');
       for (final file in request.files) {
-        print('📤 File: ${file.field} - ${file.filename} - ${file.length} bytes');
+        print(
+          '📤 File: ${file.field} - ${file.filename} - ${file.length} bytes',
+        );
       }
-      
+
       // Debug: Log the complete request structure
       print('📤 Complete request structure:');
       print('📤 URL: ${request.url}');
@@ -3496,12 +3501,14 @@ class ActionService {
             final photoStream = http.ByteStream(photo.openRead());
             final photoLength = await photo.length();
             print('📸 Photo file size: ${photoLength} bytes');
-            
+
             // Get file extension
             final fileName = photo.path.split('/').last;
-            final fileExtension = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+            final fileExtension = fileName.contains('.')
+                ? fileName.split('.').last
+                : 'jpg';
             final mimeType = _getMimeType(fileExtension);
-            
+
             final photoMultipart = http.MultipartFile(
               'photo',
               photoStream,
@@ -3516,7 +3523,8 @@ class ActionService {
             return {
               'success': false,
               'statusCode': 400,
-              'message': 'Error processing photo file: ${photoError.toString()}',
+              'message':
+                  'Error processing photo file: ${photoError.toString()}',
               'data': null,
               'error': photoError.toString(),
             };
@@ -3537,12 +3545,14 @@ class ActionService {
             final attachmentStream = http.ByteStream(attachment.openRead());
             final attachmentLength = await attachment.length();
             print('📎 Attachment file size: ${attachmentLength} bytes');
-            
+
             // Get file extension
             final fileName = attachment.path.split('/').last;
-            final fileExtension = fileName.contains('.') ? fileName.split('.').last : 'pdf';
+            final fileExtension = fileName.contains('.')
+                ? fileName.split('.').last
+                : 'pdf';
             final mimeType = _getMimeType(fileExtension);
-            
+
             final attachmentMultipart = http.MultipartFile(
               'attachment',
               attachmentStream,
@@ -3557,7 +3567,8 @@ class ActionService {
             return {
               'success': false,
               'statusCode': 400,
-              'message': 'Error processing attachment file: ${attachmentError.toString()}',
+              'message':
+                  'Error processing attachment file: ${attachmentError.toString()}',
               'data': null,
               'error': attachmentError.toString(),
             };
@@ -3571,7 +3582,9 @@ class ActionService {
 
       print('📤 Total files being sent: ${request.files.length}');
       request.files.forEach((file) {
-        print('📤 File: ${file.field} - ${file.filename} - ${file.length} bytes');
+        print(
+          '📤 File: ${file.field} - ${file.filename} - ${file.length} bytes',
+        );
       });
 
       // Send the request
@@ -4219,8 +4232,9 @@ class ActionService {
       }
 
       // Build URI with query parameters
-      final uri = Uri.parse('$baseUrl/appointment/search/global')
-          .replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$baseUrl/appointment/search/global',
+      ).replace(queryParameters: queryParams);
 
       // Make API call
       final response = await http.get(
@@ -4241,7 +4255,9 @@ class ActionService {
         throw Exception('Session expired. Please login again.');
       } else {
         final Map<String, dynamic> errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to perform global search');
+        throw Exception(
+          errorData['message'] ?? 'Failed to perform global search',
+        );
       }
     } catch (error) {
       if (error is Exception) {

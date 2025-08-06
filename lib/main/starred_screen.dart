@@ -689,6 +689,7 @@ class _StarredScreenState extends State<StarredScreen> {
                           
                           return AppointmentCard(
                             appointment: appointment,
+                            index: index, // Pass the index for alternating colors
                             onStarToggle: isStarToggleLoading ? null : (isStarred) async {
                               print('🔍 AppointmentCard onStarToggle called with isStarred: $isStarred');
                               print('🔍 Appointment ID: $appointmentId');

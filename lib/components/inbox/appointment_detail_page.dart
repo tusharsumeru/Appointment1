@@ -1357,6 +1357,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildActionButtonsSection() {
+    // Debug: Print appointment data structure
+    print('DEBUG: Building action buttons section');
+    print('DEBUG: Appointment keys: ${widget.appointment.keys.toList()}');
+    print('DEBUG: isFromScheduleScreens: ${widget.isFromScheduleScreens}');
+    
+    // Debug: Check location information
+    final appointmentLocation = widget.appointment['appointmentLocation'];
+    final location = widget.appointment['location'];
+    final venue = widget.appointment['venue'];
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    
+    print('DEBUG: appointmentLocation: $appointmentLocation');
+    print('DEBUG: location: $location');
+    print('DEBUG: venue: $venue');
+    print('DEBUG: scheduledDateTime: $scheduledDateTime');
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -1433,7 +1449,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 icon: Icons.assignment_ind,
                 label: 'Assign',
                 color: Colors.black,
-                onTap: () => _showActionBottomSheet(context, 'assign'),
+                onTap: () {
+                  print('DEBUG: Assign button tapped');
+                  _showActionBottomSheet(context, 'assign');
+                },
               ),
               _buildActionButton(
                 icon: _isStarred() ? Icons.star : Icons.star_border,
@@ -1485,6 +1504,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   void _showActionBottomSheet(BuildContext context, String action) {
+    print('DEBUG: _showActionBottomSheet() called with action: $action');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1494,6 +1514,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildActionContent(String action) {
+    print('DEBUG: _buildActionContent() called with action: $action');
     switch (action) {
       case 'reminder':
         return _buildReminderContent();
@@ -1504,6 +1525,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       case 'assign':
         return _buildAssignContent();
       default:
+        print('DEBUG: Unknown action: $action');
         return const SizedBox.shrink();
     }
   }
@@ -1566,6 +1588,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildAssignContent() {
+    print('DEBUG: _buildAssignContent() called');
+    print('DEBUG: Appointment data passed to AssignForm: ${widget.appointment.keys.toList()}');
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.6,
       decoration: const BoxDecoration(
@@ -1575,7 +1600,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       child: Column(
         children: [
           _buildActionHeader('Assign Secretary'),
-          Expanded(child: AssignForm(appointment: widget.appointment)),
+          Expanded(child: AssignForm(
+            appointment: widget.appointment,
+            onRefresh: () {
+              print('DEBUG: AssignForm onRefresh called');
+              // Refresh the detail page data if needed
+              setState(() {});
+            },
+          )),
         ],
       ),
     );

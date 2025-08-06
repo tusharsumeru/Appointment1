@@ -115,10 +115,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             _currentPage++;
             _hasMoreData = data.length >= _pageSize;
           });
+          print("🔍 Load More - data.length: ${data.length}, pageSize: $_pageSize, hasMoreData: $_hasMoreData");
         } else {
           setState(() {
             _hasMoreData = false;
           });
+          print("🔍 Load More - no more data, hasMoreData: $_hasMoreData");
         }
       } else {
         // Replace data for fresh load
@@ -126,8 +128,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           _appointments = data;
           _filteredAppointments = data;
           _currentPage = 1;
-          _hasMoreData = data.length >= _pageSize;
+          // Always show load more button initially, even if data.length < pageSize
+          // This allows users to try loading more even if the first page is small
+          _hasMoreData = data.length > 0;
         });
+        print("🔍 Fresh Load - data.length: ${data.length}, pageSize: $_pageSize, hasMoreData: $_hasMoreData");
       }
       
       print("📦 Appointments Fetched: ${_appointments.length} total");
@@ -486,39 +491,105 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   Widget _buildLoadMoreButton() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      child: _isLoadingMore
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: _isLoadingMore 
+            ? const LinearGradient(
+                colors: [Color(0xFF6B46C1), Color(0xFF553C9A)], // darker purple when loading
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)], // purple gradient
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-            )
-          : ElevatedButton(
-              onPressed: _loadMore,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+                  child: InkWell(
+            onTap: _isLoadingMore ? null : () {
+              print("🔍 Load more button tapped!");
+              _loadMore();
+            },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: _isLoadingMore 
+                  ? const LinearGradient(
+                      colors: [Color(0xFF6B46C1), Color(0xFF553C9A)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    )
+                  : const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_isLoadingMore) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Loading more...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'Load More Results',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Dot indicator
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.expand_more, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Load More',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -847,8 +918,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                                      : ListView.builder(
                                itemCount: _filteredAppointments.length + (_hasMoreData ? 1 : 0),
                                itemBuilder: (context, index) {
+                                 // Debug print to check load more logic
+                                 print("🔍 ListView - index: $index, total: ${_filteredAppointments.length}, hasMoreData: $_hasMoreData");
+                                 
                                  // Show load more button at the end
                                  if (index == _filteredAppointments.length) {
+                                   print("🔍 Showing load more button at index: $index");
                                    return _buildLoadMoreButton();
                                  }
                                  
@@ -862,6 +937,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                   status: _getAppointmentStatus(item),
                                   emailStatus: _getEmailStatus(item),
                                   isSelected: _selectedAppointments.contains(item['_id']?.toString() ?? ''),
+                                  index: index, // Add index for alternating colors
                                   onSelectionChanged: (isSelected) {
                                     _toggleAppointmentSelection(item['_id']?.toString() ?? '');
                                   },

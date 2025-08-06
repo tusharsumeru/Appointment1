@@ -408,12 +408,12 @@ class _InboxScreenState extends State<InboxScreen> {
               decoration: BoxDecoration(
                 gradient: _isLoadingMore 
                     ? const LinearGradient(
-                        colors: [Color(0xFF1D4ED8), Color(0xFF4338CA)], // disabled state
+                        colors: [Color(0xFFE65100), Color(0xFFF57C00)], // disabled state - darker orange
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       )
                     : const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5)], // from-blue-600 to-indigo-600
+                        colors: [Color(0xFFFF9800), Color(0xFFFF5722)], // orange to deep orange
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
@@ -761,6 +761,7 @@ class _InboxScreenState extends State<InboxScreen> {
             final appointment = _appointments[index];
             return AppointmentCard(
               appointment: appointment,
+              index: index, // Pass the index for alternating colors
               onStarToggle: (isStarred) async {
                 print('🔍 Inbox onStarToggle - received isStarred: $isStarred');
                 final appointmentId = appointment['appointmentId']?.toString() ?? 

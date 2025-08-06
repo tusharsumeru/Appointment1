@@ -59,9 +59,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      _loadMore();
-    }
+    // Removed automatic load more on scroll - now only manual button click
   }
 
   Future<void> _performSearch({bool isLoadMore = false}) async {
@@ -266,10 +264,12 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return appointment['phoneNumber']?.toString() ?? 'No Phone';
   }
 
-  Widget _buildSearchResultCard(Map<String, dynamic> appointment) {
+  Widget _buildSearchResultCard(Map<String, dynamic> appointment, int index) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
+      color: index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0), // Alternating colors like inbox
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -421,6 +421,107 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  Widget _buildLoadMoreButton() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: _isLoadingMore 
+            ? const LinearGradient(
+                colors: [Color(0xFF6B46C1), Color(0xFF553C9A)], // darker purple when loading
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)], // purple gradient
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _isLoadingMore ? null : _loadMore,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: _isLoadingMore 
+                  ? const LinearGradient(
+                      colors: [Color(0xFF6B46C1), Color(0xFF553C9A)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    )
+                  : const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_isLoadingMore) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Loading more...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'Load More Results',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Dot indicator
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
 
@@ -839,17 +940,42 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () => _performSearch(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
+                                          Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF5722), Color(0xFFFF7043)], // deep orange sunset colors
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5722).withOpacity(0.4),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      child: ElevatedButton(
+                        onPressed: () => _performSearch(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Search',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      child: const Text('Search'),
                     ),
                   ],
                 ),
@@ -974,18 +1100,12 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                                     controller: _scrollController,
                                     itemCount: _searchResults.length + (_hasMoreData ? 1 : 0),
                                     itemBuilder: (context, index) {
+                                      // Show load more button at the end
                                       if (index == _searchResults.length) {
-                                        return _isLoadingMore
-                                            ? const Center(
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(16),
-                                                  child: CircularProgressIndicator(),
-                                                ),
-                                              )
-                                            : const SizedBox.shrink();
+                                        return _buildLoadMoreButton();
                                       }
                                       
-                                      return _buildSearchResultCard(_searchResults[index]);
+                                      return _buildSearchResultCard(_searchResults[index], index);
                                     },
                                   ),
               ),

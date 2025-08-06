@@ -16,6 +16,7 @@ class AppointmentCard extends StatefulWidget {
   final VoidCallback? onTap;
   final Function(bool)? onStarToggle;
   final VoidCallback? onRefresh; // Add refresh callback
+  final int index; // Add index parameter for alternating colors
 
   const AppointmentCard({
     super.key,
@@ -23,6 +24,7 @@ class AppointmentCard extends StatefulWidget {
     this.onTap,
     this.onStarToggle,
     this.onRefresh, // Add refresh callback parameter
+    required this.index, // Add index parameter
   });
 
   @override
@@ -48,7 +50,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      color: Colors.white,
+      color: widget.index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0), // More orange for odd cards
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap:
@@ -317,17 +319,24 @@ class _AppointmentCardState extends State<AppointmentCard> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            Colors.amber[50]!.withOpacity(0.6),
-            Colors.orange[50]!.withOpacity(0.6),
-          ],
-        ),
+        color: widget.index % 2 == 0 
+            ? null // Use gradient for even cards
+            : Colors.white, // Use white background for odd cards
+        gradient: widget.index % 2 == 0 
+            ? LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Colors.amber[50]!.withOpacity(0.6),
+                  Colors.orange[50]!.withOpacity(0.6),
+                ],
+              )
+            : null, // No gradient for odd cards
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.amber[200]!.withOpacity(0.4),
+          color: widget.index % 2 == 0 
+              ? Colors.amber[200]!.withOpacity(0.4)
+              : Colors.grey[300]!.withOpacity(0.6),
           width: 1,
         ),
       ),
@@ -760,7 +769,14 @@ class _AppointmentCardState extends State<AppointmentCard> {
         final from = DateTime.tryParse(fromDate);
         final to = DateTime.tryParse(toDate);
         if (from != null && to != null) {
-          return '${from.day}/${from.month}/${from.year} to ${to.day}/${to.month}/${to.year}';
+          // Use month names for better readability
+          final months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ];
+          final fromFormatted = '${from.day} ${months[from.month - 1]} ${from.year}';
+          final toFormatted = '${to.day} ${months[to.month - 1]} ${to.year}';
+          return '$fromFormatted to $toFormatted';
         }
       }
     }

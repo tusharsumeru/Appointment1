@@ -135,12 +135,68 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
     if (_hasNextPage && !_isLoading && !_isLoadingMore) {
       setState(() {
         _isLoadingMore = true;
-        _currentPage++;
       });
-      await _loadDeletedAppointments();
-      setState(() {
-        _isLoadingMore = false;
-      });
+
+      try {
+        final nextPage = _currentPage + 1;
+        final result = await ActionService.getDeletedAppointments(
+          page: nextPage,
+          limit: 10,
+          assignedSecretary: _getFilterValueForAPI(),
+        );
+
+        if (result['success']) {
+          final data = result['data'];
+          final appointments = data['appointments'] as List<dynamic>? ?? [];
+          final pagination = data['pagination'] as Map<String, dynamic>?;
+
+          if (appointments.isNotEmpty) {
+            setState(() {
+              _appointments.addAll(appointments.map((appointment) {
+                if (appointment is Map<String, dynamic>) {
+                  return appointment;
+                } else if (appointment is Map) {
+                  return Map<String, dynamic>.from(appointment);
+                } else {
+                  return <String, dynamic>{};
+                }
+              }).toList());
+
+              if (pagination != null) {
+                _currentPage = pagination['currentPage'] ?? nextPage;
+                _totalPages = pagination['totalPages'] ?? 1;
+                _totalCount = pagination['totalCount'] ?? 0;
+                _hasNextPage = pagination['hasNextPage'] ?? false;
+                _hasPrevPage = pagination['hasPrevPage'] ?? false;
+              }
+            });
+          } else {
+            setState(() {
+              _hasNextPage = false;
+            });
+          }
+        } else {
+          setState(() {
+            _hasNextPage = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load more appointments: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoadingMore = false;
+          });
+        }
+      }
     }
   }
 
@@ -593,12 +649,15 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
         itemBuilder: (context, index) {
           if (index == _appointments.length) {
             // Load more button
-            return _buildLoadMoreButton();
+            return _hasNextPage
+                ? _buildLoadMoreButton()
+                : const SizedBox.shrink();
           }
 
           final appointment = _appointments[index];
           return AppointmentCard(
             appointment: appointment,
+            index: index, // Pass the index for alternating colors
             onTap: () {
               // Navigate to appointment detail page
               Navigator.push(
