@@ -1099,6 +1099,22 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _getAppointmentName(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    final guestInformation = appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final fullName = guestInformation['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];
@@ -1189,6 +1205,22 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _getUserDesignation(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    final guestInformation = appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final designation = guestInformation['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];
@@ -1220,6 +1252,22 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _getProfilePhotoUrl(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    final guestInformation = appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final photoUrl = guestInformation['profilePhotoUrl']?.toString();
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          return photoUrl;
+        }
+      }
+    }
+
     // Check if this is a quick appointment and has a photo
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];

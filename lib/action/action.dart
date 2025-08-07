@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'storage_service.dart';
 import 'jwt_utils.dart'; // Added import for JwtUtils
 
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://5223a0ce527b.ngrok-free.app/api/v3'; // API base URL
+      'https://3831ea028101.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -1071,6 +1072,7 @@ class ActionService {
     Map<String, dynamic>? options,
     String? meetingType,
     String? venueId, // Changed from venue to venueId
+    String? venueLabel, // Added venueLabel parameter
     String? arrivalTime,
     Map<String, dynamic>? scheduleConfirmation,
   }) async {
@@ -1144,17 +1146,34 @@ class ActionService {
         requestBody['meetingType'] = meetingType;
       }
       if (venueId != null) {
-        requestBody['venue'] = venueId; // Send venue ID instead of venue name
+        requestBody['venue'] = venueId; // Send venue ID
+        if (venueLabel != null) {
+          requestBody['venueLabel'] = venueLabel; // Send venue label
+        }
       }
       if (arrivalTime != null) {
         requestBody['arrivalTime'] = arrivalTime;
       }
+
+      // Handle schedule confirmation - map to sc_date and sc_time
       if (scheduleConfirmation != null) {
-        requestBody['scheduleConfirmation'] = scheduleConfirmation;
+        final date = scheduleConfirmation['date'];
+        final time = scheduleConfirmation['time'];
+        if (date != null) {
+          requestBody['sc_date'] = date;
+        }
+        if (time != null) {
+          requestBody['sc_time'] = time;
+        }
       }
 
-      // Make API call
-      final response = await http.post(
+      // Make API call - Changed from POST to PUT
+      print(
+        '🌐 [API] Making PUT request to: $baseUrl/appointment/$appointmentId/schedule',
+      );
+      print('📦 [API] Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.put(
         Uri.parse('$baseUrl/appointment/$appointmentId/schedule'),
         headers: {
           'Content-Type': 'application/json',
@@ -1162,6 +1181,9 @@ class ActionService {
         },
         body: jsonEncode(requestBody),
       );
+
+      print('📡 [API] Response status: ${response.statusCode}');
+      print('📄 [API] Response body: ${response.body}');
 
       // Parse response
       Map<String, dynamic> responseData;
@@ -4266,6 +4288,613 @@ class ActionService {
       throw Exception(
         'Network error. Please check your connection and try again.',
       );
+    }
+  }
+
+  /// Register a new user with profile photo upload
+  /// This function handles user registration with file upload (camera or device)
+  ///
+  /// Parameters:
+  /// - fullName: User's full name
+  /// - email: User's email address
+  /// - password: User's password
+  /// - phoneNumber: User's phone number with country code
+  /// - designation: User's professional designation
+  /// - company: User's company/organization
+  /// - full_address: User's full address
+  /// - userTags: Array of user role tags
+  /// - aol_teacher: Boolean indicating if user is AOL teacher
+  /// - teacher_type: Type of teacher (part-time/full-time)
+  /// - teachercode: AOL teacher code
+  /// - teacheremail: AOL teacher email
+  /// - mobilenumber: AOL teacher mobile number
+  /// - profilePhotoFile: File object from camera or device upload
+  ///
+  /// Returns:
+  /// - Map containing success status, message, and user data
+  static Future<Map<String, dynamic>> registerUser({
+    required String fullName,
+    required String email,
+    required String password,
+    required String phoneNumber,
+    String? designation,
+    String? company,
+    required String full_address,
+    required List<String> userTags,
+    required bool aol_teacher,
+    String? teacher_type,
+    String? teachercode,
+    String? teacheremail,
+    String? mobilenumber,
+    required File profilePhotoFile,
+  }) async {
+    try {
+      // ✅ 1. Validate required fields
+      if (fullName.isEmpty ||
+          email.isEmpty ||
+          password.isEmpty ||
+          phoneNumber.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Missing fullName, email, password, or phone number.',
+        };
+      }
+
+      if (profilePhotoFile == null) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Profile photo is required.',
+        };
+      }
+
+      // ✅ 2. Validate email format
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      if (!emailRegex.hasMatch(email)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please enter a valid email address.',
+        };
+      }
+
+      // ✅ 3. Validate phone number format (basic validation)
+      if (!phoneNumber.startsWith('+')) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Phone number must be in "+CC NNNNNNNNNN" format.',
+        };
+      }
+
+      // ✅ 4. Validate file type and size
+      final fileName = profilePhotoFile.path.split('/').last;
+      final fileExtension = fileName.split('.').last.toLowerCase();
+      final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+      if (!allowedExtensions.contains(fileExtension)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message':
+              'Profile photo must be a valid image file (JPG, PNG, GIF).',
+        };
+      }
+
+      // Check file size (max 5MB)
+      final fileSize = await profilePhotoFile.length();
+      if (fileSize > 5 * 1024 * 1024) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Profile photo size must be less than 5MB.',
+        };
+      }
+
+      // ✅ 5. Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'fullName': fullName.trim(),
+        'email': email.toLowerCase().trim(),
+        'password': password,
+        'phoneNumber': phoneNumber,
+        'designation': designation?.trim(),
+        'company': company?.trim(),
+        'full_address': full_address,
+        'userTags': userTags,
+        'aol_teacher': aol_teacher,
+        'teacher_type': teacher_type,
+        'teachercode': teachercode,
+        'teacheremail': teacheremail,
+        'mobilenumber': mobilenumber,
+      };
+
+      // ✅ 6. Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/signup'),
+      );
+
+      // Add headers
+      request.headers['Content-Type'] = 'multipart/form-data';
+
+      // Add text fields
+      requestBody.forEach((key, value) {
+        if (value != null) {
+          if (value is List) {
+            // Handle array fields like userTags
+            for (String item in value) {
+              request.fields['$key[]'] = item;
+            }
+          } else {
+            request.fields[key] = value.toString();
+          }
+        }
+      });
+
+      // ✅ 7. Add file to request
+      final fileStream = http.ByteStream(profilePhotoFile.openRead());
+      final fileLength = await profilePhotoFile.length();
+
+      final multipartFile = http.MultipartFile(
+        'file', // Field name expected by server
+        fileStream,
+        fileLength,
+        filename: fileName,
+        contentType: MediaType('image', fileExtension),
+      );
+
+      request.files.add(multipartFile);
+
+      // ✅ 8. Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // ✅ 9. Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201) {
+        // ✅ 10. Registration successful
+        return {
+          'success': true,
+          'statusCode': 201,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Registration successful. Please verify your email.',
+        };
+      } else if (response.statusCode == 409) {
+        // ✅ 11. User already exists
+        return {
+          'success': false,
+          'statusCode': 409,
+          'message': responseData['message'] ?? 'Email already exists.',
+        };
+      } else if (response.statusCode == 400) {
+        // ✅ 12. Validation error
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message':
+              responseData['message'] ??
+              'Validation failed. Please check your input.',
+        };
+      } else {
+        // ✅ 13. Other errors
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Registration failed. Please try again.',
+        };
+      }
+    } catch (error) {
+      // ✅ 14. Handle exceptions
+      print('❌ Registration Error: $error');
+
+      if (error.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              'Network error. Please check your connection and try again.',
+        };
+      }
+
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Registration failed. Please try again.',
+      };
+    }
+  }
+
+  /// Validate AOL teacher credentials
+  /// This function validates teacher code, email, and phone number with the ATOL API
+  ///
+  /// Parameters:
+  /// - teacherCode: Teacher's AOL code
+  /// - teacherEmail: Teacher's registered email
+  /// - teacherPhone: Teacher's registered phone number
+  ///
+  /// Returns:
+  /// - Map containing validation result and status
+  static Future<Map<String, dynamic>> validateAolTeacher({
+    required String teacherCode,
+    required String teacherEmail,
+    required String teacherPhone,
+  }) async {
+    try {
+      // ✅ 1. Validate required fields
+      if (teacherCode.isEmpty || teacherEmail.isEmpty || teacherPhone.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message':
+              'Teacher code, email, and phone number are required for validation',
+        };
+      }
+
+      // ✅ 2. Validate email format
+      final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+      if (!emailRegex.hasMatch(teacherEmail)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please provide a valid email address',
+        };
+      }
+
+      // ✅ 3. Validate phone number format
+      final phoneRegex = RegExp(r'^\+?[\d\s\-\(\)]{10,15}$');
+      if (!phoneRegex.hasMatch(teacherPhone)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please provide a valid phone number',
+        };
+      }
+
+      // ✅ 4. Validate teacher code format (3-20 alphanumeric characters)
+      final teacherCodeRegex = RegExp(r'^[A-Za-z0-9]{3,20}$');
+      if (!teacherCodeRegex.hasMatch(teacherCode)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message':
+              'Teacher code should be 3-20 characters long and contain only letters and numbers',
+        };
+      }
+
+      // ✅ 5. Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'teacherCode': teacherCode.trim().toUpperCase(),
+        'teacherEmail': teacherEmail.toLowerCase().trim(),
+        'teacherPhone': teacherPhone,
+      };
+
+      // ✅ 6. Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/validate-aol-teacher'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // ✅ 7. Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // ✅ 8. Validation successful
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              '✅ AOL teacher credentials verified successfully! You can proceed with registration.',
+        };
+      } else if (response.statusCode == 400) {
+        // ✅ 9. Validation failed
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'AOL teacher validation failed',
+          'details':
+              responseData['details'] ??
+              'The provided teacher credentials could not be verified.',
+        };
+      } else {
+        // ✅ 10. Other errors
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to validate AOL teacher credentials',
+        };
+      }
+    } catch (error) {
+      // ✅ 11. Handle exceptions
+      print('❌ AOL teacher validation error: $error');
+
+      if (error.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              'Network error. Please check your connection and try again.',
+        };
+      }
+
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message':
+            'Failed to validate AOL teacher credentials. Please try again.',
+      };
+    }
+  }
+
+  // OTP Verification Methods
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      // Validate input
+      if (email.isEmpty || otp.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Email and OTP are required',
+        };
+      }
+
+      if (otp.length != 6) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'OTP must be 6 digits',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+        'otp': otp,
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Store tokens if available
+        if (responseData['data'] != null &&
+            responseData['data']['token'] != null) {
+          await StorageService.saveToken(responseData['data']['token']);
+          if (responseData['data']['user'] != null) {
+            await StorageService.saveUserData(responseData['data']['user']);
+          }
+        }
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              '🎉 Excellent! Your account is now verified. Welcome to the Art of Living community!',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'OTP verification failed',
+        };
+      }
+    } catch (error) {
+      print('❌ OTP verification error: $error');
+
+      if (error.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              'Network error. Please check your connection and try again.',
+        };
+      }
+
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Failed to verify OTP. Please try again.',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> resendOtp({required String email}) async {
+    try {
+      // Validate input
+      if (email.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Email is required',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/resend-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              '📧 New verification code sent! Please check your inbox for the latest code.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to resend OTP',
+        };
+      }
+    } catch (error) {
+      print('❌ Resend OTP error: $error');
+
+      if (error.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              'Network error. Please check your connection and try again.',
+        };
+      }
+
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Failed to resend OTP. Please try again.',
+      };
+    }
+  }
+
+  // Get user appointments (for user history)
+  static Future<Map<String, dynamic>> getUserAppointments({
+    required String userId,
+    int page = 1,
+    int limit = 10,
+    String? status,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate userId
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'User ID is required',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/appointment/user/$userId',
+        ).replace(queryParameters: queryParams),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return appointments data
+        final List<dynamic> appointments = responseData['data'] ?? [];
+        final Map<String, dynamic> pagination =
+            responseData['pagination'] ?? {};
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': appointments,
+          'pagination': pagination,
+          'message':
+              responseData['message'] ??
+              'User appointments retrieved successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request parameters',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // User not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'User not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to get user appointments',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
     }
   }
 }

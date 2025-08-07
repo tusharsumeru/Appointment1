@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../components/sidebar/user_sidebar_component.dart';
+import 'user_sidebar.dart';
 
 class UserScreen extends StatefulWidget {
   const UserScreen({super.key});
@@ -27,7 +27,7 @@ class _UserScreenState extends State<UserScreen> {
           ),
         ),
       ),
-      drawer: const UserSidebarComponent(),
+      drawer: const UserSidebar(),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../action/storage_service.dart';
 import 'profile_edit_screen.dart';
+import 'user_sidebar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -77,7 +78,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () {
+              Scaffold.of(context).openDrawer();
+            },
+          ),
+        ),
       ),
+      drawer: const UserSidebar(),
       body: Container(
         color: Colors.grey.shade50,
         child: _isLoading

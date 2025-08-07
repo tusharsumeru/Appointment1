@@ -190,6 +190,18 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   String _getPersonName(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final fullName = guestInformation['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+
     // Try different name fields
     final referencePerson = appointment['referencePerson'];
     if (referencePerson is Map<String, dynamic>) {
@@ -208,6 +220,18 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   String _getEmail(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final email = guestInformation['emailId']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];
@@ -231,6 +255,18 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   String _getPhoneNumber(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final phoneNumber = guestInformation['phoneNumber']?.toString();
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          return phoneNumber;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];

@@ -39,6 +39,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
         widget.appointment['appointmentId']?.toString() ??
         widget.appointment['_id']?.toString() ??
         '';
+    final String appointmentType = widget.appointment['appointmentType']?.toString() ?? '';
     final String createdByName = _getCreatedByName();
     final String createdByDesignation = _getCreatedByDesignation();
     final String createdByImage = _getCreatedByImage();
@@ -46,6 +47,16 @@ class _AppointmentCardState extends State<AppointmentCard> {
     final String preferredDateRange = _getPreferredDateRange();
     final int attendeeCount = _getAttendeeCount();
     final bool isStarred = widget.appointment['starred'] == true;
+
+    // Check if this is a guest appointment
+    final guestInformation = widget.appointment['guestInformation'];
+    final bool isGuestAppointment = appointmentType.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true);
+    final String displayName = isGuestAppointment ? _getGuestName() : createdByName;
+    final String displayDesignation = isGuestAppointment ? _getGuestDesignation() : createdByDesignation;
+    final String displayImage = isGuestAppointment ? _getGuestImage() : createdByImage;
+    final String displayCompany = isGuestAppointment ? _getGuestCompany() : '';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -124,10 +135,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with created by info
+              // Header with created by info or guest info
               Row(
                 children: [
-                  // Created by Avatar (Square Box)
+                  // Created by Avatar (Square Box) or Guest Avatar
                   Container(
                     width: 50,
                     height: 50,
@@ -137,9 +148,9 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(7),
-                      child: createdByImage.isNotEmpty
+                      child: displayImage.isNotEmpty
                           ? Image.network(
-                              createdByImage,
+                              displayImage,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
@@ -175,25 +186,32 @@ class _AppointmentCardState extends State<AppointmentCard> {
                   ),
                   const SizedBox(width: 12),
 
-                  // Created by name and designation
+                  // Created by name and designation or Guest info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          createdByName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+
+                          ],
                         ),
-                        if (createdByDesignation.isNotEmpty) ...[
+                        if (displayDesignation.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            createdByDesignation,
+                            displayDesignation,
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
@@ -202,12 +220,21 @@ class _AppointmentCardState extends State<AppointmentCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
-
+                        if (isGuestAppointment && displayCompany.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            displayCompany,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-
-
                 ],
               ),
 
@@ -484,7 +511,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
   int _getAttendeeCount() {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
-      return accompanyUsers['numberOfUsers'] ?? 0;
+      final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+      return numberOfUsers + 1; // Add 1 for the main user
     }
     return 1;
   }
@@ -974,5 +1002,38 @@ class _AppointmentCardState extends State<AppointmentCard> {
       default:
         return Colors.grey;
     }
+  }
+
+  // New methods for guest appointments
+  String _getGuestName() {
+    final guestInformation = widget.appointment['guestInformation'];
+    if (guestInformation is Map<String, dynamic>) {
+      return guestInformation['fullName']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  String _getGuestDesignation() {
+    final guestInformation = widget.appointment['guestInformation'];
+    if (guestInformation is Map<String, dynamic>) {
+      return guestInformation['designation']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  String _getGuestImage() {
+    final guestInformation = widget.appointment['guestInformation'];
+    if (guestInformation is Map<String, dynamic>) {
+      return guestInformation['profilePhotoUrl']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  String _getGuestCompany() {
+    final guestInformation = widget.appointment['guestInformation'];
+    if (guestInformation is Map<String, dynamic>) {
+      return guestInformation['company']?.toString() ?? '';
+    }
+    return '';
   }
 }

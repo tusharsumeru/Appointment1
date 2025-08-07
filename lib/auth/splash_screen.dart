@@ -7,6 +7,7 @@ import '../action/storage_service.dart';
 import '../action/action.dart';
 import '../action/jwt_utils.dart';
 import '../guard/guard_screen.dart';
+import '../user/user_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -228,12 +229,11 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           );
         } else if (userRole == 'user' || userRole == 'client') {
-          // Regular user/client role - navigate to user interface (to be implemented)
-          // TODO: Replace with UserScreen when implemented
+          // Regular user/client role - navigate to user interface
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  const HomeScreen(),
+                  const UserScreen(),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);

@@ -7,7 +7,7 @@ class TomorrowCardComponent extends StatefulWidget {
   final VoidCallback? onRefresh;
 
   const TomorrowCardComponent({
-    super.key, 
+    super.key,
     required this.selectedDate,
     this.onRefresh,
   });
@@ -66,12 +66,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       'color': Colors.deepPurple,
       'timeRange': null, // Based on venue
     },
-    'poojabackstage': {
-      'title': 'Pooja Backstage',
-      'icon': Icons.temple_hindu,
-      'color': Colors.deepPurple,
-      'timeRange': null, // Based on venue
-    },
   };
 
   @override
@@ -97,6 +91,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     try {
       // Get selected date in YYYY-MM-DD format
       final dateString = ActionService.formatDateForAPI(widget.selectedDate);
+      print('📅 Fetching appointments for date: $dateString');
 
       final result = await ActionService.getAppointmentsByScheduledDate(
         date: dateString,
@@ -104,6 +99,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
+        print('✅ Successfully fetched ${appointmentsData.length} appointments');
 
         if (appointmentsData.isNotEmpty) {
           final sortedAppointments = appointmentsData
@@ -115,17 +111,38 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           });
 
           _tomorrowAppointments = sortedAppointments;
+
+          // Log appointment details
+          print('📋 Tomorrow\'s Appointments Details:');
+          for (int i = 0; i < _tomorrowAppointments.length; i++) {
+            final appointment = _tomorrowAppointments[i];
+            final name = _getAppointmentName(appointment);
+            final venue = _getLocation(appointment);
+            final time = _getAppointmentTime(appointment);
+
+            print('   Appointment ${i + 1}:');
+            print('     👤 Name: $name');
+            print('     🏢 Venue: $venue');
+            print('     ⏰ Time: $time');
+            print('     📊 Status: ${_getAppointmentStatus(appointment)}');
+            print('     🔗 ID: ${appointment['_id']}');
+            print('');
+          }
         } else {
           _tomorrowAppointments = [];
+          print('📭 No appointments found for tomorrow');
         }
         _error = null;
       } else {
-        _error = result['message'] ?? 'Failed to fetch tomorrow\'s appointments';
+        _error =
+            result['message'] ?? 'Failed to fetch tomorrow\'s appointments';
         _tomorrowAppointments = [];
+        print('❌ Failed to fetch appointments: ${result['message']}');
       }
     } catch (e) {
       _error = 'Network error: $e';
       _tomorrowAppointments = [];
+      print('❌ Network error: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -135,18 +152,24 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   // Public method to refresh data
   Future<void> refresh() async {
+    print('🔄 Refreshing tomorrow\'s appointments...');
     await _fetchTomorrowAppointments();
     widget.onRefresh?.call();
+    print('✅ Refresh completed');
   }
 
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
     if (_tomorrowAppointments.isEmpty) return [];
 
+    print('🏷️  Filtering appointments for category: $categoryKey');
+
+    List<Map<String, dynamic>> filteredAppointments;
+
     switch (categoryKey) {
       case 'morning':
       case 'evening':
       case 'night':
-        return _tomorrowAppointments.where((appointment) {
+        filteredAppointments = _tomorrowAppointments.where((appointment) {
           // First check if appointment is completed/done - if so, exclude it
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -170,12 +193,10 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           final isSatsangBackstage =
               location.contains('satsang') && location.contains('backstage');
           final isGurukul = location.contains('gurukul');
-          final isPoojaBackstage =
-              location.contains('pooja') && location.contains('backstage');
 
-          // If venue is satsang backstage, gurukul, or pooja backstage, exclude from time-based categories
+          // If venue is satsang backstage or gurukul, exclude from time-based categories
           // Otherwise, continue to check time
-          if (isSatsangBackstage || isGurukul || isPoojaBackstage) {
+          if (isSatsangBackstage || isGurukul) {
             return false; // Don't show location-based appointments in time categories
           }
 
@@ -226,9 +247,10 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             return false;
           }
         }).toList();
+        break;
 
       case 'tbs_req':
-        return _tomorrowAppointments.where((appointment) {
+        filteredAppointments = _tomorrowAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           // Exclude completed/done appointments from TBS/Req category
           if (status == 'completed' || status == 'done') {
@@ -254,16 +276,18 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
           return isTbsReq;
         }).toList();
+        break;
 
       case 'done':
-        return _tomorrowAppointments.where((appointment) {
+        filteredAppointments = _tomorrowAppointments.where((appointment) {
           final status = _getAppointmentStatus(appointment).toLowerCase();
           final isDone = status == 'completed' || status == 'done';
           return isDone;
         }).toList();
+        break;
 
       case 'satsang_backstage':
-        return _tomorrowAppointments.where((appointment) {
+        filteredAppointments = _tomorrowAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -285,20 +309,12 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
           final location = _getLocation(appointment).toLowerCase();
           final isSatsangBackstage =
               location.contains('satsang') && location.contains('backstage');
-          
-          // Exclude other location-based appointments from this category
-          final isPoojaBackstage =
-              location.contains('pooja') && location.contains('backstage');
-          final isGurukul = location.contains('gurukul');
-          if (isPoojaBackstage || isGurukul) {
-            return false; // Don't show other location-based appointments in satsang backstage category
-          }
-          
           return isSatsangBackstage;
         }).toList();
+        break;
 
       case 'gurukul':
-        return _tomorrowAppointments.where((appointment) {
+        filteredAppointments = _tomorrowAppointments.where((appointment) {
           // Exclude completed/done appointments from location-based categories
           final status = _getAppointmentStatus(appointment).toLowerCase();
           if (status == 'completed' || status == 'done') {
@@ -319,77 +335,69 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
           final location = _getLocation(appointment).toLowerCase();
           final isGurukul = location.contains('gurukul');
-          
-          // Exclude other location-based appointments from this category
-          final isSatsangBackstage =
-              location.contains('satsang') && location.contains('backstage');
-          final isPoojaBackstage =
-              location.contains('pooja') && location.contains('backstage');
-          if (isSatsangBackstage || isPoojaBackstage) {
-            return false; // Don't show other location-based appointments in gurukul category
-          }
-          
           return isGurukul;
         }).toList();
-
-      case 'poojabackstage':
-        return _tomorrowAppointments.where((appointment) {
-          // Exclude completed/done appointments from location-based categories
-          final status = _getAppointmentStatus(appointment).toLowerCase();
-          if (status == 'completed' || status == 'done') {
-            return false;
-          }
-
-          // Exclude TBS/Req appointments from location-based categories
-          final communicationPreferences =
-              appointment['communicationPreferences'];
-          if (communicationPreferences is List) {
-            final hasTbsReq = communicationPreferences.any(
-              (pref) => pref.toString() == 'TBS/Req',
-            );
-            if (hasTbsReq) {
-              return false; // Don't show TBS/Req appointments in location categories
-            }
-          }
-
-          final location = _getLocation(appointment).toLowerCase();
-          final isPoojaBackstage =
-              location.contains('pooja') && location.contains('backstage');
-          
-          // Exclude other location-based appointments from this category
-          final isSatsangBackstage =
-              location.contains('satsang') && location.contains('backstage');
-          final isGurukul = location.contains('gurukul');
-          if (isSatsangBackstage || isGurukul) {
-            return false; // Don't show other location-based appointments in pooja backstage category
-          }
-          
-          if (isPoojaBackstage) {
-            print(
-              '✅ POOJA BACKSTAGE: Appointment ${appointment['_id']} at location: $location',
-            );
-          }
-          return isPoojaBackstage;
-        }).toList();
+        break;
 
       default:
-        return [];
+        filteredAppointments = [];
+        break;
     }
+
+    // Log the results for this category
+    print(
+      '📊 Category "$categoryKey": ${filteredAppointments.length} appointments',
+    );
+
+    // Log details of appointments in this category
+    if (filteredAppointments.isNotEmpty) {
+      for (int i = 0; i < filteredAppointments.length; i++) {
+        final appointment = filteredAppointments[i];
+        final name = _getAppointmentName(appointment);
+        final venue = _getLocation(appointment);
+        final time = _getAppointmentTime(appointment);
+        final id = appointment['_id']?.toString() ?? 'No ID';
+        final appointmentId =
+            appointment['appointmentId']?.toString() ?? 'No Appointment ID';
+
+        print('   📋 $categoryKey Appointment ${i + 1}:');
+        print('     🔗 _id: $id');
+        print('     🆔 appointmentId: $appointmentId');
+        print('     👤 Name: $name');
+        print('     🏢 Venue: $venue');
+        print('     ⏰ Time: $time');
+        print('     📊 Status: ${_getAppointmentStatus(appointment)}');
+      }
+    }
+
+    return filteredAppointments;
   }
 
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
-    // Check appointmentStatus.status first (this should be the primary source)
+    // Check appointmentStatus.status first
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
       final status = appointmentStatus['status']?.toString();
       if (status != null && status.isNotEmpty) {
-        // Always prioritize appointmentStatus.status over checkInStatus.mainStatus
-        // Only use checkInStatus.mainStatus if appointmentStatus.status is not available
-        return status;
+        // If status is "not_arrived", return it
+        if (status.toLowerCase() == 'not_arrived') {
+          return status;
+        }
+        // For other statuses, check if checkInStatus.mainStatus is "not_arrived"
+        final checkInStatus = appointment['checkInStatus'];
+        if (checkInStatus is Map<String, dynamic>) {
+          final mainStatus = checkInStatus['mainStatus']?.toString();
+          if (mainStatus != null &&
+              mainStatus.isNotEmpty &&
+              mainStatus.toLowerCase() == 'not_arrived') {
+            return mainStatus; // Return "not_arrived" from checkInStatus
+          }
+        }
+        return status; // Return the appointmentStatus.status
       }
     }
 
-    // Fallback to checkInStatus.mainStatus only if appointmentStatus.status is not available
+    // Check checkInStatus.mainStatus
     final checkInStatus = appointment['checkInStatus'];
     if (checkInStatus is Map<String, dynamic>) {
       final mainStatus = checkInStatus['mainStatus']?.toString();
@@ -476,6 +484,19 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       }
     }
 
+    // Try to get location from appointmentLocation as string
+    final appointmentLocationString = appointment['appointmentLocation']
+        ?.toString();
+    if (appointmentLocationString != null &&
+        appointmentLocationString.isNotEmpty) {
+      // If it's a venue ID (24 character hex string), return a default location
+      if (appointmentLocationString.length == 24 &&
+          RegExp(r'^[0-9a-fA-F]+$').hasMatch(appointmentLocationString)) {
+        return 'Secretariat Office A1'; // Default venue name for venue IDs
+      }
+      return appointmentLocationString;
+    }
+
     // Fallback to other location fields
     final location = appointment['location'];
     if (location is Map<String, dynamic>) {
@@ -496,7 +517,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
     if (locationString != null && locationString.isNotEmpty) {
       // If it's a venue ID (24 character hex string), return a default location
-      if (locationString.length == 24 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(locationString)) {
+      if (locationString.length == 24 &&
+          RegExp(r'^[0-9a-fA-F]+$').hasMatch(locationString)) {
         return 'Secretariat Office A1'; // Default venue name for venue IDs
       }
       return locationString;
@@ -506,10 +528,26 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   String _getAppointmentName(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    final guestInformation = appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final fullName = guestInformation['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];
-    
+
     if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
       final required = quickApt['required'];
       if (required is Map<String, dynamic>) {
@@ -536,20 +574,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   String _getUserEmail(Map<String, dynamic> appointment) {
-    // Check if this is a quick appointment
-    final apptType = appointment['appt_type']?.toString();
-    final quickApt = appointment['quick_apt'];
-    
-    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
-      final optional = quickApt['optional'];
-      if (optional is Map<String, dynamic>) {
-        final email = optional['email']?.toString();
-        if (email != null && email.isNotEmpty) {
-          return email;
-        }
-      }
-    }
-
     // Try to get email from userId object first
     final userId = appointment['userId'];
     if (userId is Map<String, dynamic>) {
@@ -563,43 +587,27 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     return appointment['email']?.toString() ?? 'No email';
   }
 
-  String _getUserPhone(Map<String, dynamic> appointment) {
-    // Check if this is a quick appointment
-    final apptType = appointment['appt_type']?.toString();
-    final quickApt = appointment['quick_apt'];
+  String _getUserDesignation(Map<String, dynamic> appointment) {
+    // Check if this is a guest appointment
+    final appointmentType = appointment['appointmentType']?.toString();
+    final guestInformation = appointment['guestInformation'];
     
-    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
-      final optional = quickApt['optional'];
-      if (optional is Map<String, dynamic>) {
-        final mobileNumber = optional['mobileNumber'];
-        if (mobileNumber is Map<String, dynamic>) {
-          final countryCode = mobileNumber['countryCode']?.toString() ?? '';
-          final number = mobileNumber['number']?.toString() ?? '';
-          if (number.isNotEmpty) {
-            return '$countryCode$number';
-          }
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final designation = guestInformation['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
         }
       }
     }
 
-    // Try to get phone from userId object
-    final userId = appointment['userId'];
-    if (userId is Map<String, dynamic>) {
-      final phone = userId['phone']?.toString();
-      if (phone != null && phone.isNotEmpty) {
-        return phone;
-      }
-    }
-
-    // Fallback to direct phone field
-    return appointment['phone']?.toString() ?? 'No phone';
-  }
-
-  String _getUserDesignation(Map<String, dynamic> appointment) {
     // Check if this is a quick appointment
     final apptType = appointment['appt_type']?.toString();
     final quickApt = appointment['quick_apt'];
-    
+
     if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
       final required = quickApt['required'];
       if (required is Map<String, dynamic>) {
@@ -624,25 +632,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       return parts[0][0].toUpperCase();
     }
     return 'U';
-  }
-
-  String _getProfilePhotoUrl(Map<String, dynamic> appointment) {
-    // Check if this is a quick appointment and has a photo
-    final apptType = appointment['appt_type']?.toString();
-    final quickApt = appointment['quick_apt'];
-    
-    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
-      final optional = quickApt['optional'];
-      if (optional is Map<String, dynamic>) {
-        final photoUrl = optional['photo']?.toString();
-        if (photoUrl != null && photoUrl.isNotEmpty) {
-          return photoUrl;
-        }
-      }
-    }
-    
-    // Fallback to profile photo
-    return appointment['profilePhoto']?.toString() ?? '';
   }
 
   String _getSecretaryName(Map<String, dynamic> appointment) {
@@ -700,7 +689,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   Color _getStatusColor(String? status) {
     if (status == null) return Colors.grey;
-    
+
     // Convert status to display text and get appropriate color
     switch (status.toLowerCase()) {
       case 'checked_in':
@@ -720,7 +709,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
   String _getStatusText(String? status) {
     if (status == null) return 'Unknown';
-    
+
     // Convert status to display text
     switch (status.toLowerCase()) {
       case 'checked_in':
@@ -989,96 +978,16 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     Map<String, dynamic> category,
   ) {
     return GestureDetector(
-      onTap: () async {
-        // Check if this is a quick appointment
-        final apptType = appointment['appt_type']?.toString();
-        final quickApt = appointment['quick_apt'];
-        final isQuickAppointment = apptType == 'quick' && 
-                                  quickApt is Map<String, dynamic> && 
-                                  quickApt['isQuickAppointment'] == true;
-
-        if (isQuickAppointment) {
-          // For quick appointments, fetch detailed data using the quick appointment API
-          final appointmentId = appointment['appointmentId']?.toString();
-          if (appointmentId != null && appointmentId.isNotEmpty) {
-            try {
-              // Show loading indicator
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    content: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: const Text(
-                            'Loading quick appointment details...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-
-              final result = await ActionService.getQuickAppointmentById(appointmentId);
-              
-              // Close loading dialog
-              Navigator.of(context).pop();
-
-              if (result['success'] && result['data'] != null) {
-                // Navigate to appointment detail page with the fetched data
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AppointmentDetailPage(
-                      appointment: result['data'],
-                      isFromScheduleScreens: true,
-                    ),
-                  ),
-                );
-              } else {
-                // Show error message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result['message'] ?? 'Failed to load quick appointment details'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            } catch (e) {
-              // Close loading dialog if still open
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-              
-              // Show error message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error: $e'),
-                  backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            }
-          }
-        } else {
-          // For regular appointments, use the existing flow
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AppointmentDetailPage(
-                appointment: appointment,
-                isFromScheduleScreens: true,
-              ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AppointmentDetailPage(
+              appointment: appointment,
+              isFromScheduleScreens: true,
             ),
-          );
-        }
+          ),
+        );
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1095,292 +1004,325 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
             ),
           ],
         ),
-      child: Column(
-        children: [
-          // Main content row
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // First line - Patient profile
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade100, width: 1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Patient image
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.grey.shade200,
-                            width: 1,
-                          ),
+        child: Column(
+          children: [
+            // Main content row
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // First line - Patient profile
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey.shade100,
+                          width: 1,
                         ),
-                        child: ClipOval(
-                          child: _getProfilePhotoUrl(appointment).isNotEmpty
-                              ? Image.network(
-                                  _getProfilePhotoUrl(appointment),
-                                  width: 44,
-                                  height: 44,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          _getUserInitials(appointment),
-                                          style: TextStyle(
-                                            color: category['color'],
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Patient image
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: appointment['profilePhoto'] != null
+                                ? Image.network(
+                                    appointment['profilePhoto'],
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            _getUserInitials(appointment),
+                                            style: TextStyle(
+                                              color: category['color'],
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _getUserInitials(appointment),
-                                      style: TextStyle(
-                                        color: category['color'],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                      );
+                                    },
+                                  )
+                                : Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _getUserInitials(appointment),
+                                        style: TextStyle(
+                                          color: category['color'],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Patient details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _getAppointmentName(appointment),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _getUserDesignation(appointment).isNotEmpty
-                                  ? _getUserDesignation(appointment)
-                                  : 'No designation',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Second line - Status, Time, Accompany, Secretary (Side by Side Layout)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Main Status (Check-in Status) - Only show for non-completed appointments
-                      if (_getAppointmentStatusForDone(appointment).toLowerCase() != 'completed' && 
-                          _getAppointmentStatusForDone(appointment).toLowerCase() != 'done') ...[
-                        Row(
-                          children: [
-                            Text(
-                              'Appointment Status: ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                _getStatusText(
-                                  _getMainStatus(appointment),
-                                ).toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      // Appointment Status - Only show for completed appointments
-                      if (_getAppointmentStatusForDone(appointment).toLowerCase() == 'completed' || 
-                          _getAppointmentStatusForDone(appointment).toLowerCase() == 'done') ...[
-                        Row(
-                          children: [
-                            Text(
-                              'Appointment Status: ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                _getStatusText(
-                                  _getAppointmentStatusOnly(appointment),
-                                ).toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      const SizedBox(height: 12),
-
-                      // Time
-                      Row(
-                        children: [
-                          Text(
-                            'Time: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
                           ),
-                          Expanded(
-                            child: Text(
+                        ),
+                        const SizedBox(width: 12),
+                        // Patient details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _getAppointmentName(appointment),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _getUserDesignation(appointment).isNotEmpty
+                                    ? _getUserDesignation(appointment)
+                                    : 'No designation',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Second line - Status, Time, Accompany, Secretary (Side by Side Layout)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Main Status (Check-in Status) - Only show for non-completed appointments
+                        if (_getAppointmentStatusForDone(
+                                  appointment,
+                                ).toLowerCase() !=
+                                'completed' &&
+                            _getAppointmentStatusForDone(
+                                  appointment,
+                                ).toLowerCase() !=
+                                'done') ...[
+                          Row(
+                            children: [
+                              Text(
+                                'Appointment Status: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _getStatusText(
+                                    _getMainStatus(appointment),
+                                  ).toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // Appointment Status - Only show for completed appointments
+                        if (_getAppointmentStatusForDone(
+                                  appointment,
+                                ).toLowerCase() ==
+                                'completed' ||
+                            _getAppointmentStatusForDone(
+                                  appointment,
+                                ).toLowerCase() ==
+                                'done') ...[
+                          Row(
+                            children: [
+                              Text(
+                                'Appointment Status: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _getStatusText(
+                                    _getAppointmentStatusOnly(appointment),
+                                  ).toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        const SizedBox(height: 12),
+
+                        // Time
+                        Row(
+                          children: [
+                            Text(
+                              'Time: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
                               _getAppointmentTime(appointment),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
 
-                      const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                      // Accompany
-                      Row(
-                        children: [
-                          Text(
-                            'Accompany User: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                        // QR Code
+                        Row(
+                          children: [
+                            Text(
+                              'QR: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: Text(
+                            GestureDetector(
+                              onTap: () => _showQRCodeDialog(appointment),
+                              child: Icon(
+                                Icons.qr_code,
+                                size: 20,
+                                color: Colors.blue.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Accompany
+                        Row(
+                          children: [
+                            Text(
+                              'Accompany User: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
                               '${_getAccompanyUsersCount(appointment)}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
 
-                      const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                      // Secretary
-                      Row(
-                        children: [
-                          Text(
-                            'Secretary: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                        // Secretary
+                        Row(
+                          children: [
+                            Text(
+                              'Secretary: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade600,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                _getSecretaryInitials(appointment),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade600,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _getSecretaryInitials(appointment),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Action button section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
+                ],
               ),
             ),
-            child: _buildActionButton(appointment),
-          ),
-        ],
-      ),
+
+            // Action button section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: _buildActionButton(appointment),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1389,94 +1331,65 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     final status = _getAppointmentStatus(appointment).toLowerCase();
     final isCompleted = status == 'completed' || status == 'done';
 
-    return Row(
-      children: [
-        // Action button (Done/Undo) - takes 60% of width
-        Expanded(
-          flex: 3,
-          child: isCompleted
-              ? ElevatedButton(
-                  onPressed: () async {
-                    await _handleUndo(appointment);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Undo',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.undo, size: 16),
-                    ],
-                  ),
-                )
-              : ElevatedButton(
-                  onPressed: () async {
-                    await _handleMarkAsDone(appointment);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Done',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward, size: 16),
-                    ],
-                  ),
-                ),
-        ),
-        
-        const SizedBox(width: 8),
-        
-        // View Details button - takes 40% of width
-        Expanded(
-          flex: 2,
-          child: OutlinedButton(
-            onPressed: () {
-              _navigateToAppointmentDetails(appointment);
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.blue.shade600,
-              side: BorderSide(color: Colors.blue.shade600),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'View',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.visibility, size: 14),
-              ],
+    if (isCompleted) {
+      // Show Undo button for completed appointments
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () async {
+            await _handleUndo(appointment);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange.shade600,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Undo',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.undo, size: 18),
+            ],
+          ),
         ),
-      ],
-    );
+      );
+    } else {
+      // Show Done button for non-completed appointments
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () async {
+            await _handleMarkAsDone(appointment);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade600,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Done',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward, size: 18),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _handleMarkAsDone(Map<String, dynamic> appointment) async {
@@ -1508,15 +1421,21 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
         // Update the local appointment data immediately
         setState(() {
-          final index = _tomorrowAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          final index = _tomorrowAppointments.indexWhere(
+            (apt) => apt['_id'] == appointmentId,
+          );
           if (index != -1) {
             // Update the appointment status to 'completed' (prioritize appointmentStatus.status)
-            if (_tomorrowAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
-              _tomorrowAppointments[index]['appointmentStatus']['status'] = 'completed';
+            if (_tomorrowAppointments[index]['appointmentStatus']
+                is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['appointmentStatus']['status'] =
+                  'completed';
             }
             // Also update checkInStatus if it exists (fallback)
-            if (_tomorrowAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
-              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] = 'completed';
+            if (_tomorrowAppointments[index]['checkInStatus']
+                is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] =
+                  'completed';
             }
             // Update direct mainStatus field as well (fallback)
             _tomorrowAppointments[index]['mainStatus'] = 'completed';
@@ -1537,98 +1456,6 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
       }
     } catch (error) {
       _showSnackBar('Network error: $error', isError: true);
-    }
-  }
-
-  void _navigateToAppointmentDetails(Map<String, dynamic> appointment) async {
-    // Check if this is a quick appointment
-    final apptType = appointment['appt_type']?.toString();
-    final quickApt = appointment['quick_apt'];
-    final isQuickAppointment = apptType == 'quick' && 
-                              quickApt is Map<String, dynamic> && 
-                              quickApt['isQuickAppointment'] == true;
-
-    if (isQuickAppointment) {
-      // For quick appointments, fetch detailed data using the quick appointment API
-      final appointmentId = appointment['appointmentId']?.toString();
-      if (appointmentId != null && appointmentId.isNotEmpty) {
-        try {
-          // Show loading indicator
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                content: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: const Text(
-                        'Loading quick appointment details...',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-
-          final result = await ActionService.getQuickAppointmentById(appointmentId);
-          
-          // Close loading dialog
-          Navigator.of(context).pop();
-
-          if (result['success'] && result['data'] != null) {
-            // Navigate to appointment detail page with the fetched data
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AppointmentDetailPage(
-                  appointment: result['data'],
-                  isFromScheduleScreens: true,
-                ),
-              ),
-            );
-          } else {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message'] ?? 'Failed to load quick appointment details'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        } catch (e) {
-          // Close loading dialog if still open
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
-          
-          // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } else {
-      // For regular appointments, use the existing flow
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AppointmentDetailPage(
-            appointment: appointment,
-            isFromScheduleScreens: true,
-          ),
-        ),
-      );
     }
   }
 
@@ -1661,18 +1488,24 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
 
         // Update the local appointment data immediately
         setState(() {
-          final index = _tomorrowAppointments.indexWhere((apt) => apt['_id'] == appointmentId);
+          final index = _tomorrowAppointments.indexWhere(
+            (apt) => apt['_id'] == appointmentId,
+          );
           if (index != -1) {
-            // Update the appointment status back to 'scheduled' (original status)
-            if (_tomorrowAppointments[index]['appointmentStatus'] is Map<String, dynamic>) {
-              _tomorrowAppointments[index]['appointmentStatus']['status'] = 'scheduled';
+            // Update the appointment status back to 'not_arrived' (prioritize appointmentStatus.status)
+            if (_tomorrowAppointments[index]['appointmentStatus']
+                is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['appointmentStatus']['status'] =
+                  'not_arrived';
             }
             // Also update checkInStatus if it exists (fallback)
-            if (_tomorrowAppointments[index]['checkInStatus'] is Map<String, dynamic>) {
-              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] = 'scheduled';
+            if (_tomorrowAppointments[index]['checkInStatus']
+                is Map<String, dynamic>) {
+              _tomorrowAppointments[index]['checkInStatus']['mainStatus'] =
+                  'not_arrived';
             }
             // Update direct mainStatus field as well (fallback)
-            _tomorrowAppointments[index]['mainStatus'] = 'scheduled';
+            _tomorrowAppointments[index]['mainStatus'] = 'not_arrived';
           }
         });
 
@@ -1712,5 +1545,222 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     }
   }
 
+  Future<void> _downloadQRCode(String qrUrl, String patientName) async {
+    try {
+      _showSnackBar('Downloading QR code...', isError: false);
 
+      // For now, we'll just show a success message
+      // In a real implementation, you would use a package like 'dio' or 'http'
+      // to download the file and save it to the device
+
+      await Future.delayed(const Duration(seconds: 1));
+      _showSnackBar(
+        'QR code download started for $patientName',
+        isError: false,
+      );
+    } catch (error) {
+      _showSnackBar('Failed to download QR code: $error', isError: true);
+    }
+  }
+
+  void _showQRCodeDialog(Map<String, dynamic> appointment) {
+    final appointmentId = appointment['appointmentId']?.toString();
+    if (appointmentId == null) {
+      _showSnackBar('Error: Appointment ID not found', isError: true);
+      return;
+    }
+
+    // Use the correct domain for QR codes
+    final qrUrl =
+        '${ActionService.baseUrl}/public/qr-codes/qr-$appointmentId.png';
+    final patientName = _getAppointmentName(appointment);
+
+    // Debug: Print the URL to console
+    print('🔍 QR Code URL: $qrUrl');
+    print('🔍 Appointment ID: $appointmentId');
+    print('🔍 MongoDB ID: ${appointment['_id']}');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with close button
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QR Code - $patientName',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'QR code for appointment ID: $appointmentId',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade600,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // QR Code Image Container
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 192, // w-48 = 12rem = 192px
+                      height: 192, // h-48 = 12rem = 192px
+                      child: Image.network(
+                        qrUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Debug: Print the error details
+                          print('❌ QR Code Error: $error');
+                          print('❌ Stack Trace: $stackTrace');
+
+                          return GestureDetector(
+                            onTap: () {
+                              // Close current dialog and reopen to retry
+                              Navigator.of(context).pop();
+                              _showQRCodeDialog(appointment);
+                            },
+                            child: Container(
+                              width: 192,
+                              height: 192,
+                              color: Colors.grey.shade50,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.qr_code,
+                                    size: 48,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'QR Code not available',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to retry',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: 192,
+                            height: 192,
+                            color: Colors.grey.shade50,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Colors.blue.shade600,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _downloadQRCode(qrUrl, patientName),
+                        icon: const Icon(Icons.download, size: 16),
+                        label: const Text('Download'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showQRCodeDialog(appointment);
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Refresh'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

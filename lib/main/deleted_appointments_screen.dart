@@ -24,13 +24,16 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalCount = 0;
-  bool _hasNextPage = false;
+  bool _hasNextPage = true; // Initialize to true like starred screen
   bool _hasPrevPage = false;
   
   // Filter state
   String _selectedFilter = 'All Deleted';
   List<Map<String, dynamic>> _secretaries = [];
   bool _isLoadingSecretaries = false;
+  
+  // Star toggle loading state
+  Set<String> _starToggleLoadingIds = {};
   
   // Scroll controller for pagination
   final ScrollController _scrollController = ScrollController();
@@ -83,6 +86,8 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
         final data = result['data'];
         final appointments = data['appointments'] as List<dynamic>? ?? [];
         final pagination = data['pagination'] as Map<String, dynamic>?;
+        
+
 
         setState(() {
           if (refresh || _currentPage == 1) {
@@ -200,6 +205,129 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
     }
   }
 
+  Future<void> _toggleStar(String appointmentId) async {
+    print('🔍 _toggleStar called with appointmentId: $appointmentId');
+    print('🔍 Current appointments count: ${_appointments.length}');
+    
+    // Find the appointment index before making the API call
+    final index = _appointments.indexWhere((appointment) => 
+      appointment['_id'] == appointmentId || 
+      appointment['appointmentId'] == appointmentId
+    );
+    
+    print('🔍 Found appointment at index: $index');
+    
+    if (index == -1) {
+      print('❌ Appointment not found in deleted list: $appointmentId');
+      return;
+    }
+
+    // Add to loading state
+    setState(() {
+      _starToggleLoadingIds.add(appointmentId);
+    });
+
+    // Get current starred status
+    final currentStarredStatus = _appointments[index]['starred'] ?? false;
+    print('🔍 Current starred status: $currentStarredStatus');
+    
+    // Optimistically update UI first (like inbox screen)
+    setState(() {
+      _appointments[index]['starred'] = !currentStarredStatus;
+    });
+    print('🔍 Optimistically updated to: ${!currentStarredStatus}');
+
+    try {
+      // Call the API to update starred status
+      final desiredStarredStatus = !currentStarredStatus;
+      final result = await ActionService.updateStarred(appointmentId, starred: desiredStarredStatus);
+      print('🔍 API result: $result');
+      
+      if (result['success']) {
+        // Update with the actual response from API
+        final newStarredStatus = result['data']?['starred'] ?? !currentStarredStatus;
+        print('🔍 New starred status from API: $newStarredStatus');
+        
+        // Check if the API response matches our expected toggle
+        final expectedNewStatus = !currentStarredStatus;
+        final finalStatus = (newStarredStatus == expectedNewStatus) ? newStarredStatus : expectedNewStatus;
+        
+        print('🔍 Expected status: $expectedNewStatus, final status: $finalStatus');
+        
+        setState(() {
+          // Update the starred status in the list
+          if (index < _appointments.length) {
+            _appointments[index]['starred'] = finalStatus;
+          }
+        });
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(finalStatus ? 'Appointment starred!' : 'Appointment unstarred!'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Check if it's a 404 error (appointment not found - likely because it's deleted)
+        if (result['statusCode'] == 404) {
+          // Revert the optimistic update
+          setState(() {
+            _appointments[index]['starred'] = currentStarredStatus;
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Star functionality is not available for deleted appointments'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          // Revert the optimistic update on other failures
+          print('🔍 Toggle Star - API failed, reverting to: $currentStarredStatus');
+          setState(() {
+            _appointments[index]['starred'] = currentStarredStatus;
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message'] ?? 'Failed to update starred status'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Revert the optimistic update on error
+      print('🔍 Toggle Star - Exception occurred: $e');
+      setState(() {
+        _appointments[index]['starred'] = currentStarredStatus;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Network error. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      // Remove from loading state
+      setState(() {
+        _starToggleLoadingIds.remove(appointmentId);
+      });
+    }
+  }
+
   Future<void> _fetchSecretaries() async {
     print('🔍 _fetchSecretaries() called');
     setState(() {
@@ -268,6 +396,7 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
           _selectedFilter = filter;
           _currentPage = 1;
           _appointments.clear();
+          _hasNextPage = true; // Reset to true when filter changes
         });
         _loadDeletedAppointments(refresh: true);
       },
@@ -536,32 +665,70 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
             ),
           ),
           
-          // Results Count
-          if (_totalCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Text(
-                    '$_totalCount deleted appointment${_totalCount == 1 ? '' : 's'} found',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+          // Header with count and clear all button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, color: Colors.red[600], size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  '${_appointments.length} Deleted Appointment${_appointments.length != 1 ? 's' : ''}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                if (_appointments.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Clear All Deleted'),
+                          content: const Text('Are you sure you want to permanently delete all appointments from the deleted list?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                // Clear all deleted appointments
+                                setState(() {
+                                  _appointments.clear();
+                                  _totalCount = 0;
+                                  _hasNextPage = false;
+                                });
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('All deleted appointments cleared'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Clear All'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.clear_all, size: 16),
+                    label: const Text('Clear All'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red,
                     ),
                   ),
-                  const Spacer(),
-                  if (_hasNextPage || _hasPrevPage)
-                    Text(
-                      'Page $_currentPage of $_totalPages',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
+          ),
           
           // Appointments List
           Expanded(
@@ -655,9 +822,18 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
           }
 
           final appointment = _appointments[index];
+          final appointmentId = appointment['appointmentId']?.toString() ?? 
+                              appointment['_id']?.toString() ?? '';
+          final isStarToggleLoading = _starToggleLoadingIds.contains(appointmentId);
+          
           return AppointmentCard(
             appointment: appointment,
             index: index, // Pass the index for alternating colors
+            onStarToggle: isStarToggleLoading ? null : (isStarred) async {
+              print('🔍 Deleted Appointments onStarToggle called with isStarred: $isStarred');
+              print('🔍 Appointment ID: $appointmentId');
+              await _toggleStar(appointmentId);
+            },
             onTap: () {
               // Navigate to appointment detail page
               Navigator.push(

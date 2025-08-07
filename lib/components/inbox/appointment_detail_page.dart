@@ -105,60 +105,152 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
 
   String _getUserName(int index) {
-    // Generate user names based on index and attendee count
-    if (index == 0) {
-      // Main user - try to get from mainUser object first, then fallback
-      final mainUser = widget.appointment['mainUser'];
-      if (mainUser is Map<String, dynamic>) {
-        return mainUser['fullName']?.toString() ?? _getCreatedByName();
-      }
-      return _getCreatedByName(); // Fallback to createdBy
-    } else {
-      // Accompanying user - try to get from guest object
-      final guest = widget.appointment['guest'];
-      if (guest is Map<String, dynamic>) {
-        return guest['fullName']?.toString() ?? 'Guest User';
-      }
-      
-      // Fallback to old accompanyUsers structure
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final users = accompanyUsers['users'] as List<dynamic>?;
-        if (users != null && index - 1 < users.length) {
-          final user = users[index - 1];
-          if (user is Map<String, dynamic>) {
-            return user['fullName']?.toString() ?? 'User ${index + 1}';
-          }
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      if (index == 0) {
+        // For guest appointments, index 0 is the guest (main user)
+        final guestInformation = widget.appointment['guestInformation'];
+        if (guestInformation is Map<String, dynamic>) {
+          return guestInformation['fullName']?.toString() ?? 'Guest';
         }
-      }
-      
-      // Final fallback
-      return 'User ${index + 1}';
-    }
-
-  }
-
-  String _getUserLabel(int index) {
-    if (index == 0) {
-      return '(Main User)';
-    } else {
-      // Get age from API data
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final users = accompanyUsers['users'] as List<dynamic>?;
-        if (users != null && index - 1 < users.length) {
-          final user = users[index - 1];
-          if (user is Map<String, dynamic>) {
-            final age = user['age']?.toString();
-            if (age != null && age.isNotEmpty) {
-              return '($age years old)';
+        return 'Guest';
+      } else {
+        // For guest appointments, index 1+ are the accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              return user['fullName']?.toString() ?? 'User ${index + 1}';
             }
           }
         }
+        return 'User ${index + 1}';
       }
-      
-      // Fallback ages
-      return '(Adult)';
+    } else if (appointmentType?.toLowerCase() == 'myself') {
+      if (index == 0) {
+        // For myself appointments, index 0 is the main user
+        return _getCreatedByName(); // Main user (Ram Tharun)
+      } else {
+        // For myself appointments, index 1+ are the accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              return user['fullName']?.toString() ?? 'User ${index + 1}';
+            }
+          }
+        }
+        return 'User ${index + 1}';
+      }
+    } else {
+      // Regular appointment logic
+      if (index == 0) {
+        // Main user - try to get from mainUser object first, then fallback
+        final mainUser = widget.appointment['mainUser'];
+        if (mainUser is Map<String, dynamic>) {
+          return mainUser['fullName']?.toString() ?? _getCreatedByName();
+        }
+        return _getCreatedByName(); // Fallback to createdBy
+      } else {
+        // Accompanying user - try to get from guest object
+        final guest = widget.appointment['guest'];
+        if (guest is Map<String, dynamic>) {
+          return guest['fullName']?.toString() ?? 'Guest User';
+        }
+        
+        // Fallback to old accompanyUsers structure
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              return user['fullName']?.toString() ?? 'User ${index + 1}';
+            }
+          }
+        }
+        
+        // Final fallback
+        return 'User ${index + 1}';
+      }
+    }
+  }
+
+  String _getUserLabel(int index) {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      if (index == 0) {
+        return '(Guest)';
+      } else {
+        // Get age from API data for accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              final age = user['age']?.toString();
+              if (age != null && age.isNotEmpty) {
+                return '($age years old)';
+              }
+            }
+          }
+        }
+        
+        // Fallback ages
+        return '(Adult)';
+      }
+    } else if (appointmentType?.toLowerCase() == 'myself') {
+      if (index == 0) {
+        return '(Main User)';
+      } else {
+        // Get age from API data for accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              final age = user['age']?.toString();
+              if (age != null && age.isNotEmpty) {
+                return '($age years old)';
+              }
+            }
+          }
+        }
+        
+        // Fallback ages
+        return '(Adult)';
+      }
+    } else {
+      // Regular appointment logic
+      if (index == 0) {
+        return '(Main User)';
+      } else {
+        // Get age from API data
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && index - 1 < users.length) {
+            final user = users[index - 1];
+            if (user is Map<String, dynamic>) {
+              final age = user['age']?.toString();
+              if (age != null && age.isNotEmpty) {
+                return '($age years old)';
+              }
+            }
+          }
+        }
+        
+        // Fallback ages
+        return '(Adult)';
+      }
     }
   }
 
@@ -331,49 +423,122 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getUserImageUrl(int userIndex) {
-    // Get user images from API data
-    if (userIndex == 0) {
-      // Main user - try to get from mainUser object first, then fallback
-      final mainUser = widget.appointment['mainUser'];
-      if (mainUser is Map<String, dynamic>) {
-        // Main user might not have profilePhotoUrl in this structure
-        // Use the profilePhoto from the main appointment object
-        return widget.appointment['profilePhoto']?.toString() ?? 
-               'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
-      }
-      return widget.appointment['profilePhoto']?.toString() ?? 
-             'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
-    }
-    
-    // Accompanying user - try to get from guest object
-    final guest = widget.appointment['guest'];
-    if (guest is Map<String, dynamic>) {
-      final imageUrl = guest['profilePhotoUrl']?.toString();
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        return imageUrl;
-      }
-    }
-    
-    // Fallback to old accompanyUsers structure
-    final accompanyUsers = widget.appointment['accompanyUsers'];
-    if (accompanyUsers is Map<String, dynamic>) {
-      final users = accompanyUsers['users'] as List<dynamic>?;
-      if (users != null && userIndex - 1 < users.length) {
-        final user = users[userIndex - 1];
-        if (user is Map<String, dynamic>) {
-          final imageUrl = user['profilePhotoUrl']?.toString();
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      if (userIndex == 0) {
+        // For guest appointments, index 0 is the guest (main user)
+        final guestInformation = widget.appointment['guestInformation'];
+        if (guestInformation is Map<String, dynamic>) {
+          final imageUrl = guestInformation['profilePhotoUrl']?.toString();
           if (imageUrl != null && imageUrl.isNotEmpty) {
             return imageUrl;
           }
         }
+        // Fallback to default image for guest
+        return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+      } else {
+        // For guest appointments, index 1+ are the accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && userIndex - 1 < users.length) {
+            final user = users[userIndex - 1];
+            if (user is Map<String, dynamic>) {
+              final imageUrl = user['profilePhotoUrl']?.toString();
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                return imageUrl;
+              }
+            }
+          }
+        }
+        // Fallback to default image for accompanying users
+        return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
       }
+    } else if (appointmentType?.toLowerCase() == 'myself') {
+      if (userIndex == 0) {
+        // For myself appointments, index 0 is the main user
+        return widget.appointment['profilePhoto']?.toString() ?? 
+               'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+      } else {
+        // For myself appointments, index 1+ are the accompanying users
+        final accompanyUsers = widget.appointment['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final users = accompanyUsers['users'] as List<dynamic>?;
+          if (users != null && userIndex - 1 < users.length) {
+            final user = users[userIndex - 1];
+            if (user is Map<String, dynamic>) {
+              final imageUrl = user['profilePhotoUrl']?.toString();
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                return imageUrl;
+              }
+            }
+          }
+        }
+        // Fallback to default image for accompanying users
+        return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+      }
+    } else {
+      // Regular appointment logic
+      if (userIndex == 0) {
+        // Main user - try to get from mainUser object first, then fallback
+        final mainUser = widget.appointment['mainUser'];
+        if (mainUser is Map<String, dynamic>) {
+          // Main user might not have profilePhotoUrl in this structure
+          // Use the profilePhoto from the main appointment object
+          return widget.appointment['profilePhoto']?.toString() ?? 
+                 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+        }
+        return widget.appointment['profilePhoto']?.toString() ?? 
+               'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+      }
+      
+      // Accompanying user - try to get from guest object
+      final guest = widget.appointment['guest'];
+      if (guest is Map<String, dynamic>) {
+        final imageUrl = guest['profilePhotoUrl']?.toString();
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          return imageUrl;
+        }
+      }
+      
+      // Fallback to old accompanyUsers structure
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final users = accompanyUsers['users'] as List<dynamic>?;
+        if (users != null && userIndex - 1 < users.length) {
+          final user = users[userIndex - 1];
+          if (user is Map<String, dynamic>) {
+            final imageUrl = user['profilePhotoUrl']?.toString();
+            if (imageUrl != null && imageUrl.isNotEmpty) {
+              return imageUrl;
+            }
+          }
+        }
+      }
+      
+      // Fallback to default image
+      return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
     }
-    
-    // Fallback to default image
-    return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
   }
 
   String _getAppointmentName() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final fullName = guestInformation['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
@@ -402,6 +567,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointmentRole() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final designation = guestInformation['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
+        }
+      }
+    }
+
     // Check if this is a quick appointment
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
@@ -420,10 +601,42 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointmentCompany() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final company = guestInformation['company']?.toString();
+        if (company != null && company.isNotEmpty) {
+          return company;
+        }
+      }
+    }
+
     return widget.appointment['userCurrentCompany']?.toString() ?? '';
   }
 
   String _getAppointmentImageUrl() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final photoUrl = guestInformation['profilePhotoUrl']?.toString();
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          return photoUrl;
+        }
+      }
+    }
+
     // Check if this is a quick appointment and has a photo
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
@@ -449,6 +662,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   // Get quick appointment email
   String _getQuickAppointmentEmail() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final email = guestInformation['emailId']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
     
@@ -467,6 +696,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   // Get quick appointment phone number
   String _getQuickAppointmentPhone() {
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      if (guestInformation is Map<String, dynamic>) {
+        final phoneNumber = guestInformation['phoneNumber']?.toString();
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          return phoneNumber;
+        }
+      }
+    }
+
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
     
@@ -489,6 +734,40 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
     
+    return '';
+  }
+
+  // Get reference person email for guest appointments
+  String _getReferencePersonEmail() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final email = referencePerson['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+    return '';
+  }
+
+  // Get reference person phone number for guest appointments
+  String _getReferencePersonPhone() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final phoneNumber = referencePerson['phoneNumber'];
+        if (phoneNumber is Map<String, dynamic>) {
+          final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+          final number = phoneNumber['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            return '$countryCode $number';
+          }
+        }
+      }
+    }
     return '';
   }
 
@@ -532,6 +811,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   bool _isQuickAppointment() {
     final apptType = widget.appointment['appt_type']?.toString();
     return apptType == 'quick';
+  }
+
+  // Check if this is a guest appointment
+  bool _isGuestAppointment() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    return appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true);
   }
 
   // Debug method to print quick appointment data
@@ -951,6 +1241,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getLocation() {
+    // First try to get venue label from scheduledDateTime
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (venueLabel != null && venueLabel.isNotEmpty) {
+        return venueLabel;
+      }
+    }
+    
+    // Try locationName field
+    final locationName = widget.appointment['locationName']?.toString();
+    if (locationName != null && locationName.isNotEmpty) {
+      return locationName;
+    }
+    
     // First try to get location from appointmentLocation object
     final appointmentLocation = widget.appointment['appointmentLocation'];
     if (appointmentLocation is Map<String, dynamic>) {
@@ -970,8 +1275,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
     
     // Try other string fields
-    final locationString = widget.appointment['locationName']?.toString() ?? 
-                          widget.appointment['venue']?.toString() ?? 
+    final locationString = widget.appointment['venue']?.toString() ?? 
                           widget.appointment['address']?.toString() ?? 
                           widget.appointment['city']?.toString() ?? 
                           widget.appointment['state']?.toString() ?? 
@@ -1002,19 +1306,45 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   int _getAttendeeCount() {
-    // Check if guest exists in new structure
-    final guest = widget.appointment['guest'];
-    if (guest != null) {
-      return 2; // Main user + guest
-    }
+    // Check if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
     
-    // Fallback to old accompanyUsers structure
-    final accompanyUsers = widget.appointment['accompanyUsers'];
-    if (accompanyUsers is Map<String, dynamic>) {
-      final count = accompanyUsers['numberOfUsers'] ?? 1;
-      return count;
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    if (appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true)) {
+      // For guest appointments: 1 (guest) + number of accompanying users
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+        return 1 + (numberOfUsers as int); // Guest + accompanying users
+      }
+      return 1; // Just the guest if no accompanying users
+    } else if (appointmentType?.toLowerCase() == 'myself') {
+      // For myself appointments: 1 (main user) + number of accompanying users
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+        return 1 + (numberOfUsers as int); // Main user + accompanying users
+      }
+      return 1; // Just the main user if no accompanying users
+    } else {
+      // Regular appointment logic
+      // Check if guest exists in new structure
+      final guest = widget.appointment['guest'];
+      if (guest != null) {
+        return 2; // Main user + guest
+      }
+      
+      // Fallback to old accompanyUsers structure
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final count = accompanyUsers['numberOfUsers'] ?? 1;
+        return count;
+      }
+      return 1;
     }
-    return 1;
   }
 
 
@@ -1828,15 +2158,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _getAppointmentName(),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _getAppointmentName(),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1871,6 +2207,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           _buildMainCardDetailRow('Date Range', _getDateRange(), Icons.calendar_today),
           _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
           _buildMainCardDetailRow('Number of People', '${_getAttendeeCount()} People', Icons.people),
+          
+
           
           const SizedBox(height: 20),
           

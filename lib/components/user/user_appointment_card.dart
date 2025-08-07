@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../user/darshan_photos_screen.dart';
 
 class UserAppointmentCard extends StatelessWidget {
   final String appointmentId;
@@ -9,7 +10,7 @@ class UserAppointmentCard extends StatelessWidget {
   final String? profilePhoto;
   final String appointmentDateRange;
   final int attendeesCount;
-  final String? attendeePhoto;
+  final List<String>? attendeePhotos;
   final String purpose;
   final String assignedTo;
   final String dateRange;
@@ -19,6 +20,7 @@ class UserAppointmentCard extends StatelessWidget {
   final String location;
   final VoidCallback? onEditPressed;
   final Color? headerColor;
+  final Map<String, dynamic>? appointmentData;
 
   const UserAppointmentCard({
     super.key,
@@ -30,7 +32,7 @@ class UserAppointmentCard extends StatelessWidget {
     this.profilePhoto,
     required this.appointmentDateRange,
     required this.attendeesCount,
-    this.attendeePhoto,
+    this.attendeePhotos,
     required this.purpose,
     required this.assignedTo,
     required this.dateRange,
@@ -40,6 +42,7 @@ class UserAppointmentCard extends StatelessWidget {
     required this.location,
     this.onEditPressed,
     this.headerColor,
+    this.appointmentData,
   });
 
   Color _getStatusColor() {
@@ -204,6 +207,77 @@ class UserAppointmentCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
+                // View Darshan Photos Section
+                Container(
+                  width: double.infinity,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.blue.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        if (appointmentData != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => DarshanPhotosScreen(
+                                appointmentId: appointmentId,
+                                appointmentData: appointmentData!,
+                              ),
+                            ),
+                          );
+                        } else {
+                          // Fallback if appointmentData is not available
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => DarshanPhotosScreen(
+                                appointmentId: appointmentId,
+                                appointmentData: {
+                                  'profilePhoto': profilePhoto,
+                                  'createdBy': {'fullName': userName},
+                                  'accompanyUsers': {
+                                    'users': attendeePhotos?.map((photo) => {
+                                      'profilePhotoUrl': photo,
+                                      'fullName': 'User',
+                                    }).toList() ?? [],
+                                  },
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt,
+                            size: 20,
+                            color: Colors.blue.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'View Darshan Photos with Gurudev',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blue.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Appointment Date
                 _buildDetailRow(
                   Icons.calendar_today,
@@ -225,19 +299,23 @@ class UserAppointmentCard extends StatelessWidget {
                        child: Column(
                          crossAxisAlignment: CrossAxisAlignment.start,
                          children: [
-                           Text(
-                             'Appointment Attendees',
-                             style: TextStyle(
-                               fontSize: 14,
-                               color: Colors.grey.shade600,
-                               fontWeight: FontWeight.w500,
-                             ),
+                           Row(
+                             children: [
+                               Text(
+                                 'Appointment Attendees',
+                                 style: TextStyle(
+                                   fontSize: 14,
+                                   color: Colors.grey.shade600,
+                                   fontWeight: FontWeight.w500,
+                                 ),
+                               ),
+                             ],
                            ),
                            const SizedBox(height: 4),
                            Row(
                              children: [
                                Text(
-                                 '$attendeesCount Person',
+                                 '$attendeesCount Person${attendeesCount > 1 ? 's' : ''}',
                                  style: const TextStyle(
                                    fontSize: 14,
                                    color: Colors.black87,
@@ -245,32 +323,45 @@ class UserAppointmentCard extends StatelessWidget {
                                  ),
                                ),
                                const Spacer(),
-                               if (attendeePhoto != null)
+                               if (attendeePhotos != null && attendeePhotos!.isNotEmpty)
                                  Container(
-                                   width: 24,
+                                   width: (attendeePhotos!.length * 16.0) + 8.0,
                                    height: 24,
-                                   decoration: BoxDecoration(
-                                     shape: BoxShape.circle,
-                                     border: Border.all(
-                                       color: Colors.grey.shade300,
-                                       width: 1,
-                                     ),
-                                   ),
-                                   child: ClipOval(
-                                     child: Image.network(
-                                       attendeePhoto!,
-                                       fit: BoxFit.cover,
-                                       errorBuilder: (context, error, stackTrace) {
-                                         return Container(
-                                           color: Colors.grey.shade200,
-                                           child: const Icon(
-                                             Icons.person,
-                                             size: 12,
-                                             color: Colors.grey,
+                                   child: Stack(
+                                     children: attendeePhotos!.asMap().entries.map((entry) {
+                                       final index = entry.key;
+                                       final photoUrl = entry.value;
+                                       return Positioned(
+                                         left: index * 16.0,
+                                         child: Container(
+                                           width: 24,
+                                           height: 24,
+                                           decoration: BoxDecoration(
+                                             shape: BoxShape.circle,
+                                             border: Border.all(
+                                               color: Colors.white,
+                                               width: 2,
+                                             ),
                                            ),
-                                         );
-                                       },
-                                     ),
+                                           child: ClipOval(
+                                             child: Image.network(
+                                               photoUrl,
+                                               fit: BoxFit.cover,
+                                               errorBuilder: (context, error, stackTrace) {
+                                                 return Container(
+                                                   color: Colors.grey.shade200,
+                                                   child: const Icon(
+                                                     Icons.person,
+                                                     size: 12,
+                                                     color: Colors.grey,
+                                                   ),
+                                                 );
+                                               },
+                                             ),
+                                           ),
+                                         ),
+                                       );
+                                     }).toList(),
                                    ),
                                  )
                                else
@@ -321,13 +412,17 @@ class UserAppointmentCard extends StatelessWidget {
                          child: Column(
                            crossAxisAlignment: CrossAxisAlignment.start,
                            children: [
-                             Text(
-                               'Purpose of Meeting',
-                               style: TextStyle(
-                                 fontSize: 14,
-                                 color: headerColor ?? Colors.deepPurple,
-                                 fontWeight: FontWeight.w500,
-                               ),
+                             Row(
+                               children: [
+                                 Text(
+                                   'Purpose of Meeting',
+                                   style: TextStyle(
+                                     fontSize: 14,
+                                     color: headerColor ?? Colors.deepPurple,
+                                     fontWeight: FontWeight.w500,
+                                   ),
+                                 ),
+                               ],
                              ),
                              const SizedBox(height: 4),
                              Text(
@@ -362,65 +457,40 @@ class UserAppointmentCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Date: ',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                dateRange,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Date: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                'Range: ',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                          Expanded(
+                            child: Text(
+                              dateRange,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w500,
                               ),
-                              Text(
-                                dateRange.split(' to ').last,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$daysCount Days',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '$daysCount Days',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -429,23 +499,23 @@ class UserAppointmentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                                 // Contact Details
-                 const Text(
-                   'Contact Details',
-                   style: TextStyle(
-                     fontSize: 16,
-                     fontWeight: FontWeight.bold,
-                     color: Colors.black87,
-                   ),
-                   textAlign: TextAlign.left,
-                 ),
-                const SizedBox(height: 12),
-                _buildContactRow(Icons.email, email),
-                const SizedBox(height: 8),
-                _buildContactRow(Icons.phone, phone),
-                const SizedBox(height: 8),
-                _buildContactRow(Icons.location_on, location),
-                const SizedBox(height: 16),
+                                 // Contact Details - Commented out
+                 // const Text(
+                 //   'Contact Details',
+                 //   style: TextStyle(
+                 //     fontSize: 16,
+                 //     fontWeight: FontWeight.bold,
+                 //     color: Colors.black87,
+                 //   ),
+                 //   textAlign: TextAlign.left,
+                 // ),
+                 // const SizedBox(height: 12),
+                 // _buildContactRow(Icons.email, email),
+                 // const SizedBox(height: 8),
+                 // _buildContactRow(Icons.phone, phone),
+                 // const SizedBox(height: 8),
+                 // _buildContactRow(Icons.location_on, location),
+                 // const SizedBox(height: 16),
 
                                  // Edit Button
                  if (onEditPressed != null)
@@ -492,8 +562,7 @@ class UserAppointmentCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
               Text(
                 label,
@@ -503,7 +572,7 @@ class UserAppointmentCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 8),
               Text(
                 value,
                 style: const TextStyle(

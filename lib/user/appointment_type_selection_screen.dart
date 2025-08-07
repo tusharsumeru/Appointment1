@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../components/sidebar/sidebar_component.dart';
+import 'user_sidebar.dart';
 import 'request_appointment.dart';
 
 class AppointmentTypeSelectionScreen extends StatefulWidget {
@@ -53,7 +53,7 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
           },
         ),
       ),
-      drawer: const SidebarComponent(),
+      drawer: const UserSidebar(),
       body: Container(
         color: Colors.grey.shade50,
         child: Center(

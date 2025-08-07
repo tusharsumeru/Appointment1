@@ -569,44 +569,9 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
       // Apply placeholder replacements to the original HTML content
       String processedHtmlContent = _replacePlaceholdersInHtml(originalHtmlContent);
 
-      // Show confirmation dialog
-      _showBulkEmailConfirmationDialog(subject, processedHtmlContent);
+      // FIXED: Send bulk email directly without confirmation dialog
+      _sendBulkEmailToBackend(subject, processedHtmlContent);
     }
-  }
-
-  void _showBulkEmailConfirmationDialog(String subject, String content) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirm Bulk Email'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Recipients: ${widget.appointments.length} appointments'),
-              const SizedBox(height: 8),
-              Text('Subject: $subject'),
-              const SizedBox(height: 8),
-              const Text('Are you sure you want to send this bulk email?'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _sendBulkEmailToBackend(subject, content);
-              },
-              child: const Text('Send'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _sendBulkEmailToBackend(String subject, String content) async {

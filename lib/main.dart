@@ -11,8 +11,11 @@ import 'main/tomorrow_screen.dart';
 import 'main/add_new_screen.dart';
 import 'main/deleted_appointments_screen.dart';
 import 'main/global_search_screen.dart';
+import 'user/user_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
   runApp(const MyApp());
 }
 
@@ -39,6 +42,7 @@ class MyApp extends StatelessWidget {
         '/add-new': (context) => const AddNewScreen(),
         '/deleted-appointments': (context) => const DeletedAppointmentsScreen(),
         '/global-search': (context) => const GlobalSearchScreen(),
+        '/user': (context) => const UserScreen(),
       },
     );
   }
