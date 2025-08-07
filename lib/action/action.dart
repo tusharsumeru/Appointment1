@@ -9,7 +9,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://5fca9d234d88.ngrok-free.app/api/v3'; // API base URL
+      'https://89628f197129.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -4336,6 +4336,110 @@ class ActionService {
       }
     } catch (e) {
       print('❌ Error creating appointment: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Upload and validate profile photo for accompanying users
+  static Future<Map<String, dynamic>> uploadAndValidateProfilePhoto(File photoFile) async {
+    try {
+      print('📸 Starting photo upload and validation for: ${photoFile.path}');
+      
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/validate-upload-s3'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the photo file
+      if (await photoFile.exists()) {
+        try {
+          print('📸 Adding photo file to request: ${photoFile.path}');
+          final photoStream = http.ByteStream(photoFile.openRead());
+          final photoLength = await photoFile.length();
+          print('📸 Photo file size: ${photoLength} bytes');
+          
+          // Get file extension and name
+          final fileName = photoFile.path.split('/').last;
+          final fileExtension = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+          final mimeType = _getMimeType(fileExtension);
+          
+          final photoMultipart = http.MultipartFile(
+            'file', // Field name expected by the API
+            photoStream,
+            photoLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(photoMultipart);
+          print('📸 Photo file added successfully to multipart request');
+        } catch (photoError) {
+          print('❌ Error adding photo file: $photoError');
+          return {
+            'success': false,
+            'message': 'Error processing photo file: ${photoError.toString()}',
+          };
+        }
+      } else {
+        print('⚠️ Photo file does not exist: ${photoFile.path}');
+        return {
+          'success': false,
+          'message': 'Photo file not found',
+        };
+      }
+
+      print('📤 Sending photo upload request to: ${request.url}');
+      print('📤 Request headers: ${request.headers}');
+      print('📤 Total files being sent: ${request.files.length}');
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Photo upload response status: ${response.statusCode}');
+      print('📥 Photo upload response body: ${response.body}');
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('✅ Photo uploaded and validated successfully!');
+        print('📸 S3 URL: ${responseData['data']['s3Url']}');
+        print('📸 Validation result: ${responseData['data']['validation']}');
+        
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Photo uploaded and validated successfully',
+          's3Url': responseData['data']['s3Url'],
+          'validation': responseData['data']['validation'],
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ Photo upload failed: ${errorData['message']}');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Failed to upload photo',
+          'error': errorData['error'],
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error in uploadAndValidateProfilePhoto: $e');
       return {
         'success': false,
         'message': 'Network error: $e',

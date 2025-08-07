@@ -38,6 +38,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   // Form state
   bool _isTeacher = false;
   bool _isFormValid = false;
+  bool _isLoading = true; // Add loading state
   
 
 
@@ -162,6 +163,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         _designationController.text = designation;
         _companyController.text = company;
         _isTeacher = isTeacher;
+        _isLoading = false; // Set loading to false after data is loaded
       });
       
       print('✅ RequestAppointmentScreen._loadUserData() completed successfully');
@@ -181,6 +183,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         _designationController.text = '';
         _companyController.text = '';
         _isTeacher = false;
+        _isLoading = false; // Ensure loading is false on error
       });
       
       print('✅ Default values set successfully');
@@ -240,38 +243,57 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         ],
       ),
       drawer: const SidebarComponent(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
+      body: _isLoading 
+          ? const Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Header
-                  const Text(
-                    'Personal Information',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enter your contact details',
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading your information...',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        const Text(
+                          'Personal Information',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Your contact details (read-only)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
                   // Appointment Type Display Card
                   Container(
@@ -371,7 +393,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
                   // Teacher Question
                   const Text(
-                    'Are you an Art Of Living teacher? (Optional)',
+                    'Are you an Art Of Living teacher? (Read-only)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -384,24 +406,26 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                       Radio<bool>(
                         value: false,
                         groupValue: _isTeacher,
-                        onChanged: (value) {
-                          setState(() {
-                            _isTeacher = value!;
-                          });
-                        },
+                        onChanged: null, // Disable radio buttons
                       ),
-                      const Text('No'),
+                      Text(
+                        'No',
+                        style: TextStyle(
+                          color: _isTeacher ? Colors.grey[400] : Colors.black87,
+                        ),
+                      ),
                       const SizedBox(width: 32),
                       Radio<bool>(
                         value: true,
                         groupValue: _isTeacher,
-                        onChanged: (value) {
-                          setState(() {
-                            _isTeacher = value!;
-                          });
-                        },
+                        onChanged: null, // Disable radio buttons
                       ),
-                      const Text('Yes'),
+                      Text(
+                        'Yes',
+                        style: TextStyle(
+                          color: _isTeacher ? Colors.black87 : Colors.grey[400],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -448,7 +472,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label (Optional)',
+          '$label (Read-only)',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -460,11 +484,12 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
+          enabled: false, // Make fields read-only
           decoration: InputDecoration(
-            hintText: '$placeholder (optional for testing)',
+            hintText: '$placeholder',
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Colors.grey[100], // Different color to indicate read-only
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -473,9 +498,9 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
-            focusedBorder: OutlineInputBorder(
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: BorderSide(color: Colors.grey[400]!),
             ),
           ),
         ),
@@ -488,7 +513,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Phone Number (Optional)',
+          'Phone Number (Read-only)',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -498,8 +523,9 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: Colors.grey[400]!),
             borderRadius: BorderRadius.circular(8),
+            color: Colors.grey[100], // Different color to indicate read-only
           ),
           child: Row(
             children: [
@@ -507,7 +533,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: Colors.grey[200], // Darker color for read-only
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(8),
                     bottomLeft: Radius.circular(8),
@@ -535,11 +561,14 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   onChanged: (value) => _validateForm(),
-                  decoration: const InputDecoration(
-                    hintText: 'Enter phone number (optional for testing)',
-                    hintStyle: TextStyle(color: Colors.grey),
+                  enabled: false, // Make field read-only
+                  decoration: InputDecoration(
+                    hintText: 'Enter phone number',
+                    hintStyle: const TextStyle(color: Colors.grey),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    filled: true,
+                    fillColor: Colors.grey[100],
                   ),
                 ),
               ),

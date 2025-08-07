@@ -13,6 +13,14 @@ class StorageService {
   static const String _assignedToMeAppointmentsKey = 'cached_assigned_to_me_appointments';
   static const String _assignedToMeAppointmentsTimestampKey = 'assigned_to_me_appointments_timestamp';
 
+  // API base URL - same as in ActionService
+  static const String _apiBaseUrl = 'https://89628f197129.ngrok-free.app/api/v3';
+
+  // Get API URL
+  static Future<String> getApiUrl() async {
+    return _apiBaseUrl;
+  }
+
   // Save authentication token
   static Future<void> saveToken(String token) async {
     try {
