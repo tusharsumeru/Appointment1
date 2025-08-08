@@ -269,7 +269,10 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
           if (index == appointments.length) {
             // Load more indicator
             if (hasMoreData) {
-              _loadMoreAppointments();
+              // Use addPostFrameCallback to defer the load until after the current build
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _loadMoreAppointments();
+              });
               return const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
