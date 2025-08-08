@@ -221,7 +221,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Request Appointment - $_appointmentTypeText'),
+        title: Text('$_appointmentTypeText'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -231,16 +231,6 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
             Navigator.pop(context);
           },
         ),
-        actions: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-          ),
-        ],
       ),
       drawer: const SidebarComponent(),
       body: _isLoading 
@@ -523,38 +513,12 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[400]!),
+            color: Colors.grey[100],
             borderRadius: BorderRadius.circular(8),
-            color: Colors.grey[100], // Different color to indicate read-only
+            border: Border.all(color: Colors.grey[400]!),
           ),
           child: Row(
             children: [
-              // Country Code Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200], // Darker color for read-only
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('🇮🇳', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '+91',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
-                  ],
-                ),
-              ),
               // Phone Number Input
               Expanded(
                 child: TextField(

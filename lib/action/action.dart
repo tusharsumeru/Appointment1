@@ -9,7 +9,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://89628f197129.ngrok-free.app/api/v3'; // API base URL
+      'https://b23abcea76aa.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -3763,6 +3763,112 @@ class ActionService {
           'statusCode': response.statusCode,
           'message':
               responseData['message'] ?? 'Failed to retrieve ashram locations',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get ashram location by location ID with assigned secretaries
+  static Future<Map<String, dynamic>> getAshramLocationByLocationId({
+    required String locationId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate locationId
+      if (locationId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Location ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/ashram-locations/$locationId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return location data with assigned secretaries
+        final locationData = responseData['data'];
+        final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': {
+            'location': locationData,
+            'assignedSecretaries': assignedSecretaries,
+          },
+          'message': responseData['message'] ?? 'Location details fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid location ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 403) {
+        // Location deactivated
+        return {
+          'success': false,
+          'statusCode': 403,
+          'message': responseData['message'] ?? 'This location is deactivated',
+        };
+      } else if (response.statusCode == 404) {
+        // Location not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Ashram location not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to fetch location details',
         };
       }
     } catch (error) {
