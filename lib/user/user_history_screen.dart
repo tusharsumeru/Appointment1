@@ -29,7 +29,16 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
   }
 
   Future<void> _loadUserAppointments({bool refresh = false}) async {
+    print('🔄 _loadUserAppointments called with refresh: $refresh');
+    
+    // Check if widget is still mounted
+    if (!mounted) {
+      print('🔄 Widget not mounted, skipping load');
+      return;
+    }
+    
     if (refresh) {
+      print('🔄 Refreshing appointments list...');
       setState(() {
         currentPage = 1;
         appointments = [];
@@ -39,33 +48,39 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
     if (!hasMoreData && !refresh) return;
 
-    setState(() {
-      if (refresh) {
-        isLoading = true;
-        hasError = false;
-        errorMessage = '';
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (refresh) {
+          isLoading = true;
+          hasError = false;
+          errorMessage = '';
+        }
+      });
+    }
 
     try {
       // Get current user ID from JWT token
       final token = await StorageService.getToken();
       if (token == null) {
-        setState(() {
-          isLoading = false;
-          hasError = true;
-          errorMessage = 'No authentication token found. Please login again.';
-        });
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            hasError = true;
+            errorMessage = 'No authentication token found. Please login again.';
+          });
+        }
         return;
       }
 
       final userId = JwtUtils.extractMongoId(token);
       if (userId == null) {
-        setState(() {
-          isLoading = false;
-          hasError = true;
-          errorMessage = 'Could not extract user ID from authentication token.';
-        });
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            hasError = true;
+            errorMessage = 'Could not extract user ID from authentication token.';
+          });
+        }
         return;
       }
 
@@ -80,41 +95,56 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         final List<dynamic> newAppointments = result['data'] ?? [];
         final Map<String, dynamic> pagination = result['pagination'] ?? {};
         
-        setState(() {
-          if (refresh) {
-            appointments = List<Map<String, dynamic>>.from(newAppointments);
-          } else {
-            appointments.addAll(List<Map<String, dynamic>>.from(newAppointments));
-          }
-          
-          currentPage = pagination['currentPage'] ?? currentPage;
-          totalPages = pagination['totalPages'] ?? 1;
-          hasMoreData = currentPage < totalPages;
-          isLoading = false;
-          hasError = false;
-        });
+        print('🔄 Loaded ${newAppointments.length} appointments from API');
+        if (refresh) {
+          print('🔄 Refreshing appointments list with ${newAppointments.length} appointments');
+        }
+        
+        if (mounted) {
+          setState(() {
+            if (refresh) {
+              appointments = List<Map<String, dynamic>>.from(newAppointments);
+            } else {
+              appointments.addAll(List<Map<String, dynamic>>.from(newAppointments));
+            }
+            
+            currentPage = pagination['currentPage'] ?? currentPage;
+            totalPages = pagination['totalPages'] ?? 1;
+            hasMoreData = currentPage < totalPages;
+            isLoading = false;
+            hasError = false;
+          });
+        }
+        
+        print('🔄 Total appointments in state: ${appointments.length}');
       } else {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            hasError = true;
+            errorMessage = result['message'] ?? 'Failed to load appointments';
+          });
+        }
+      }
+    } catch (error) {
+      if (mounted) {
         setState(() {
           isLoading = false;
           hasError = true;
-          errorMessage = result['message'] ?? 'Failed to load appointments';
+          errorMessage = 'Network error. Please check your connection and try again.';
         });
       }
-    } catch (error) {
-      setState(() {
-        isLoading = false;
-        hasError = true;
-        errorMessage = 'Network error. Please check your connection and try again.';
-      });
     }
   }
 
   Future<void> _loadMoreAppointments() async {
     if (!hasMoreData || isLoading) return;
     
-    setState(() {
-      currentPage++;
-    });
+    if (mounted) {
+      setState(() {
+        currentPage++;
+      });
+    }
     
     await _loadUserAppointments();
   }
@@ -239,7 +269,10 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
           if (index == appointments.length) {
             // Load more indicator
             if (hasMoreData) {
-              _loadMoreAppointments();
+              // Use addPostFrameCallback to defer the load until after the current build
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _loadMoreAppointments();
+              });
               return const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
@@ -269,8 +302,9 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
             phone: _formatPhoneNumber(appointment),
             location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
             appointmentData: appointment, // Pass the complete appointment data
-            onEditPressed: () {
-              Navigator.push(
+            onEditPressed: () async {
+              print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => EditAppointmentScreen(
@@ -278,6 +312,26 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
                   ),
                 ),
               );
+              print('🔄 Returned from edit screen with result: $result');
+              // Refresh the appointments list after returning from edit screen
+              // Only refresh if the edit was successful (result == true)
+              if (result == true) {
+                print('🔄 Refreshing appointments list...');
+                // Use addPostFrameCallback to defer the refresh until after the current build
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _loadUserAppointments(refresh: true);
+                });
+                // Show a brief success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Appointment updated successfully!'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } else {
+                print('🔄 No refresh needed - edit was not successful');
+              }
             },
           );
         },
@@ -421,7 +475,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       
       // Add main user's photo first
       final mainUserPhoto = appointment['profilePhoto'];
-      if (mainUserPhoto != null && mainUserPhoto.isNotEmpty) {
+      if (mainUserPhoto != null && mainUserPhoto.toString().isNotEmpty) {
         photos.add(mainUserPhoto);
       }
       
@@ -431,7 +485,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         final List<dynamic> users = accompanyUsers['users'];
         
         for (final user in users) {
-          if (user is Map<String, dynamic> && user['profilePhotoUrl'] != null) {
+          if (user is Map<String, dynamic> && user['profilePhotoUrl'] != null && user['profilePhotoUrl'].toString().isNotEmpty) {
             photos.add(user['profilePhotoUrl']);
           }
         }

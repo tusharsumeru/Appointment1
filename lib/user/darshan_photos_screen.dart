@@ -267,9 +267,9 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
           if (!addedNames.contains(fullName)) {
             addedNames.add(fullName);
             
-            String photoUrl = user['profilePhotoUrl'] ?? '';
+            String photoUrl = user['profilePhotoUrl']?.toString() ?? '';
             if (photoUrl.isEmpty) {
-              photoUrl = widget.appointmentData['profilePhoto'] ?? '';
+              photoUrl = widget.appointmentData['profilePhoto']?.toString() ?? '';
             }
             
             referencePhotos.add({
@@ -291,9 +291,9 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
             if (!addedNames.contains(fullName)) {
               addedNames.add(fullName);
               
-              String photoUrl = profilePhotoUrl ?? '';
+              String photoUrl = profilePhotoUrl?.toString() ?? '';
               if (photoUrl.isEmpty) {
-                photoUrl = widget.appointmentData['profilePhoto'] ?? '';
+                photoUrl = widget.appointmentData['profilePhoto']?.toString() ?? '';
               }
               
               referencePhotos.add({

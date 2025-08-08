@@ -334,7 +334,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                            );
                                          },
                                        );
-                                     } else if (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty) {
+                                     } else if (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty && _uploadedPhotoUrl!.toString().isNotEmpty) {
                                        return Image.network(
                                          _uploadedPhotoUrl!,
                                          fit: BoxFit.cover,
@@ -577,7 +577,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                                          );
                                                        },
                                                      )
-                                                   : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
+                                                   : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty && _uploadedPhotoUrl!.toString().isNotEmpty
                                                        ? Image.network(
                                                            _uploadedPhotoUrl!,
                                                            fit: BoxFit.cover,
