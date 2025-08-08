@@ -126,10 +126,10 @@ class _UserSidebarState extends State<UserSidebar> {
                 CircleAvatar(
                   radius: 25,
                   backgroundColor: Colors.white,
-                  backgroundImage: _userData?['profilePhoto'] != null
+                  backgroundImage: _userData?['profilePhoto'] != null && _userData!['profilePhoto'].toString().isNotEmpty
                       ? NetworkImage(_userData!['profilePhoto'])
                       : null,
-                  child: _userData?['profilePhoto'] == null
+                  child: _userData?['profilePhoto'] == null || _userData!['profilePhoto'].toString().isEmpty
                       ? const Icon(
                           Icons.person,
                           size: 30,

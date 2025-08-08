@@ -274,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ],
                               ),
                               child: ClipOval(
-                                child: _userData?['profilePhoto'] != null
+                                child: _userData?['profilePhoto'] != null && _userData!['profilePhoto'].toString().isNotEmpty
                                     ? Image.network(
                                         _userData!['profilePhoto'],
                                         fit: BoxFit.cover,

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import 'user_screen.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:country_picker/country_picker.dart';
 
 class EditAppointmentScreen extends StatefulWidget {
   final Map<String, dynamic>? appointmentData;
@@ -16,346 +20,1128 @@ class EditAppointmentScreen extends StatefulWidget {
 }
 
 class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
-  String _selectedAppointmentType = 'myself';
-  String _selectedTeacherStatus = 'no';
-  String _selectedLocation = 'Bengaluru,India';
-  String _selectedSecretary = 'None';
-  final TextEditingController _purposeController = TextEditingController(text: 'Blessings');
-  DateTime _fromDate = DateTime(2025, 8, 8);
-  DateTime _toDate = DateTime(2025, 8, 11);
+  // Form controllers
+  final TextEditingController _appointmentPurposeController = TextEditingController();
+  final TextEditingController _numberOfUsersController = TextEditingController();
+  final TextEditingController _fromDateController = TextEditingController();
+  final TextEditingController _toDateController = TextEditingController();
+  
+  // Reference Information Controllers (for guest appointments)
+  final TextEditingController _referenceNameController = TextEditingController();
+  final TextEditingController _referenceEmailController = TextEditingController();
+  final TextEditingController _referencePhoneController = TextEditingController();
+  
+  // Guest Information Controllers (for guest appointments)
+  final TextEditingController _guestNameController = TextEditingController();
+  final TextEditingController _guestEmailController = TextEditingController();
+  final TextEditingController _guestPhoneController = TextEditingController();
+  final TextEditingController _guestDesignationController = TextEditingController();
+  final TextEditingController _guestCompanyController = TextEditingController();
+  final TextEditingController _guestLocationController = TextEditingController();
+  
+  // Form state
+  bool _isFormValid = false;
+  String? _selectedSecretary;
+  String? _selectedSecretaryName;
+  String? _selectedAppointmentLocation;
+  String? _selectedLocationId;
+  String? _selectedLocationMongoId;
+  File? _selectedImage;
+  bool _isAttendingProgram = false;
+  
+  // Guest information state
+  List<Map<String, TextEditingController>> _guestControllers = [];
+  Map<int, String> _guestImages = {};
+  Map<int, bool> _guestUploading = {};
+  
+  // Location search state
+  List<Map<String, dynamic>> _locationSuggestions = [];
+  bool _isSearchingLocations = false;
+  String _lastSearchQuery = '';
+  
+  // Main guest photo state
+  String? _mainGuestPhotoUrl;
+  bool _isMainGuestPhotoUploading = false;
+  File? _mainGuestPhotoFile;
+
+  // Location data
+  List<Map<String, dynamic>> _locations = [];
+  bool _isLoadingLocations = true;
+  
+  // Reference information loading state
+  bool _isLoadingReferenceInfo = true;
+
+  // Secretary data
+  List<Map<String, dynamic>> _secretaries = [];
+  bool _isLoadingSecretaries = false;
+  String? _secretaryErrorMessage;
+
+  // Country picker data for guest phone
+  Country _selectedCountry = Country(
+    phoneCode: '91',
+    countryCode: 'IN',
+    e164Sc: 0,
+    geographic: true,
+    level: 1,
+    name: 'India',
+    example: '9876543210',
+    displayName: 'India (IN) [+91]',
+    displayNameNoCountryCode: 'India (IN)',
+    e164Key: '91-IN-0',
+  );
+
+  // Country picker data for additional guests
+  Map<int, Country> _guestCountries = {};
+
+  // Loading state
+  bool _isLoading = false;
+  bool _isSaving = false;
+
+  // Get appointment type
+  String get _appointmentType {
+    return widget.appointmentData?['appointmentType']?.toString().toLowerCase() ?? 
+           widget.appointmentData?['appointmentFor']?['type']?.toString().toLowerCase() ?? 
+           'myself';
+  }
+
+  // Check if this is a guest appointment
+  bool get _isGuestAppointment => _appointmentType == 'guest';
 
   @override
   void initState() {
     super.initState();
+    _loadAppointmentData();
+    _loadLocations();
+    if (_isGuestAppointment) {
+      _loadReferenceInfo();
+    }
   }
 
   @override
   void dispose() {
-    _purposeController.dispose();
+    _appointmentPurposeController.dispose();
+    _numberOfUsersController.dispose();
+    _fromDateController.dispose();
+    _toDateController.dispose();
+    _referenceNameController.dispose();
+    _referenceEmailController.dispose();
+    _referencePhoneController.dispose();
+    _guestNameController.dispose();
+    _guestEmailController.dispose();
+    _guestPhoneController.dispose();
+    _guestDesignationController.dispose();
+    _guestCompanyController.dispose();
+    _guestLocationController.dispose();
+    
+    // Dispose guest controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['email']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Edit Appointment',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+  // Load existing appointment data
+  void _loadAppointmentData() {
+    if (widget.appointmentData == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final appointment = widget.appointmentData!;
+      
+      // Load basic appointment data
+      _appointmentPurposeController.text = appointment['appointmentPurpose']?.toString() ?? 
+                                          appointment['appointmentSubject']?.toString() ?? '';
+      
+      // Load date range
+      final preferredDateRange = appointment['preferredDateRange'];
+      if (preferredDateRange != null) {
+        final fromDate = preferredDateRange['fromDate'];
+        final toDate = preferredDateRange['toDate'];
+        
+        if (fromDate != null) {
+          final from = DateTime.parse(fromDate);
+          _fromDateController.text = '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+        }
+        
+        if (toDate != null) {
+          final to = DateTime.parse(toDate);
+          _toDateController.text = '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+        }
+      }
+
+      // Load location
+      final appointmentLocation = appointment['appointmentLocation'];
+      if (appointmentLocation != null) {
+        if (appointmentLocation is Map<String, dynamic>) {
+          _selectedAppointmentLocation = appointmentLocation['name']?.toString();
+          _selectedLocationId = appointmentLocation['locationId']?.toString();
+          _selectedLocationMongoId = appointmentLocation['_id']?.toString();
+        } else {
+          _selectedAppointmentLocation = appointmentLocation.toString();
+        }
+      }
+
+      // Load secretary
+      final assignedSecretary = appointment['assignedSecretary'];
+      print('🔍 Loading assignedSecretary data: $assignedSecretary');
+      print('🔍 assignedSecretary type: ${assignedSecretary.runtimeType}');
+      
+      if (assignedSecretary is Map<String, dynamic>) {
+        print('🔍 assignedSecretary keys: ${assignedSecretary.keys.toList()}');
+        _selectedSecretary = assignedSecretary['_id']?.toString();
+        // Store the full name for display
+        _selectedSecretaryName = assignedSecretary['fullName']?.toString();
+        print('🔍 Set _selectedSecretary: $_selectedSecretary');
+        print('🔍 Set _selectedSecretaryName: $_selectedSecretaryName');
+      } else {
+        _selectedSecretary = assignedSecretary?.toString();
+        print('🔍 Set _selectedSecretary (fallback): $_selectedSecretary');
+      }
+
+      // Load number of users
+      final accompanyUsers = appointment['accompanyUsers'];
+      if (accompanyUsers != null && accompanyUsers['numberOfUsers'] != null) {
+        _numberOfUsersController.text = accompanyUsers['numberOfUsers'].toString();
+      } else {
+        _numberOfUsersController.text = '1';
+      }
+
+      // Load secretaries after location is set
+      if (_selectedLocationId != null) {
+        _loadSecretaries();
+      }
+
+      // Load guest-specific data if this is a guest appointment
+      if (_isGuestAppointment) {
+        _loadGuestData(appointment);
+      }
+
+      // Load accompanying users data
+      _loadAccompanyingUsersData(appointment);
+
+      _validateForm();
+    } catch (e) {
+      print('Error loading appointment data: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading appointment data: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _loadGuestData(Map<String, dynamic> appointment) {
+    final guestInformation = appointment['guestInformation'];
+    if (guestInformation != null && guestInformation is Map<String, dynamic>) {
+      _guestNameController.text = guestInformation['fullName']?.toString() ?? '';
+      _guestEmailController.text = guestInformation['emailId']?.toString() ?? '';
+      _guestDesignationController.text = guestInformation['designation']?.toString() ?? '';
+      _guestCompanyController.text = guestInformation['company']?.toString() ?? '';
+      _guestLocationController.text = guestInformation['location']?.toString() ?? '';
+      
+      // Load guest photo
+      _mainGuestPhotoUrl = guestInformation['profilePhotoUrl']?.toString();
+      
+      // Load phone number
+      final phoneNumber = guestInformation['phoneNumber']?.toString();
+      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        // Parse phone number to extract country code and number
+        if (phoneNumber.startsWith('+')) {
+          final parts = phoneNumber.substring(1).split(' ');
+          if (parts.length >= 2) {
+            final countryCode = parts[0];
+            final number = parts.sublist(1).join('');
+            _guestPhoneController.text = number;
+            
+            // Set country
+            _selectedCountry = Country(
+              phoneCode: countryCode,
+              countryCode: 'IN', // Default to India
+              e164Sc: 0,
+              geographic: true,
+              level: 1,
+              name: 'India',
+              example: '9876543210',
+              displayName: 'India (IN) [+$countryCode]',
+              displayNameNoCountryCode: 'India (IN)',
+              e164Key: '$countryCode-IN-0',
+            );
+          } else {
+            _guestPhoneController.text = phoneNumber.substring(1);
+          }
+        } else {
+          _guestPhoneController.text = phoneNumber;
+        }
+      }
+    }
+
+    // Load reference information
+    final referenceInformation = appointment['referenceInformation'];
+    if (referenceInformation != null && referenceInformation is Map<String, dynamic>) {
+      _referenceNameController.text = referenceInformation['fullName']?.toString() ?? '';
+      _referenceEmailController.text = referenceInformation['email']?.toString() ?? '';
+      _referencePhoneController.text = referenceInformation['phoneNumber']?.toString() ?? '';
+    }
+  }
+
+  void _loadAccompanyingUsersData(Map<String, dynamic> appointment) {
+    final accompanyUsers = appointment['accompanyUsers'];
+    if (accompanyUsers != null && accompanyUsers['users'] != null) {
+      final List<dynamic> users = accompanyUsers['users'];
+      
+      // Clear existing controllers
+      for (var guest in _guestControllers) {
+        guest['name']?.dispose();
+        guest['email']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+      }
+      _guestControllers.clear();
+      _guestImages.clear();
+      _guestCountries.clear();
+
+      for (int i = 0; i < users.length; i++) {
+        final user = users[i];
+        if (user is Map<String, dynamic>) {
+          final guestNumber = i + 1;
+          
+          // Create controllers for this guest
+          final nameController = TextEditingController(text: user['fullName']?.toString() ?? '');
+          final emailController = TextEditingController(text: user['emailId']?.toString() ?? '');
+          final phoneController = TextEditingController();
+          final ageController = TextEditingController(text: user['age']?.toString() ?? '');
+
+          // Parse phone number
+          final phoneNumber = user['phoneNumber']?.toString();
+          if (phoneNumber != null && phoneNumber.isNotEmpty) {
+            if (phoneNumber.startsWith('+')) {
+              final parts = phoneNumber.substring(1).split(' ');
+              if (parts.length >= 2) {
+                final countryCode = parts[0];
+                final number = parts.sublist(1).join('');
+                phoneController.text = number;
+                
+                _guestCountries[guestNumber] = Country(
+                  phoneCode: countryCode,
+                  countryCode: 'IN',
+                  e164Sc: 0,
+                  geographic: true,
+                  level: 1,
+                  name: 'India',
+                  example: '9876543210',
+                  displayName: 'India (IN) [+$countryCode]',
+                  displayNameNoCountryCode: 'India (IN)',
+                  e164Key: '$countryCode-IN-0',
+                );
+              } else {
+                phoneController.text = phoneNumber.substring(1);
+              }
+            } else {
+              phoneController.text = phoneNumber;
+            }
+          }
+
+          _guestControllers.add({
+            'name': nameController,
+            'email': emailController,
+            'phone': phoneController,
+            'age': ageController,
+          });
+
+          // Load guest photo
+          final photoUrl = user['profilePhotoUrl']?.toString();
+          if (photoUrl != null && photoUrl.isNotEmpty) {
+            _guestImages[guestNumber] = photoUrl;
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final result = await ActionService.getAshramLocations();
+      if (result['success'] == true) {
+        setState(() {
+          _locations = List<Map<String, dynamic>>.from(result['data'] ?? []);
+          _isLoadingLocations = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading locations: $e');
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  Future<void> _loadSecretaries() async {
+    if (_selectedLocationId == null) return;
+
+    setState(() {
+      _isLoadingSecretaries = true;
+      _secretaryErrorMessage = null;
+    });
+
+    try {
+      final result = await ActionService.getAshramLocationByLocationId(locationId: _selectedLocationId!);
+      if (result['success'] == true) {
+        final locationData = result['data'];
+        final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
+        
+        print('✅ Loaded ${assignedSecretaries.length} secretaries from API');
+        
+        // Transform the API response to match our expected format
+        final List<Map<String, dynamic>> secretaries = [];
+        
+        for (var secretary in assignedSecretaries) {
+          try {
+            final secretaryData = secretary['secretaryId'] ?? secretary;
+            secretaries.add({
+              'id': secretaryData['_id']?.toString() ?? '',
+              'name': secretaryData['fullName']?.toString() ?? 'Unknown Secretary',
+              'email': secretaryData['email']?.toString() ?? '',
+              'role': secretaryData['role']?.toString() ?? '',
+            });
+          } catch (e) {
+            print('⚠️ Error processing secretary data: $e');
+            print('⚠️ Secretary data: $secretary');
+          }
+        }
+
+        setState(() {
+          _secretaries = secretaries;
+          _isLoadingSecretaries = false;
+        });
+        
+        // Log secretary details for debugging
+        for (var secretary in secretaries) {
+          print('👤 Secretary: ${secretary['name']} (ID: ${secretary['id']})');
+        }
+      } else {
+        print('❌ Failed to load secretaries: ${result['message']}');
+        setState(() {
+          _isLoadingSecretaries = false;
+          _secretaryErrorMessage = result['message'] ?? 'Failed to load secretaries';
+          _secretaries = [];
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading secretaries: $e');
+      setState(() {
+        _isLoadingSecretaries = false;
+        _secretaryErrorMessage = 'Network error: $e';
+        _secretaries = [];
+      });
+    }
+  }
+
+  // Main guest photo methods
+  Future<void> _pickMainGuestImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _mainGuestPhotoFile = File(image.path);
+          _isMainGuestPhotoUploading = true;
+        });
+
+        // Upload to S3
+        try {
+          final result = await ActionService.uploadAndValidateProfilePhoto(
+            _mainGuestPhotoFile!,
+          );
+
+          if (result['success'] == true) {
+            final s3Url = result['data']['s3Url'];
+            print('✅ Main guest photo uploaded successfully!');
+            print('📸 S3 URL received: $s3Url');
+            setState(() {
+              _mainGuestPhotoUrl = s3Url;
+              _isMainGuestPhotoUploading = false;
+            });
+            _validateForm();
+          } else {
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result['message'] ?? 'Failed to upload photo')),
+            );
+          }
+        } catch (e) {
+          setState(() {
+            _isMainGuestPhotoUploading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error uploading photo: $e')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
+  }
+
+  void _removeMainGuestImage() {
+    setState(() {
+      _mainGuestPhotoUrl = null;
+      _mainGuestPhotoFile = null;
+    });
+    _validateForm();
+  }
+
+  Future<void> _loadReferenceInfo() async {
+    try {
+      final result = await ActionService.getCurrentUser();
+      if (result['success'] == true) {
+        final userData = result['data'];
+        if (userData != null) {
+          final fullName = userData['fullName']?.toString() ?? '';
+          final email = userData['email']?.toString() ?? '';
+          String phone = '';
+
+          // Extract phone number
+          if (userData['phoneNumber'] != null) {
+            if (userData['phoneNumber'] is Map<String, dynamic>) {
+              final phoneData = userData['phoneNumber'];
+              final countryCode = phoneData['countryCode']?.toString() ?? '';
+              final number = phoneData['number']?.toString() ?? '';
+              phone = '$countryCode$number';
+            } else {
+              phone = userData['phoneNumber'].toString();
+            }
+          } else if (userData['phone'] != null) {
+            phone = userData['phone'].toString();
+          }
+
+          setState(() {
+            _referenceNameController.text = fullName;
+            _referenceEmailController.text = email;
+            _referencePhoneController.text = phone;
+            _isLoadingReferenceInfo = false;
+          });
+        }
+      }
+    } catch (error) {
+      setState(() {
+        _referenceNameController.text = '';
+        _referenceEmailController.text = '';
+        _referencePhoneController.text = '';
+        _isLoadingReferenceInfo = false;
+      });
+    }
+  }
+
+  void _validateForm() {
+    bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
+        _numberOfUsersController.text.isNotEmpty &&
+        _fromDateController.text.isNotEmpty &&
+        _toDateController.text.isNotEmpty;
+    
+    // Validate main guest photo if appointment type is guest
+    bool mainGuestPhotoValid = true;
+    if (_isGuestAppointment) {
+      if (_mainGuestPhotoUrl == null) {
+        mainGuestPhotoValid = false;
+      }
+    }
+    
+    // Validate guest information if any
+    bool guestFormValid = true;
+    if (_guestControllers.isNotEmpty) {
+      for (var guest in _guestControllers) {
+        if (guest['name']?.text.isEmpty == true ||
+            guest['phone']?.text.isEmpty == true ||
+            guest['age']?.text.isEmpty == true) {
+          guestFormValid = false;
+          break;
+        }
+      }
+    }
+    
+    setState(() {
+      _isFormValid = basicFormValid && mainGuestPhotoValid && guestFormValid;
+    });
+  }
+
+  Future<void> _saveAppointment() async {
+    if (!_isFormValid) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      // Prepare update data
+      Map<String, dynamic> updateData = {
+        'appointmentPurpose': _appointmentPurposeController.text.trim(),
+        'appointmentSubject': _appointmentPurposeController.text.trim(),
+        'preferredDateRange': {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        },
+        'appointmentLocation': _selectedLocationMongoId,
+        'assignedSecretary': _selectedSecretary,
+        'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
+      };
+
+      // Add guest information if appointment type is guest
+      if (_isGuestAppointment) {
+        final countryCode = '+${_selectedCountry.phoneCode}';
+        final phoneNumber = _guestPhoneController.text.trim();
+        final fullPhoneNumber = '$countryCode$phoneNumber';
+        
+        Map<String, dynamic> guestInfo = {
+          'fullName': _guestNameController.text.trim(),
+          'emailId': _guestEmailController.text.trim(),
+          'phoneNumber': fullPhoneNumber,
+          'designation': _guestDesignationController.text.trim(),
+          'company': _guestCompanyController.text.trim(),
+          'location': _guestLocationController.text.trim(),
+        };
+        
+        if (_mainGuestPhotoUrl != null) {
+          guestInfo['profilePhotoUrl'] = _mainGuestPhotoUrl;
+        }
+        
+        updateData['guestInformation'] = guestInfo;
+
+        // Add reference information
+        updateData['referenceInformation'] = {
+          'fullName': _referenceNameController.text.trim(),
+          'email': _referenceEmailController.text.trim(),
+          'phoneNumber': _referencePhoneController.text.trim(),
+        };
+      }
+
+      // Add accompanyUsers if there are additional users
+      if (_guestControllers.isNotEmpty) {
+        List<Map<String, dynamic>> accompanyUsers = [];
+        for (int i = 0; i < _guestControllers.length; i++) {
+          var guest = _guestControllers[i];
+          int guestNumber = i + 1;
+          
+          final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
+          final phoneNumber = guest['phone']?.text.trim() ?? '';
+          final fullPhoneNumber = '$countryCode$phoneNumber';
+          
+          Map<String, dynamic> guestData = {
+            'fullName': guest['name']?.text.trim() ?? '',
+            'phoneNumber': fullPhoneNumber,
+            'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
+          };
+          
+          if (_guestImages.containsKey(guestNumber)) {
+            guestData['profilePhotoUrl'] = _guestImages[guestNumber];
+          }
+          
+          accompanyUsers.add(guestData);
+        }
+        
+        updateData['accompanyUsers'] = {
+          'numberOfUsers': accompanyUsers.length,
+          'users': accompanyUsers,
+        };
+      }
+
+      // Call API to update appointment
+      final appointmentId = widget.appointmentData?['appointmentId'] ?? 
+                           widget.appointmentData?['_id'] ?? '';
+      
+      final result = await ActionService.updateAppointmentEnhanced(
+        appointmentId: appointmentId,
+        updateData: updateData,
+      );
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appointment updated successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
-        ),
-        backgroundColor: const Color(0xFF1E3A8A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+        );
+        Navigator.pop(context, true); // Return true to indicate success
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Failed to update appointment')),
+        );
+      }
+    } catch (e) {
+      print('Error saving appointment: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving appointment: $e')),
+      );
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
+  String _parseDateToISO(String dateString) {
+    try {
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final date = DateTime(year, month, day);
+        return date.toIso8601String().split('T')[0];
+      }
+    } catch (e) {
+      print('Error parsing date: $e');
+    }
+    return dateString;
+  }
+
+  // UI Helper Methods
+  Widget _buildReferenceField({
+    required String label,
+    required TextEditingController controller,
+    String? placeholder,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Appointment Type Selection
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC), // slate-50 equivalent
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  const Text(
-                    'Appointment Type',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B), // slate-800 equivalent
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Select who this appointment is for',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B), // slate-500 equivalent
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Radio Buttons
-                  Column(
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: (_) => _validateForm(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextArea({
+    required String label,
+    required TextEditingController controller,
+    String? placeholder,
+    Function(String)? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Myself Option
-                      _buildRadioOption(
-                        value: 'myself',
-                        title: 'Request appointment for Myself',
-                        isSelected: _selectedAppointmentType == 'myself',
-                        onTap: () {
-                          setState(() {
-                            _selectedAppointmentType = 'myself';
-                          });
-                        },
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
                       ),
                       const SizedBox(height: 8),
-                      
-                      // Guest Option
-                      _buildRadioOption(
-                        value: 'guest',
-                        title: 'Request appointment for a Guest',
-                        isSelected: _selectedAppointmentType == 'guest',
-                        onTap: () {
-                          setState(() {
-                            _selectedAppointmentType = 'guest';
-                          });
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.multiline,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+          'Appointment Location *',
+                  style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showLocationBottomSheet,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+            ),
+            child: Row(
+                  children: [
+                Icon(
+                  Icons.location_on,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedAppointmentLocation ?? 'Select a location',
+                    style: TextStyle(
+                      color: _selectedAppointmentLocation != null ? Colors.black87 : Colors.grey[600],
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: Colors.grey[600],
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showLocationBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+                  // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.deepPurple, size: 24),
+                    const SizedBox(width: 12),
+                  const Text(
+                      'Select Location',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const Divider(height: 1),
+              
+              // Location List
+              Expanded(
+                child: _isLoadingLocations
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: _locations.length,
+                        itemBuilder: (context, index) {
+                          final location = _locations[index];
+                          final locationName = location['name']?.toString() ?? '';
+                          final isSelected = _selectedAppointmentLocation == locationName;
+                          
+                          return ListTile(
+                            leading: Icon(
+                              Icons.location_on,
+                              color: isSelected ? Colors.deepPurple : Colors.grey[600],
+                            ),
+                            title: Text(
+                              locationName,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: isSelected ? Colors.deepPurple : Colors.black87,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? Icon(Icons.check, color: Colors.deepPurple)
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedAppointmentLocation = locationName;
+                                _selectedLocationId = location['locationId']?.toString();
+                                _selectedLocationMongoId = location['_id']?.toString();
+                              });
+                              
+                              // Load secretaries for the selected location
+                              if (_selectedLocationId != null) {
+                                _loadSecretaries();
+                              }
+                              
+                              Navigator.pop(context);
+                              _validateForm();
+                            },
+                          );
                         },
                       ),
-                    ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecretaryField() {
+    return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+          'Have you been in touch with any secretary regarding your appointment?',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showSecretaryBottomSheet,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.person,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _isLoadingSecretaries
+                      ? Text(
+                          'Loading secretaries...',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      : _selectedLocationId == null
+                          ? Text(
+                              'Please select a location first',
+                              style: TextStyle(color: Colors.grey[600]),
+                            )
+                          : _secretaries.isEmpty
+                              ? Text(
+                                  'Select a secretary',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                )
+                              : Text(
+                                  _getSelectedSecretaryName() ?? 'Select a secretary',
+                              style: TextStyle(
+                                    color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
+                                        ? Colors.black87 
+                                        : Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: Colors.grey[600],
+                  size: 24,
+                            ),
+                          ],
+                        ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String? _getSelectedSecretaryName() {
+    print('🔍 _getSelectedSecretaryName() called');
+    print('🔍 _selectedSecretary: $_selectedSecretary');
+    print('🔍 _selectedSecretaryName: $_selectedSecretaryName');
+    print('🔍 _secretaries count: ${_secretaries.length}');
+    
+    if (_selectedSecretary == null) return 'None - I am not in touch with any secretary';
+    
+    // If we have a stored name, use it
+    if (_selectedSecretaryName != null && _selectedSecretaryName!.isNotEmpty) {
+      print('🔍 Using stored name: $_selectedSecretaryName');
+      return _selectedSecretaryName;
+    }
+    
+    // Otherwise, try to find it in the secretaries list
+    final selectedSecretary = _secretaries.firstWhere(
+      (secretary) => secretary['id'] == _selectedSecretary,
+      orElse: () => {},
+    );
+    print('🔍 Found secretary in list: $selectedSecretary');
+    return selectedSecretary['name'];
+  }
+
+  void _showSecretaryBottomSheet() {
+    if (_selectedLocationId == null || _isLoadingSecretaries) {
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+                                  color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.person, color: Colors.deepPurple, size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Select Secretary',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                 ],
               ),
             ),
             
-            const SizedBox(height: 24),
+            const Divider(height: 1),
             
-            // Personal Information Section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                const Text(
-                  'Personal Information',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937), // gray-800 equivalent
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your contact details (auto-filled from your profile)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: const Color(0xFF71717A), // zinc-500 equivalent
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Form Fields - Each on separate line
-                Column(
-                  children: [
-                    _buildFormField(
-                      label: 'Full Name',
-                      value: 'Ram Tharun',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    _buildFormField(
-                      label: 'Email Address',
-                      value: 'ramtharun0720@gmail.com',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    _buildFormField(
-                      label: 'Phone Number',
-                      value: '+919347653480',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    _buildFormField(
-                      label: 'Designation',
-                      value: 'Tech Developer',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    _buildFormField(
-                      label: 'Company/Organization',
-                      value: 'Sumeru Digital',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    _buildAOLTeacherSection(),
-                  ],
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Appointment Details Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC), // slate-50 equivalent
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Secretary List
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
                 children: [
-                  // Header
-                  const Text(
-                    'Appointment Details',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B), // slate-800 equivalent
+                  // None option
+                  ListTile(
+                    leading: Icon(
+                      Icons.person_off,
+                      color: _selectedSecretary == null ? Colors.deepPurple : Colors.grey[600],
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Provide details about your requested appointment',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B), // slate-500 equivalent
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Appointment Location
-                  _buildDropdownField(
-                    label: 'Appointment Location',
-                    value: _selectedLocation,
-                    isRequired: true,
-                    onTap: () {
-                      // TODO: Show location picker
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Secretary Selection
-                  _buildSecretaryDropdown(),
-                  const SizedBox(height: 12),
-                  
-                  // Purpose of Meeting
-                  _buildPurposeField(),
-                  const SizedBox(height: 12),
-                  
-                  // Attachment
-                  _buildAttachmentField(),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Date Range Section
-                  Container(
-                    padding: const EdgeInsets.only(top: 16),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: Color(0xFFE2E8F0), // slate-200 equivalent
-                          width: 1,
-                        ),
+                    title: Text(
+                      'None - I am not in touch with any secretary',
+                      style: TextStyle(
+                        fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
+                        color: _selectedSecretary == null ? Colors.deepPurple : Colors.black87,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Preferred Date Range',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1E293B), // slate-800 equivalent
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Select your preferred date range for the appointment',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: const Color(0xFF64748B), // slate-500 equivalent
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Date Fields
-                        Column(
-                          children: [
-                            _buildDateField(
-                              label: 'From Date',
-                              date: _fromDate,
-                              isRequired: true,
-                              onTap: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: _fromDate,
-                                  firstDate: DateTime.now(),
-                                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                                );
-                                if (date != null) {
+                    trailing: _selectedSecretary == null
+                        ? Icon(Icons.check, color: Colors.deepPurple)
+                        : null,
+                    onTap: () {
                                   setState(() {
-                                    _fromDate = date;
-                                  });
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Days Range Indicator
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0), // slate-200 equivalent
-                                  ),
-                                  borderRadius: BorderRadius.circular(4),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 1,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  '${_toDate.difference(_fromDate).inDays + 1} Days Range',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF475569), // slate-600 equivalent
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            _buildDateField(
-                              label: 'To Date',
-                              date: _toDate,
-                              isRequired: true,
-                              onTap: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: _toDate,
-                                  firstDate: _fromDate,
-                                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                                );
-                                if (date != null) {
-                                  setState(() {
-                                    _toDate = date;
-                                  });
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                        _selectedSecretary = null;
+                        _selectedSecretaryName = null;
+                      });
+                      Navigator.pop(context);
+                      _validateForm();
+                    },
                   ),
+                  
+                  // Secretary options
+                  ..._secretaries.map((secretary) {
+                    final secretaryId = secretary['id']?.toString();
+                    final secretaryName = secretary['name']?.toString() ?? 'Unknown';
+                    final isSelected = _selectedSecretary == secretaryId;
+                    
+                    return ListTile(
+                      leading: Icon(
+                        Icons.person,
+                        color: isSelected ? Colors.deepPurple : Colors.grey[600],
+                      ),
+                      title: Text(
+                        secretaryName,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected ? Colors.deepPurple : Colors.black87,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check, color: Colors.deepPurple)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedSecretary = secretaryId;
+                          _selectedSecretaryName = secretaryName;
+                        });
+                        Navigator.pop(context);
+                        _validateForm();
+                      },
+                    );
+                  }).toList(),
                 ],
               ),
             ),
@@ -365,331 +1151,125 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  Widget _buildDropdownField({
+  // Photo picker methods for guests
+  Future<void> _pickGuestImage(ImageSource source, int guestNumber) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+
+    if (pickedFile != null) {
+      print('📸 Guest $guestNumber image selected: ${pickedFile.path}');
+      
+      // Show uploading state
+      setState(() {
+        _guestUploading[guestNumber] = true;
+      });
+      
+      try {
+        // Upload photo immediately and get S3 URL
+        final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
+        
+        if (result['success']) {
+          final s3Url = result['s3Url'];
+          setState(() {
+            _guestImages[guestNumber] = s3Url;
+            _guestUploading[guestNumber] = false;
+          });
+          
+          print('✅ Guest $guestNumber photo uploaded to S3: $s3Url');
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Guest $guestNumber photo uploaded and validated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          setState(() {
+            _guestUploading[guestNumber] = false;
+          });
+          
+          print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload photo: ${result['message']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _guestUploading[guestNumber] = false;
+        });
+        
+        print('❌ Error uploading guest $guestNumber photo: $e');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeGuestImage(int guestNumber) {
+    setState(() {
+      _guestImages.remove(guestNumber);
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Guest $guestNumber photo removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      controller.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      _validateForm();
+    }
+  }
+
+  Widget _buildTextField({
     required String label,
-    required String value,
-    required bool isRequired,
-    required VoidCallback onTap,
+    required TextEditingController controller,
+    String? placeholder,
+    TextInputType? keyboardType,
+    Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
           children: [
             Text(
               label,
               style: const TextStyle(
-                fontSize: 12,
+            fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF475569), // slate-600 equivalent
-              ),
-            ),
-            if (isRequired)
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(
-                color: const Color(0xFFE2E8F0), // slate-200 equivalent
-              ),
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 1,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF334155), // slate-700 equivalent
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: Color(0xFF94A3B8), // slate-400 equivalent
-                ),
-              ],
-            ),
+            color: Colors.black87,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSecretaryDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Have you been in touch with any secretary regarding your appointment?',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF475569), // slate-600 equivalent
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
-        ),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: () {
-            // TODO: Show secretary picker
-          },
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(
-                color: const Color(0xFFE2E8F0), // slate-200 equivalent
-              ),
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 1,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD1D5DB), Color(0xFF9CA3AF)], // gray-300 to gray-400
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '—',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'None',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF334155), // slate-700 equivalent
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: Color(0xFF94A3B8), // slate-400 equivalent
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPurposeField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Purpose of Meeting',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF475569), // slate-600 equivalent
-              ),
-            ),
-            const Text(
-              ' *',
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          constraints: const BoxConstraints(minHeight: 70),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(
-              color: const Color(0xFFE2E8F0), // slate-200 equivalent
-            ),
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 1,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _purposeController,
-            maxLines: null,
-            expands: false,
-            decoration: const InputDecoration(
-              hintText: 'Please describe the purpose of your meeting in detail',
-              hintStyle: TextStyle(
-                color: Color(0xFF94A3B8), // slate-400 equivalent
-                fontSize: 14,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF334155), // slate-700 equivalent
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAttachmentField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Attachment',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF475569), // slate-600 equivalent
-              ),
-            ),
-            Text(
-              ' (Optional)',
-              style: TextStyle(
-                fontSize: 10,
-                color: const Color(0xFF94A3B8), // slate-400 equivalent
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-                Container(
-          height: 80,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(
-              color: const Color(0xFFE2E8F0), // slate-200 equivalent
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)], // slate-100 to slate-200
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFFCBD5E1), // slate-300 equivalent
-                  ),
-                ),
-                child: const Icon(
-                  Icons.attach_file,
-                  size: 20,
-                  color: Color(0xFF64748B), // slate-500 equivalent
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Upload Document',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF334155), // slate-700 equivalent
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'PDF, DOC, PPT up to 5MB',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B), // slate-500 equivalent
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  border: Border.all(
-                    color: const Color(0xFFE2E8F0), // slate-200 equivalent
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Choose File',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF475569), // slate-600 equivalent
-                  ),
-                ),
-              ),
-            ],
-          ),
+          onChanged: onChanged,
         ),
       ],
     );
@@ -697,202 +1277,124 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   Widget _buildDateField({
     required String label,
-    required DateTime date,
-    required bool isRequired,
-    required VoidCallback onTap,
+    required TextEditingController controller,
+    Function()? onTap,
   }) {
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final dayName = days[date.weekday - 1];
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF475569), // slate-600 equivalent
-              ),
-            ),
-            if (isRequired)
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(
-                color: const Color(0xFFCBD5E1), // slate-300 equivalent
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
               children: [
-                const Icon(
-                  Icons.calendar_today,
-                  size: 20,
-                  color: Color(0xFF64748B), // slate-500 equivalent
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${date.day} ${_getMonthName(date.month)} ${date.year}',
+        Text(
+          label,
                     style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF334155), // slate-700 equivalent
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '($dayName)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: const Color(0xFF64748B), // slate-500 equivalent
-                  ),
-                ),
-              ],
-            ),
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
           ),
-        ),
-      ],
-    );
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return months[month - 1];
-  }
-
-  Widget _buildFormField({
-    required String label,
-    required String value,
-    required bool isRequired,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF3F3F46), // zinc-700 equivalent
-              ),
-            ),
-            if (isRequired)
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-          ],
         ),
         const SizedBox(height: 8),
-        Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF4F4F5), // zinc-100 equivalent
-            border: Border.all(
-              color: const Color(0xFFE4E4E7), // zinc-200 equivalent
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          decoration: InputDecoration(
+            hintText: 'Select date',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-            borderRadius: BorderRadius.circular(8.0),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            suffixIcon: const Icon(Icons.calendar_today),
           ),
-          child: Center(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF52525B), // zinc-600 equivalent
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          onTap: onTap,
         ),
       ],
     );
   }
 
-  Widget _buildAOLTeacherSection() {
+  Widget _buildGuestPhoneFieldWithCountryPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'AOL Teacher:',
+          'Mobile Number',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF3F3F46), // zinc-700 equivalent
+            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: _buildTeacherRadioOption(
-                value: 'no',
-                title: 'No',
-                isSelected: _selectedTeacherStatus == 'no',
-                onTap: () {
-                  setState(() {
-                    _selectedTeacherStatus = 'no';
-                  });
-                },
+            // Country picker button
+        GestureDetector(
+          onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country country) {
+                    setState(() {
+                      _selectedCountry = country;
+                    });
+                  },
+                );
+          },
+          child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+            ),
+            child: Row(
+                  mainAxisSize: MainAxisSize.min,
+              children: [
+                    Text(
+                      '+${_selectedCountry.phoneCode}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 20),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            // Phone number field
             Expanded(
-              child: _buildTeacherRadioOption(
-                value: 'part-time',
-                title: 'Part-time',
-                isSelected: _selectedTeacherStatus == 'part-time',
-                onTap: () {
-                  setState(() {
-                    _selectedTeacherStatus = 'part-time';
-                  });
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildTeacherRadioOption(
-                value: 'full-time',
-                title: 'Full-time',
-                isSelected: _selectedTeacherStatus == 'full-time',
-                onTap: () {
-                  setState(() {
-                    _selectedTeacherStatus = 'full-time';
-                  });
-                },
+              child: TextFormField(
+                controller: _guestPhoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  hintText: 'Enter mobile number',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onChanged: (_) => _validateForm(),
               ),
             ),
           ],
@@ -901,147 +1403,1192 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  Widget _buildTeacherRadioOption({
-    required String value,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? const Color(0xFFECFDF5) // emerald-50 equivalent
-              : Colors.white,
-          border: Border.all(
-            color: isSelected 
-                ? const Color(0xFFBBF7D0) // emerald-200 equivalent
-                : const Color(0xFFE4E4E7), // zinc-200 equivalent
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(8.0),
+  Widget _buildGuestCard(int guestNumber, Map<String, TextEditingController> guest) {
+    // Check if photo is required (age >= 12)
+    final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+    final isPhotoRequired = age >= 12;
+    
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Person $guestNumber',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Name
+            _buildReferenceField(
+              label: 'Name',
+              controller: guest['name']!,
+              placeholder: 'Enter name',
+            ),
+            const SizedBox(height: 12),
+            
+            // Age
+            _buildReferenceField(
+              label: 'Age',
+              controller: guest['age']!,
+              placeholder: 'Enter age',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            
+            // Phone
+            _buildReferenceField(
+              label: 'Phone',
+              controller: guest['phone']!,
+              placeholder: 'Enter phone number',
+              keyboardType: TextInputType.phone,
+            ),
+            
+            // Photo Section (only show if age >= 12)
+            if (isPhotoRequired) ...[
+              const SizedBox(height: 16),
+              
+              // Photo Header
+              Row(
+                children: [
+                  Icon(
+                    Icons.camera_alt,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+            const Text(
+                    'Photo *',
+              style: TextStyle(
+                      fontSize: 16,
+                fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+              ),
+            ),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+        const SizedBox(height: 4),
+              Text(
+                'Photo of the Guest Required for Age 12 years and Above',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // Photo Upload Options
+              Column(
+                children: [
+                  // Upload from Device Card
+                  GestureDetector(
+                    onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                    child: Container(
+                      width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.upload_file,
+                            color: Colors.blue.shade700,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Upload from Device',
+                                  style: TextStyle(
+                fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Choose an existing photo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+          ),
+        ),
+      ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Take Photo Card
+                  GestureDetector(
+                    onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.camera_alt,
+                            color: Colors.blue.shade700,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+                                  'Take Photo',
+              style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+            Text(
+                                  'Use your device camera',
+              style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Show selected image preview
+                  if (_guestImages.containsKey(guestNumber) || _guestUploading[guestNumber] == true) ...[
+                    const SizedBox(height: 16),
+                Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+                        color: _guestUploading[guestNumber] == true 
+                            ? Colors.blue[50] 
+                            : (_guestImages.containsKey(guestNumber) ? Colors.green[50] : Colors.orange[50]),
+                        borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                          color: _guestUploading[guestNumber] == true 
+                              ? Colors.blue[200]! 
+                              : (_guestImages.containsKey(guestNumber) ? Colors.green[200]! : Colors.orange[200]!),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Photo preview and status message
+                          Row(
+            children: [
+              Container(
+                                width: 48,
+                                height: 48,
+                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.grey[200],
+                                ),
+                                child: _guestUploading[guestNumber] == true
+                                    ? const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                        ),
+                                      )
+                                    : _guestImages.containsKey(guestNumber)
+                                        ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(
+                                              _guestImages[guestNumber]!,
+                                              fit: BoxFit.cover,
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return Center(
+                                                  child: CircularProgressIndicator(
+                                                    value: loadingProgress.expectedTotalBytes != null
+                                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                        : null,
+                                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                                                  ),
+                                                );
+                                              },
+                                              errorBuilder: (context, error, stackTrace) {
+                                                print('❌ Error loading accompanying user photo for guest $guestNumber: $error');
+                                                print('❌ Photo URL: ${_guestImages[guestNumber]}');
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[200],
+                                                    borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                                                    Icons.error_outline,
+                                                    color: Colors.red,
+                                                    size: 24,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.warning,
+                                            color: Colors.orange,
+                                            size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                                    if (_guestUploading[guestNumber] == true) ...[
+                    const Text(
+                                        'Uploading photo...',
+                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue,
+                                        ),
+                                      ),
+                                    ] else if (_guestImages.containsKey(guestNumber)) ...[
+                                      const Text(
+                                        'Photo uploaded successfully',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green,
+                                        ),
+                    ),
+                    const SizedBox(height: 2),
+                                      const Text(
+                                        'Guest photo is ready',
+                      style: TextStyle(
+                        fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      const Text(
+                                        'Photo required',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Please upload a photo',
+                  style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+            ],
+          ),
+        ),
+      ],
+                          ),
+                          
+                          // Action buttons (only show if photo is uploaded)
+                          if (_guestImages.containsKey(guestNumber)) ...[
+                            const SizedBox(height: 12),
+                            
+                            Column(
+      children: [
+                                // Upload Different Photo
+                                GestureDetector(
+                                  onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.blue[200]!),
+                                    ),
+                                    child: Row(
+          children: [
+                                        Icon(
+                                          Icons.upload_file,
+                                          color: Colors.blue[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+            Text(
+                                          'Upload Different Photo',
+                                          style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                                            color: Colors.blue[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 6),
+                                
+                                // Take New Photo
+                                GestureDetector(
+                                  onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.orange[200]!),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.orange[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Take New Photo',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                                            color: Colors.orange[700],
+                ),
+              ),
+          ],
+        ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 6),
+                                
+                                // Remove Photo
+        GestureDetector(
+                                  onTap: () => _removeGuestImage(guestNumber),
+          child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+                                      color: Colors.red[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.red[200]!),
+            ),
+            child: Row(
+              children: [
+                                        Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red[700],
+                                          size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                                          'Remove Photo',
+                  style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.red[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Edit Appointment'),
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Appointment Type Display at Top
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _isGuestAppointment ? Colors.green.shade50 : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _isGuestAppointment ? Colors.green.shade200 : Colors.blue.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+                                  Icon(
+                                    _isGuestAppointment ? Icons.person : Icons.person_outline,
+                                    color: _isGuestAppointment ? Colors.green.shade700 : Colors.blue.shade700,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+            Text(
+                                    'Appointment Type: ${_isGuestAppointment ? 'Guest' : 'Myself'}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: _isGuestAppointment ? Colors.green.shade700 : Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isGuestAppointment 
+                                    ? 'Editing appointment for a guest'
+                                    : 'Editing your personal appointment',
+                style: TextStyle(
+                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                ),
+              ),
+          ],
+        ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Reference Information Section (for guest appointments)
+                        if (_isGuestAppointment) ...[
+        Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                                color: Colors.blue.shade200,
+                                width: 1,
+            ),
+          ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                                const Text(
+                                  'Reference Information',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _isLoadingReferenceInfo 
+                                      ? 'Loading your information...'
+                                      : 'Your reference details',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                
+                                // Show loading state or reference fields
+                                if (_isLoadingReferenceInfo) ...[
+                                  const Center(
+                                    child: Column(
+                                      children: [
+                                        CircularProgressIndicator(
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                        ),
+                                        SizedBox(height: 12),
+                                        Text(
+                                          'Loading your information...',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+                                ] else ...[
+                                  // Reference Name
+                                  _buildReferenceField(
+                                    label: 'Reference Name',
+                                    controller: _referenceNameController,
+                                    placeholder: 'Your name',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  
+                                  // Reference Email
+                                  _buildReferenceField(
+                                    label: 'Reference Email',
+                                    controller: _referenceEmailController,
+                                    placeholder: 'Your email',
+                                    keyboardType: TextInputType.emailAddress,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  
+                                  // Reference Phone
+                                  _buildReferenceField(
+                                    label: 'Reference Phone',
+                                    controller: _referencePhoneController,
+                                    placeholder: 'Your phone number',
+                                    keyboardType: TextInputType.phone,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          // Guest Information Section
+        const Text(
+                            'Guest Information',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Edit the details of the person you are requesting the appointment for',
+          style: TextStyle(
+            fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Guest Full Name
+                          _buildReferenceField(
+                            label: 'Full Name of the Guest',
+                            controller: _guestNameController,
+                            placeholder: 'Enter guest\'s full name',
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Email
+                          _buildReferenceField(
+                            label: 'Email ID of the Guest',
+                            controller: _guestEmailController,
+                            placeholder: 'guest@email.com',
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Mobile
+                          _buildGuestPhoneFieldWithCountryPicker(),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Designation
+                          _buildReferenceField(
+                            label: 'Designation',
+                            controller: _guestDesignationController,
+                            placeholder: 'Guest\'s professional title',
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Company/Organization
+                          _buildReferenceField(
+                            label: 'Company/Organization',
+                            controller: _guestCompanyController,
+                            placeholder: 'Guest\'s organization name',
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Location
+                          _buildReferenceField(
+                            label: 'Location',
+                            controller: _guestLocationController,
+                            placeholder: 'Guest\'s location',
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          // Guest Photo Section
+        Row(
+          children: [
+                              Icon(
+                                Icons.camera_alt,
+                                color: Colors.blue.shade700,
+                                size: 20,
+            ),
+            const SizedBox(width: 8),
+                              const Text(
+                                'Guest Photo',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Required for guests 12+ years old - Divine pic validation',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Guest Photo Status
+                          if (_isMainGuestPhotoUploading) ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue[200]!),
+                              ),
+                              child: const Row(
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+            Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Uploading photo...',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Please wait while we process your photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (_mainGuestPhotoUrl != null) ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green[200]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.grey[200],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        _mainGuestPhotoUrl!,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress.expectedTotalBytes != null
+                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                  : null,
+                                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          print('❌ Error loading main guest photo: $error');
+                                          print('❌ Photo URL: $_mainGuestPhotoUrl');
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(
+                                              Icons.error_outline,
+                                              color: Colors.red,
+                                              size: 24,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Photo uploaded successfully',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Guest photo is ready',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+              ),
+            ),
+          ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Action buttons for main guest photo
+                            const SizedBox(height: 12),
+                            Column(
+                              children: [
+                                // Upload Different Photo
+                                GestureDetector(
+                                  onTap: () => _pickMainGuestImage(ImageSource.gallery),
+      child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+                                      color: Colors.blue[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.blue[200]!),
+                                    ),
           child: Row(
             children: [
-              // Radio Button
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected 
-                        ? const Color(0xFF10B981) // emerald-500 equivalent
-                        : const Color(0xFFD4D4D8), // zinc-300 equivalent
-                    width: 2,
-                  ),
-                  color: isSelected 
-                      ? const Color(0xFF10B981) // emerald-500 equivalent
-                      : Colors.white,
-                ),
-                child: isSelected
-                    ? Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 8),
-              
-              // Title
-              Expanded(
-                child: Text(
-                  title,
+                                        Icon(
+                                          Icons.upload_file,
+                                          color: Colors.blue[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Upload Different Photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.blue[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 6),
+                                
+                                // Take New Photo
+                                GestureDetector(
+                                  onTap: () => _pickMainGuestImage(ImageSource.camera),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.orange[200]!),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.orange[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Take New Photo',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: isSelected 
-                        ? const Color(0xFF064E3B) // emerald-900 equivalent
-                        : const Color(0xFF52525B), // zinc-700 equivalent
-                  ),
+                                            color: Colors.orange[700],
                 ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildRadioOption({
-    required String value,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
+                                
+                                const SizedBox(height: 6),
+                                
+                                // Remove Photo
+                                GestureDetector(
+                                  onTap: _removeMainGuestImage,
       child: Container(
-        height: 48,
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? const Color(0xFFFEF3C7) // orange-50 equivalent
-              : Colors.white,
-          border: Border.all(
-            color: isSelected 
-                ? const Color(0xFFFDBA74) // orange-300 equivalent
-                : const Color(0xFFE2E8F0), // slate-200 equivalent
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                      color: Colors.red[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.red[200]!),
+                                    ),
           child: Row(
             children: [
-              // Radio Button
+                                        Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red[700],
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Remove Photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.red[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
               Container(
-                width: 20,
-                height: 20,
+                              padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected 
-                        ? const Color(0xFFF97316) // orange-500 equivalent
-                        : const Color(0xFFCBD5E1), // slate-300 equivalent
-                    width: 2,
-                  ),
-                  color: isSelected 
-                      ? const Color(0xFFF97316) // orange-500 equivalent
-                      : Colors.white,
-                ),
-                child: isSelected
-                    ? const Icon(
-                        Icons.check,
-                        size: 12,
-                        color: Colors.white,
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              
-              // Title
+                                color: Colors.orange[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange[200]!),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.warning,
+                                    color: Colors.orange,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Photo required for guests 12+ years old',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Please upload a photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Upload buttons when no photo exists
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
               Expanded(
-                child: Text(
-                  title,
+                                  child: GestureDetector(
+                                    onTap: () => _pickMainGuestImage(ImageSource.gallery),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue[50],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.blue[200]!),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.upload_file,
+                                            color: Colors.blue[700],
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Upload Photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.blue[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _pickMainGuestImage(ImageSource.camera),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange[50],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.orange[200]!),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.camera_alt,
+                                            color: Colors.orange[700],
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Take Photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.orange[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                        ],
+
+                        // Header for Appointment Details
+                        const Text(
+                          'Appointment Details',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Edit details about your requested appointment',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Appointment Purpose
+                        _buildTextArea(
+                          label: 'Appointment Purpose',
+                          controller: _appointmentPurposeController,
+                          placeholder: 'Please describe the purpose of your appointment in detail',
+                          onChanged: (value) => _validateForm(),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Appointment Location
+                        _buildLocationField(),
+                        const SizedBox(height: 20),
+
+                        // Secretary Contact
+                        _buildSecretaryField(),
+                        const SizedBox(height: 20),
+
+                        // Number of People
+                        _buildTextField(
+                          label: 'Number of People',
+                          controller: _numberOfUsersController,
+                          placeholder: 'Number of people (including yourself)',
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) => _validateForm(),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Guest Information Cards (for accompanying users)
+                        if (_guestControllers.isNotEmpty) ...[
+                          const Text(
+                            'Additional Person Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Please provide details for additional persons',
                   style: TextStyle(
                     fontSize: 14,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ..._guestControllers.asMap().entries.map((entry) {
+                            int index = entry.key;
+                            Map<String, TextEditingController> guest = entry.value;
+                            return _buildGuestCard(index + 1, guest);
+                          }).toList(),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Date Range Section
+                        const Text(
+                          'Select your preferred date range *',
+                          style: TextStyle(
+                            fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isSelected 
-                        ? const Color(0xFF9A3412) // orange-800 equivalent
-                        : const Color(0xFF475569), // slate-600 equivalent
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // From Date
+                        _buildDateField(
+                          label: 'From Date',
+                          controller: _fromDateController,
+                          onTap: () => _selectDate(context, _fromDateController),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // To Date
+                        _buildDateField(
+                          label: 'To Date',
+                          controller: _toDateController,
+                          onTap: () => _selectDate(context, _toDateController),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Save Changes Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isFormValid && !_isSaving ? _saveAppointment : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: _isSaving
+                                ? const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text('Saving Changes...'),
+                                    ],
+                                  )
+                                : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ],
           ),
         ),
       ),
