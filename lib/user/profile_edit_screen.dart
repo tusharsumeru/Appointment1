@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -29,8 +28,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   
-  // Photo upload state (bytes for cross-platform support incl. web)
-  Uint8List? _selectedImageBytes;
+  // Photo upload state
+  File? _selectedImageFile;
   bool _isUploadingPhoto = false;
   String? _uploadedPhotoUrl;
   bool _isLoading = false;
@@ -219,154 +218,48 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
   }
 
-  // Photo upload functions with validation and S3 upload
+  // Photo upload functions with validation and S3 upload (same as appointment details screen)
   Future<void> _pickImage(ImageSource source) async {
+    print('📸 Starting profile photo pick process...');
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
-    
+
     if (pickedFile != null) {
-      final bytes = await pickedFile.readAsBytes();
-      
-      // Validate file size before uploading
-      if (bytes.length > 5 * 1024 * 1024) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('File size must be less than 5MB'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
+      print('📸 Profile image selected: ${pickedFile.path}');
+      print('📸 File size: ${await File(pickedFile.path).length()} bytes');
 
-      // Validate file extension
-      final originalName = pickedFile.name;
-      final extension = originalName.split('.').last.toLowerCase();
-      final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
-      if (!allowedExtensions.contains(extension)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Only JPG, PNG, and GIF files are allowed'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      
+      // Store the selected file for later upload with profile update
       setState(() {
-        _selectedImageBytes = bytes;
-        _isUploadingPhoto = true; // Start uploading immediately
-      });
-      
-      // Generate a proper filename with timestamp
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'profile_photo_$timestamp.$extension';
-      
-      print('🔍 Debug - Original file name: $originalName');
-      print('🔍 Debug - Generated file name: $fileName');
-      print('🔍 Debug - Starting upload for file: $fileName, size: ${bytes.length} bytes');
-      
-      // Validate and upload photo to S3 immediately
-      await _uploadPhotoToS3(bytes, fileName);
-    }
-  }
-
-  // Upload photo to S3
-  Future<void> _uploadPhotoToS3(Uint8List imageBytes, String fileName) async {
-    try {
-      // Show loading message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Uploading photo...'),
-          backgroundColor: Colors.blue,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      // Call ActionService method
-      final result = await ActionService.validateAndUploadProfilePhoto(
-        imageBytes: imageBytes,
-        fileName: fileName,
-      );
-
-      print('🔍 Debug - Upload result: $result');
-      print('🔍 Debug - Success value: ${result['success']}');
-      print('🔍 Debug - Data: ${result['data']}');
-
-      setState(() {
+        _selectedImageFile = File(pickedFile.path);
         _isUploadingPhoto = false;
       });
 
-      final success = result['success'];
-      if (success == true) {
-        // Upload successful
-        final data = result['data'];
-        String? uploadedUrl;
-        if (data != null) {
-          // Try different possible field names for the URL
-          uploadedUrl = data['s3Url'] ?? data['url'] ?? data['imageUrl'] ?? data['photoUrl'];
-        }
-        
-        print('🔍 Debug - Uploaded URL: $uploadedUrl');
-        
-        // Update state to show uploaded image
-        setState(() {
-          _selectedImageBytes = null;
-          _uploadedPhotoUrl = uploadedUrl;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Photo uploaded successfully!'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } else {
-        // Upload failed
-        setState(() {
-          _selectedImageBytes = null;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to upload photo'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (error) {
-      setState(() {
-        _isUploadingPhoto = false;
-        _selectedImageBytes = null;
-      });
-      
+      print('💾 Profile photo file stored for later upload');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading photo: $error'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
+          content: Text('Photo selected! Click "Save Changes" to upload.'),
+          backgroundColor: Colors.blue,
         ),
       );
+    } else {
+      print('⚠️ No image selected for profile');
     }
   }
-
-  
 
   void _removeImage() {
     setState(() {
-      _selectedImageBytes = null;
+      _selectedImageFile = null;
       _uploadedPhotoUrl = null;
       _isUploadingPhoto = false;
     });
+    
+    print('🗑️ Profile photo removed');
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Photo removed'),
         backgroundColor: Colors.orange,
-        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -412,412 +305,440 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       ),
                       child: Column(
                         children: [
-                          // Current Profile Photo Display
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.lightGreen.shade300,
-                                width: 2,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child: Builder(
-                                builder: (context) {
-                                  print('🔍 Debug - Image display logic:');
-                                  print('🔍 Debug - _selectedImageBytes: ${_selectedImageBytes != null}');
-                                  print('🔍 Debug - _uploadedPhotoUrl: $_uploadedPhotoUrl');
-                                  print('🔍 Debug - widget.userData profilePhoto: ${widget.userData?['profilePhoto']}');
-                                  
-                                  if (_selectedImageBytes != null) {
-                                    return Image.memory(
-                                      _selectedImageBytes!,
-                                      fit: BoxFit.cover,
-                                    );
-                                  } else if (_uploadedPhotoUrl != null) {
-                                    return Image.network(
-                                      _uploadedPhotoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('🔍 Debug - Network image error: $error');
-                                        return Container(
-                                          color: Colors.lightGreen.shade50,
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 60,
-                                            color: Colors.green,
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  } else if (widget.userData?['profilePhoto'] != null) {
-                                    return Image.network(
-                                      widget.userData!['profilePhoto'],
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.lightGreen.shade50,
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 60,
-                                            color: Colors.green,
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  } else {
-                                    return Container(
-                                      color: Colors.lightGreen.shade50,
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 60,
-                                        color: Colors.green,
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
+                                                     // Profile Photo Display
+                           Container(
+                             width: 120,
+                             height: 120,
+                             decoration: BoxDecoration(
+                               shape: BoxShape.circle,
+                               border: Border.all(
+                                 color: Colors.lightGreen.shade300,
+                                 width: 2,
+                               ),
+                             ),
+                                                            child: ClipOval(
+                                 child: Builder(
+                                   builder: (context) {
+                                     if (_selectedImageFile != null) {
+                                       return Image.file(
+                                         _selectedImageFile!,
+                                         fit: BoxFit.cover,
+                                         errorBuilder: (context, error, stackTrace) {
+                                           return Container(
+                                             color: Colors.lightGreen.shade50,
+                                             child: const Icon(
+                                               Icons.person,
+                                               size: 60,
+                                               color: Colors.green,
+                                             ),
+                                           );
+                                         },
+                                       );
+                                     } else if (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty) {
+                                       return Image.network(
+                                         _uploadedPhotoUrl!,
+                                         fit: BoxFit.cover,
+                                         errorBuilder: (context, error, stackTrace) {
+                                           return Container(
+                                             color: Colors.lightGreen.shade50,
+                                             child: const Icon(
+                                               Icons.person,
+                                               size: 60,
+                                               color: Colors.green,
+                                             ),
+                                           );
+                                         },
+                                       );
+                                     } else {
+                                       return Container(
+                                         color: Colors.lightGreen.shade50,
+                                         child: const Icon(
+                                           Icons.person,
+                                           size: 60,
+                                           color: Colors.green,
+                                         ),
+                                       );
+                                     }
+                                   },
+                                 ),
+                               ),
+                           ),
                           const SizedBox(height: 12),
                           
-                          // Current Profile Photo Text
-                          Text(
-                            _selectedImageBytes != null 
-                                ? 'Selected Photo (Not Uploaded)'
-                                : _uploadedPhotoUrl != null
-                                    ? 'Uploaded Profile Photo'
-                                    : 'Current Profile Photo',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          
-                          Text(
-                            _selectedImageBytes != null 
-                                ? 'Photo selected, click upload to save'
-                                : _uploadedPhotoUrl != null
-                                    ? 'Successfully uploaded to server'
-                                    : 'Profile photo from server',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.green.shade600,
-                            ),
-                          ),
+                                                     // Profile Photo Status Text
+                           Text(
+                             _selectedImageFile != null
+                                 ? 'New Photo Selected'
+                                 : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
+                                     ? 'Uploaded Profile Photo'
+                                     : 'No Profile Photo',
+                             style: TextStyle(
+                               fontSize: 16,
+                               fontWeight: FontWeight.bold,
+                               color: Colors.green.shade700,
+                             ),
+                           ),
+                           const SizedBox(height: 4),
+                           
+                           Text(
+                             _selectedImageFile != null
+                                 ? 'Click "Save Changes" to upload'
+                                 : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
+                                     ? 'Successfully uploaded to server'
+                                     : 'Upload a profile photo',
+                             style: TextStyle(
+                               fontSize: 14,
+                               color: Colors.green.shade600,
+                             ),
+                           ),
                           const SizedBox(height: 20),
                           
-                          // Photo Upload Options
-                          Column(
-                            children: [
-                              // Upload from Device Card
-                              GestureDetector(
-                                onTap: () => _pickImage(ImageSource.gallery),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey.shade300),
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.upload_file,
-                                        color: Colors.blue.shade700,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Upload from Device',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Choose an existing photo',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              
-                              // Take Photo Card
-                              GestureDetector(
-                                onTap: () => _pickImage(ImageSource.camera),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey.shade300),
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.blue.shade700,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Take Photo',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Use your device camera',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              
-                              // Show selected image preview
-                              if (_selectedImageBytes != null) ...[
-                                const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: _isUploadingPhoto 
-                                        ? Colors.blue[50] 
-                                        : (_uploadedPhotoUrl != null ? Colors.green[50] : Colors.orange[50]),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _isUploadingPhoto 
-                                          ? Colors.blue[200]! 
-                                          : (_uploadedPhotoUrl != null ? Colors.green[200]! : Colors.orange[200]!),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Photo preview and status message
-                                      Row(
-                                        children: [
-                                          Container(
-                                            width: 48,
-                                            height: 48,
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(8),
-                                              image: DecorationImage(
-                                                image: MemoryImage(_selectedImageBytes!),
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                if (_isUploadingPhoto) ...[
-                                                  const Text(
-                                                    'Uploading photo...',
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.blue,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  const SizedBox(
-                                                    width: 20,
-                                                    height: 20,
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                                                    ),
-                                                  ),
-                                                ] else if (_uploadedPhotoUrl != null) ...[
-                                                  const Text(
-                                                    'Photo uploaded and validated successfully',
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.green,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    'S3 URL: ${_uploadedPhotoUrl!.substring(0, 50)}...',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                ] else ...[
-                                                  const Text(
-                                                    'Photo selected but not uploaded',
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.orange,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    'Tap to remove',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      
-                                      // Show action buttons after successful upload
-                                      if (_uploadedPhotoUrl != null) ...[
-                                        const SizedBox(height: 12),
-                                        
-                                        // Action buttons - one below the other
-                                        Column(
-                                          children: [
-                                            // Upload Different Photo
-                                            GestureDetector(
-                                              onTap: () => _pickImage(ImageSource.gallery),
-                                              child: Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blue[50],
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.blue[200]!),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.upload_file,
-                                                      color: Colors.blue[700],
-                                                      size: 16,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      'Upload Different Photo',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w500,
-                                                        color: Colors.blue[700],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            
-                                            const SizedBox(height: 6),
-                                            
-                                            // Take New Photo
-                                            GestureDetector(
-                                              onTap: () => _pickImage(ImageSource.camera),
-                                              child: Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange[50],
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.orange[200]!),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.camera_alt,
-                                                      color: Colors.orange[700],
-                                                      size: 16,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      'Take New Photo',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w500,
-                                                        color: Colors.orange[700],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            
-                                            const SizedBox(height: 6),
-                                            
-                                            // Remove Photo
-                                            GestureDetector(
-                                              onTap: _removeImage,
-                                              child: Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.red[50],
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.red[200]!),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.delete_outline,
-                                                      color: Colors.red[700],
-                                                      size: 16,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      'Remove Photo',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w500,
-                                                        color: Colors.red[700],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                                                     // Photo Upload Options
+                           Column(
+                             children: [
+                               // Upload from Device Card
+                               GestureDetector(
+                                 onTap: () => _pickImage(ImageSource.gallery),
+                                 child: Container(
+                                   width: double.infinity,
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     border: Border.all(color: Colors.grey.shade300),
+                                     borderRadius: BorderRadius.circular(12),
+                                     color: Colors.white,
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       Icon(
+                                         Icons.upload_file,
+                                         color: Colors.blue.shade700,
+                                         size: 32,
+                                       ),
+                                       const SizedBox(width: 16),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Upload from Device',
+                                               style: TextStyle(
+                                                 fontSize: 16,
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.black87,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 4),
+                                             Text(
+                                               'Choose an existing photo',
+                                               style: TextStyle(
+                                                 fontSize: 14,
+                                                 color: Colors.grey.shade600,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                               const SizedBox(height: 12),
+                               
+                               // Take Photo Card
+                               GestureDetector(
+                                 onTap: () => _pickImage(ImageSource.camera),
+                                 child: Container(
+                                   width: double.infinity,
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     border: Border.all(color: Colors.grey.shade300),
+                                     borderRadius: BorderRadius.circular(12),
+                                     color: Colors.white,
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       Icon(
+                                         Icons.camera_alt,
+                                         color: Colors.blue.shade700,
+                                         size: 32,
+                                       ),
+                                       const SizedBox(width: 16),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Take Photo',
+                                               style: TextStyle(
+                                                 fontSize: 16,
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.black87,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 4),
+                                             Text(
+                                               'Use your device camera',
+                                               style: TextStyle(
+                                                 fontSize: 14,
+                                                 color: Colors.grey.shade600,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                               
+                               // Show upload status
+                               if (_isUploadingPhoto) ...[
+                                 const SizedBox(height: 16),
+                                 Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: Colors.blue[50],
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(color: Colors.blue[200]!),
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       SizedBox(
+                                         width: 20,
+                                         height: 20,
+                                         child: CircularProgressIndicator(
+                                           strokeWidth: 2,
+                                           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Uploading and validating photo...',
+                                               style: TextStyle(
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.blue,
+                                                 fontSize: 14,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 2),
+                                             Text(
+                                               'Please wait',
+                                               style: TextStyle(
+                                                 fontSize: 12,
+                                                 color: Colors.grey[600],
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
+                               
+                               // Show photo preview (either selected file or uploaded URL)
+                               if (_selectedImageFile != null || (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty)) ...[
+                                 const SizedBox(height: 16),
+                                 Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: Colors.green[50],
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(color: Colors.green[200]!),
+                                   ),
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       // Photo preview and success message
+                                       Row(
+                                         children: [
+                                           Container(
+                                             width: 48,
+                                             height: 48,
+                                             decoration: BoxDecoration(
+                                               borderRadius: BorderRadius.circular(8),
+                                               color: Colors.grey[200],
+                                             ),
+                                             child: ClipRRect(
+                                               borderRadius: BorderRadius.circular(8),
+                                               child: _selectedImageFile != null
+                                                   ? Image.file(
+                                                       _selectedImageFile!,
+                                                       fit: BoxFit.cover,
+                                                       errorBuilder: (context, error, stackTrace) {
+                                                         return const Icon(
+                                                           Icons.check_circle,
+                                                           color: Colors.green,
+                                                           size: 24,
+                                                         );
+                                                       },
+                                                     )
+                                                   : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
+                                                       ? Image.network(
+                                                           _uploadedPhotoUrl!,
+                                                           fit: BoxFit.cover,
+                                                           errorBuilder: (context, error, stackTrace) {
+                                                             return const Icon(
+                                                               Icons.check_circle,
+                                                               color: Colors.green,
+                                                               size: 24,
+                                                             );
+                                                           },
+                                                         )
+                                                       : const Icon(
+                                                           Icons.check_circle,
+                                                           color: Colors.green,
+                                                           size: 24,
+                                                         ),
+                                             ),
+                                           ),
+                                           const SizedBox(width: 12),
+                                           Expanded(
+                                             child: Column(
+                                               crossAxisAlignment: CrossAxisAlignment.start,
+                                               children: [
+                                                 Text(
+                                                   _selectedImageFile != null
+                                                       ? 'Photo selected for upload'
+                                                       : 'Photo uploaded successfully',
+                                                   style: TextStyle(
+                                                     fontWeight: FontWeight.w600,
+                                                     color: Colors.green,
+                                                     fontSize: 14,
+                                                   ),
+                                                 ),
+                                                 const SizedBox(height: 2),
+                                                 Text(
+                                                   _selectedImageFile != null
+                                                       ? 'File: ${_selectedImageFile!.path.split('/').last}'
+                                                       : 'S3 URL: ${_uploadedPhotoUrl!.isNotEmpty ? _uploadedPhotoUrl!.substring(0, 30) + '...' : 'N/A'}',
+                                                   style: TextStyle(
+                                                     fontSize: 12,
+                                                     color: Colors.grey[600],
+                                                   ),
+                                                 ),
+                                               ],
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                       
+                                       const SizedBox(height: 12),
+                                       
+                                       // Action buttons - one below the other
+                                       Column(
+                                         children: [
+                                           // Upload Different Photo
+                                           GestureDetector(
+                                             onTap: () => _pickImage(ImageSource.gallery),
+                                             child: Container(
+                                               width: double.infinity,
+                                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                               decoration: BoxDecoration(
+                                                 color: Colors.blue[50],
+                                                 borderRadius: BorderRadius.circular(6),
+                                                 border: Border.all(color: Colors.blue[200]!),
+                                               ),
+                                               child: Row(
+                                                 children: [
+                                                   Icon(
+                                                     Icons.upload_file,
+                                                     color: Colors.blue[700],
+                                                     size: 16,
+                                                   ),
+                                                   const SizedBox(width: 8),
+                                                   Text(
+                                                     'Upload Different Photo',
+                                                     style: TextStyle(
+                                                       fontSize: 12,
+                                                       fontWeight: FontWeight.w500,
+                                                       color: Colors.blue[700],
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ),
+                                           ),
+                                           
+                                           const SizedBox(height: 6),
+                                           
+                                           // Take New Photo
+                                           GestureDetector(
+                                             onTap: () => _pickImage(ImageSource.camera),
+                                             child: Container(
+                                               width: double.infinity,
+                                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                               decoration: BoxDecoration(
+                                                 color: Colors.orange[50],
+                                                 borderRadius: BorderRadius.circular(6),
+                                                 border: Border.all(color: Colors.orange[200]!),
+                                               ),
+                                               child: Row(
+                                                 children: [
+                                                   Icon(
+                                                     Icons.camera_alt,
+                                                     color: Colors.orange[700],
+                                                     size: 16,
+                                                   ),
+                                                   const SizedBox(width: 8),
+                                                   Text(
+                                                     'Take New Photo',
+                                                     style: TextStyle(
+                                                       fontSize: 12,
+                                                       fontWeight: FontWeight.w500,
+                                                       color: Colors.orange[700],
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ),
+                                           ),
+                                           
+                                           const SizedBox(height: 6),
+                                           
+                                           // Remove Photo
+                                           GestureDetector(
+                                             onTap: _removeImage,
+                                             child: Container(
+                                               width: double.infinity,
+                                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                               decoration: BoxDecoration(
+                                                 color: Colors.red[50],
+                                                 borderRadius: BorderRadius.circular(6),
+                                                 border: Border.all(color: Colors.red[200]!),
+                                               ),
+                                               child: Row(
+                                                 children: [
+                                                   Icon(
+                                                     Icons.delete_outline,
+                                                     color: Colors.red[700],
+                                                     size: 16,
+                                                   ),
+                                                   const SizedBox(width: 8),
+                                                   Text(
+                                                     'Remove Photo',
+                                                     style: TextStyle(
+                                                       fontSize: 12,
+                                                       fontWeight: FontWeight.w500,
+                                                       color: Colors.red[700],
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
+                             ],
+                           ),
                         ],
                       ),
                     ),
@@ -1564,27 +1485,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       
 
 
-      // Convert Uint8List to File if image is selected
-      File? profilePhotoFile;
-      if (_selectedImageBytes != null) {
-        // Create a temporary file
-        final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/profile_photo_${DateTime.now().millisecondsSinceEpoch}.jpg');
-        await tempFile.writeAsBytes(_selectedImageBytes!);
-        profilePhotoFile = tempFile;
-      }
-
-      // Call ActionService to update profile
-      final result = await ActionService.updateUserProfile(
-        fullName: _fullNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phoneNumber: fullPhoneNumber,
-        designation: _designationController.text.trim(),
-        company: _companyController.text.trim(),
-        full_address: _locationController.text.trim(),
-        userTags: selectedRoles,
-        profilePhotoFile: profilePhotoFile,
-      );
+             // Call ActionService to update profile
+       final result = await ActionService.updateUserProfile(
+         fullName: _fullNameController.text.trim(),
+         email: _emailController.text.trim(),
+         phoneNumber: fullPhoneNumber,
+         designation: _designationController.text.trim(),
+         company: _companyController.text.trim(),
+         full_address: _locationController.text.trim(),
+         userTags: selectedRoles,
+         profilePhotoFile: _selectedImageFile, // Pass the selected file for upload
+       );
 
       setState(() {
         _isLoading = false;
@@ -1600,6 +1511,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           ),
         );
         
+        // Clear selected file after successful upload
+        setState(() {
+          _selectedImageFile = null;
+        });
+        
         // Navigate back with updated data
     final updatedData = {
       'fullName': _fullNameController.text,
@@ -1609,7 +1525,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       'company': _companyController.text,
       'location': _locationController.text,
           'selectedRoles': selectedRoles,
-          'profilePhotoUrl': _uploadedPhotoUrl,
+          'profilePhoto': result['data']?['profilePhoto'] ?? _uploadedPhotoUrl, // Use the updated profile photo from response
         };
         
         Navigator.pop(context, updatedData);
