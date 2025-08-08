@@ -1022,17 +1022,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (result != null) {
-      setState(() {
-        _userData = {...?_userData, ...result};
-      });
-
-      _fullNameController.text = result['fullName'] ?? _fullNameController.text;
-      _emailController.text = result['email'] ?? _emailController.text;
-      _phoneController.text = result['phoneNumber'] ?? _phoneController.text;
-      _designationController.text =
-          result['designation'] ?? _designationController.text;
-      _companyController.text = result['company'] ?? _companyController.text;
-      _locationController.text = result['location'] ?? _locationController.text;
+      // Refresh user data from API to get the most up-to-date information
+      try {
+        final apiResult = await ActionService.getCurrentUser();
+        if (apiResult['success'] == true) {
+          setState(() {
+            _userData = apiResult['data'];
+          });
+          
+          // Update form controllers with fresh data
+          _fullNameController.text = _userData?['fullName'] ?? _userData?['name'] ?? '';
+          _emailController.text = _userData?['email'] ?? '';
+          
+          // Handle phone number mapping
+          final dynamic phoneField = _userData?['phoneNumber'] ?? _userData?['phone'];
+          String phoneText = '';
+          if (phoneField is Map) {
+            final cc = (phoneField['countryCode'] ?? '').toString();
+            final num = (phoneField['number'] ?? '').toString();
+            phoneText = '$cc $num';
+          } else if (phoneField is String) {
+            phoneText = phoneField;
+          }
+          _phoneController.text = phoneText;
+          
+          _designationController.text = _userData?['designation'] ?? '';
+          _companyController.text = _userData?['company'] ?? '';
+          
+          // Handle location mapping
+          final dynamic fullAddress = _userData?['full_address'];
+          String locationText = '';
+          if (fullAddress is Map) {
+            locationText = (fullAddress['street'] ?? '').toString();
+          }
+          if (locationText.isEmpty) {
+            locationText = (_userData?['location'] ?? '').toString();
+          }
+          _locationController.text = locationText;
+        }
+      } catch (error) {
+        print('Error refreshing user data after edit: $error');
+        // Fallback to using returned data if API refresh fails
+        setState(() {
+          _userData = {...?_userData, ...result};
+        });
+        
+        _fullNameController.text = result['fullName'] ?? _fullNameController.text;
+        _emailController.text = result['email'] ?? _emailController.text;
+        _phoneController.text = result['phoneNumber'] ?? _phoneController.text;
+        _designationController.text = result['designation'] ?? _designationController.text;
+        _companyController.text = result['company'] ?? _companyController.text;
+        _locationController.text = result['location'] ?? _locationController.text;
+      }
     }
   }
 }
