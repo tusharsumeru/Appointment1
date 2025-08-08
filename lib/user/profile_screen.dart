@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../action/storage_service.dart';
 import 'profile_edit_screen.dart';
 import 'user_sidebar.dart';
+import '../action/action.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -39,34 +40,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _loadUserData() async {
+    Future<void> _loadUserData() async {
     try {
-      final userData = await StorageService.getUserData();
-      setState(() {
-        _userData = userData;
-        _isLoading = false;
-      });
+      // Only fetch fresh data from API
+      final apiResult = await ActionService.getCurrentUser();
       
-      // Set initial values for form fields
-      _fullNameController.text = userData?['fullName'] ?? userData?['name'] ?? 'Kaveri B';
-      _emailController.text = userData?['email'] ?? 'kaveri@sumerudigital.com';
-      _phoneController.text = userData?['phoneNumber'] ?? userData?['phone'] ?? '+919347653480';
-      _designationController.text = userData?['designation'] ?? 'Office Operations Specialist';
-      _companyController.text = userData?['company'] ?? 'Sumeru Digital';
-      _locationController.text = userData?['location'] ?? 'Coimbatore, Tamil Nadu, India';
+      if (apiResult['success'] == true) {
+        final freshUserData = apiResult['data'];
+        
+        // Update cached data in StorageService (for other parts of app)
+        await StorageService.saveUserData(freshUserData);
+        
+        setState(() {
+          _userData = freshUserData;
+          _isLoading = false;
+        });
+        
+        // Set initial values for form fields from fresh data
+        _fullNameController.text = freshUserData?['fullName'] ?? freshUserData?['name'] ?? '';
+        _emailController.text = freshUserData?['email'] ?? '';
+        
+        // Handle phone number mapping
+        final dynamic phoneField = freshUserData?['phoneNumber'] ?? freshUserData?['phone'];
+        String phoneText = '';
+        if (phoneField is Map) {
+          final cc = (phoneField['countryCode'] ?? '').toString();
+          final num = (phoneField['number'] ?? '').toString();
+          phoneText = '$cc $num';
+        } else if (phoneField is String) {
+          phoneText = phoneField;
+        }
+        _phoneController.text = phoneText;
+        
+        _designationController.text = freshUserData?['designation'] ?? '';
+        _companyController.text = freshUserData?['company'] ?? '';
+        
+        // Handle location mapping
+        final dynamic fullAddress = freshUserData?['full_address'];
+        String locationText = '';
+        if (fullAddress is Map) {
+          locationText = (fullAddress['street'] ?? '').toString();
+        }
+        if (locationText.isEmpty) {
+          locationText = (freshUserData?['location'] ?? '').toString();
+        }
+        _locationController.text = locationText;
+        
+      } else {
+        // API failed - show error and empty state
+        setState(() {
+          _userData = null;
+          _isLoading = false;
+        });
+        
+        // Clear form fields
+        _fullNameController.text = '';
+        _emailController.text = '';
+        _phoneController.text = '';
+        _designationController.text = '';
+        _companyController.text = '';
+        _locationController.text = '';
+        
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load profile: ${apiResult['message']}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (error) {
       print('Error loading user data: $error');
+      
+      // Network error - show error and empty state
       setState(() {
+        _userData = null;
         _isLoading = false;
       });
       
-      // Set default values if data loading fails
-      _fullNameController.text = 'Kaveri B';
-      _emailController.text = 'kaveri@sumerudigital.com';
-      _phoneController.text = '+919347653480';
-      _designationController.text = 'Office Operations Specialist';
-      _companyController.text = 'Sumeru Digital';
-      _locationController.text = 'Coimbatore, Tamil Nadu, India';
+      // Clear form fields
+      _fullNameController.text = '';
+      _emailController.text = '';
+      _phoneController.text = '';
+      _designationController.text = '';
+      _companyController.text = '';
+      _locationController.text = '';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Network error: Failed to load profile data'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -86,6 +153,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : () {
+              setState(() {
+                _isLoading = true;
+              });
+              _loadUserData();
+            },
+          ),
+        ],
       ),
       drawer: const UserSidebar(),
       body: Container(
@@ -96,9 +174,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
                 ),
               )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+            : _userData == null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load profile data',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Please check your connection and try again',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isLoading = true;
+                            });
+                            _loadUserData();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await _loadUserData();
+                    },
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
                   children: [
                     const SizedBox(height: 20),
                     
@@ -171,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _userData?['fullName'] ?? _userData?['name'] ?? 'Kaveri B',
+                                  _userData?['fullName'] ?? _userData?['name'] ?? '',
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -180,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _userData?['designation'] ?? 'Office Operations Specialist',
+                                  _userData?['designation'] ?? '',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: Colors.grey.shade600,
@@ -189,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  _userData?['company'] ?? 'Sumeru Digital',
+                                  _userData?['company'] ?? '',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey.shade500,
@@ -482,19 +610,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Role Tags
-                          Wrap(
-                            spacing: 8.0,
-                            runSpacing: 8.0,
-                            children: [
-                              _buildRoleTag('State Apex / STC'),
-                              _buildRoleTag('Ashram HOD'),
-                              _buildRoleTag('Ashram Sevak (Short-term)'),
-                              _buildRoleTag('Ashramite'),
-                              _buildRoleTag('Swamiji / Brahmachari'),
-                              _buildRoleTag('Trustee'),
-                            ],
-                          ),
+                          // Role Tags - Dynamic based on user data
+                          _buildDynamicRoleTags(),
                         ],
                       ),
                     ),
@@ -650,7 +767,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     
-                    const SizedBox(height: 32),
+                                        const SizedBox(height: 32),
                     
                     // Edit Button
                     SizedBox(
@@ -683,6 +800,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+            ),
       ),
     );
   }
@@ -705,9 +823,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          enabled: false, // Make read-only
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Colors.white, // Keep white background
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -716,19 +835,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
-            focusedBorder: OutlineInputBorder(
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: BorderSide(color: Colors.grey.shade300),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           style: const TextStyle(
             fontSize: 16,
-            color: Colors.black87,
+            color: Colors.black87, // Keep black text color
             fontWeight: FontWeight.w500,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDynamicRoleTags() {
+    // Get user roles from various possible fields
+    final dynamic rolesDynamic = _userData != null
+        ? (_userData!['selectedRoles'] ??
+            _userData!['roles'] ??
+            _userData!['userTags'])
+        : null;
+    
+    List<String> userRoles = [];
+    if (rolesDynamic is List) {
+      userRoles = rolesDynamic.map((e) => e.toString()).toList();
+    }
+    
+
+    
+    if (userRoles.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Text(
+          'No additional roles assigned',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+    
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      children: userRoles.map((role) => _buildRoleTag(role)).toList(),
     );
   }
 
@@ -784,20 +944,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditForm(BuildContext context) async {
+    // Show loading while fetching fresh user data
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Fetching profile...'),
+            ],
+          ),
+        );
+      },
+    );
+
+    Map<String, dynamic>? freshUserData;
+    try {
+      final apiResult = await ActionService.getCurrentUser();
+      if (apiResult['success'] == true) {
+        freshUserData = apiResult['data'];
+      } else {
+        // API failed - show error and don't proceed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(apiResult['message'] ?? 'Failed to fetch latest profile data.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pop(); // Close loading dialog
+        return; // Don't proceed to edit screen
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error fetching profile: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pop(); // Close loading dialog
+      return; // Don't proceed to edit screen
+    } finally {
+      // Close the loading dialog
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileEditScreen(userData: _userData),
+        builder: (context) => ProfileEditScreen(userData: freshUserData),
       ),
     );
-    
+
     if (result != null) {
-      // Handle the updated data
       setState(() {
         _userData = {...?_userData, ...result};
       });
-      
-      // Update the form controllers with new data
+
       _fullNameController.text = result['fullName'] ?? _fullNameController.text;
       _emailController.text = result['email'] ?? _emailController.text;
       _phoneController.text = result['phoneNumber'] ?? _phoneController.text;

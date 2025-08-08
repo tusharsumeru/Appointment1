@@ -6,7 +6,6 @@ import '../../user/appointment_details_screen.dart';
 import '../../user/user_screen.dart';
 import '../../user/user_history_screen.dart';
 import '../../user/profile_screen.dart';
-import '../../main/change_password_screen.dart';
 
 class UserSidebarComponent extends StatefulWidget {
   const UserSidebarComponent({super.key});

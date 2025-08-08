@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:http_parser/http_parser.dart';
@@ -10,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://3831ea028101.ngrok-free.app/api/v3'; // API base URL
+      'https://c7e670fdfa51.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -4894,6 +4895,253 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Validate and upload profile photo to S3
+  static Future<Map<String, dynamic>> validateAndUploadProfilePhoto({
+    required Uint8List imageBytes,
+    required String fileName,
+  }) async {
+    try {
+      // Get authentication token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate file size (max 5MB)
+      if (imageBytes.length > 5 * 1024 * 1024) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'File size must be less than 5MB.',
+        };
+      }
+
+      // Validate file type
+      final fileExtension = fileName.split('.').last.toLowerCase();
+      final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+      if (!allowedExtensions.contains(fileExtension)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Only JPG, PNG, and GIF files are allowed.',
+        };
+      }
+
+      // Create form data for multipart upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/validate-upload-s3'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the image file with proper content type
+      final contentType = MediaType('image', fileExtension == 'jpg' ? 'jpeg' : fileExtension);
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          imageBytes,
+          filename: fileName,
+          contentType: contentType,
+        ),
+      );
+
+      print('🔍 Debug - Uploading file: $fileName, size: ${imageBytes.length} bytes');
+      print('🔍 Debug - Content-Type: $contentType');
+
+      // Send request
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      
+      print('🔍 Debug - Response status: ${response.statusCode}');
+      print('🔍 Debug - Response body: $responseData');
+
+      final jsonResponse = json.decode(responseData);
+
+      if (response.statusCode == 200) {
+        // Check if upload was successful based on response structure
+        final success = jsonResponse['success'] == true || jsonResponse['status'] == 'success';
+        
+        if (success) {
+          // Upload successful
+          return {
+            'success': true,
+            'statusCode': 200,
+            'data': jsonResponse['data'] ?? jsonResponse,
+            'message': jsonResponse['message'] ?? 'Profile photo uploaded successfully',
+          };
+        } else {
+          // Upload failed
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'message': jsonResponse['message'] ?? 'Failed to upload profile photo',
+          };
+        }
+      } else {
+        // HTTP error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': jsonResponse['message'] ?? 'Failed to upload profile photo',
+        };
+      }
+    } catch (error) {
+      print('🔍 Debug - Upload error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Update user profile with file upload
+  static Future<Map<String, dynamic>> updateUserProfile({
+    required String fullName,
+    required String email,
+    required String phoneNumber,
+    String? designation,
+    String? company,
+    required String full_address,
+    required List<String> userTags,
+    File? profilePhotoFile,
+  }) async {
+    try {
+      // Get authentication token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate required fields
+      if (fullName.isEmpty || email.isEmpty || phoneNumber.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Missing required fields: fullName, email, or phoneNumber.',
+        };
+      }
+
+      // Validate email format
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      if (!emailRegex.hasMatch(email)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please enter a valid email address.',
+        };
+      }
+
+      // Create multipart request
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$baseUrl/auth/profile'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      request.fields['fullName'] = fullName.trim();
+      request.fields['email'] = email.toLowerCase().trim();
+      request.fields['phoneNumber'] = phoneNumber;
+      if (designation != null && designation.isNotEmpty) {
+        request.fields['designation'] = designation.trim();
+      }
+      if (company != null && company.isNotEmpty) {
+        request.fields['company'] = company.trim();
+      }
+
+      // Handle full_address as JSON string
+      request.fields['full_address'] = jsonEncode({
+        'display_name': full_address.trim(),
+      });
+
+      // Handle userTags as array - send as additionalRoles
+      if (userTags.isNotEmpty) {
+        request.fields['additionalRoles'] = jsonEncode(userTags);
+      }
+
+      // Add file if present
+      if (profilePhotoFile != null) {
+        final fileName = profilePhotoFile.path.split('/').last;
+        final fileExtension = fileName.split('.').last.toLowerCase();
+        
+        // Validate file type
+        final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+        if (!allowedExtensions.contains(fileExtension)) {
+          return {
+            'success': false,
+            'statusCode': 400,
+            'message': 'Profile photo must be a valid image file (JPG, PNG, GIF).',
+          };
+        }
+
+        // Check file size (max 5MB)
+        final fileSize = await profilePhotoFile.length();
+        if (fileSize > 5 * 1024 * 1024) {
+          return {
+            'success': false,
+            'statusCode': 400,
+            'message': 'Profile photo size must be less than 5MB.',
+          };
+        }
+
+        // Add file to request
+        final fileStream = http.ByteStream(profilePhotoFile.openRead());
+        final fileLength = await profilePhotoFile.length();
+
+        final multipartFile = http.MultipartFile(
+          'file',
+          fileStream,
+          fileLength,
+          filename: fileName,
+          contentType: MediaType('image', fileExtension),
+        );
+
+        request.files.add(multipartFile);
+      }
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Profile updated successfully!',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to update profile',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
       };
     }
   }

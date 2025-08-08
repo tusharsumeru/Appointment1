@@ -5,7 +5,6 @@ import 'user_screen.dart';
 import 'user_history_screen.dart';
 import 'profile_screen.dart';
 import 'appointment_type_selection_screen.dart';
-import '../main/change_password_screen.dart';
 
 class UserSidebar extends StatefulWidget {
   const UserSidebar({super.key});
@@ -223,22 +222,6 @@ class _UserSidebarState extends State<UserSidebar> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const ProfileScreen(),
-                ),
-              );
-            },
-          ),
-
-          const Divider(),
-
-          ListTile(
-            leading: const Icon(Icons.lock_reset, color: Colors.grey),
-            title: const Text('Change Password'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ChangePasswordScreen(),
                 ),
               );
             },
