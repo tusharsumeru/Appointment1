@@ -117,9 +117,9 @@ class _ReminderFormState extends State<ReminderForm> {
               
               if (_selectedVenueId.isEmpty || !venueExists) {
                 // Set to first venue if none selected or current selection doesn't exist
-                final firstVenue = _venueOptions.first;
-                _selectedVenueId = firstVenue['_id']?.toString() ?? '';
-                _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
+              final firstVenue = _venueOptions.first;
+              _selectedVenueId = firstVenue['_id']?.toString() ?? '';
+              _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
                 print('🎯 [VENUE] Auto-selected first venue: ${_selectedVenueName} (ID: ${_selectedVenueId})');
               } else {
                 // Update venue name for existing selection
@@ -242,7 +242,7 @@ class _ReminderFormState extends State<ReminderForm> {
 
         print('📡 [SAVE] Calling API to schedule appointment...');
         print('   🔑 Appointment ID: ${_getAppointmentId()}');
-        
+
         // Call the ActionService method
         final result = await ActionService.scheduleAppointment(
           appointmentId: _getAppointmentId(),
@@ -546,11 +546,11 @@ class _ReminderFormState extends State<ReminderForm> {
                           }
                         },
                       ),
-                    ],
+                                         ],
+                     
                     
                     
-                    
-                    const SizedBox(height: 16),
+                     const SizedBox(height: 16),
                     
                     // Meeting Type Dropdown
                     DropdownButtonFormField<String>(
@@ -579,8 +579,8 @@ class _ReminderFormState extends State<ReminderForm> {
                     
                     const SizedBox(height: 16),
                     
-                                         // Venue Selection
-                     if (_showOfflineVenue) ...[
+                    // Venue Selection
+                    if (_showOfflineVenue) ...[
                        _isLoadingVenues
                            ? const Center(
                                child: Padding(
@@ -610,10 +610,10 @@ class _ReminderFormState extends State<ReminderForm> {
                                  )
                                : DropdownButtonFormField<String>(
                                    value: _selectedVenueId.isNotEmpty && _venueOptions.any((venue) => venue['_id']?.toString() == _selectedVenueId) ? _selectedVenueId : null,
-                                   decoration: const InputDecoration(
-                                     labelText: 'Select Venue',
-                                     border: OutlineInputBorder(),
-                                     prefixIcon: Icon(Icons.location_on),
+                        decoration: const InputDecoration(
+                          labelText: 'Select Venue',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
                                    ),
                                    items: _venueOptions.where((venue) => 
                                      venue['_id']?.toString().isNotEmpty == true
@@ -636,15 +636,15 @@ class _ReminderFormState extends State<ReminderForm> {
                                        });
                                        print('   🏛️  Selected venue name: $_selectedVenueName');
                                      }
-                                   },
-                                   validator: (value) {
+                        },
+                        validator: (value) {
                                      if (value == null || value.isEmpty) {
-                                       return 'Please select a venue';
-                                     }
-                                     return null;
-                                   },
-                                 ),
-                     ],
+                            return 'Please select a venue';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                     
                     if (_showOnlineVenue) ...[
                       TextFormField(

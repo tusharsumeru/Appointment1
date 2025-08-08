@@ -511,76 +511,311 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Action Buttons
+                          // Photo Upload Options
                           Column(
                             children: [
-                              // Upload Different Photo Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _isUploadingPhoto ? null : () => _pickImage(ImageSource.gallery),
-                                  icon: _isUploadingPhoto 
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.cloud_upload_outlined),
-                                  label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Different Photo'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.grey.shade700,
-                                    side: BorderSide(color: Colors.grey.shade300),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                              // Upload from Device Card
+                              GestureDetector(
+                                onTap: () => _pickImage(ImageSource.gallery),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.upload_file,
+                                        color: Colors.blue.shade700,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Upload from Device',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Choose an existing photo',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 12),
                               
-                              // Take New Photo Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _isUploadingPhoto ? null : () => _pickImage(ImageSource.camera),
-                                  icon: _isUploadingPhoto 
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.camera_alt_outlined),
-                                  label: Text(_isUploadingPhoto ? 'Uploading...' : 'Take New Photo'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.grey.shade700,
-                                    side: BorderSide(color: Colors.grey.shade300),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                              // Take Photo Card
+                              GestureDetector(
+                                onTap: () => _pickImage(ImageSource.camera),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.blue.shade700,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Take Photo',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Use your device camera',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
                               
-                              // Delete Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _removeImage,
-                                  icon: const Icon(Icons.delete_outline),
-                                  label: const Text('Delete Photo'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red.shade600,
-                                    side: BorderSide(color: Colors.red.shade300),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                              // Show selected image preview
+                              if (_selectedImageBytes != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: _isUploadingPhoto 
+                                        ? Colors.blue[50] 
+                                        : (_uploadedPhotoUrl != null ? Colors.green[50] : Colors.orange[50]),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _isUploadingPhoto 
+                                          ? Colors.blue[200]! 
+                                          : (_uploadedPhotoUrl != null ? Colors.green[200]! : Colors.orange[200]!),
                                     ),
                                   ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Photo preview and status message
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(8),
+                                              image: DecorationImage(
+                                                image: MemoryImage(_selectedImageBytes!),
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                if (_isUploadingPhoto) ...[
+                                                  const Text(
+                                                    'Uploading photo...',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.blue,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  const SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                                    ),
+                                                  ),
+                                                ] else if (_uploadedPhotoUrl != null) ...[
+                                                  const Text(
+                                                    'Photo uploaded and validated successfully',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.green,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'S3 URL: ${_uploadedPhotoUrl!.substring(0, 50)}...',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ] else ...[
+                                                  const Text(
+                                                    'Photo selected but not uploaded',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.orange,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Tap to remove',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      
+                                      // Show action buttons after successful upload
+                                      if (_uploadedPhotoUrl != null) ...[
+                                        const SizedBox(height: 12),
+                                        
+                                        // Action buttons - one below the other
+                                        Column(
+                                          children: [
+                                            // Upload Different Photo
+                                            GestureDetector(
+                                              onTap: () => _pickImage(ImageSource.gallery),
+                                              child: Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue[50],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.blue[200]!),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.upload_file,
+                                                      color: Colors.blue[700],
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Upload Different Photo',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.blue[700],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            
+                                            const SizedBox(height: 6),
+                                            
+                                            // Take New Photo
+                                            GestureDetector(
+                                              onTap: () => _pickImage(ImageSource.camera),
+                                              child: Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange[50],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.orange[200]!),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.camera_alt,
+                                                      color: Colors.orange[700],
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Take New Photo',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.orange[700],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            
+                                            const SizedBox(height: 6),
+                                            
+                                            // Remove Photo
+                                            GestureDetector(
+                                              onTap: _removeImage,
+                                              child: Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red[50],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.red[200]!),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.delete_outline,
+                                                      color: Colors.red[700],
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Remove Photo',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors.red[700],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],

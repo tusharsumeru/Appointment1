@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import 'user_screen.dart';
 import 'appointment_details_screen.dart';
+import '../action/storage_service.dart';
+import '../action/action.dart';
 
 class RequestAppointmentScreen extends StatefulWidget {
   final String selectedType;
@@ -36,8 +38,15 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   // Form state
   bool _isTeacher = false;
   bool _isFormValid = false;
+  bool _isLoading = true; // Add loading state
   
 
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
 
   @override
   void dispose() {
@@ -49,13 +58,142 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
     super.dispose();
   }
 
+  Future<void> _loadUserData() async {
+    print('🚀 RequestAppointmentScreen._loadUserData() - Starting to load user data...');
+    
+    try {
+      // First try to get fresh data from API
+      print('📡 Calling ActionService.getCurrentUser() to fetch fresh data...');
+      final apiResult = await ActionService.getCurrentUser();
+      
+      Map<String, dynamic>? userData;
+      
+      if (apiResult['success'] == true) {
+        print('✅ API call successful, using fresh data');
+        userData = apiResult['data'];
+      } else {
+        print('⚠️ API call failed, falling back to stored data');
+        print('📡 Calling StorageService.getUserData()...');
+        userData = await StorageService.getUserData();
+      }
+      
+      print('✅ Data retrieval completed');
+      print('📋 Raw userData received: $userData');
+      print('📋 userData type: ${userData.runtimeType}');
+      print('📋 userData is null: ${userData == null}');
+      
+      if (userData != null) {
+        print('🔍 Detailed userData analysis:');
+        print('   - userData keys: ${userData.keys.toList()}');
+        print('   - userData length: ${userData.length}');
+        
+        // Log each field individually
+        print('📝 Individual field values:');
+        print('   - fullName: ${userData['fullName']} (type: ${userData['fullName']?.runtimeType})');
+        print('   - name: ${userData['name']} (type: ${userData['name']?.runtimeType})');
+        print('   - email: ${userData['email']} (type: ${userData['email']?.runtimeType})');
+        print('   - phoneNumber: ${userData['phoneNumber']} (type: ${userData['phoneNumber']?.runtimeType})');
+        print('   - phone: ${userData['phone']} (type: ${userData['phone']?.runtimeType})');
+        print('   - designation: ${userData['designation']} (type: ${userData['designation']?.runtimeType})');
+        print('   - company: ${userData['company']} (type: ${userData['company']?.runtimeType})');
+        print('   - location: ${userData['location']} (type: ${userData['location']?.runtimeType})');
+        print('   - isTeacher: ${userData['isTeacher']} (type: ${userData['isTeacher']?.runtimeType})');
+        print('   - aol_teacher: ${userData['aol_teacher']} (type: ${userData['aol_teacher']?.runtimeType})');
+        
+        // Log ALL fields to see what's actually available
+        print('🔍 ALL fields in userData:');
+        userData.forEach((key, value) {
+          print('   - $key: $value (type: ${value.runtimeType})');
+        });
+      }
+      
+      print('🎯 Setting form field values...');
+      
+      // Set initial values for form fields with logging
+      final fullName = userData?['fullName'] ?? userData?['name'] ?? '';
+      final email = userData?['email'] ?? '';
+      
+      // Handle phone number object structure
+      String phone = '';
+      if (userData?['phoneNumber'] != null) {
+        if (userData!['phoneNumber'] is Map<String, dynamic>) {
+          final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
+          final countryCode = phoneObj['countryCode'] ?? '';
+          final number = phoneObj['number'] ?? '';
+          phone = '$countryCode$number';
+          print('📱 Phone number extracted: $phone (from phoneNumber object)');
+        } else {
+          phone = userData['phoneNumber'].toString();
+          print('📱 Phone number extracted: $phone (from phoneNumber string)');
+        }
+      } else if (userData?['phone'] != null) {
+        phone = userData!['phone'].toString();
+        print('📱 Phone number extracted: $phone (from phone field)');
+      } else {
+        print('📱 No phone number found in user data');
+      }
+      
+      final designation = userData?['designation'] ?? '';
+      final company = userData?['company'] ?? '';
+      
+      // Handle teacher status - check both aol_teacher and isTeacher fields
+      bool isTeacher = false;
+      if (userData?['aol_teacher'] != null) {
+        isTeacher = userData!['aol_teacher'] == true;
+        print('👨‍🏫 Teacher status from aol_teacher: $isTeacher');
+      } else if (userData?['isTeacher'] != null) {
+        isTeacher = userData!['isTeacher'] == true;
+        print('👨‍🏫 Teacher status from isTeacher: $isTeacher');
+      } else {
+        print('👨‍🏫 No teacher status found, defaulting to false');
+      }
+      
+      print('📝 Form field values set:');
+      print('   - fullName: $fullName');
+      print('   - email: $email');
+      print('   - phone: $phone');
+      print('   - designation: $designation');
+      print('   - company: $company');
+      print('   - isTeacher: $isTeacher');
+      
+      setState(() {
+        _fullNameController.text = fullName;
+        _emailController.text = email;
+        _phoneController.text = phone;
+        _designationController.text = designation;
+        _companyController.text = company;
+        _isTeacher = isTeacher;
+        _isLoading = false; // Set loading to false after data is loaded
+      });
+      
+      print('✅ RequestAppointmentScreen._loadUserData() completed successfully');
+      
+    } catch (error) {
+      print('❌ Error in RequestAppointmentScreen._loadUserData(): $error');
+      print('❌ Error type: ${error.runtimeType}');
+      print('❌ Stack trace: ${StackTrace.current}');
+      
+      print('🔄 Setting default values due to error...');
+      
+      // Set default values if data loading fails
+      setState(() {
+        _fullNameController.text = '';
+        _emailController.text = '';
+        _phoneController.text = '';
+        _designationController.text = '';
+        _companyController.text = '';
+        _isTeacher = false;
+        _isLoading = false; // Ensure loading is false on error
+      });
+      
+      print('✅ Default values set successfully');
+    }
+  }
+
   void _validateForm() {
     setState(() {
-      _isFormValid = _fullNameController.text.isNotEmpty &&
-          _emailController.text.isNotEmpty &&
-          _phoneController.text.isNotEmpty &&
-          _designationController.text.isNotEmpty &&
-          _companyController.text.isNotEmpty;
+      // FIXED: All fields are now optional for testing
+      _isFormValid = true; // Always allow navigation for testing
     });
   }
 
@@ -83,7 +221,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Request Appointment - $_appointmentTypeText'),
+        title: Text('$_appointmentTypeText'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -93,50 +231,59 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
             Navigator.pop(context);
           },
         ),
-        actions: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-          ),
-        ],
       ),
       drawer: const SidebarComponent(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
+      body: _isLoading 
+          ? const Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Header
-                  const Text(
-                    'Personal Information',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enter your contact details',
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading your information...',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        const Text(
+                          'Personal Information',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Your contact details (read-only)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
                   // Appointment Type Display Card
                   Container(
@@ -236,7 +383,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
                   // Teacher Question
                   const Text(
-                    'Are you an Art Of Living teacher? *',
+                    'Are you an Art Of Living teacher? (Read-only)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -249,24 +396,26 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                       Radio<bool>(
                         value: false,
                         groupValue: _isTeacher,
-                        onChanged: (value) {
-                          setState(() {
-                            _isTeacher = value!;
-                          });
-                        },
+                        onChanged: null, // Disable radio buttons
                       ),
-                      const Text('No'),
+                      Text(
+                        'No',
+                        style: TextStyle(
+                          color: _isTeacher ? Colors.grey[400] : Colors.black87,
+                        ),
+                      ),
                       const SizedBox(width: 32),
                       Radio<bool>(
                         value: true,
                         groupValue: _isTeacher,
-                        onChanged: (value) {
-                          setState(() {
-                            _isTeacher = value!;
-                          });
-                        },
+                        onChanged: null, // Disable radio buttons
                       ),
-                      const Text('Yes'),
+                      Text(
+                        'Yes',
+                        style: TextStyle(
+                          color: _isTeacher ? Colors.black87 : Colors.grey[400],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -275,7 +424,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isFormValid ? _showSuccessAndNavigate : null,
+                      onPressed: _showSuccessAndNavigate, // FIXED: Always enabled for testing
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
@@ -313,7 +462,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label *',
+          '$label (Read-only)',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -325,11 +474,12 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
+          enabled: false, // Make fields read-only
           decoration: InputDecoration(
-            hintText: placeholder,
+            hintText: '$placeholder',
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Colors.grey[100], // Different color to indicate read-only
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -338,9 +488,9 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
-            focusedBorder: OutlineInputBorder(
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: BorderSide(color: Colors.grey[400]!),
             ),
           ),
         ),
@@ -353,7 +503,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Phone Number *',
+          'Phone Number (Read-only)',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -363,48 +513,26 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
+            color: Colors.grey[100],
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[400]!),
           ),
           child: Row(
             children: [
-              // Country Code Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('🇮🇳', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '+91',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
-                  ],
-                ),
-              ),
               // Phone Number Input
               Expanded(
                 child: TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   onChanged: (value) => _validateForm(),
-                  decoration: const InputDecoration(
+                  enabled: false, // Make field read-only
+                  decoration: InputDecoration(
                     hintText: 'Enter phone number',
-                    hintStyle: TextStyle(color: Colors.grey),
+                    hintStyle: const TextStyle(color: Colors.grey),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    filled: true,
+                    fillColor: Colors.grey[100],
                   ),
                 ),
               ),

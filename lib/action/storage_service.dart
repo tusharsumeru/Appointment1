@@ -13,6 +13,14 @@ class StorageService {
   static const String _assignedToMeAppointmentsKey = 'cached_assigned_to_me_appointments';
   static const String _assignedToMeAppointmentsTimestampKey = 'assigned_to_me_appointments_timestamp';
 
+  // API base URL - same as in ActionService
+  static const String _apiBaseUrl = 'https://89628f197129.ngrok-free.app/api/v3';
+
+  // Get API URL
+  static Future<String> getApiUrl() async {
+    return _apiBaseUrl;
+  }
+
   // Save authentication token
   static Future<void> saveToken(String token) async {
     try {
@@ -66,9 +74,11 @@ class StorageService {
       final prefs = await SharedPreferences.getInstance();
       final userDataString = jsonEncode(userData);
       await prefs.setString(_userDataKey, userDataString);
-      print('User data saved successfully: $userData');
+      print('✅ User data saved successfully to storage');
+      print('📋 Saved data: $userData');
+      print('📋 Saved JSON string: $userDataString');
     } catch (e) {
-      print('Error saving user data: $e');
+      print('❌ Error saving user data: $e');
       throw Exception('Failed to save user data: $e');
     }
   }
@@ -78,12 +88,17 @@ class StorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userDataString = prefs.getString(_userDataKey);
+      print('📡 StorageService.getUserData() - Retrieved from storage: $userDataString');
+      
       if (userDataString != null) {
-        return jsonDecode(userDataString);
+        final decodedData = jsonDecode(userDataString);
+        print('✅ StorageService.getUserData() - Successfully decoded: $decodedData');
+        return decodedData;
       }
+      print('⚠️ StorageService.getUserData() - No data found in storage');
       return null;
     } catch (e) {
-      print('Error getting user data: $e');
+      print('❌ Error getting user data: $e');
       return null;
     }
   }

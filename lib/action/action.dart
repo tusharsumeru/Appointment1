@@ -3791,6 +3791,115 @@ class ActionService {
     }
   }
 
+  // Get ashram location by location ID with assigned secretaries
+  static Future<Map<String, dynamic>> getAshramLocationByLocationId({
+    required String locationId,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate locationId
+      if (locationId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Location ID is required',
+        };
+      }
+
+      // Make API call
+      final response = await http.get(
+        Uri.parse('$baseUrl/ashram-locations/$locationId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return location data with assigned secretaries
+        final locationData = responseData['data'];
+        final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': {
+            'location': locationData,
+            'assignedSecretaries': assignedSecretaries,
+          },
+          'message':
+              responseData['message'] ??
+              'Location details fetched successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid location ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 403) {
+        // Location deactivated
+        return {
+          'success': false,
+          'statusCode': 403,
+          'message': responseData['message'] ?? 'This location is deactivated',
+        };
+      } else if (response.statusCode == 404) {
+        // Location not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Ashram location not found',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to fetch location details',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
   // Get all venues
   static Future<Map<String, dynamic>> getAllVenues({
     int page = 1,
@@ -4945,7 +5054,10 @@ class ActionService {
       request.headers['Authorization'] = 'Bearer $token';
 
       // Add the image file with proper content type
-      final contentType = MediaType('image', fileExtension == 'jpg' ? 'jpeg' : fileExtension);
+      final contentType = MediaType(
+        'image',
+        fileExtension == 'jpg' ? 'jpeg' : fileExtension,
+      );
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -4955,13 +5067,15 @@ class ActionService {
         ),
       );
 
-      print('🔍 Debug - Uploading file: $fileName, size: ${imageBytes.length} bytes');
+      print(
+        '🔍 Debug - Uploading file: $fileName, size: ${imageBytes.length} bytes',
+      );
       print('🔍 Debug - Content-Type: $contentType');
 
       // Send request
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
-      
+
       print('🔍 Debug - Response status: ${response.statusCode}');
       print('🔍 Debug - Response body: $responseData');
 
@@ -4969,22 +5083,27 @@ class ActionService {
 
       if (response.statusCode == 200) {
         // Check if upload was successful based on response structure
-        final success = jsonResponse['success'] == true || jsonResponse['status'] == 'success';
-        
+        final success =
+            jsonResponse['success'] == true ||
+            jsonResponse['status'] == 'success';
+
         if (success) {
           // Upload successful
           return {
             'success': true,
             'statusCode': 200,
             'data': jsonResponse['data'] ?? jsonResponse,
-            'message': jsonResponse['message'] ?? 'Profile photo uploaded successfully',
+            'message':
+                jsonResponse['message'] ??
+                'Profile photo uploaded successfully',
           };
         } else {
           // Upload failed
           return {
             'success': false,
             'statusCode': response.statusCode,
-            'message': jsonResponse['message'] ?? 'Failed to upload profile photo',
+            'message':
+                jsonResponse['message'] ?? 'Failed to upload profile photo',
           };
         }
       } else {
@@ -4992,7 +5111,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': jsonResponse['message'] ?? 'Failed to upload profile photo',
+          'message':
+              jsonResponse['message'] ?? 'Failed to upload profile photo',
         };
       }
     } catch (error) {
@@ -5032,7 +5152,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 400,
-          'message': 'Missing required fields: fullName, email, or phoneNumber.',
+          'message':
+              'Missing required fields: fullName, email, or phoneNumber.',
         };
       }
 
@@ -5080,14 +5201,15 @@ class ActionService {
       if (profilePhotoFile != null) {
         final fileName = profilePhotoFile.path.split('/').last;
         final fileExtension = fileName.split('.').last.toLowerCase();
-        
+
         // Validate file type
         final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         if (!allowedExtensions.contains(fileExtension)) {
           return {
             'success': false,
             'statusCode': 400,
-            'message': 'Profile photo must be a valid image file (JPG, PNG, GIF).',
+            'message':
+                'Profile photo must be a valid image file (JPG, PNG, GIF).',
           };
         }
 
@@ -5142,6 +5264,201 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Network error: $error',
+      };
+    }
+  }
+
+  ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
+  // Create appointment method using enhanced API
+  static Future<Map<String, dynamic>> createAppointment(
+    Map<String, dynamic> appointmentData,
+  ) async {
+    try {
+      print('🚀 Creating appointment with data: $appointmentData');
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      // Add default secretary ID if not provided
+      if (appointmentData['assignedSecretary'] == null) {
+        appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
+        print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
+      }
+
+      // Log the final appointment data being sent
+      print('📋 Final appointment data to be sent:');
+      print('   - meetingType: ${appointmentData['meetingType']}');
+      print('   - appointmentFor: ${appointmentData['appointmentFor']}');
+      print(
+        '   - userCurrentCompany: ${appointmentData['userCurrentCompany']}',
+      );
+      print(
+        '   - userCurrentDesignation: ${appointmentData['userCurrentDesignation']}',
+      );
+      print(
+        '   - appointmentPurpose: ${appointmentData['appointmentPurpose']}',
+      );
+      print(
+        '   - appointmentSubject: ${appointmentData['appointmentSubject']}',
+      );
+      print(
+        '   - preferredDateRange: ${appointmentData['preferredDateRange']}',
+      );
+      print(
+        '   - appointmentLocation: ${appointmentData['appointmentLocation']}',
+      );
+      print('   - numberOfUsers: ${appointmentData['numberOfUsers']}');
+      print('   - accompanyUsers: ${appointmentData['accompanyUsers']}');
+      print('   - assignedSecretary: ${appointmentData['assignedSecretary']}');
+      print('   - guestInformation: ${appointmentData['guestInformation']}');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/appointment'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(appointmentData),
+      );
+
+      print('📡 API Response Status: ${response.statusCode}');
+      print('📡 API Response Body: ${response.body}');
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        print('✅ Appointment created successfully!');
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Appointment created successfully',
+          'statusCode': response.statusCode,
+        };
+      } else {
+        print('❌ Failed to create appointment: ${responseData['message']}');
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Failed to create appointment',
+          'error': responseData['error'],
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error creating appointment: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Upload and validate profile photo for accompanying users
+  static Future<Map<String, dynamic>> uploadAndValidateProfilePhoto(
+    File photoFile,
+  ) async {
+    try {
+      print('📸 Starting photo upload and validation for: ${photoFile.path}');
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/validate-upload-s3'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the photo file
+      if (await photoFile.exists()) {
+        try {
+          print('📸 Adding photo file to request: ${photoFile.path}');
+          final photoStream = http.ByteStream(photoFile.openRead());
+          final photoLength = await photoFile.length();
+          print('📸 Photo file size: ${photoLength} bytes');
+
+          // Get file extension and name
+          final fileName = photoFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'jpg';
+          final mimeType = _getMimeType(fileExtension);
+
+          final photoMultipart = http.MultipartFile(
+            'file', // Field name expected by the API
+            photoStream,
+            photoLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(photoMultipart);
+          print('📸 Photo file added successfully to multipart request');
+        } catch (photoError) {
+          print('❌ Error adding photo file: $photoError');
+          return {
+            'success': false,
+            'message': 'Error processing photo file: ${photoError.toString()}',
+          };
+        }
+      } else {
+        print('⚠️ Photo file does not exist: ${photoFile.path}');
+        return {'success': false, 'message': 'Photo file not found'};
+      }
+
+      print('📤 Sending photo upload request to: ${request.url}');
+      print('📤 Request headers: ${request.headers}');
+      print('📤 Total files being sent: ${request.files.length}');
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Photo upload response status: ${response.statusCode}');
+      print('📥 Photo upload response body: ${response.body}');
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('✅ Photo uploaded and validated successfully!');
+        print('📸 S3 URL: ${responseData['data']['s3Url']}');
+        print('📸 Validation result: ${responseData['data']['validation']}');
+
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Photo uploaded and validated successfully',
+          's3Url': responseData['data']['s3Url'],
+          'validation': responseData['data']['validation'],
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ Photo upload failed: ${errorData['message']}');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Failed to upload photo',
+          'error': errorData['error'],
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error in uploadAndValidateProfilePhoto: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
       };
     }
   }

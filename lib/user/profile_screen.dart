@@ -14,7 +14,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
-  
+
   // Text controllers for form fields
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -40,28 +40,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-    Future<void> _loadUserData() async {
+  Future<void> _loadUserData() async {
     try {
       // Only fetch fresh data from API
       final apiResult = await ActionService.getCurrentUser();
-      
+
       if (apiResult['success'] == true) {
         final freshUserData = apiResult['data'];
-        
+
         // Update cached data in StorageService (for other parts of app)
         await StorageService.saveUserData(freshUserData);
-        
+
         setState(() {
           _userData = freshUserData;
           _isLoading = false;
         });
-        
+
         // Set initial values for form fields from fresh data
-        _fullNameController.text = freshUserData?['fullName'] ?? freshUserData?['name'] ?? '';
+        _fullNameController.text =
+            freshUserData?['fullName'] ?? freshUserData?['name'] ?? '';
         _emailController.text = freshUserData?['email'] ?? '';
-        
+
         // Handle phone number mapping
-        final dynamic phoneField = freshUserData?['phoneNumber'] ?? freshUserData?['phone'];
+        final dynamic phoneField =
+            freshUserData?['phoneNumber'] ?? freshUserData?['phone'];
         String phoneText = '';
         if (phoneField is Map) {
           final cc = (phoneField['countryCode'] ?? '').toString();
@@ -71,10 +73,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           phoneText = phoneField;
         }
         _phoneController.text = phoneText;
-        
+
         _designationController.text = freshUserData?['designation'] ?? '';
         _companyController.text = freshUserData?['company'] ?? '';
-        
+
         // Handle location mapping
         final dynamic fullAddress = freshUserData?['full_address'];
         String locationText = '';
@@ -85,14 +87,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           locationText = (freshUserData?['location'] ?? '').toString();
         }
         _locationController.text = locationText;
-        
       } else {
         // API failed - show error and empty state
         setState(() {
           _userData = null;
           _isLoading = false;
         });
-        
+
         // Clear form fields
         _fullNameController.text = '';
         _emailController.text = '';
@@ -100,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _designationController.text = '';
         _companyController.text = '';
         _locationController.text = '';
-        
+
         // Show error to user
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -112,13 +113,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (error) {
       print('Error loading user data: $error');
-      
+
       // Network error - show error and empty state
       setState(() {
         _userData = null;
         _isLoading = false;
       });
-      
+
+      print('🔄 Setting default values due to error...');
+
       // Clear form fields
       _fullNameController.text = '';
       _emailController.text = '';
@@ -126,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _designationController.text = '';
       _companyController.text = '';
       _locationController.text = '';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Network error: Failed to load profile data'),
@@ -156,12 +159,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : () {
-              setState(() {
-                _isLoading = true;
-              });
-              _loadUserData();
-            },
+            onPressed: _isLoading
+                ? null
+                : () {
+                    setState(() {
+                      _isLoading = true;
+                    });
+                    _loadUserData();
+                  },
           ),
         ],
       ),
@@ -175,632 +180,648 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               )
             : _userData == null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Failed to load profile data',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Please check your connection and try again',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _isLoading = true;
-                            });
-                            _loadUserData();
-                          },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      await _loadUserData();
-                    },
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 20),
-                    
-                    // User Profile Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load profile data',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
                       ),
-                      child: Row(
-                        children: [
-                          // Profile Image
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.deepPurple.withOpacity(0.3),
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please check your connection and try again',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isLoading = true;
+                        });
+                        _loadUserData();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await _loadUserData();
+                },
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+
+                      // User Profile Header
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Profile Image
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.deepPurple.withOpacity(0.3),
+                                  width: 3,
                                 ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child: _userData?['profilePhoto'] != null
-                                  ? Image.network(
-                                      _userData!['profilePhoto'],
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.deepPurple.withOpacity(0.1),
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 40,
-                                            color: Colors.deepPurple,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: Colors.deepPurple.withOpacity(0.1),
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 40,
-                                        color: Colors.deepPurple,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: _userData?['profilePhoto'] != null
+                                    ? Image.network(
+                                        _userData!['profilePhoto'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                              return Container(
+                                                color: Colors.deepPurple
+                                                    .withOpacity(0.1),
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  size: 40,
+                                                  color: Colors.deepPurple,
+                                                ),
+                                              );
+                                            },
+                                      )
+                                    : Container(
+                                        color: Colors.deepPurple.withOpacity(
+                                          0.1,
+                                        ),
+                                        child: const Icon(
+                                          Icons.person,
+                                          size: 40,
+                                          color: Colors.deepPurple,
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          
-                          // User Name and Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(width: 20),
+
+                            // User Name and Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _userData?['fullName'] ??
+                                        _userData?['name'] ??
+                                        '',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _userData?['designation'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _userData?['company'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Personal Information Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
                               children: [
-                                Text(
-                                  _userData?['fullName'] ?? _userData?['name'] ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 24,
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Personal Information',
+                                  style: TextStyle(
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black87,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle
+                            Text(
+                              'Your basic account information.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Full Name Field
+                            _buildFormField(
+                              label: 'Full Name',
+                              controller: _fullNameController,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Email Address Field
+                            _buildFormField(
+                              label: 'Email Address',
+                              controller: _emailController,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Phone Number Field
+                            _buildFormField(
+                              label: 'Phone Number',
+                              controller: _phoneController,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Professional Details Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Icon(
+                                    Icons.work_outline,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Professional Details',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle
+                            Text(
+                              'Your professional background.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Designation Field
+                            _buildFormField(
+                              label: 'Designation',
+                              controller: _designationController,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Company/Organization Field
+                            _buildFormField(
+                              label: 'Company/Organization',
+                              controller: _companyController,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Location Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Icon(
+                                    Icons.location_on_outlined,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Location',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle
+                            Text(
+                              'Your current location.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Location Field
+                            _buildFormField(
+                              label: 'Location',
+                              controller: _locationController,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Additional Roles Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Icon(
+                                    Icons.shield_outlined,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Additional Roles',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle
+                            Text(
+                              'Your roles and responsibilities.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Role Tags - Dynamic based on user data
+                            _buildDynamicRoleTags(),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Teacher Information Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Icon(
+                                    Icons.school_outlined,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Teacher Information',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle
+                            Text(
+                              'Your Art of Living teacher status',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Question
+                            Row(
+                              children: [
                                 Text(
-                                  _userData?['designation'] ?? '',
+                                  'Are you an Art Of Living teacher?',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: Colors.grey.shade600,
+                                    color: Colors.grey.shade700,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _userData?['company'] ?? '',
+                                const Text(
+                                  ' *',
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
+                                    color: Colors.red,
+                                    fontSize: 16,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Personal Information Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Icon(
-                                  Icons.person_outline,
-                                  color: Colors.grey.shade600,
-                                  size: 20,
+                            const SizedBox(height: 16),
+
+                            // Teacher Verification Box
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: Colors.lightGreen.shade50,
+                                borderRadius: BorderRadius.circular(12.0),
+                                border: Border.all(
+                                  color: Colors.lightGreen.shade200,
+                                  width: 1,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Personal Information',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your basic account information.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Full Name Field
-                          _buildFormField(
-                            label: 'Full Name',
-                            controller: _fullNameController,
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Email Address Field
-                          _buildFormField(
-                            label: 'Email Address',
-                            controller: _emailController,
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Phone Number Field
-                          _buildFormField(
-                            label: 'Phone Number',
-                            controller: _phoneController,
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Professional Details Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Icon(
-                                  Icons.work_outline,
-                                  color: Colors.grey.shade600,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Professional Details',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your professional background.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Designation Field
-                          _buildFormField(
-                            label: 'Designation',
-                            controller: _designationController,
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Company/Organization Field
-                          _buildFormField(
-                            label: 'Company/Organization',
-                            controller: _companyController,
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Location Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Icon(
-                                  Icons.location_on_outlined,
-                                  color: Colors.grey.shade600,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Location',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your current location.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Location Field
-                          _buildFormField(
-                            label: 'Location',
-                            controller: _locationController,
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Additional Roles Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Icon(
-                                  Icons.shield_outlined,
-                                  color: Colors.grey.shade600,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Additional Roles',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your roles and responsibilities.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Role Tags - Dynamic based on user data
-                          _buildDynamicRoleTags(),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Teacher Information Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Icon(
-                                  Icons.school_outlined,
-                                  color: Colors.grey.shade600,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Teacher Information',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your Art of Living teacher status',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Question
-                          Row(
-                            children: [
-                              Text(
-                                'Are you an Art Of Living teacher?',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Text(
-                                ' *',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Teacher Verification Box
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.lightGreen.shade50,
-                              borderRadius: BorderRadius.circular(12.0),
-                              border: Border.all(
-                                color: Colors.lightGreen.shade200,
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Verification Header
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: Colors.green,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Teacher Verified',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green.shade700,
-                                          ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Verification Header
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
                                         ),
-                                        Text(
-                                          'true Teacher',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.green.shade600,
-                                          ),
+                                        child: const Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: 16,
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                // Teacher Details
-                                _buildTeacherDetail('Name', 'Kiran Patule'),
-                                const SizedBox(height: 8),
-                                _buildTeacherDetail('Teacher Code', 'MH1458'),
-                                const SizedBox(height: 8),
-                                _buildTeacherDetail('Type', 'True AOL Teacher'),
-                                const SizedBox(height: 8),
-                                _buildTeacherDetail('Programs', 'Happiness Program'),
-                              ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Teacher Verified',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green.shade700,
+                                            ),
+                                          ),
+                                          Text(
+                                            'true Teacher',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.green.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Teacher Details
+                                  _buildTeacherDetail('Name', 'Kiran Patule'),
+                                  const SizedBox(height: 8),
+                                  _buildTeacherDetail('Teacher Code', 'MH1458'),
+                                  const SizedBox(height: 8),
+                                  _buildTeacherDetail(
+                                    'Type',
+                                    'True AOL Teacher',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildTeacherDetail(
+                                    'Programs',
+                                    'Happiness Program',
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                                        const SizedBox(height: 32),
-                    
-                    // Edit Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Show edit form
-                          _showEditForm(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
+                          ],
                         ),
-                        child: const Text(
-                          'Edit',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // Edit Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Show edit form
+                            _showEditForm(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    
-                    const SizedBox(height: 40),
-                  ],
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
-            ),
       ),
     );
   }
@@ -839,7 +860,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
           style: const TextStyle(
             fontSize: 16,
@@ -855,17 +879,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Get user roles from various possible fields
     final dynamic rolesDynamic = _userData != null
         ? (_userData!['selectedRoles'] ??
-            _userData!['roles'] ??
-            _userData!['userTags'])
+              _userData!['roles'] ??
+              _userData!['userTags'])
         : null;
-    
+
     List<String> userRoles = [];
     if (rolesDynamic is List) {
       userRoles = rolesDynamic.map((e) => e.toString()).toList();
     }
-    
 
-    
     if (userRoles.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -884,7 +906,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
-    
+
     return Wrap(
       spacing: 8.0,
       runSpacing: 8.0,
@@ -898,10 +920,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.lightGreen.shade100,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.lightGreen.shade300,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.lightGreen.shade300, width: 1),
       ),
       child: Text(
         role,
@@ -970,7 +989,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // API failed - show error and don't proceed
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(apiResult['message'] ?? 'Failed to fetch latest profile data.'),
+            content: Text(
+              apiResult['message'] ?? 'Failed to fetch latest profile data.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -1008,10 +1029,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _fullNameController.text = result['fullName'] ?? _fullNameController.text;
       _emailController.text = result['email'] ?? _emailController.text;
       _phoneController.text = result['phoneNumber'] ?? _phoneController.text;
-      _designationController.text = result['designation'] ?? _designationController.text;
+      _designationController.text =
+          result['designation'] ?? _designationController.text;
       _companyController.text = result['company'] ?? _companyController.text;
       _locationController.text = result['location'] ?? _locationController.text;
     }
   }
 }
- 
