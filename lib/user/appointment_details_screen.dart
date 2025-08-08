@@ -59,6 +59,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Guest upload states - Map to track upload status for each guest
   Map<int, bool> _guestUploading = {};
   
+  // Location search state
+  List<Map<String, dynamic>> _locationSuggestions = [];
+  bool _isSearchingLocations = false;
+  String _lastSearchQuery = '';
+  
   // Main guest photo state
   String? _mainGuestPhotoUrl;
   bool _isMainGuestPhotoUploading = false;
@@ -689,7 +694,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'toDate': _parseDateToISO(_toDateController.text),
         },
         'appointmentLocation': _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
-        'assignedSecretary': _selectedSecretary ?? '6891a4d3a26a787d5aec5d50',
+        'assignedSecretary': _selectedSecretary, // Send null when no secretary is selected
         'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
       };
       
@@ -1019,12 +1024,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ),
                     const SizedBox(height: 16),
                     
-                    // Guest Location
-                    _buildReferenceField(
-                      label: 'Location',
-                      controller: _guestLocationController,
-                      placeholder: 'Start typing guest\'s location...',
-                    ),
+                    // Guest Location with Search
+                    _buildLocationSearchField(),
                     const SizedBox(height: 24),
                     
                     // Guest Photo Section
@@ -2696,7 +2697,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
              width: double.infinity,
              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
              decoration: BoxDecoration(
-               border: Border.all(color: Colors.grey[300]!),
+               border: Border.all(
+                 color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
+                     ? Colors.deepPurple
+                     : Colors.grey[300]!,
+               ),
                borderRadius: BorderRadius.circular(8),
                color: Colors.white,
              ),
@@ -2743,22 +2748,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                    style: TextStyle(color: Colors.grey[600]),
                                  )
                                : _secretaries.isEmpty
-                                   ? Row(
-                                       children: [
-                                         Icon(Icons.info_outline, color: Colors.orange[600], size: 20),
-                                         const SizedBox(width: 8),
-                                         Expanded(
-                                           child: Text(
-                                             'No secretaries available for this location',
-                                             style: TextStyle(color: Colors.orange[600], fontSize: 14),
-                                           ),
-                                         ),
-                                       ],
+                                   ? Text(
+                                       'Select a secretary',
+                                       style: TextStyle(color: Colors.grey[600]),
                                      )
                                    : Text(
                                        _getSelectedSecretaryName() ?? 'Select a secretary',
                                        style: TextStyle(
-                                         color: _getSelectedSecretaryName() != null 
+                                         color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
                                              ? Colors.black87 
                                              : Colors.grey[600],
                                          fontSize: 16,
@@ -2778,19 +2775,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
      );
    }
 
-   // Get selected secretary name
-   String? _getSelectedSecretaryName() {
-     if (_selectedSecretary == null) return null;
-     final selectedSecretary = _secretaries.firstWhere(
-       (secretary) => secretary['id'] == _selectedSecretary,
-       orElse: () => {},
-     );
-     return selectedSecretary['name'];
-   }
+     // Get selected secretary name
+  String? _getSelectedSecretaryName() {
+    if (_selectedSecretary == null) return 'None - I am not in touch with any secretary';
+    final selectedSecretary = _secretaries.firstWhere(
+      (secretary) => secretary['id'] == _selectedSecretary,
+      orElse: () => {},
+    );
+    return selectedSecretary['name'];
+  }
 
    // Show secretary bottom sheet
    void _showSecretaryBottomSheet() {
-     if (_selectedLocationId == null || _isLoadingSecretaries || _secretaryErrorMessage != null || _secretaries.isEmpty) {
+     if (_selectedLocationId == null || _isLoadingSecretaries || _secretaryErrorMessage != null) {
        return; // Don't show bottom sheet if conditions aren't met
      }
 
@@ -2840,42 +2837,89 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
              
              // Secretary List
              Flexible(
-               child: ListView.builder(
+               child: ListView(
                  shrinkWrap: true,
-                 itemCount: _secretaries.length,
-                 itemBuilder: (context, index) {
-                   final secretary = _secretaries[index];
-                   final secretaryName = secretary['name'] ?? 'Unknown Secretary';
-                   final isSelected = _selectedSecretary == secretary['id'];
-                   
-                   return ListTile(
+                 children: [
+                   // None option at the top
+                   ListTile(
                      leading: CircleAvatar(
-                       backgroundColor: isSelected ? Colors.deepPurple : Colors.grey[300],
-                       child: Text(
-                         secretaryName.isNotEmpty ? secretaryName[0].toUpperCase() : '?',
-                         style: TextStyle(
-                           color: isSelected ? Colors.white : Colors.grey[600],
-                           fontWeight: FontWeight.bold,
-                         ),
+                       backgroundColor: _selectedSecretary == null ? Colors.deepPurple : Colors.grey[300],
+                       child: Icon(
+                         Icons.person_off,
+                         color: _selectedSecretary == null ? Colors.white : Colors.grey[600],
+                         size: 20,
                        ),
                      ),
                      title: Text(
-                       secretaryName,
+                       'None - I am not in touch with any secretary',
                        style: TextStyle(
-                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                         color: isSelected ? Colors.deepPurple : Colors.black87,
+                         fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
+                         color: _selectedSecretary == null ? Colors.deepPurple : Colors.black87,
                        ),
                      ),
-                     trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+                     trailing: _selectedSecretary == null ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
                      onTap: () {
                        setState(() {
-                         _selectedSecretary = secretary['id'];
+                         _selectedSecretary = null;
                        });
                        _validateForm();
                        Navigator.pop(context);
                      },
-                   );
-                 },
+                   ),
+                   
+                   // Divider between None and secretary options
+                   const Divider(height: 1),
+                   
+                   // Show message if no secretaries available
+                   if (_secretaries.isEmpty) ...[
+                     Padding(
+                       padding: const EdgeInsets.all(16),
+                       child: Text(
+                         'No secretaries available for this location',
+                         style: TextStyle(
+                           color: Colors.grey[600],
+                           fontSize: 14,
+                           fontStyle: FontStyle.italic,
+                         ),
+                         textAlign: TextAlign.center,
+                       ),
+                     ),
+                   ] else ...[
+                     // Secretary options
+                     ..._secretaries.map((secretary) {
+                     final secretaryName = secretary['name'] ?? 'Unknown Secretary';
+                     final isSelected = _selectedSecretary == secretary['id'];
+                     
+                     return ListTile(
+                       leading: CircleAvatar(
+                         backgroundColor: isSelected ? Colors.deepPurple : Colors.grey[300],
+                         child: Text(
+                           secretaryName.isNotEmpty ? secretaryName[0].toUpperCase() : '?',
+                           style: TextStyle(
+                             color: isSelected ? Colors.white : Colors.grey[600],
+                             fontWeight: FontWeight.bold,
+                           ),
+                         ),
+                       ),
+                       title: Text(
+                         secretaryName,
+                         style: TextStyle(
+                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                           color: isSelected ? Colors.deepPurple : Colors.black87,
+                         ),
+                       ),
+                       trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+                       onTap: () {
+                         setState(() {
+                           _selectedSecretary = secretary['id'];
+                         });
+                         _validateForm();
+                         Navigator.pop(context);
+                       },
+                     );
+                   }).toList(),
+                   ],
+                 ],
                ),
              ),
              
@@ -3157,6 +3201,274 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     } catch (e) {
       print('⚠️ Failed to parse phone string "$value": $e');
       return {'countryCode': defaultCode, 'number': ''};
+    }
+  }
+
+  // Location search functionality
+  Future<void> _searchLocations(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _locationSuggestions = [];
+        _isSearchingLocations = false;
+      });
+      return;
+    }
+
+    // Don't search if query is too short
+    if (query.trim().length < 3) {
+      setState(() {
+        _locationSuggestions = [];
+        _isSearchingLocations = false;
+      });
+      return;
+    }
+
+    // Don't search if it's the same query
+    if (_lastSearchQuery == query.trim()) {
+      return;
+    }
+
+    setState(() {
+      _isSearchingLocations = true;
+      _lastSearchQuery = query.trim();
+    });
+
+    try {
+      print('🔍 Searching locations for: "$query"');
+      
+      final response = await http.get(
+        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'AppointmentApp/1.0', // Required by Nominatim
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        
+        final List<Map<String, dynamic>> suggestions = data.map((item) {
+          final address = item['address'] as Map<String, dynamic>? ?? {};
+          final displayName = item['display_name'] as String? ?? '';
+          
+          // Create a formatted display name
+          String formattedName = displayName;
+          if (address.isNotEmpty) {
+            final city = address['city'] ?? address['town'] ?? address['village'] ?? '';
+            final state = address['state'] ?? '';
+            final country = address['country'] ?? '';
+            
+            if (city.isNotEmpty && state.isNotEmpty) {
+              formattedName = '$city, $state';
+              if (country.isNotEmpty) {
+                formattedName += ', $country';
+              }
+            }
+          }
+          
+          return {
+            'display_name': formattedName,
+            'full_display_name': displayName,
+            'lat': item['lat']?.toString() ?? '',
+            'lon': item['lon']?.toString() ?? '',
+            'type': item['type']?.toString() ?? '',
+            'address': address,
+          };
+        }).toList();
+
+        setState(() {
+          _locationSuggestions = suggestions;
+          _isSearchingLocations = false;
+        });
+        
+        print('✅ Found ${suggestions.length} location suggestions');
+      } else {
+        print('❌ Location search failed: ${response.statusCode}');
+        setState(() {
+          _locationSuggestions = [];
+          _isSearchingLocations = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error searching locations: $e');
+      setState(() {
+        _locationSuggestions = [];
+        _isSearchingLocations = false;
+      });
+    }
+  }
+
+  void _selectLocation(Map<String, dynamic> location) {
+    final displayName = location['display_name'] as String? ?? '';
+    _guestLocationController.text = displayName;
+    
+    setState(() {
+      _locationSuggestions = [];
+      _isSearchingLocations = false;
+    });
+    
+    print('📍 Selected location: $displayName');
+  }
+
+  void _clearLocationSuggestions() {
+    setState(() {
+      _locationSuggestions = [];
+      _isSearchingLocations = false;
+    });
+  }
+
+  // Build location search field with dropdown
+  Widget _buildLocationSearchField() {
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Location',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+        
+        // Search input field
+        TextField(
+          controller: _guestLocationController,
+          onChanged: (value) {
+            // Debounce the search
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_guestLocationController.text == value) {
+                _searchLocations(value);
+              }
+            });
+          },
+          onTap: () {
+            // Show suggestions if there's text
+            if (_guestLocationController.text.isNotEmpty) {
+              _searchLocations(_guestLocationController.text);
+            }
+          },
+          decoration: InputDecoration(
+            hintText: 'Start typing guest\'s location...',
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.deepPurple),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            suffixIcon: _isSearchingLocations
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : _guestLocationController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _guestLocationController.clear();
+                          _clearLocationSuggestions();
+                        },
+                      )
+                    : const Icon(Icons.search, color: Colors.grey),
+          ),
+        ),
+        
+        // Location suggestions dropdown
+        if (_locationSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _locationSuggestions.length,
+              itemBuilder: (context, index) {
+                final location = _locationSuggestions[index];
+                final displayName = location['display_name'] as String? ?? '';
+                final type = location['type'] as String? ?? '';
+                
+                return ListTile(
+                  dense: true,
+                  leading: Icon(
+                    _getLocationIcon(type),
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
+                  title: Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: type.isNotEmpty
+                      ? Text(
+                          type.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        )
+                      : null,
+                  onTap: () => _selectLocation(location),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Get appropriate icon for location type
+  IconData _getLocationIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'city':
+      case 'town':
+        return Icons.location_city;
+      case 'village':
+        return Icons.location_on;
+      case 'state':
+      case 'province':
+        return Icons.map;
+      case 'country':
+        return Icons.public;
+      case 'suburb':
+      case 'neighbourhood':
+        return Icons.home;
+      case 'street':
+      case 'road':
+        return Icons.directions;
+      default:
+        return Icons.location_on;
     }
   }
  } 
