@@ -4,6 +4,7 @@ import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../action/jwt_utils.dart';
 import 'user_sidebar.dart';
+import 'edit_appointment_screen.dart';
 
 class UserHistoryScreen extends StatefulWidget {
   const UserHistoryScreen({super.key});
@@ -269,10 +270,12 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
             location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
             appointmentData: appointment, // Pass the complete appointment data
             onEditPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Edit functionality coming soon!'),
-                  backgroundColor: Colors.blue,
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditAppointmentScreen(
+                    appointmentData: appointment,
+                  ),
                 ),
               );
             },
