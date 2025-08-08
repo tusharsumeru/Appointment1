@@ -266,23 +266,65 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   String _getCreatedByName() {
-    return widget.appointment['createdBy']?['name']?.toString() ?? 
-           widget.appointment['createdBy']?['fullName']?.toString() ?? 
-           'Not specified';
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final name = createdBy['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+        final fullName = createdBy['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByName: $e');
+      return 'Not specified';
+    }
   }
 
   String _getCreatedByEmail() {
-    return widget.appointment['createdBy']?['email']?.toString() ?? 
-           widget.appointment['email']?.toString() ?? 
-           'Not specified';
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final email = createdBy['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+      final email = widget.appointment['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByEmail: $e');
+      return 'Not specified';
+    }
   }
 
   String _getCreatedByPhone() {
-    // Try multiple possible phone field locations
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      // Check for phoneNumber object structure
-      final phoneObj = createdBy['phoneNumber'];
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final phoneObj = createdBy['phoneNumber'];
+        if (phoneObj is Map<String, dynamic>) {
+          final countryCode = phoneObj['countryCode']?.toString() ?? '';
+          final number = phoneObj['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            return '$countryCode $number';
+          }
+        }
+        
+        final phone = createdBy['phone']?.toString();
+        if (phone != null && phone.isNotEmpty) {
+          return phone;
+        }
+      }
+      
+      final phoneObj = widget.appointment['phoneNumber'];
       if (phoneObj is Map<String, dynamic>) {
         final countryCode = phoneObj['countryCode']?.toString() ?? '';
         final number = phoneObj['number']?.toString() ?? '';
@@ -291,115 +333,154 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         }
       }
       
-      // Check for phone object structure (fallback)
-      final phoneObj2 = createdBy['phone'];
-      if (phoneObj2 is Map<String, dynamic>) {
-        final countryCode = phoneObj2['countryCode']?.toString() ?? '';
-        final number = phoneObj2['number']?.toString() ?? '';
-        if (countryCode.isNotEmpty && number.isNotEmpty) {
-          return '$countryCode $number';
-        }
-      }
-      
-      // Check for simple string phone fields
-      final phone = createdBy['phone']?.toString() ?? 
-                   createdBy['phoneNumber']?.toString() ?? 
-                   createdBy['mobile']?.toString() ?? 
-                   createdBy['contactNumber']?.toString();
+      final phone = widget.appointment['phone']?.toString();
       if (phone != null && phone.isNotEmpty) {
         return phone;
       }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByPhone: $e');
+      return 'Not specified';
     }
-    
-    // Try direct appointment fields
-    final phoneObj = widget.appointment['phoneNumber'];
-    if (phoneObj is Map<String, dynamic>) {
-      final countryCode = phoneObj['countryCode']?.toString() ?? '';
-      final number = phoneObj['number']?.toString() ?? '';
-      if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode $number';
-      }
-    }
-    
-    // Check for phone object structure (fallback)
-    final phoneObj2 = widget.appointment['phone'];
-    if (phoneObj2 is Map<String, dynamic>) {
-      final countryCode = phoneObj2['countryCode']?.toString() ?? '';
-      final number = phoneObj2['number']?.toString() ?? '';
-      if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode $number';
-      }
-    }
-    
-    // Check for simple string phone fields
-    final phone = widget.appointment['phone']?.toString() ?? 
-                 widget.appointment['phoneNumber']?.toString() ?? 
-                 widget.appointment['mobile']?.toString() ?? 
-                 widget.appointment['contactNumber']?.toString();
-    
-    if (phone != null && phone.isNotEmpty) {
-      return phone;
-    }
-    
-    return 'Not specified';
   }
 
   String _getCreatedByDesignation() {
-    // Try direct appointment fields first (these are the correct ones)
-    final designation = widget.appointment['userCurrentDesignation']?.toString() ?? 
-                       widget.appointment['designation']?.toString() ?? 
-                       widget.appointment['currentDesignation']?.toString() ?? 
-                       widget.appointment['jobTitle']?.toString() ?? 
-                       widget.appointment['title']?.toString() ?? 
-                       widget.appointment['role']?.toString();
-    
-    if (designation != null && designation.isNotEmpty) {
-      return designation;
-    }
-    
-    // Try createdBy fields as fallback
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      final designation2 = createdBy['designation']?.toString() ?? 
-                          createdBy['currentDesignation']?.toString() ?? 
-                          createdBy['jobTitle']?.toString() ?? 
-                          createdBy['title']?.toString() ?? 
-                          createdBy['role']?.toString();
+    try {
+      // Try direct appointment fields first (these are the correct ones)
+      final designation = widget.appointment['userCurrentDesignation']?.toString();
+      if (designation != null && designation.isNotEmpty) {
+        return designation;
+      }
+      
+      final designation2 = widget.appointment['designation']?.toString();
       if (designation2 != null && designation2.isNotEmpty) {
         return designation2;
       }
+      
+      final designation3 = widget.appointment['currentDesignation']?.toString();
+      if (designation3 != null && designation3.isNotEmpty) {
+        return designation3;
+      }
+      
+      final designation4 = widget.appointment['jobTitle']?.toString();
+      if (designation4 != null && designation4.isNotEmpty) {
+        return designation4;
+      }
+      
+      final designation5 = widget.appointment['title']?.toString();
+      if (designation5 != null && designation5.isNotEmpty) {
+        return designation5;
+      }
+      
+      final designation6 = widget.appointment['role']?.toString();
+      if (designation6 != null && designation6.isNotEmpty) {
+        return designation6;
+      }
+      
+      // Try createdBy fields as fallback
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final designation7 = createdBy['designation']?.toString();
+        if (designation7 != null && designation7.isNotEmpty) {
+          return designation7;
+        }
+        
+        final designation8 = createdBy['currentDesignation']?.toString();
+        if (designation8 != null && designation8.isNotEmpty) {
+          return designation8;
+        }
+        
+        final designation9 = createdBy['jobTitle']?.toString();
+        if (designation9 != null && designation9.isNotEmpty) {
+          return designation9;
+        }
+        
+        final designation10 = createdBy['title']?.toString();
+        if (designation10 != null && designation10.isNotEmpty) {
+          return designation10;
+        }
+        
+        final designation11 = createdBy['role']?.toString();
+        if (designation11 != null && designation11.isNotEmpty) {
+          return designation11;
+        }
+      }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByDesignation: $e');
+      return 'Not specified';
     }
-    
-    return 'Not specified';
   }
 
   String _getCreatedByCompany() {
-    // Try direct appointment fields first (these are the correct ones)
-    final company = widget.appointment['userCurrentCompany']?.toString() ?? 
-                   widget.appointment['company']?.toString() ?? 
-                   widget.appointment['currentCompany']?.toString() ?? 
-                   widget.appointment['organization']?.toString() ?? 
-                   widget.appointment['employer']?.toString() ?? 
-                   widget.appointment['workplace']?.toString();
-    
-    if (company != null && company.isNotEmpty) {
-      return company;
-    }
-    
-    // Try createdBy fields as fallback
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      final company2 = createdBy['company']?.toString() ?? 
-                      createdBy['currentCompany']?.toString() ?? 
-                      createdBy['organization']?.toString() ?? 
-                      createdBy['employer']?.toString() ?? 
-                      createdBy['workplace']?.toString();
+    try {
+      // Try direct appointment fields first (these are the correct ones)
+      final company = widget.appointment['userCurrentCompany']?.toString();
+      if (company != null && company.isNotEmpty) {
+        return company;
+      }
+      
+      final company2 = widget.appointment['company']?.toString();
       if (company2 != null && company2.isNotEmpty) {
         return company2;
       }
+      
+      final company3 = widget.appointment['currentCompany']?.toString();
+      if (company3 != null && company3.isNotEmpty) {
+        return company3;
+      }
+      
+      final company4 = widget.appointment['organization']?.toString();
+      if (company4 != null && company4.isNotEmpty) {
+        return company4;
+      }
+      
+      final company5 = widget.appointment['employer']?.toString();
+      if (company5 != null && company5.isNotEmpty) {
+        return company5;
+      }
+      
+      final company6 = widget.appointment['workplace']?.toString();
+      if (company6 != null && company6.isNotEmpty) {
+        return company6;
+      }
+      
+      // Try createdBy fields as fallback
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final company7 = createdBy['company']?.toString();
+        if (company7 != null && company7.isNotEmpty) {
+          return company7;
+        }
+        
+        final company8 = createdBy['currentCompany']?.toString();
+        if (company8 != null && company8.isNotEmpty) {
+          return company8;
+        }
+        
+        final company9 = createdBy['organization']?.toString();
+        if (company9 != null && company9.isNotEmpty) {
+          return company9;
+        }
+        
+        final company10 = createdBy['employer']?.toString();
+        if (company10 != null && company10.isNotEmpty) {
+          return company10;
+        }
+        
+        final company11 = createdBy['workplace']?.toString();
+        if (company11 != null && company11.isNotEmpty) {
+          return company11;
+        }
+      }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByCompany: $e');
+      return 'Not specified';
     }
-    
-    return 'Not specified';
   }
 
   void _initializeGuestData() {
@@ -643,9 +724,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (name.isEmpty) return '';
     final parts = name.split(' ');
     if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      final firstPart = parts[0];
+      final secondPart = parts[1];
+      if (firstPart.isNotEmpty && secondPart.isNotEmpty) {
+        return '${firstPart[0]}${secondPart[0]}'.toUpperCase();
+      } else if (firstPart.isNotEmpty) {
+        return firstPart[0].toUpperCase();
+      }
     }
-    return name[0].toUpperCase();
+    if (name.isNotEmpty) {
+      return name[0].toUpperCase();
+    }
+    return '';
   }
 
   // Load locations from API

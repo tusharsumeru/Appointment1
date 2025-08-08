@@ -106,7 +106,7 @@ flutter:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "image/aol-logo.jpg"
+  image_path: "image/aol-logo3.jpg"
   min_sdk_android: 21
   web:
     generate: false

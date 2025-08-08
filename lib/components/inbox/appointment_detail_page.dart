@@ -105,6 +105,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
 
   String _getUserName(int index) {
+    // First, try to get name from face match data if available
+    final faceMatchResults = _faceMatchData[index] ?? [];
+    if (faceMatchResults.isNotEmpty) {
+      final userData = faceMatchResults[0];
+      final fullName = userData['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return fullName;
+      }
+    }
+    
+    // Fallback to appointment data if no face match data available
     // Check if this is a guest appointment
     final appointmentType = widget.appointment['appointmentType']?.toString();
     if (appointmentType?.toLowerCase() == 'guest') {
@@ -182,6 +193,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getUserLabel(int index) {
+    // First, try to get age from face match data if available
+    final faceMatchResults = _faceMatchData[index] ?? [];
+    if (faceMatchResults.isNotEmpty) {
+      final userData = faceMatchResults[0];
+      final age = userData['age']?.toString();
+      if (age != null && age.isNotEmpty) {
+        return '($age years old)';
+      }
+    }
+    
+    // Fallback to appointment data if no face match data available
     // Check if this is a guest appointment
     final appointmentType = widget.appointment['appointmentType']?.toString();
     if (appointmentType?.toLowerCase() == 'guest') {
@@ -261,6 +283,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     if (faceMatchResults.isNotEmpty) {
       final result = faceMatchResults[0]; // Get first result
       
+      // Check if apiResult exists and is not null
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
@@ -269,12 +292,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
         final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
         
-        // Return total count of all matches (no +1 for profile image)
-        return matches30.length + matches60.length + matches90.length;
+        // Return total count of all matches
+        final totalMatches = matches30.length + matches60.length + matches90.length;
+        
+        // Debug: Print match count for this user
+        print('User $index (${result['fullName']}): Total matches = $totalMatches (30d: ${matches30.length}, 60d: ${matches60.length}, 90d: ${matches90.length})');
+        
+        return totalMatches;
+      } else {
+        // apiResult is null - no face match data for this user
+        print('User $index (${result['fullName']}): apiResult is null - no face match data');
+        return 0;
       }
     }
     
     // If no face match data available, return 0 (no matches found)
+    print('User $index: No face match results found');
     return 0;
   }
 
@@ -317,26 +350,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           final faceMatchData = responseData['faceMatchResults'];
           
           if (faceMatchData != null && faceMatchData is List) {
-            // Process the faceMatchResults array
-            for (final resultItem in faceMatchData) {
-              if (resultItem is Map<String, dynamic>) {
-                final userType = resultItem['userType']?.toString();
-                
-                // Match by userType: "main" for index 0, "guest" for index 1
-                if ((userIndex == 0 && userType == 'main') || 
-                    (userIndex == 1 && userType == 'guest')) {
-                  faceMatchResults = [resultItem];
-                  break;
-                }
+            // Process the faceMatchResults array - each item represents a user
+            if (userIndex < faceMatchData.length) {
+              final userResult = faceMatchData[userIndex];
+              if (userResult is Map<String, dynamic>) {
+                faceMatchResults = [userResult];
               }
             }
             
-            // If no match found by userType, try photo URL matching as fallback
+            // If no match found by index, try photo URL matching as fallback
             if (faceMatchResults.isEmpty) {
               final userPhotoUrl = _getUserImageUrl(userIndex);
               for (final resultItem in faceMatchData) {
                 if (resultItem is Map<String, dynamic>) {
-                  final resultPhotoUrl = resultItem['photoUrl']?.toString();
+                  final resultPhotoUrl = resultItem['profilePhotoUrl']?.toString();
                   if (resultPhotoUrl == userPhotoUrl) {
                     faceMatchResults = [resultItem];
                     break;
@@ -345,27 +372,26 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               }
             }
             
-            // If still no match, try index-based matching as final fallback
-            if (faceMatchResults.isEmpty && faceMatchData.isNotEmpty) {
-              final apiIndex = userIndex < faceMatchData.length ? userIndex : 0;
-              final userResult = faceMatchData[apiIndex];
-              if (userResult is Map<String, dynamic>) {
-                faceMatchResults = [userResult];
+            // If still no match, try matching by fullName as final fallback
+            if (faceMatchResults.isEmpty) {
+              final userName = _getUserName(userIndex);
+              for (final resultItem in faceMatchData) {
+                if (resultItem is Map<String, dynamic>) {
+                  final resultName = resultItem['fullName']?.toString();
+                  if (resultName == userName) {
+                    faceMatchResults = [resultItem];
+                    break;
+                  }
+                }
               }
             }
           }
         } else if (responseData != null && responseData is List) {
           // Fallback: if data is directly a list (old structure)
-          for (final resultItem in responseData) {
-            if (resultItem is Map<String, dynamic>) {
-              final userType = resultItem['userType']?.toString();
-              
-              // Match by userType: "main" for index 0, "guest" for index 1
-              if ((userIndex == 0 && userType == 'main') || 
-                  (userIndex == 1 && userType == 'guest')) {
-                faceMatchResults = [resultItem];
-                break;
-              }
+          if (userIndex < responseData.length) {
+            final userResult = responseData[userIndex];
+            if (userResult is Map<String, dynamic>) {
+              faceMatchResults = [userResult];
             }
           }
         }
@@ -376,12 +402,24 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         });
         
         // Debug: Print the results
-        // print('User $userIndex: Found ${faceMatchResults.length} face match results');
-        // if (faceMatchResults.isNotEmpty) {
-        //   print('User $userIndex: First result userType: ${faceMatchResults[0]['userType']}');
-        // } else {
-        //   print('User $userIndex: No face match results found - this is normal for users without face match data');
-        // }
+        print('User $userIndex: Found ${faceMatchResults.length} face match results');
+        if (faceMatchResults.isNotEmpty) {
+          final userData = faceMatchResults[0];
+          print('User $userIndex: User name: ${userData['fullName']}');
+          print('User $userIndex: Age: ${userData['age']}');
+          print('User $userIndex: Profile photo: ${userData['profilePhotoUrl']}');
+          final apiResult = userData['apiResult'];
+          if (apiResult != null) {
+            final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+            final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+            final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+            print('User $userIndex: Matches - 30d: ${matches30.length}, 60d: ${matches60.length}, 90d: ${matches90.length}');
+          } else {
+            print('User $userIndex: apiResult is null - no face match data available');
+          }
+        } else {
+          print('User $userIndex: No face match results found');
+        }
       } else {
         setState(() {
           _faceMatchErrors[userIndex] = result['message'] ?? 'Failed to fetch face match results';
@@ -423,6 +461,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getUserImageUrl(int userIndex) {
+    // First, try to get profile photo from face match data if available
+    final faceMatchResults = _faceMatchData[userIndex] ?? [];
+    if (faceMatchResults.isNotEmpty) {
+      final userData = faceMatchResults[0];
+      final imageUrl = userData['profilePhotoUrl']?.toString();
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return imageUrl;
+      }
+    }
+    
+    // Fallback to appointment data if no face match data available
     // Check if this is a guest appointment
     final appointmentType = widget.appointment['appointmentType']?.toString();
     if (appointmentType?.toLowerCase() == 'guest') {
@@ -2333,6 +2382,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     final userLabel = _getUserLabel(actualIndex);
                     final userMatches = _getUserMatches(actualIndex);
                     
+                    // Debug: Print what data is being used for each card
+                    print('Building card for index $actualIndex: Name="$userName", Label="$userLabel", Matches=$userMatches');
+                    
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: _buildUserCard(
@@ -2396,8 +2448,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildUserCard(String name, String label, int matches, bool isMainUser, int userIndex) {
-    // Only make cards clickable if there are matches (count > 0)
-    bool isClickable = matches > 0;
+    // Make cards clickable if there is face match data available and apiResult is not null
+    bool isClickable = _faceMatchData[userIndex]?.isNotEmpty == true && 
+                      _faceMatchData[userIndex]![0]['apiResult'] != null;
     
     return GestureDetector(
       onTap: isClickable ? () => _navigateToUserImages(name, matches, userIndex) : null,
@@ -2479,16 +2532,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                             _isLoadingFaceMatch[userIndex] == true
                               ? 'Loading matches...'
                               : _faceMatchData[userIndex]?.isNotEmpty == true
-                                ? matches > 0 
+                                ? _faceMatchData[userIndex]![0]['apiResult'] != null
                                   ? 'Total Matches Found : $matches'
-                                  : 'No matches found'
+                                  : 'No face match data available'
                                 : 'No face match data available',
                             style: TextStyle(
                               fontSize: 12,
                               color: _isLoadingFaceMatch[userIndex] == true
                                 ? Colors.blue[600]
                                 : _faceMatchData[userIndex]?.isNotEmpty == true
-                                  ? matches > 0
+                                  ? _faceMatchData[userIndex]![0]['apiResult'] != null
                                     ? Colors.grey[600]
                                     : Colors.grey[500]
                                   : Colors.grey[500],
@@ -2497,14 +2550,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                             softWrap: true,
                           ),
                         ),
-                        if (matches > 0) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.photo_library,
-                            size: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ] else if (_isLoadingFaceMatch[userIndex] == true) ...[
+                        if (_isLoadingFaceMatch[userIndex] == true) ...[
                           const SizedBox(width: 4),
                           SizedBox(
                             width: 14,
@@ -2513,6 +2559,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
                             ),
+                          ),
+                        ] else if (_faceMatchData[userIndex]?.isNotEmpty == true && 
+                                   _faceMatchData[userIndex]![0]['apiResult'] != null) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.photo_library,
+                            size: 14,
+                            color: Colors.grey[600],
                           ),
                         ],
                       ],

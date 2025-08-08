@@ -11,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://b23abcea76aa.ngrok-free.app/api/v3'; // API base URL
+      'https://c7e670fdfa51.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -5250,7 +5250,7 @@ class ActionService {
         if (responseData['data'] != null) {
           await StorageService.saveUserData(responseData['data']);
         }
-        
+
         return {
           'success': true,
           'statusCode': 200,
