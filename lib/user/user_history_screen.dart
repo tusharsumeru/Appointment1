@@ -295,7 +295,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
             attendeesCount: _calculateTotalAttendees(appointment),
             attendeePhotos: _extractAttendeePhotos(appointment),
             purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
-            assignedTo: 'Not assigned yet',
+            assignedTo: _formatAssignedSecretary(appointment),
             dateRange: _formatPreferredDateRange(appointment),
             daysCount: _calculateDaysCount(appointment),
             email: appointment['email'] ?? 'N/A',
@@ -446,6 +446,21 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
     }
   }
 
+  String _formatAssignedSecretary(Map<String, dynamic> appointment) {
+    try {
+      final assignedSecretary = appointment['assignedSecretary'];
+      if (assignedSecretary is Map<String, dynamic>) {
+        final fullName = assignedSecretary['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+      return 'Not assigned yet';
+    } catch (e) {
+      return 'Not assigned yet';
+    }
+  }
+
   String _formatPreferredDateRange(Map<String, dynamic> appointment) {
     try {
       // Check for preferred date range
@@ -499,36 +514,20 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateTotalAttendees(Map<String, dynamic> appointment) {
     try {
-      // First, try to get the numberOfUsers from the main appointment data
+      // Check for accompanyUsers first (this is the most reliable source)
+      final accompanyUsers = appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+        return numberOfUsers + 1; // Add 1 for the main user
+      }
+      
+      // Fallback: check for numberOfUsers in main appointment data
       final numberOfUsers = appointment['numberOfUsers'];
       if (numberOfUsers != null) {
         return (numberOfUsers as num).toInt();
       }
       
-      // Fallback: calculate from accompanying users
-      final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null) {
-        // If numberOfUsers is set in accompanyUsers, use it
-        if (accompanyUsers['numberOfUsers'] != null) {
-          return (accompanyUsers['numberOfUsers'] as num).toInt();
-        }
-        
-        // Otherwise, count the users array + 1 for main user
-        final users = accompanyUsers['users'];
-        if (users != null && users is List) {
-          return users.length + 1; // +1 for main user
-        }
-      }
-      
-      // If no accompanying users data, check appointment type
-      final appointmentType = appointment['appointmentType'];
-      final appointmentFor = appointment['appointmentFor'];
-      
-      bool isForMyself = appointmentType == 'myself' || 
-                        (appointmentFor != null && appointmentFor['type'] == 'myself');
-      
-      // For myself appointments, return 1 (just the main user)
-      // For guest appointments, return 1 (just the main user if no accompanying users)
+      // If no data available, return 1 (at least the main user)
       return 1;
     } catch (e) {
       print('Error calculating total attendees: $e');

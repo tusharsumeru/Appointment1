@@ -262,35 +262,68 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _mainGuestPhotoUrl = guestInformation['profilePhotoUrl']?.toString();
       
       // Load phone number
-      final phoneNumber = guestInformation['phoneNumber']?.toString();
-      if (phoneNumber != null && phoneNumber.isNotEmpty) {
-        // Parse phone number to extract country code and number
-        if (phoneNumber.startsWith('+')) {
-          final parts = phoneNumber.substring(1).split(' ');
-          if (parts.length >= 2) {
-            final countryCode = parts[0];
-            final number = parts.sublist(1).join('');
-            _guestPhoneController.text = number;
+      final phoneNumber = guestInformation['phoneNumber'];
+      print('📞 Loading main guest phone number: $phoneNumber');
+      if (phoneNumber != null) {
+        if (phoneNumber is Map<String, dynamic>) {
+          // Phone number is stored as an object with countryCode and number
+          final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+          final number = phoneNumber['number']?.toString() ?? '';
+          
+          if (number.isNotEmpty) {
+            // Set combined format: +countryCode + number
+            final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+            _guestPhoneController.text = '+$cleanCountryCode$number';
+            print('📞 Parsed main guest phone: +$cleanCountryCode$number');
             
             // Set country
             _selectedCountry = Country(
-              phoneCode: countryCode,
+              phoneCode: cleanCountryCode,
               countryCode: 'IN', // Default to India
               e164Sc: 0,
               geographic: true,
               level: 1,
               name: 'India',
               example: '9876543210',
-              displayName: 'India (IN) [+$countryCode]',
+              displayName: 'India (IN) [+$cleanCountryCode]',
               displayNameNoCountryCode: 'India (IN)',
-              e164Key: '$countryCode-IN-0',
+              e164Key: '$cleanCountryCode-IN-0',
             );
-          } else {
-            _guestPhoneController.text = phoneNumber.substring(1);
           }
-        } else {
-          _guestPhoneController.text = phoneNumber;
+        } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
+          // Fallback: phone number is stored as a string
+          if (phoneNumber.startsWith('+')) {
+            final parts = phoneNumber.substring(1).split(' ');
+            if (parts.length >= 2) {
+              final countryCode = parts[0];
+              final number = parts.sublist(1).join('');
+              _guestPhoneController.text = '+$countryCode$number';
+              print('📞 Parsed main guest phone: +$countryCode$number');
+              
+              // Set country
+              _selectedCountry = Country(
+                phoneCode: countryCode,
+                countryCode: 'IN', // Default to India
+                e164Sc: 0,
+                geographic: true,
+                level: 1,
+                name: 'India',
+                example: '9876543210',
+                displayName: 'India (IN) [+$countryCode]',
+                displayNameNoCountryCode: 'India (IN)',
+                e164Key: '$countryCode-IN-0',
+              );
+            } else {
+              _guestPhoneController.text = phoneNumber;
+              print('📞 Main guest phone (no country code): $phoneNumber');
+            }
+          } else {
+            _guestPhoneController.text = phoneNumber;
+            print('📞 Main guest phone (no + prefix): $phoneNumber');
+          }
         }
+      } else {
+        print('📞 No main guest phone number found');
       }
     }
 
@@ -343,33 +376,66 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           final ageController = TextEditingController(text: user['age']?.toString() ?? '');
 
           // Parse phone number
-          final phoneNumber = user['phoneNumber']?.toString();
-          if (phoneNumber != null && phoneNumber.isNotEmpty) {
-            if (phoneNumber.startsWith('+')) {
-              final parts = phoneNumber.substring(1).split(' ');
-              if (parts.length >= 2) {
-                final countryCode = parts[0];
-                final number = parts.sublist(1).join('');
-                phoneController.text = number;
+          final phoneNumber = user['phoneNumber'];
+          print('📞 Loading accompanying user $guestNumber phone number: $phoneNumber');
+          if (phoneNumber != null) {
+            if (phoneNumber is Map<String, dynamic>) {
+              // Phone number is stored as an object with countryCode and number
+              final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+              final number = phoneNumber['number']?.toString() ?? '';
+              
+              if (number.isNotEmpty) {
+                // Set combined format: +countryCode + number
+                final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                phoneController.text = '+$cleanCountryCode$number';
+                print('📞 Accompanying user $guestNumber phone: +$cleanCountryCode$number');
                 
                 _guestCountries[guestNumber] = Country(
-                  phoneCode: countryCode,
+                  phoneCode: cleanCountryCode,
                   countryCode: 'IN',
                   e164Sc: 0,
                   geographic: true,
                   level: 1,
                   name: 'India',
                   example: '9876543210',
-                  displayName: 'India (IN) [+$countryCode]',
+                  displayName: 'India (IN) [+$cleanCountryCode]',
                   displayNameNoCountryCode: 'India (IN)',
-                  e164Key: '$countryCode-IN-0',
+                  e164Key: '$cleanCountryCode-IN-0',
                 );
-              } else {
-                phoneController.text = phoneNumber.substring(1);
               }
-            } else {
-              phoneController.text = phoneNumber;
+            } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
+              // Fallback: phone number is stored as a string
+              if (phoneNumber.startsWith('+')) {
+                final parts = phoneNumber.substring(1).split(' ');
+                if (parts.length >= 2) {
+                  final countryCode = parts[0];
+                  final number = parts.sublist(1).join('');
+                  phoneController.text = '+$countryCode$number';
+                  print('📞 Accompanying user $guestNumber phone: +$countryCode$number');
+                  
+                  _guestCountries[guestNumber] = Country(
+                    phoneCode: countryCode,
+                    countryCode: 'IN',
+                    e164Sc: 0,
+                    geographic: true,
+                    level: 1,
+                    name: 'India',
+                    example: '9876543210',
+                    displayName: 'India (IN) [+$countryCode]',
+                    displayNameNoCountryCode: 'India (IN)',
+                    e164Key: '$countryCode-IN-0',
+                  );
+                } else {
+                  phoneController.text = phoneNumber;
+                  print('📞 Accompanying user $guestNumber phone (no country code): $phoneNumber');
+                }
+              } else {
+                phoneController.text = phoneNumber;
+                print('📞 Accompanying user $guestNumber phone (no + prefix): $phoneNumber');
+              }
             }
+          } else {
+            print('📞 No phone number found for accompanying user $guestNumber');
           }
 
           _guestControllers.add({
@@ -684,9 +750,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Add guest information if appointment type is guest
       if (_isGuestAppointment) {
-        final countryCode = '+${_selectedCountry.phoneCode}';
-        final phoneNumber = _guestPhoneController.text.trim();
-        final fullPhoneNumber = '$countryCode$phoneNumber';
+        final phoneText = _guestPhoneController.text.trim();
+        String fullPhoneNumber = phoneText;
+        
+        // If the phone number doesn't start with +, add the country code
+        if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
+          final countryCode = '+${_selectedCountry.phoneCode}';
+          fullPhoneNumber = '$countryCode$phoneText';
+        }
+        
+        print('📞 Saving main guest phone: $fullPhoneNumber');
         
         Map<String, dynamic> guestInfo = {
           'fullName': _guestNameController.text.trim(),
@@ -718,9 +791,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
           
-          final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
-          final phoneNumber = guest['phone']?.text.trim() ?? '';
-          final fullPhoneNumber = '$countryCode$phoneNumber';
+          final phoneText = guest['phone']?.text.trim() ?? '';
+          String fullPhoneNumber = phoneText;
+          
+          // If the phone number doesn't start with +, add the country code
+          if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
+            final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
+            fullPhoneNumber = '$countryCode$phoneText';
+          }
+          
+          print('📞 Saving accompanying user $guestNumber phone: $fullPhoneNumber');
           
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
@@ -1315,6 +1395,61 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  void _updatePhoneNumberWithCountryCode(int guestNumber, String newCountryCode) {
+    if (guestNumber > 0 && guestNumber <= _guestControllers.length) {
+      final controller = _guestControllers[guestNumber - 1]['phone'];
+      if (controller != null) {
+        final currentText = controller.text;
+        if (currentText.isNotEmpty) {
+          // Extract the number part (remove existing country code)
+          String numberPart = currentText;
+          if (currentText.startsWith('+')) {
+            // Remove the + and existing country code
+            numberPart = currentText.substring(1);
+            // Find where the country code ends and number begins
+            for (int i = 1; i <= numberPart.length; i++) {
+              final possibleCountryCode = numberPart.substring(0, i);
+              if (possibleCountryCode == newCountryCode) {
+                numberPart = numberPart.substring(i);
+                break;
+              }
+            }
+          }
+          // Set the new combined format
+          controller.text = '+$newCountryCode$numberPart';
+          controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: controller.text.length),
+          );
+        }
+      }
+    }
+  }
+
+  void _updateMainGuestPhoneNumberWithCountryCode(String newCountryCode) {
+    final currentText = _guestPhoneController.text;
+    if (currentText.isNotEmpty) {
+      // Extract the number part (remove existing country code)
+      String numberPart = currentText;
+      if (currentText.startsWith('+')) {
+        // Remove the + and existing country code
+        numberPart = currentText.substring(1);
+        // Find where the country code ends and number begins
+        for (int i = 1; i <= numberPart.length; i++) {
+          final possibleCountryCode = numberPart.substring(0, i);
+          if (possibleCountryCode == newCountryCode) {
+            numberPart = numberPart.substring(i);
+            break;
+          }
+        }
+      }
+      // Set the new combined format
+      _guestPhoneController.text = '+$newCountryCode$numberPart';
+      _guestPhoneController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _guestPhoneController.text.length),
+      );
+    }
+  }
+
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1441,6 +1576,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   onSelect: (Country country) {
                     setState(() {
                       _selectedCountry = country;
+                      // Update the phone number with new country code
+                      _updateMainGuestPhoneNumberWithCountryCode(country.phoneCode);
                     });
                   },
                 );
@@ -1467,13 +1604,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ),
               ),
             ),
-            // Phone number field
+            // Phone number field with combined format
             Expanded(
               child: TextFormField(
                 controller: _guestPhoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  hintText: 'Enter mobile number',
+                decoration: InputDecoration(
+                  hintText: '+${_selectedCountry.phoneCode} Enter mobile number',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.only(
                       topRight: Radius.circular(8),
@@ -1482,7 +1619,130 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   ),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-                onChanged: (_) => _validateForm(),
+                onChanged: (value) {
+                  // Ensure the phone number starts with the country code
+                  if (value.isNotEmpty && !value.startsWith('+')) {
+                    // If user enters number without +, add the country code
+                    if (!value.startsWith(_selectedCountry.phoneCode)) {
+                      final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                      _guestPhoneController.text = '+${_selectedCountry.phoneCode}$cleanValue';
+                      _guestPhoneController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _guestPhoneController.text.length),
+                      );
+                    }
+                  }
+                  _validateForm();
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
+    // Get the country for this guest
+    final country = _guestCountries[guestNumber] ?? _selectedCountry;
+    final countryCode = country.phoneCode;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Phone',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            // Country picker button
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country selectedCountry) {
+                    setState(() {
+                      _guestCountries[guestNumber] = selectedCountry;
+                      // Update the phone number with new country code
+                      _updatePhoneNumberWithCountryCode(guestNumber, selectedCountry.phoneCode);
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '+$countryCode',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            // Phone number field with combined format
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  hintText: '+$countryCode Enter phone number',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onChanged: (value) {
+                  // Ensure the phone number starts with the country code
+                  if (value.isNotEmpty && !value.startsWith('+')) {
+                    // If user enters number without +, add the country code
+                    if (!value.startsWith(countryCode)) {
+                      final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                      controller.text = '+$countryCode$cleanValue';
+                      controller.selection = TextSelection.fromPosition(
+                        TextPosition(offset: controller.text.length),
+                      );
+                    }
+                  }
+                  _validateForm();
+                },
               ),
             ),
           ],
@@ -1546,12 +1806,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             const SizedBox(height: 12),
             
             // Phone
-            _buildReferenceField(
-              label: 'Phone',
-              controller: guest['phone']!,
-              placeholder: 'Enter phone number',
-              keyboardType: TextInputType.phone,
-            ),
+            _buildAccompanyingUserPhoneField(guestNumber, guest['phone']!),
             
             // Photo Section (only show if age >= 12)
             if (isPhotoRequired) ...[
