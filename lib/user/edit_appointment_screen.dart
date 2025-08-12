@@ -1545,97 +1545,95 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            // Country picker button
-        GestureDetector(
-          onTap: () {
-                showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-                    bottomSheetHeight: 500,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                    inputDecoration: InputDecoration(
-                      labelText: 'Search',
-                      hintText: 'Start typing to search',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: const Color(0xFF8C98A8).withOpacity(0.2),
-                        ),
-                      ),
-                    ),
-                  ),
-                  onSelect: (Country country) {
-                    setState(() {
-                      _selectedCountry = country;
-                      // Update the phone number with new country code
-                      _updateMainGuestPhoneNumberWithCountryCode(country.phoneCode);
-                    });
-                  },
-                );
-          },
-          child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-            ),
-            child: Row(
-                  mainAxisSize: MainAxisSize.min,
-              children: [
-                    Text(
-                      '+${_selectedCountry.phoneCode}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20),
-                  ],
-                ),
+        // Row(
+        //   children: [
+        //     // Country picker button - UI COMMENTED OUT
+        // GestureDetector(
+        //   onTap: () {
+        //         showCountryPicker(
+        //           context: context,
+        //           showPhoneCode: true,
+        //           countryListTheme: CountryListThemeData(
+        //             flagSize: 25,
+        //             backgroundColor: Colors.white,
+        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+        //             bottomSheetHeight: 500,
+        //             borderRadius: const BorderRadius.only(
+        //               topLeft: Radius.circular(20.0),
+        //               topRight: Radius.circular(20.0),
+        //             ),
+        //             inputDecoration: InputDecoration(
+        //               labelText: 'Search',
+        //               hintText: 'Start typing to search',
+        //               prefixIcon: const Icon(Icons.search),
+        //               border: OutlineInputBorder(
+        //                 borderSide: BorderSide(
+        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
+        //                 ),
+        //               ),
+        //             ),
+        //           ),
+        //           onSelect: (Country country) {
+        //             setState(() {
+        //               _selectedCountry = country;
+        //               // Update the phone number with new country code
+        //               _updateMainGuestPhoneNumberWithCountryCode(country.phoneCode);
+        //             });
+        //           },
+        //         );
+        //   },
+        //   child: Container(
+        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        //     decoration: BoxDecoration(
+        //           border: Border.all(color: Colors.grey.shade300),
+        //           borderRadius: const BorderRadius.only(
+        //             topLeft: Radius.circular(8),
+        //             bottomLeft: Radius.circular(8),
+        //           ),
+        //     ),
+        //     child: Row(
+        //           mainAxisSize: MainAxisSize.min,
+        //       children: [
+        //             Text(
+        //               '+${_selectedCountry.phoneCode}',
+        //               style: const TextStyle(fontSize: 16),
+        //             ),
+        //             const SizedBox(width: 4),
+        //             const Icon(Icons.arrow_drop_down, size: 20),
+        //           ],
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // Phone number field with combined format - FULL WIDTH (country picker commented out)
+        SizedBox(
+          width: double.infinity,
+          child: TextFormField(
+            controller: _guestPhoneController,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: '+${_selectedCountry.phoneCode} Enter mobile number',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
-            // Phone number field with combined format
-            Expanded(
-              child: TextFormField(
-                controller: _guestPhoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  hintText: '+${_selectedCountry.phoneCode} Enter mobile number',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
-                    ),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                onChanged: (value) {
-                  // Ensure the phone number starts with the country code
-                  if (value.isNotEmpty && !value.startsWith('+')) {
-                    // If user enters number without +, add the country code
-                    if (!value.startsWith(_selectedCountry.phoneCode)) {
-                      final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
-                      _guestPhoneController.text = '+${_selectedCountry.phoneCode}$cleanValue';
-                      _guestPhoneController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: _guestPhoneController.text.length),
-                      );
-                    }
-                  }
-                  _validateForm();
-                },
-              ),
-            ),
-          ],
+            onChanged: (value) {
+              // Ensure the phone number starts with the country code
+              if (value.isNotEmpty && !value.startsWith('+')) {
+                // If user enters number without +, add the country code
+                if (!value.startsWith(_selectedCountry.phoneCode)) {
+                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                  _guestPhoneController.text = '+${_selectedCountry.phoneCode}$cleanValue';
+                  _guestPhoneController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _guestPhoneController.text.length),
+                  );
+                }
+              }
+              _validateForm();
+            },
+          ),
         ),
       ],
     );
@@ -1658,94 +1656,95 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            // Country picker button
-            GestureDetector(
-              onTap: () {
-                showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-                    bottomSheetHeight: 500,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                    inputDecoration: InputDecoration(
-                      labelText: 'Search',
-                      hintText: 'Start typing to search',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: const Color(0xFF8C98A8).withOpacity(0.2),
-                        ),
-                      ),
-                    ),
-                  ),
-                  onSelect: (Country selectedCountry) {
-                    setState(() {
-                      _guestCountries[guestNumber] = selectedCountry;
-                      // Update the phone number with new country code
-                      _updatePhoneNumberWithCountryCode(guestNumber, selectedCountry.phoneCode);
-                    });
-                  },
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '+$countryCode',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20),
-                  ],
-                ),
+        // Row(
+        //   children: [
+        //     // Country picker button - UI COMMENTED OUT
+        //     GestureDetector(
+        //       onTap: () {
+        //         showCountryPicker(
+        //           context: context,
+        //           showPhoneCode: true,
+        //           countryListTheme: CountryListThemeData(
+        //             flagSize: 25,
+        //             backgroundColor: Colors.white,
+        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+        //             bottomSheetHeight: 500,
+        //             borderRadius: const BorderRadius.only(
+        //               topLeft: Radius.circular(20.0),
+        //               topRight: Radius.circular(20.0),
+        //             ),
+        //             inputDecoration: InputDecoration(
+        //               labelText: 'Search',
+        //               hintText: 'Start typing to search',
+        //               prefixIcon: const Icon(Icons.search),
+        //               border: OutlineInputBorder(
+        //                 borderSide: BorderSide(
+        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
+        //                 ),
+        //               ),
+        //             ),
+        //           ),
+        //           onSelect: (Country selectedCountry) {
+        //             setState(() {
+        //               _guestCountries[guestNumber] = selectedCountry;
+        //               // Update the phone number with new country code
+        //               _updatePhoneNumberWithCountryCode(guestNumber, selectedCountry.phoneCode);
+        //             });
+        //           },
+        //         );
+        //       },
+        //       child: Container(
+        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        //         decoration: BoxDecoration(
+        //           border: Border.all(color: Colors.grey.shade300),
+        //           borderRadius: const BorderRadius.only(
+        //             topLeft: Radius.circular(8),
+        //             bottomLeft: Radius.circular(8),
+        //           ),
+        //         ),
+        //         child: Row(
+        //           mainAxisSize: MainAxisSize.min,
+        //           children: [
+        //             Text(
+        //               '+$countryCode',
+        //               style: const TextStyle(fontSize: 16),
+        //             ),
+        //             const SizedBox(width: 4),
+        //             const Icon(Icons.arrow_drop_down, size: 20),
+        //           ],
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // Phone number field with combined format - FULL WIDTH (country picker commented out)
+        SizedBox(
+          width: double.infinity,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: '+$countryCode Enter phone number',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
-            // Phone number field with combined format
-            Expanded(
-              child: TextFormField(
-                controller: controller,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  hintText: '+$countryCode Enter phone number',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                onChanged: (value) {
-                  // Ensure the phone number starts with the country code
-                  if (value.isNotEmpty && !value.startsWith('+')) {
-                    // If user enters number without +, add the country code
-                    if (!value.startsWith(countryCode)) {
-                      final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
-                      controller.text = '+$countryCode$cleanValue';
-                      controller.selection = TextSelection.fromPosition(
-                        TextPosition(offset: controller.text.length),
-                      );
-                    }
-                  }
-                  _validateForm();
-                },
-              ),
-            ),
-          ],
+            onChanged: (value) {
+              // Ensure the phone number starts with the country code
+              if (value.isNotEmpty && !value.startsWith('+')) {
+                // If user enters number without +, add the country code
+                if (!value.startsWith(countryCode)) {
+                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                  controller.text = '+$countryCode$cleanValue';
+                  controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: controller.text.length),
+                  );
+                }
+              }
+              _validateForm();
+            },
+          ),
         ),
       ],
     );
