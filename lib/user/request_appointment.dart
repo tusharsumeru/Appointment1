@@ -277,7 +277,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Your contact details (read-only)',
+                          'Your contact details',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.black54,
@@ -462,7 +462,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label (Read-only)',
+          label, // Removed "(Read-only)" text
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -474,12 +474,12 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
-          enabled: false, // Make fields read-only
+          enabled: false, // Keep read-only functionality
           decoration: InputDecoration(
             hintText: '$placeholder',
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
-            fillColor: Colors.grey[100], // Different color to indicate read-only
+            fillColor: Colors.grey[100], // Keep different color to indicate read-only
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -503,7 +503,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Phone Number (Read-only)',
+          'Phone Number', // Removed "(Read-only)" text
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -525,7 +525,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   onChanged: (value) => _validateForm(),
-                  enabled: false, // Make field read-only
+                  enabled: false, // Keep read-only functionality
                   decoration: InputDecoration(
                     hintText: 'Enter phone number',
                     hintStyle: const TextStyle(color: Colors.grey),

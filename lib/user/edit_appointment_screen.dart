@@ -136,7 +136,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Dispose guest controllers
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
-      guest['email']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
     }
@@ -205,14 +204,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         print('🔍 Set _selectedSecretary (fallback): $_selectedSecretary');
       }
 
-      // Load number of users
-      final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null && accompanyUsers['numberOfUsers'] != null) {
-        _numberOfUsersController.text = accompanyUsers['numberOfUsers'].toString();
-      } else {
-        _numberOfUsersController.text = '1';
-      }
-
       // Load secretaries after location is set
       if (_selectedLocationId != null) {
         _loadSecretaries();
@@ -225,6 +216,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Load accompanying users data
       _loadAccompanyingUsersData(appointment);
+
+      // Set the number of users based on the loaded data
+      final accompanyUsers = appointment['accompanyUsers'];
+      if (accompanyUsers != null && accompanyUsers['users'] != null) {
+        final List<dynamic> users = accompanyUsers['users'];
+        // Set number of users to 1 (main user) + number of accompanying users
+        _numberOfUsersController.text = (users.length + 1).toString();
+      } else {
+        _numberOfUsersController.text = '1';
+      }
 
       _validateForm();
     } catch (e) {
@@ -301,7 +302,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Clear existing controllers
       for (var guest in _guestControllers) {
         guest['name']?.dispose();
-        guest['email']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
       }
@@ -316,7 +316,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           
           // Create controllers for this guest
           final nameController = TextEditingController(text: user['fullName']?.toString() ?? '');
-          final emailController = TextEditingController(text: user['emailId']?.toString() ?? '');
           final phoneController = TextEditingController();
           final ageController = TextEditingController(text: user['age']?.toString() ?? '');
 
@@ -352,7 +351,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
           _guestControllers.add({
             'name': nameController,
-            'email': emailController,
             'phone': phoneController,
             'age': ageController,
           });
@@ -551,6 +549,59 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
+  void _updateGuestControllers() {
+    int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
+    
+    // If we're reducing the number of guests, dispose extra controllers from the end
+    if (_guestControllers.length > guestCount) {
+      for (int i = guestCount; i < _guestControllers.length; i++) {
+        var guest = _guestControllers[i];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        
+        // Also remove associated data
+        int guestNumber = i + 1;
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        _guestCountries.remove(guestNumber);
+      }
+      _guestControllers.removeRange(guestCount, _guestControllers.length);
+    }
+    
+    // If we need more guests, add them at the bottom
+    while (_guestControllers.length < guestCount) {
+      int guestNumber = _guestControllers.length + 1;
+      
+      Map<String, TextEditingController> controllers = {
+        'name': TextEditingController(),
+        'phone': TextEditingController(),
+        'age': TextEditingController(),
+      };
+      _guestControllers.add(controllers);
+      
+      // Initialize country for new guest (only if not already set)
+      if (!_guestCountries.containsKey(guestNumber)) {
+        _guestCountries[guestNumber] = Country(
+          phoneCode: '91',
+          countryCode: 'IN',
+          e164Sc: 0,
+          geographic: true,
+          level: 1,
+          name: 'India',
+          example: '9876543210',
+          displayName: 'India (IN) [+91]',
+          displayNameNoCountryCode: 'India (IN)',
+          e164Key: '91-IN-0',
+        );
+      }
+    }
+    
+    setState(() {});
+    _validateForm();
+  }
+
   void _validateForm() {
     bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
         _numberOfUsersController.text.isNotEmpty &&
@@ -658,7 +709,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         }
         
         updateData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsers.length,
+          'numberOfUsers': accompanyUsers.length + 1, // +1 for main user
           'users': accompanyUsers,
         };
       }
@@ -2484,13 +2535,110 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         _buildSecretaryField(),
                         const SizedBox(height: 20),
 
-                        // Number of People
-                        _buildTextField(
-                          label: 'Number of People',
-                          controller: _numberOfUsersController,
-                          placeholder: 'Number of people (including yourself)',
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) => _validateForm(),
+                        // Number of People with + and - buttons
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Number of People',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                // Minus button
+                                GestureDetector(
+                                  onTap: () {
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    if (currentCount > 1) {
+                                      setState(() {
+                                        _numberOfUsersController.text = (currentCount - 1).toString();
+                                      });
+                                      _updateGuestControllers();
+                                      _validateForm();
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: const Icon(
+                                      Icons.remove,
+                                      color: Colors.black87,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                
+                                // Number display
+                                Expanded(
+                                  child: Container(
+                                    height: 48,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.white,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _numberOfUsersController.text.isEmpty ? '1' : _numberOfUsersController.text,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                
+                                // Plus button
+                                GestureDetector(
+                                  onTap: () {
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    setState(() {
+                                      _numberOfUsersController.text = (currentCount + 1).toString();
+                                    });
+                                    _updateGuestControllers();
+                                    _validateForm();
+                                  },
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.deepPurple,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.deepPurple),
+                                    ),
+                                    child: const Icon(
+                                      Icons.add,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Number of people (including yourself)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 20),
 
