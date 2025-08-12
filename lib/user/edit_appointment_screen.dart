@@ -219,12 +219,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Set the number of users based on the loaded data
       final accompanyUsers = appointment['accompanyUsers'];
+      print('DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers');
       if (accompanyUsers != null && accompanyUsers['users'] != null) {
         final List<dynamic> users = accompanyUsers['users'];
-        // Set number of users to 1 (main user) + number of accompanying users
-        _numberOfUsersController.text = (users.length + 1).toString();
+        // If users array is empty, set to 1 (just main user)
+        if (users.isEmpty) {
+          _numberOfUsersController.text = '1';
+          print('DEBUG LOAD: Set numberOfUsers to 1 (empty users array)');
+        } else {
+          // Set number of users to 1 (main user) + number of accompanying users
+          _numberOfUsersController.text = (users.length + 1).toString();
+          print('DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (${users.length} accompanying + 1 main)');
+        }
       } else {
         _numberOfUsersController.text = '1';
+        print('DEBUG LOAD: Set numberOfUsers to 1 (no accompanying users)');
       }
 
       _validateForm();
@@ -294,20 +303,34 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
+  void _clearGuestControllers() {
+    // Clear existing controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    _guestControllers.clear();
+    _guestImages.clear();
+    _guestCountries.clear();
+  }
+
   void _loadAccompanyingUsersData(Map<String, dynamic> appointment) {
     final accompanyUsers = appointment['accompanyUsers'];
+    print('DEBUG LOAD: accompanyUsers from appointment: $accompanyUsers');
     if (accompanyUsers != null && accompanyUsers['users'] != null) {
       final List<dynamic> users = accompanyUsers['users'];
+      print('DEBUG LOAD: Found ${users.length} accompanying users');
+      
+      // If users array is empty, treat it as no accompanying users
+      if (users.isEmpty) {
+        print('DEBUG LOAD: Empty users array, clearing guest controllers');
+        _clearGuestControllers();
+        return;
+      }
       
       // Clear existing controllers
-      for (var guest in _guestControllers) {
-        guest['name']?.dispose();
-        guest['phone']?.dispose();
-        guest['age']?.dispose();
-      }
-      _guestControllers.clear();
-      _guestImages.clear();
-      _guestCountries.clear();
+      _clearGuestControllers();
 
       for (int i = 0; i < users.length; i++) {
         final user = users[i];
@@ -553,11 +576,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
     
-    print('DEBUG: _updateGuestControllers - peopleCount: $peopleCount, guestCount: $guestCount, current controllers: ${_guestControllers.length}');
+    print('DEBUG UPDATE: _updateGuestControllers - peopleCount: $peopleCount, guestCount: $guestCount, current controllers: ${_guestControllers.length}');
     
     // If we're reducing the number of guests, dispose extra controllers from the end
     if (_guestControllers.length > guestCount) {
-      print('DEBUG: Removing ${_guestControllers.length - guestCount} guest controllers');
+      print('DEBUG UPDATE: Removing ${_guestControllers.length - guestCount} guest controllers');
       for (int i = guestCount; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         guest['name']?.dispose();
@@ -571,7 +594,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestCountries.remove(guestNumber);
       }
       _guestControllers.removeRange(guestCount, _guestControllers.length);
-      print('DEBUG: After removal, controllers count: ${_guestControllers.length}');
+      print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
     }
     
     // If we need more guests, add them at the bottom
@@ -716,10 +739,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'numberOfUsers': accompanyUsers.length + 1, // +1 for main user
           'users': accompanyUsers,
         };
+        print('DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users');
       } else {
         // If no accompanying users, ensure numberOfUsers is set to 1 and clear accompanyUsers
         updateData['numberOfUsers'] = 1;
-        updateData['accompanyUsers'] = null; // Clear any existing accompanyUsers data
+        // Try sending empty array instead of null to ensure backend clears the data
+        updateData['accompanyUsers'] = {
+          'numberOfUsers': 1,
+          'users': [],
+        };
+        print('DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1');
       }
 
       // Call API to update appointment
@@ -1899,39 +1928,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
             ],
             
-            // Delete button for this guest card
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () => _deleteGuestCard(guestNumber),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.delete_outline,
-                      color: Colors.red[700],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Delete Person $guestNumber',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red[700],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+
           ],
         ),
       ),
@@ -2596,14 +2593,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 GestureDetector(
                                   onTap: () {
                                     int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                                     if (currentCount > 1) {
-                                      print('DEBUG: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                                      print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                                       setState(() {
                                         _numberOfUsersController.text = (currentCount - 1).toString();
                                       });
                                       _updateGuestControllers();
                                       _validateForm();
-                                      print('DEBUG: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
+                                      print('DEBUG MINUS: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
+                                    } else {
+                                      print('DEBUG MINUS: Cannot reduce below 1 (main user)');
                                     }
                                   },
                                   child: Container(
@@ -2787,45 +2787,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  void _deleteGuestCard(int guestNumber) {
-    // Don't allow deletion if there's only one guest (main user)
-    if (_guestControllers.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot delete the main person. At least one person is required.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
 
-    // Show confirmation dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Person'),
-          content: Text('Are you sure you want to delete Person $guestNumber? This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _performDeleteGuestCard(guestNumber);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _performDeleteGuestCard(int guestNumber) {
     // Convert guestNumber to 0-based index
@@ -2847,8 +2809,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestImages.remove(guestNumber);
         _guestUploading.remove(guestNumber);
         
-        // Update the number of users
-        _numberOfUsersController.text = _guestControllers.length.toString();
+        // Update the number of users (main user + accompanying users)
+        _numberOfUsersController.text = (_guestControllers.length + 1).toString();
         
         // Update form validation
         _validateForm();
