@@ -499,31 +499,39 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateTotalAttendees(Map<String, dynamic> appointment) {
     try {
-      // Check appointment type
+      // First, try to get the numberOfUsers from the main appointment data
+      final numberOfUsers = appointment['numberOfUsers'];
+      if (numberOfUsers != null) {
+        return (numberOfUsers as num).toInt();
+      }
+      
+      // Fallback: calculate from accompanying users
+      final accompanyUsers = appointment['accompanyUsers'];
+      if (accompanyUsers != null) {
+        // If numberOfUsers is set in accompanyUsers, use it
+        if (accompanyUsers['numberOfUsers'] != null) {
+          return (accompanyUsers['numberOfUsers'] as num).toInt();
+        }
+        
+        // Otherwise, count the users array + 1 for main user
+        final users = accompanyUsers['users'];
+        if (users != null && users is List) {
+          return users.length + 1; // +1 for main user
+        }
+      }
+      
+      // If no accompanying users data, check appointment type
       final appointmentType = appointment['appointmentType'];
       final appointmentFor = appointment['appointmentFor'];
       
-      // If appointment is for "myself", numberOfUsers already includes the main user
-      // If appointment is for "accompanying users", we need to add the main user
       bool isForMyself = appointmentType == 'myself' || 
                         (appointmentFor != null && appointmentFor['type'] == 'myself');
       
-      int totalCount = 0;
-      
-      // Add accompanying users count
-      final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null && accompanyUsers['numberOfUsers'] != null) {
-        totalCount = (accompanyUsers['numberOfUsers'] as num).toInt();
-      }
-      
-      // If not for myself, add the main user
-      if (!isForMyself) {
-        totalCount += 1;
-      }
-      
-      // Ensure at least 1 person
-      return totalCount > 0 ? totalCount : 1;
+      // For myself appointments, return 1 (just the main user)
+      // For guest appointments, return 1 (just the main user if no accompanying users)
+      return 1;
     } catch (e) {
+      print('Error calculating total attendees: $e');
       return 1; // Return 1 if there's an error (at least the main user)
     }
   }

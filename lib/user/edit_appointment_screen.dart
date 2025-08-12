@@ -553,8 +553,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
     
+    print('DEBUG: _updateGuestControllers - peopleCount: $peopleCount, guestCount: $guestCount, current controllers: ${_guestControllers.length}');
+    
     // If we're reducing the number of guests, dispose extra controllers from the end
     if (_guestControllers.length > guestCount) {
+      print('DEBUG: Removing ${_guestControllers.length - guestCount} guest controllers');
       for (int i = guestCount; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         guest['name']?.dispose();
@@ -568,6 +571,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestCountries.remove(guestNumber);
       }
       _guestControllers.removeRange(guestCount, _guestControllers.length);
+      print('DEBUG: After removal, controllers count: ${_guestControllers.length}');
     }
     
     // If we need more guests, add them at the bottom
@@ -712,6 +716,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'numberOfUsers': accompanyUsers.length + 1, // +1 for main user
           'users': accompanyUsers,
         };
+      } else {
+        // If no accompanying users, ensure numberOfUsers is set to 1 and clear accompanyUsers
+        updateData['numberOfUsers'] = 1;
+        updateData['accompanyUsers'] = null; // Clear any existing accompanyUsers data
       }
 
       // Call API to update appointment
@@ -1468,10 +1476,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -1529,17 +1537,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-            const Text(
+                  const Text(
                     'Photo *',
-              style: TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w500,
                       color: Colors.black87,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Photo of the Guest Required for Age 12 years and Above',
                 style: TextStyle(
@@ -1557,11 +1565,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
                     child: Container(
                       width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(8),
-            color: Colors.white,
+                        color: Colors.white,
                       ),
                       child: Row(
                         children: [
@@ -1578,7 +1586,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 const Text(
                                   'Upload from Device',
                                   style: TextStyle(
-                fontSize: 14,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,
                                   ),
@@ -1592,9 +1600,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                               ],
-          ),
-        ),
-      ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1621,26 +1629,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
                                   'Take Photo',
-              style: TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
-            Text(
+                                Text(
                                   'Use your device camera',
-              style: TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1650,14 +1658,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   // Show selected image preview
                   if (_guestImages.containsKey(guestNumber) || _guestUploading[guestNumber] == true) ...[
                     const SizedBox(height: 16),
-                Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
                         color: _guestUploading[guestNumber] == true 
                             ? Colors.blue[50] 
                             : (_guestImages.containsKey(guestNumber) ? Colors.green[50] : Colors.orange[50]),
                         borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+                        border: Border.all(
                           color: _guestUploading[guestNumber] == true 
                               ? Colors.blue[200]! 
                               : (_guestImages.containsKey(guestNumber) ? Colors.green[200]! : Colors.orange[200]!),
@@ -1668,11 +1676,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         children: [
                           // Photo preview and status message
                           Row(
-            children: [
-              Container(
+                            children: [
+                              Container(
                                 width: 48,
                                 height: 48,
-                decoration: BoxDecoration(
+                                decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
                                   color: Colors.grey[200],
                                 ),
@@ -1685,7 +1693,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       )
                                     : _guestImages.containsKey(guestNumber)
                                         ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(8),
                                             child: Image.network(
                                               _guestImages[guestNumber]!,
                                               fit: BoxFit.cover,
@@ -1707,8 +1715,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                                   decoration: BoxDecoration(
                                                     color: Colors.grey[200],
                                                     borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
+                                                  ),
+                                                  child: const Icon(
                                                     Icons.error_outline,
                                                     color: Colors.red,
                                                     size: 24,
@@ -1721,17 +1729,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                             Icons.warning,
                                             color: Colors.orange,
                                             size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                                          ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     if (_guestUploading[guestNumber] == true) ...[
-                    const Text(
+                                      const Text(
                                         'Uploading photo...',
-                      style: TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: Colors.blue,
                                         ),
@@ -1743,12 +1751,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           fontWeight: FontWeight.w600,
                                           color: Colors.green,
                                         ),
-                    ),
-                    const SizedBox(height: 2),
+                                      ),
+                                      const SizedBox(height: 2),
                                       const Text(
                                         'Guest photo is ready',
-                      style: TextStyle(
-                        fontSize: 12,
+                                        style: TextStyle(
+                                          fontSize: 12,
                                           color: Colors.grey,
                                         ),
                                       ),
@@ -1763,16 +1771,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       const SizedBox(height: 2),
                                       const Text(
                                         'Please upload a photo',
-                  style: TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,
                                         ),
                                       ),
                                     ],
-            ],
-          ),
-        ),
-      ],
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           
                           // Action buttons (only show if photo is uploaded)
@@ -1780,7 +1788,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             const SizedBox(height: 12),
                             
                             Column(
-      children: [
+                              children: [
                                 // Upload Different Photo
                                 GestureDetector(
                                   onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
@@ -1793,18 +1801,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       border: Border.all(color: Colors.blue[200]!),
                                     ),
                                     child: Row(
-          children: [
+                                      children: [
                                         Icon(
                                           Icons.upload_file,
                                           color: Colors.blue[700],
                                           size: 16,
                                         ),
                                         const SizedBox(width: 8),
-            Text(
+                                        Text(
                                           'Upload Different Photo',
                                           style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
                                             color: Colors.blue[700],
                                           ),
                                         ),
@@ -1836,51 +1844,51 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         const SizedBox(width: 8),
                                         Text(
                                           'Take New Photo',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
                                             color: Colors.orange[700],
-                ),
-              ),
-          ],
-        ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 
                                 const SizedBox(height: 6),
                                 
                                 // Remove Photo
-        GestureDetector(
+                                GestureDetector(
                                   onTap: () => _removeGuestImage(guestNumber),
-          child: Container(
+                                  child: Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
+                                    decoration: BoxDecoration(
                                       color: Colors.red[50],
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(color: Colors.red[200]!),
-            ),
-            child: Row(
-              children: [
+                                    ),
+                                    child: Row(
+                                      children: [
                                         Icon(
                                           Icons.delete_outline,
                                           color: Colors.red[700],
                                           size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
                                           'Remove Photo',
-                  style: TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                             color: Colors.red[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -1890,6 +1898,40 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ],
               ),
             ],
+            
+            // Delete button for this guest card
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => _deleteGuestCard(guestNumber),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.delete_outline,
+                      color: Colors.red[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Delete Person $guestNumber',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -2555,11 +2597,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   onTap: () {
                                     int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
                                     if (currentCount > 1) {
+                                      print('DEBUG: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                                       setState(() {
                                         _numberOfUsersController.text = (currentCount - 1).toString();
                                       });
                                       _updateGuestControllers();
                                       _validateForm();
+                                      print('DEBUG: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
                                     }
                                   },
                                   child: Container(
@@ -2741,5 +2785,81 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       ),
     );
+  }
+
+  void _deleteGuestCard(int guestNumber) {
+    // Don't allow deletion if there's only one guest (main user)
+    if (_guestControllers.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete the main person. At least one person is required.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Person'),
+          content: Text('Are you sure you want to delete Person $guestNumber? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performDeleteGuestCard(guestNumber);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performDeleteGuestCard(int guestNumber) {
+    // Convert guestNumber to 0-based index
+    int index = guestNumber - 1;
+    
+    if (index >= 0 && index < _guestControllers.length) {
+      setState(() {
+        // Dispose the controllers for this guest
+        var guest = _guestControllers[index];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        
+        // Remove the guest from the list
+        _guestControllers.removeAt(index);
+        
+        // Remove associated data
+        _guestCountries.remove(guestNumber);
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        
+        // Update the number of users
+        _numberOfUsersController.text = _guestControllers.length.toString();
+        
+        // Update form validation
+        _validateForm();
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Person $guestNumber has been deleted.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }
