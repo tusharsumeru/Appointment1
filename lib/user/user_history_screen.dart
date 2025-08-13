@@ -295,7 +295,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
             attendeesCount: _calculateTotalAttendees(appointment),
             attendeePhotos: _extractAttendeePhotos(appointment),
             purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
-            assignedTo: 'Not assigned yet',
+            assignedTo: _formatAssignedSecretary(appointment),
             dateRange: _formatPreferredDateRange(appointment),
             daysCount: _calculateDaysCount(appointment),
             email: appointment['email'] ?? 'N/A',
@@ -446,6 +446,21 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
     }
   }
 
+  String _formatAssignedSecretary(Map<String, dynamic> appointment) {
+    try {
+      final assignedSecretary = appointment['assignedSecretary'];
+      if (assignedSecretary is Map<String, dynamic>) {
+        final fullName = assignedSecretary['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+      return 'Not assigned yet';
+    } catch (e) {
+      return 'Not assigned yet';
+    }
+  }
+
   String _formatPreferredDateRange(Map<String, dynamic> appointment) {
     try {
       // Check for preferred date range
@@ -499,31 +514,23 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateTotalAttendees(Map<String, dynamic> appointment) {
     try {
-      // Check appointment type
-      final appointmentType = appointment['appointmentType'];
-      final appointmentFor = appointment['appointmentFor'];
-      
-      // If appointment is for "myself", numberOfUsers already includes the main user
-      // If appointment is for "accompanying users", we need to add the main user
-      bool isForMyself = appointmentType == 'myself' || 
-                        (appointmentFor != null && appointmentFor['type'] == 'myself');
-      
-      int totalCount = 0;
-      
-      // Add accompanying users count
+      // Check for accompanyUsers first (this is the most reliable source)
       final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null && accompanyUsers['numberOfUsers'] != null) {
-        totalCount = (accompanyUsers['numberOfUsers'] as num).toInt();
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+        return numberOfUsers + 1; // Add 1 for the main user
       }
       
-      // If not for myself, add the main user
-      if (!isForMyself) {
-        totalCount += 1;
+      // Fallback: check for numberOfUsers in main appointment data
+      final numberOfUsers = appointment['numberOfUsers'];
+      if (numberOfUsers != null) {
+        return (numberOfUsers as num).toInt();
       }
       
-      // Ensure at least 1 person
-      return totalCount > 0 ? totalCount : 1;
+      // If no data available, return 1 (at least the main user)
+      return 1;
     } catch (e) {
+      print('Error calculating total attendees: $e');
       return 1; // Return 1 if there's an error (at least the main user)
     }
   }

@@ -711,79 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const SizedBox(height: 16),
 
                             // Teacher Verification Box
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16.0),
-                              decoration: BoxDecoration(
-                                color: Colors.lightGreen.shade50,
-                                borderRadius: BorderRadius.circular(12.0),
-                                border: Border.all(
-                                  color: Colors.lightGreen.shade200,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Verification Header
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Teacher Verified',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.green.shade700,
-                                            ),
-                                          ),
-                                          Text(
-                                            'true Teacher',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.green.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // Teacher Details
-                                  _buildTeacherDetail('Name', 'Kiran Patule'),
-                                  const SizedBox(height: 8),
-                                  _buildTeacherDetail('Teacher Code', 'MH1458'),
-                                  const SizedBox(height: 8),
-                                  _buildTeacherDetail(
-                                    'Type',
-                                    'True AOL Teacher',
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _buildTeacherDetail(
-                                    'Programs',
-                                    'Happiness Program',
-                                  ),
-                                ],
-                              ),
-                            ),
+                            _buildTeacherVerificationBox(),
                           ],
                         ),
                       ),
@@ -929,6 +857,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
           fontWeight: FontWeight.w500,
           color: Colors.green.shade700,
         ),
+      ),
+    );
+  }
+
+  Widget _buildTeacherVerificationBox() {
+    // Check if user is an AOL teacher
+    final aolTeacherData = _userData?['aol_teacher'];
+    final atolValidationData = aolTeacherData?['atolValidationData'];
+    
+    // Check if teacher verification is successful
+    final bool isTeacherVerified = atolValidationData?['success'] == true;
+    
+    if (!isTeacherVerified) {
+      // Show "Not an AOL Teacher" message
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: Colors.grey.shade300,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Not an AOL Teacher',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  'No teacher verification found',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Get teacher details from API response
+    final teacherDetails = atolValidationData?['data']?['teacherdetails'];
+    final teacherCode = aolTeacherData?['aolTeacher']?['teacherCode'] ?? 'N/A';
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.lightGreen.shade50,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: Colors.lightGreen.shade200,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Verification Header
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Teacher Verified',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                  Text(
+                    'AOL Teacher',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Teacher Details
+          _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
+          const SizedBox(height: 8),
+          _buildTeacherDetail('Teacher Code', teacherCode),
+          const SizedBox(height: 8),
+          _buildTeacherDetail(
+            'Type',
+            teacherDetails?['teacher_type'] ?? 'N/A',
+          ),
+          const SizedBox(height: 8),
+          _buildTeacherDetail(
+            'Programs',
+            teacherDetails?['program_types_can_teach'] ?? 'N/A',
+          ),
+        ],
       ),
     );
   }

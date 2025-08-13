@@ -136,7 +136,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Dispose guest controllers
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
-      guest['email']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
     }
@@ -205,14 +204,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         print('🔍 Set _selectedSecretary (fallback): $_selectedSecretary');
       }
 
-      // Load number of users
-      final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null && accompanyUsers['numberOfUsers'] != null) {
-        _numberOfUsersController.text = accompanyUsers['numberOfUsers'].toString();
-      } else {
-        _numberOfUsersController.text = '1';
-      }
-
       // Load secretaries after location is set
       if (_selectedLocationId != null) {
         _loadSecretaries();
@@ -225,6 +216,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Load accompanying users data
       _loadAccompanyingUsersData(appointment);
+
+      // Set the number of users based on the loaded data
+      final accompanyUsers = appointment['accompanyUsers'];
+      print('DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers');
+      if (accompanyUsers != null && accompanyUsers['users'] != null) {
+        final List<dynamic> users = accompanyUsers['users'];
+        // If users array is empty, set to 1 (just main user)
+        if (users.isEmpty) {
+          _numberOfUsersController.text = '1';
+          print('DEBUG LOAD: Set numberOfUsers to 1 (empty users array)');
+        } else {
+          // Set number of users to 1 (main user) + number of accompanying users
+          _numberOfUsersController.text = (users.length + 1).toString();
+          print('DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (${users.length} accompanying + 1 main)');
+        }
+      } else {
+        _numberOfUsersController.text = '1';
+        print('DEBUG LOAD: Set numberOfUsers to 1 (no accompanying users)');
+      }
 
       _validateForm();
     } catch (e) {
@@ -252,35 +262,68 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _mainGuestPhotoUrl = guestInformation['profilePhotoUrl']?.toString();
       
       // Load phone number
-      final phoneNumber = guestInformation['phoneNumber']?.toString();
-      if (phoneNumber != null && phoneNumber.isNotEmpty) {
-        // Parse phone number to extract country code and number
-        if (phoneNumber.startsWith('+')) {
-          final parts = phoneNumber.substring(1).split(' ');
-          if (parts.length >= 2) {
-            final countryCode = parts[0];
-            final number = parts.sublist(1).join('');
-            _guestPhoneController.text = number;
+      final phoneNumber = guestInformation['phoneNumber'];
+      print('📞 Loading main guest phone number: $phoneNumber');
+      if (phoneNumber != null) {
+        if (phoneNumber is Map<String, dynamic>) {
+          // Phone number is stored as an object with countryCode and number
+          final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+          final number = phoneNumber['number']?.toString() ?? '';
+          
+          if (number.isNotEmpty) {
+            // Set combined format: +countryCode + number
+            final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+            _guestPhoneController.text = '+$cleanCountryCode$number';
+            print('📞 Parsed main guest phone: +$cleanCountryCode$number');
             
             // Set country
             _selectedCountry = Country(
-              phoneCode: countryCode,
+              phoneCode: cleanCountryCode,
               countryCode: 'IN', // Default to India
               e164Sc: 0,
               geographic: true,
               level: 1,
               name: 'India',
               example: '9876543210',
-              displayName: 'India (IN) [+$countryCode]',
+              displayName: 'India (IN) [+$cleanCountryCode]',
               displayNameNoCountryCode: 'India (IN)',
-              e164Key: '$countryCode-IN-0',
+              e164Key: '$cleanCountryCode-IN-0',
             );
-          } else {
-            _guestPhoneController.text = phoneNumber.substring(1);
           }
-        } else {
-          _guestPhoneController.text = phoneNumber;
+        } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
+          // Fallback: phone number is stored as a string
+          if (phoneNumber.startsWith('+')) {
+            final parts = phoneNumber.substring(1).split(' ');
+            if (parts.length >= 2) {
+              final countryCode = parts[0];
+              final number = parts.sublist(1).join('');
+              _guestPhoneController.text = '+$countryCode$number';
+              print('📞 Parsed main guest phone: +$countryCode$number');
+              
+              // Set country
+              _selectedCountry = Country(
+                phoneCode: countryCode,
+                countryCode: 'IN', // Default to India
+                e164Sc: 0,
+                geographic: true,
+                level: 1,
+                name: 'India',
+                example: '9876543210',
+                displayName: 'India (IN) [+$countryCode]',
+                displayNameNoCountryCode: 'India (IN)',
+                e164Key: '$countryCode-IN-0',
+              );
+            } else {
+              _guestPhoneController.text = phoneNumber;
+              print('📞 Main guest phone (no country code): $phoneNumber');
+            }
+          } else {
+            _guestPhoneController.text = phoneNumber;
+            print('📞 Main guest phone (no + prefix): $phoneNumber');
+          }
         }
+      } else {
+        print('📞 No main guest phone number found');
       }
     }
 
@@ -293,21 +336,34 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
+  void _clearGuestControllers() {
+    // Clear existing controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    _guestControllers.clear();
+    _guestImages.clear();
+    _guestCountries.clear();
+  }
+
   void _loadAccompanyingUsersData(Map<String, dynamic> appointment) {
     final accompanyUsers = appointment['accompanyUsers'];
+    print('DEBUG LOAD: accompanyUsers from appointment: $accompanyUsers');
     if (accompanyUsers != null && accompanyUsers['users'] != null) {
       final List<dynamic> users = accompanyUsers['users'];
+      print('DEBUG LOAD: Found ${users.length} accompanying users');
+      
+      // If users array is empty, treat it as no accompanying users
+      if (users.isEmpty) {
+        print('DEBUG LOAD: Empty users array, clearing guest controllers');
+        _clearGuestControllers();
+        return;
+      }
       
       // Clear existing controllers
-      for (var guest in _guestControllers) {
-        guest['name']?.dispose();
-        guest['email']?.dispose();
-        guest['phone']?.dispose();
-        guest['age']?.dispose();
-      }
-      _guestControllers.clear();
-      _guestImages.clear();
-      _guestCountries.clear();
+      _clearGuestControllers();
 
       for (int i = 0; i < users.length; i++) {
         final user = users[i];
@@ -316,43 +372,74 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           
           // Create controllers for this guest
           final nameController = TextEditingController(text: user['fullName']?.toString() ?? '');
-          final emailController = TextEditingController(text: user['emailId']?.toString() ?? '');
           final phoneController = TextEditingController();
           final ageController = TextEditingController(text: user['age']?.toString() ?? '');
 
           // Parse phone number
-          final phoneNumber = user['phoneNumber']?.toString();
-          if (phoneNumber != null && phoneNumber.isNotEmpty) {
-            if (phoneNumber.startsWith('+')) {
-              final parts = phoneNumber.substring(1).split(' ');
-              if (parts.length >= 2) {
-                final countryCode = parts[0];
-                final number = parts.sublist(1).join('');
-                phoneController.text = number;
+          final phoneNumber = user['phoneNumber'];
+          print('📞 Loading accompanying user $guestNumber phone number: $phoneNumber');
+          if (phoneNumber != null) {
+            if (phoneNumber is Map<String, dynamic>) {
+              // Phone number is stored as an object with countryCode and number
+              final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+              final number = phoneNumber['number']?.toString() ?? '';
+              
+              if (number.isNotEmpty) {
+                // Set combined format: +countryCode + number
+                final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                phoneController.text = '+$cleanCountryCode$number';
+                print('📞 Accompanying user $guestNumber phone: +$cleanCountryCode$number');
                 
                 _guestCountries[guestNumber] = Country(
-                  phoneCode: countryCode,
+                  phoneCode: cleanCountryCode,
                   countryCode: 'IN',
                   e164Sc: 0,
                   geographic: true,
                   level: 1,
                   name: 'India',
                   example: '9876543210',
-                  displayName: 'India (IN) [+$countryCode]',
+                  displayName: 'India (IN) [+$cleanCountryCode]',
                   displayNameNoCountryCode: 'India (IN)',
-                  e164Key: '$countryCode-IN-0',
+                  e164Key: '$cleanCountryCode-IN-0',
                 );
-              } else {
-                phoneController.text = phoneNumber.substring(1);
               }
-            } else {
-              phoneController.text = phoneNumber;
+            } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
+              // Fallback: phone number is stored as a string
+              if (phoneNumber.startsWith('+')) {
+                final parts = phoneNumber.substring(1).split(' ');
+                if (parts.length >= 2) {
+                  final countryCode = parts[0];
+                  final number = parts.sublist(1).join('');
+                  phoneController.text = '+$countryCode$number';
+                  print('📞 Accompanying user $guestNumber phone: +$countryCode$number');
+                  
+                  _guestCountries[guestNumber] = Country(
+                    phoneCode: countryCode,
+                    countryCode: 'IN',
+                    e164Sc: 0,
+                    geographic: true,
+                    level: 1,
+                    name: 'India',
+                    example: '9876543210',
+                    displayName: 'India (IN) [+$countryCode]',
+                    displayNameNoCountryCode: 'India (IN)',
+                    e164Key: '$countryCode-IN-0',
+                  );
+                } else {
+                  phoneController.text = phoneNumber;
+                  print('📞 Accompanying user $guestNumber phone (no country code): $phoneNumber');
+                }
+              } else {
+                phoneController.text = phoneNumber;
+                print('📞 Accompanying user $guestNumber phone (no + prefix): $phoneNumber');
+              }
             }
+          } else {
+            print('📞 No phone number found for accompanying user $guestNumber');
           }
 
           _guestControllers.add({
             'name': nameController,
-            'email': emailController,
             'phone': phoneController,
             'age': ageController,
           });
@@ -551,6 +638,63 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
+  void _updateGuestControllers() {
+    int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
+    
+    print('DEBUG UPDATE: _updateGuestControllers - peopleCount: $peopleCount, guestCount: $guestCount, current controllers: ${_guestControllers.length}');
+    
+    // If we're reducing the number of guests, dispose extra controllers from the end
+    if (_guestControllers.length > guestCount) {
+      print('DEBUG UPDATE: Removing ${_guestControllers.length - guestCount} guest controllers');
+      for (int i = guestCount; i < _guestControllers.length; i++) {
+        var guest = _guestControllers[i];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        
+        // Also remove associated data
+        int guestNumber = i + 1;
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        _guestCountries.remove(guestNumber);
+      }
+      _guestControllers.removeRange(guestCount, _guestControllers.length);
+      print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
+    }
+    
+    // If we need more guests, add them at the bottom
+    while (_guestControllers.length < guestCount) {
+      int guestNumber = _guestControllers.length + 1;
+      
+      Map<String, TextEditingController> controllers = {
+        'name': TextEditingController(),
+        'phone': TextEditingController(),
+        'age': TextEditingController(),
+      };
+      _guestControllers.add(controllers);
+      
+      // Initialize country for new guest (only if not already set)
+      if (!_guestCountries.containsKey(guestNumber)) {
+        _guestCountries[guestNumber] = Country(
+          phoneCode: '91',
+          countryCode: 'IN',
+          e164Sc: 0,
+          geographic: true,
+          level: 1,
+          name: 'India',
+          example: '9876543210',
+          displayName: 'India (IN) [+91]',
+          displayNameNoCountryCode: 'India (IN)',
+          e164Key: '91-IN-0',
+        );
+      }
+    }
+    
+    setState(() {});
+    _validateForm();
+  }
+
   void _validateForm() {
     bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
         _numberOfUsersController.text.isNotEmpty &&
@@ -606,9 +750,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Add guest information if appointment type is guest
       if (_isGuestAppointment) {
-        final countryCode = '+${_selectedCountry.phoneCode}';
-        final phoneNumber = _guestPhoneController.text.trim();
-        final fullPhoneNumber = '$countryCode$phoneNumber';
+        final phoneText = _guestPhoneController.text.trim();
+        String fullPhoneNumber = phoneText;
+        
+        // If the phone number doesn't start with +, add the country code
+        if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
+          final countryCode = '+${_selectedCountry.phoneCode}';
+          fullPhoneNumber = '$countryCode$phoneText';
+        }
+        
+        print('📞 Saving main guest phone: $fullPhoneNumber');
         
         Map<String, dynamic> guestInfo = {
           'fullName': _guestNameController.text.trim(),
@@ -640,9 +791,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
           
-          final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
-          final phoneNumber = guest['phone']?.text.trim() ?? '';
-          final fullPhoneNumber = '$countryCode$phoneNumber';
+          final phoneText = guest['phone']?.text.trim() ?? '';
+          String fullPhoneNumber = phoneText;
+          
+          // If the phone number doesn't start with +, add the country code
+          if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
+            final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
+            fullPhoneNumber = '$countryCode$phoneText';
+          }
+          
+          print('📞 Saving accompanying user $guestNumber phone: $fullPhoneNumber');
           
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
@@ -658,9 +816,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         }
         
         updateData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsers.length,
+          'numberOfUsers': accompanyUsers.length + 1, // +1 for main user
           'users': accompanyUsers,
         };
+        print('DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users');
+      } else {
+        // If no accompanying users, ensure numberOfUsers is set to 1 and clear accompanyUsers
+        updateData['numberOfUsers'] = 1;
+        // Try sending empty array instead of null to ensure backend clears the data
+        updateData['accompanyUsers'] = {
+          'numberOfUsers': 1,
+          'users': [],
+        };
+        print('DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1');
       }
 
       // Call API to update appointment
@@ -1227,6 +1395,61 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  void _updatePhoneNumberWithCountryCode(int guestNumber, String newCountryCode) {
+    if (guestNumber > 0 && guestNumber <= _guestControllers.length) {
+      final controller = _guestControllers[guestNumber - 1]['phone'];
+      if (controller != null) {
+        final currentText = controller.text;
+        if (currentText.isNotEmpty) {
+          // Extract the number part (remove existing country code)
+          String numberPart = currentText;
+          if (currentText.startsWith('+')) {
+            // Remove the + and existing country code
+            numberPart = currentText.substring(1);
+            // Find where the country code ends and number begins
+            for (int i = 1; i <= numberPart.length; i++) {
+              final possibleCountryCode = numberPart.substring(0, i);
+              if (possibleCountryCode == newCountryCode) {
+                numberPart = numberPart.substring(i);
+                break;
+              }
+            }
+          }
+          // Set the new combined format
+          controller.text = '+$newCountryCode$numberPart';
+          controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: controller.text.length),
+          );
+        }
+      }
+    }
+  }
+
+  void _updateMainGuestPhoneNumberWithCountryCode(String newCountryCode) {
+    final currentText = _guestPhoneController.text;
+    if (currentText.isNotEmpty) {
+      // Extract the number part (remove existing country code)
+      String numberPart = currentText;
+      if (currentText.startsWith('+')) {
+        // Remove the + and existing country code
+        numberPart = currentText.substring(1);
+        // Find where the country code ends and number begins
+        for (int i = 1; i <= numberPart.length; i++) {
+          final possibleCountryCode = numberPart.substring(0, i);
+          if (possibleCountryCode == newCountryCode) {
+            numberPart = numberPart.substring(i);
+            break;
+          }
+        }
+      }
+      // Set the new combined format
+      _guestPhoneController.text = '+$newCountryCode$numberPart';
+      _guestPhoneController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _guestPhoneController.text.length),
+      );
+    }
+  }
+
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1322,82 +1545,206 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            // Country picker button
-        GestureDetector(
-          onTap: () {
-                showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-                    bottomSheetHeight: 500,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                    inputDecoration: InputDecoration(
-                      labelText: 'Search',
-                      hintText: 'Start typing to search',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: const Color(0xFF8C98A8).withOpacity(0.2),
-                        ),
-                      ),
-                    ),
-                  ),
-                  onSelect: (Country country) {
-                    setState(() {
-                      _selectedCountry = country;
-                    });
-                  },
-                );
-          },
-          child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-            ),
-            child: Row(
-                  mainAxisSize: MainAxisSize.min,
-              children: [
-                    Text(
-                      '+${_selectedCountry.phoneCode}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20),
-                  ],
-                ),
+        // Row(
+        //   children: [
+        //     // Country picker button - UI COMMENTED OUT
+        // GestureDetector(
+        //   onTap: () {
+        //         showCountryPicker(
+        //           context: context,
+        //           showPhoneCode: true,
+        //           countryListTheme: CountryListThemeData(
+        //             flagSize: 25,
+        //             backgroundColor: Colors.white,
+        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+        //             bottomSheetHeight: 500,
+        //             borderRadius: const BorderRadius.only(
+        //               topLeft: Radius.circular(20.0),
+        //               topRight: Radius.circular(20.0),
+        //             ),
+        //             inputDecoration: InputDecoration(
+        //               labelText: 'Search',
+        //               hintText: 'Start typing to search',
+        //               prefixIcon: const Icon(Icons.search),
+        //               border: OutlineInputBorder(
+        //                 borderSide: BorderSide(
+        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
+        //                 ),
+        //               ),
+        //             ),
+        //           ),
+        //           onSelect: (Country country) {
+        //             setState(() {
+        //               _selectedCountry = country;
+        //               // Update the phone number with new country code
+        //               _updateMainGuestPhoneNumberWithCountryCode(country.phoneCode);
+        //             });
+        //           },
+        //         );
+        //   },
+        //   child: Container(
+        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        //     decoration: BoxDecoration(
+        //           border: Border.all(color: Colors.grey.shade300),
+        //           borderRadius: const BorderRadius.only(
+        //             topLeft: Radius.circular(8),
+        //             bottomLeft: Radius.circular(8),
+        //           ),
+        //     ),
+        //     child: Row(
+        //           mainAxisSize: MainAxisSize.min,
+        //       children: [
+        //             Text(
+        //               '+${_selectedCountry.phoneCode}',
+        //               style: const TextStyle(fontSize: 16),
+        //             ),
+        //             const SizedBox(width: 4),
+        //             const Icon(Icons.arrow_drop_down, size: 20),
+        //           ],
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // Phone number field with combined format - FULL WIDTH (country picker commented out)
+        SizedBox(
+          width: double.infinity,
+          child: TextFormField(
+            controller: _guestPhoneController,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: '+${_selectedCountry.phoneCode} Enter mobile number',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
-            // Phone number field
-            Expanded(
-              child: TextFormField(
-                controller: _guestPhoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  hintText: 'Enter mobile number',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
-                    ),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                onChanged: (_) => _validateForm(),
+            onChanged: (value) {
+              // Ensure the phone number starts with the country code
+              if (value.isNotEmpty && !value.startsWith('+')) {
+                // If user enters number without +, add the country code
+                if (!value.startsWith(_selectedCountry.phoneCode)) {
+                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                  _guestPhoneController.text = '+${_selectedCountry.phoneCode}$cleanValue';
+                  _guestPhoneController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _guestPhoneController.text.length),
+                  );
+                }
+              }
+              _validateForm();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
+    // Get the country for this guest
+    final country = _guestCountries[guestNumber] ?? _selectedCountry;
+    final countryCode = country.phoneCode;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Phone',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Row(
+        //   children: [
+        //     // Country picker button - UI COMMENTED OUT
+        //     GestureDetector(
+        //       onTap: () {
+        //         showCountryPicker(
+        //           context: context,
+        //           showPhoneCode: true,
+        //           countryListTheme: CountryListThemeData(
+        //             flagSize: 25,
+        //             backgroundColor: Colors.white,
+        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+        //             bottomSheetHeight: 500,
+        //             borderRadius: const BorderRadius.only(
+        //               topLeft: Radius.circular(20.0),
+        //               topRight: Radius.circular(20.0),
+        //             ),
+        //             inputDecoration: InputDecoration(
+        //               labelText: 'Search',
+        //               hintText: 'Start typing to search',
+        //               prefixIcon: const Icon(Icons.search),
+        //               border: OutlineInputBorder(
+        //                 borderSide: BorderSide(
+        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
+        //                 ),
+        //               ),
+        //             ),
+        //           ),
+        //           onSelect: (Country selectedCountry) {
+        //             setState(() {
+        //               _guestCountries[guestNumber] = selectedCountry;
+        //               // Update the phone number with new country code
+        //               _updatePhoneNumberWithCountryCode(guestNumber, selectedCountry.phoneCode);
+        //             });
+        //           },
+        //         );
+        //       },
+        //       child: Container(
+        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        //         decoration: BoxDecoration(
+        //           border: Border.all(color: Colors.grey.shade300),
+        //           borderRadius: const BorderRadius.only(
+        //             topLeft: Radius.circular(8),
+        //             bottomLeft: Radius.circular(8),
+        //           ),
+        //         ),
+        //         child: Row(
+        //           mainAxisSize: MainAxisSize.min,
+        //           children: [
+        //             Text(
+        //               '+$countryCode',
+        //               style: const TextStyle(fontSize: 16),
+        //             ),
+        //             const SizedBox(width: 4),
+        //             const Icon(Icons.arrow_drop_down, size: 20),
+        //           ],
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // Phone number field with combined format - FULL WIDTH (country picker commented out)
+        SizedBox(
+          width: double.infinity,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: '+$countryCode Enter phone number',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
-          ],
+            onChanged: (value) {
+              // Ensure the phone number starts with the country code
+              if (value.isNotEmpty && !value.startsWith('+')) {
+                // If user enters number without +, add the country code
+                if (!value.startsWith(countryCode)) {
+                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
+                  controller.text = '+$countryCode$cleanValue';
+                  controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: controller.text.length),
+                  );
+                }
+              }
+              _validateForm();
+            },
+          ),
         ),
       ],
     );
@@ -1417,10 +1764,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -1458,12 +1805,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             const SizedBox(height: 12),
             
             // Phone
-            _buildReferenceField(
-              label: 'Phone',
-              controller: guest['phone']!,
-              placeholder: 'Enter phone number',
-              keyboardType: TextInputType.phone,
-            ),
+            _buildAccompanyingUserPhoneField(guestNumber, guest['phone']!),
             
             // Photo Section (only show if age >= 12)
             if (isPhotoRequired) ...[
@@ -1478,17 +1820,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-            const Text(
+                  const Text(
                     'Photo *',
-              style: TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w500,
                       color: Colors.black87,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Photo of the Guest Required for Age 12 years and Above',
                 style: TextStyle(
@@ -1506,11 +1848,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
                     child: Container(
                       width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(8),
-            color: Colors.white,
+                        color: Colors.white,
                       ),
                       child: Row(
                         children: [
@@ -1527,7 +1869,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 const Text(
                                   'Upload from Device',
                                   style: TextStyle(
-                fontSize: 14,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,
                                   ),
@@ -1541,9 +1883,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                               ],
-          ),
-        ),
-      ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1570,26 +1912,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
                                   'Take Photo',
-              style: TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
-            Text(
+                                Text(
                                   'Use your device camera',
-              style: TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1599,14 +1941,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   // Show selected image preview
                   if (_guestImages.containsKey(guestNumber) || _guestUploading[guestNumber] == true) ...[
                     const SizedBox(height: 16),
-                Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
                         color: _guestUploading[guestNumber] == true 
                             ? Colors.blue[50] 
                             : (_guestImages.containsKey(guestNumber) ? Colors.green[50] : Colors.orange[50]),
                         borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+                        border: Border.all(
                           color: _guestUploading[guestNumber] == true 
                               ? Colors.blue[200]! 
                               : (_guestImages.containsKey(guestNumber) ? Colors.green[200]! : Colors.orange[200]!),
@@ -1617,11 +1959,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         children: [
                           // Photo preview and status message
                           Row(
-            children: [
-              Container(
+                            children: [
+                              Container(
                                 width: 48,
                                 height: 48,
-                decoration: BoxDecoration(
+                                decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
                                   color: Colors.grey[200],
                                 ),
@@ -1634,7 +1976,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       )
                                     : _guestImages.containsKey(guestNumber)
                                         ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(8),
                                             child: Image.network(
                                               _guestImages[guestNumber]!,
                                               fit: BoxFit.cover,
@@ -1656,8 +1998,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                                   decoration: BoxDecoration(
                                                     color: Colors.grey[200],
                                                     borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
+                                                  ),
+                                                  child: const Icon(
                                                     Icons.error_outline,
                                                     color: Colors.red,
                                                     size: 24,
@@ -1670,17 +2012,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                             Icons.warning,
                                             color: Colors.orange,
                                             size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                                          ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     if (_guestUploading[guestNumber] == true) ...[
-                    const Text(
+                                      const Text(
                                         'Uploading photo...',
-                      style: TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: Colors.blue,
                                         ),
@@ -1692,12 +2034,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           fontWeight: FontWeight.w600,
                                           color: Colors.green,
                                         ),
-                    ),
-                    const SizedBox(height: 2),
+                                      ),
+                                      const SizedBox(height: 2),
                                       const Text(
                                         'Guest photo is ready',
-                      style: TextStyle(
-                        fontSize: 12,
+                                        style: TextStyle(
+                                          fontSize: 12,
                                           color: Colors.grey,
                                         ),
                                       ),
@@ -1712,16 +2054,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       const SizedBox(height: 2),
                                       const Text(
                                         'Please upload a photo',
-                  style: TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,
                                         ),
                                       ),
                                     ],
-            ],
-          ),
-        ),
-      ],
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           
                           // Action buttons (only show if photo is uploaded)
@@ -1729,7 +2071,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             const SizedBox(height: 12),
                             
                             Column(
-      children: [
+                              children: [
                                 // Upload Different Photo
                                 GestureDetector(
                                   onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
@@ -1742,18 +2084,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       border: Border.all(color: Colors.blue[200]!),
                                     ),
                                     child: Row(
-          children: [
+                                      children: [
                                         Icon(
                                           Icons.upload_file,
                                           color: Colors.blue[700],
                                           size: 16,
                                         ),
                                         const SizedBox(width: 8),
-            Text(
+                                        Text(
                                           'Upload Different Photo',
                                           style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
                                             color: Colors.blue[700],
                                           ),
                                         ),
@@ -1785,51 +2127,51 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         const SizedBox(width: 8),
                                         Text(
                                           'Take New Photo',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
                                             color: Colors.orange[700],
-                ),
-              ),
-          ],
-        ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 
                                 const SizedBox(height: 6),
                                 
                                 // Remove Photo
-        GestureDetector(
+                                GestureDetector(
                                   onTap: () => _removeGuestImage(guestNumber),
-          child: Container(
+                                  child: Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
+                                    decoration: BoxDecoration(
                                       color: Colors.red[50],
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(color: Colors.red[200]!),
-            ),
-            child: Row(
-              children: [
+                                    ),
+                                    child: Row(
+                                      children: [
                                         Icon(
                                           Icons.delete_outline,
                                           color: Colors.red[700],
                                           size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
                                           'Remove Photo',
-                  style: TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                             color: Colors.red[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -1839,6 +2181,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ],
               ),
             ],
+            
+
           ],
         ),
       ),
@@ -2484,13 +2828,115 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         _buildSecretaryField(),
                         const SizedBox(height: 20),
 
-                        // Number of People
-                        _buildTextField(
-                          label: 'Number of People',
-                          controller: _numberOfUsersController,
-                          placeholder: 'Number of people (including yourself)',
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) => _validateForm(),
+                        // Number of People with + and - buttons
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Number of People',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                // Minus button
+                                GestureDetector(
+                                  onTap: () {
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                                    if (currentCount > 1) {
+                                      print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                                      setState(() {
+                                        _numberOfUsersController.text = (currentCount - 1).toString();
+                                      });
+                                      _updateGuestControllers();
+                                      _validateForm();
+                                      print('DEBUG MINUS: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
+                                    } else {
+                                      print('DEBUG MINUS: Cannot reduce below 1 (main user)');
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: const Icon(
+                                      Icons.remove,
+                                      color: Colors.black87,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                
+                                // Number display
+                                Expanded(
+                                  child: Container(
+                                    height: 48,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.white,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _numberOfUsersController.text.isEmpty ? '1' : _numberOfUsersController.text,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                
+                                // Plus button
+                                GestureDetector(
+                                  onTap: () {
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    setState(() {
+                                      _numberOfUsersController.text = (currentCount + 1).toString();
+                                    });
+                                    _updateGuestControllers();
+                                    _validateForm();
+                                  },
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.deepPurple,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.deepPurple),
+                                    ),
+                                    child: const Icon(
+                                      Icons.add,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Number of people (including yourself)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 20),
 
@@ -2593,5 +3039,43 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       ),
     );
+  }
+
+
+
+  void _performDeleteGuestCard(int guestNumber) {
+    // Convert guestNumber to 0-based index
+    int index = guestNumber - 1;
+    
+    if (index >= 0 && index < _guestControllers.length) {
+      setState(() {
+        // Dispose the controllers for this guest
+        var guest = _guestControllers[index];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        
+        // Remove the guest from the list
+        _guestControllers.removeAt(index);
+        
+        // Remove associated data
+        _guestCountries.remove(guestNumber);
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        
+        // Update the number of users (main user + accompanying users)
+        _numberOfUsersController.text = (_guestControllers.length + 1).toString();
+        
+        // Update form validation
+        _validateForm();
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Person $guestNumber has been deleted.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }

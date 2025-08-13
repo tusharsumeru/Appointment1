@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:country_picker/country_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
@@ -138,31 +140,35 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
     
-    // Dispose existing controllers
-    for (var guest in _guestControllers) {
-      guest['name']?.dispose();
-      guest['phone']?.dispose();
-      guest['age']?.dispose();
+    // If we're reducing the number of guests, dispose extra controllers from the end
+    if (_guestControllers.length > guestCount) {
+      for (int i = guestCount; i < _guestControllers.length; i++) {
+        var guest = _guestControllers[i];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        
+        // Also remove associated data
+        int guestNumber = i + 1;
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        _guestCountries.remove(guestNumber);
+      }
+      _guestControllers.removeRange(guestCount, _guestControllers.length);
     }
     
-    // Clear guest images and upload states for removed guests
-    _guestImages.clear();
-    _guestUploading.clear();
-    
-    // Clear guest countries for removed guests
-    _guestCountries.clear();
-    
-    // Create new controllers
-    _guestControllers.clear();
-    for (int i = 0; i < guestCount; i++) {
-      int guestNumber = i + 1;
-      _guestControllers.add({
+    // If we need more guests, add them at the bottom
+    while (_guestControllers.length < guestCount) {
+      int guestNumber = _guestControllers.length + 1;
+      
+      Map<String, TextEditingController> controllers = {
         'name': TextEditingController(),
         'phone': TextEditingController(),
         'age': TextEditingController(),
-      });
+      };
+      _guestControllers.add(controllers);
       
-      // Initialize country data for this guest
+      // Initialize country for new guest
       _guestCountries[guestNumber] = Country(
         phoneCode: '91',
         countryCode: 'IN',
@@ -498,7 +504,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             final secretaryData = secretary['secretaryId'] ?? secretary;
             secretaries.add({
               'id': secretaryData['_id']?.toString() ?? '',
-              'name': secretaryData['fullName']?.toString() ?? 'Unknown Secretary',
+              'name': secretaryData['fullName']?.toString() ?? '',
               'email': secretaryData['email']?.toString() ?? '',
               'role': secretaryData['role']?.toString() ?? '',
             });
@@ -604,6 +610,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         print('📱 Phone number extracted: $phone (from phone field)');
       } else {
         print('📱 No phone number found in user data');
+        phone = ''; // Explicitly set to empty string
       }
       
       print('📝 Reference field values set:');
@@ -685,8 +692,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'type': widget.personalInfo['appointmentType'] ?? 'myself',
           'personalInfo': cleanedPersonalInfo, // Use cleaned version
         },
-        'userCurrentCompany': widget.personalInfo['company'] ?? 'Sumeru Digital',
-        'userCurrentDesignation': widget.personalInfo['designation'] ?? 'Office Operations Specialist',
+        'userCurrentCompany': widget.personalInfo['company'] ?? '', // Changed from 'Sumeru Digital'
+        'userCurrentDesignation': widget.personalInfo['designation'] ?? '', // Changed from 'Office Operations Specialist'
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'preferredDateRange': {
@@ -1467,6 +1474,86 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     label: 'To Date',
                     controller: _toDateController,
                     onTap: () => _selectDate(context, _toDateController),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Add Gurudev's Schedule Link
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blue.shade200,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: Colors.blue.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Check Gurudev\'s Schedule',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'View Gurudev Sri Sri Ravi Shankar\'s tour schedule to plan your visit accordingly',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            _launchGurudevSchedule();
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade300),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.open_in_new,
+                                  color: Colors.blue.shade700,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Open Tour Schedule',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -2782,7 +2869,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       (secretary) => secretary['id'] == _selectedSecretary,
       orElse: () => {},
     );
-    return selectedSecretary['name'];
+    return selectedSecretary['name'] ?? '';
   }
 
    // Show secretary bottom sheet
@@ -3469,6 +3556,62 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         return Icons.directions;
       default:
         return Icons.location_on;
+    }
+  }
+
+  void _launchGurudevSchedule() async {
+    const url = 'https://gurudev.artofliving.org/tour-schedule/';
+    
+    try {
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      print('❌ Error launching URL: $e');
+      // Show URL in a dialog instead
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Gurudev\'s Tour Schedule'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Please visit the following URL to check Gurudev\'s schedule:'),
+                const SizedBox(height: 12),
+                SelectableText(
+                  url,
+                  style: const TextStyle(
+                    color: Colors.blue,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: url));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('URL copied to clipboard'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Copy URL'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
     }
   }
  } 
