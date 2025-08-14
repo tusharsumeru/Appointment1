@@ -35,6 +35,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   bool _isLoading = false;
   String? _currentUserPhotoUrl; // Store current user's photo URL
   
+  // Log display state for profile picture
+  List<String> _photoLogs = [];
+  bool _showPhotoLogs = true; // Set to true to show logs on screen
+  
   // Phone number state (same as signup screen)
   String _selectedCountryCode = '+91';
   String _selectedCountryFlag = '🇮🇳';
@@ -57,11 +61,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   void initState() {
     super.initState();
+    print('🚀 ProfileEditScreen.initState() - Starting initialization...');
+    print('📋 Received userData: ${widget.userData}');
     _initializeControllers();
+    print('✅ ProfileEditScreen.initState() - Initialization completed');
   }
 
   @override
   void dispose() {
+    print('🧹 ProfileEditScreen.dispose() - Cleaning up resources...');
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -70,19 +78,31 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _locationController.dispose();
     _locationDebounceTimer?.cancel();
     super.dispose();
+    print('✅ ProfileEditScreen.dispose() - Cleanup completed');
   }
 
   void _initializeControllers() {
-    _fullNameController.text =
-        (widget.userData?['fullName'] ?? widget.userData?['name'] ?? '').toString();
-    _emailController.text = (widget.userData?['email'] ?? '').toString();
+    print('🔧 _initializeControllers() - Starting controller initialization...');
+    
+    // Initialize full name
+    final fullName = (widget.userData?['fullName'] ?? widget.userData?['name'] ?? '').toString();
+    _fullNameController.text = fullName;
+    print('📝 Full Name initialized: "$fullName"');
+
+    // Initialize email
+    final email = (widget.userData?['email'] ?? '').toString();
+    _emailController.text = email;
+    print('📧 Email initialized: "$email"');
 
     // Phone mapping: supports {countryCode, number} or plain string, and initialize country picker
     final dynamic phoneField = widget.userData?['phoneNumber'] ?? widget.userData?['phone'];
     String mappedPhone = '';
+    print('📱 Phone field received: $phoneField (type: ${phoneField.runtimeType})');
+    
     if (phoneField is Map) {
       final cc = (phoneField['countryCode'] ?? '').toString();
       final num = (phoneField['number'] ?? '').toString();
+      print('📱 Phone is Map - Country Code: "$cc", Number: "$num"');
       if (cc.isNotEmpty) {
         _selectedCountryCode = cc;
         // Try to find matching flag (simplified - you might want to add a mapping)
@@ -90,11 +110,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         else if (cc == '+1') _selectedCountryFlag = '🇺🇸';
         else if (cc == '+44') _selectedCountryFlag = '🇬🇧';
         else _selectedCountryFlag = '🇺🇳'; // default
+        print('🌍 Country code set to: $_selectedCountryCode with flag: $_selectedCountryFlag');
       }
       mappedPhone = num; // Only the number part goes to the input field
     } else if (phoneField is String) {
       // Try to extract country code from string like "+91 7209657008"
       final phoneStr = phoneField.trim();
+      print('📱 Phone is String: "$phoneStr"');
       if (phoneStr.startsWith('+')) {
         final spaceIndex = phoneStr.indexOf(' ');
         if (spaceIndex > 0) {
@@ -106,33 +128,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           else if (cc == '+44') _selectedCountryFlag = '🇬🇧';
           else _selectedCountryFlag = '🇺🇳';
           mappedPhone = num; // Only the number part goes to the input field
+          print('🌍 Extracted country code: $cc, number: $num');
         } else {
           // If no space, treat as just country code, leave phone empty
           mappedPhone = '';
+          print('⚠️ Phone string has no space, treating as country code only');
         }
       } else {
         // If doesn't start with +, treat as just the number
         mappedPhone = phoneStr;
+        print('📱 Phone doesn\'t start with +, treating as number only: "$mappedPhone"');
       }
     }
     _phoneController.text = mappedPhone;
+    print('📱 Final phone number set: "$mappedPhone"');
 
-    _designationController.text = (widget.userData?['designation'] ?? '').toString();
-    _companyController.text = (widget.userData?['company'] ?? '').toString();
+    // Initialize designation
+    final designation = (widget.userData?['designation'] ?? '').toString();
+    _designationController.text = designation;
+    print('💼 Designation initialized: "$designation"');
+
+    // Initialize company
+    final company = (widget.userData?['company'] ?? '').toString();
+    _companyController.text = company;
+    print('🏢 Company initialized: "$company"');
 
     // Location mapping: prefer full_address.street, fallback to location
     final dynamic fullAddress = widget.userData?['full_address'];
     String mappedLocation = '';
+    print('📍 Full address received: $fullAddress (type: ${fullAddress.runtimeType})');
+    
     if (fullAddress is Map) {
       mappedLocation = (fullAddress['street'] ?? '').toString();
+      print('📍 Location from full_address.street: "$mappedLocation"');
     }
     if (mappedLocation.isEmpty) {
       mappedLocation = (widget.userData?['location'] ?? '').toString();
+      print('📍 Location from location field: "$mappedLocation"');
     }
     _locationController.text = mappedLocation;
+    print('📍 Final location set: "$mappedLocation"');
 
     // Store current user's profile photo URL
     _currentUserPhotoUrl = widget.userData?['profilePhoto'];
+    print('🖼️ Current profile photo URL: $_currentUserPhotoUrl');
+    _addPhotoLog('🖼️ Current profile photo URL: $_currentUserPhotoUrl');
 
     // Initialize role checkboxes from current user data if available
     // Backend might return either 'additionalRoles' or 'userTags' - handle both
@@ -143,16 +183,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             widget.userData!['roles'])
         : null;
     
+    print('🏷️ Roles field received: $rolesDynamic (type: ${rolesDynamic.runtimeType})');
+    
     List<String> roles = [];
     
     if (rolesDynamic is List) {
       roles = rolesDynamic.map((e) => e.toString()).toList();
+      print('🏷️ Roles is List: $roles');
     } else if (rolesDynamic is String) {
       try {
         final List<dynamic> parsedRoles = json.decode(rolesDynamic);
         roles = parsedRoles.map((e) => e.toString()).toList();
+        print('🏷️ Roles parsed from JSON string: $roles');
       } catch (e) {
-        // Error parsing roles JSON
+        print('❌ Error parsing roles JSON: $e');
       }
     }
     
@@ -160,17 +204,27 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       for (final entry in _roleCheckboxes.entries.toList()) {
         final isSelected = roles.contains(entry.key);
         _roleCheckboxes[entry.key] = isSelected;
+        if (isSelected) {
+          print('✅ Role selected: ${entry.key}');
+        }
       }
+    } else {
+      print('⚠️ No roles found in user data');
     }
+    
+    print('✅ _initializeControllers() - All controllers initialized successfully');
   }
 
   // Location search (same approach as in signup screen)
   Future<void> _fetchLocations(String query) async {
+    print('🔍 _fetchLocations() - Query: "$query"');
+    
     if (query.isEmpty) {
       setState(() {
         _locationSuggestions = [];
         _isLoadingLocations = false;
       });
+      print('🔍 Query is empty, clearing suggestions');
       return;
     }
 
@@ -179,6 +233,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
 
     try {
+      print('🌐 Making API call to OpenStreetMap for location suggestions...');
       final response = await http.get(
         Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
         headers: {
@@ -186,6 +241,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           'User-Agent': 'AppointmentApp/1.0',
         },
       );
+
+      print('🌐 Location API response status: ${response.statusCode}');
+      print('🌐 Location API response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -200,6 +258,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
         });
+        print('✅ Location suggestions loaded: $suggestions');
       } else {
         final suggestions = <String>[
           '$query, New York, USA',
@@ -212,8 +271,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
         });
+        print('⚠️ Using fallback location suggestions: $suggestions');
       }
     } catch (e) {
+      print('❌ Error fetching locations: $e');
       final suggestions = <String>[
         '$query, New York, USA',
         '$query, London, UK',
@@ -225,38 +286,88 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _locationSuggestions = suggestions;
         _isLoadingLocations = false;
       });
+      print('⚠️ Using error fallback location suggestions: $suggestions');
     }
   }
 
   void _onLocationChanged(String value) {
+    print('📍 _onLocationChanged() - Value: "$value"');
     _locationDebounceTimer?.cancel();
     _locationDebounceTimer = Timer(const Duration(milliseconds: 500), () {
       _fetchLocations(value);
     });
   }
 
-  // Photo upload functions with validation and S3 upload (same as appointment details screen)
+  // Photo upload functions with S3 URL only (no file upload)
   Future<void> _pickImage(ImageSource source) async {
+    _addPhotoLog('📸 _pickImage() - Source: $source');
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      // Store the selected file for later upload with profile update
+      _addPhotoLog('📸 Image picked: ${pickedFile.path}');
+      _addPhotoLog('📸 Image name: ${pickedFile.name}');
+      _addPhotoLog('📸 Image size: ${pickedFile.length} bytes');
+      
+      // Show uploading state immediately
       setState(() {
         _selectedImageFile = File(pickedFile.path);
-        _isUploadingPhoto = false;
+        _isUploadingPhoto = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Photo selected! Click "Save Changes" to upload.'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      try {
+        _addPhotoLog('📤 Starting photo upload to S3...');
+        // Upload photo to S3 and get URL
+        final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
+        _addPhotoLog('📤 Upload result: $result');
+
+        if (result['success']) {
+          final s3Url = result['s3Url'] ?? result['data']?['s3Url'] ?? result['data']?['url'];
+          setState(() {
+            _uploadedPhotoUrl = s3Url;
+            _isUploadingPhoto = false;
+          });
+          _addPhotoLog('✅ Photo uploaded successfully. S3 URL: $s3Url');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Photo uploaded successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          setState(() {
+            _isUploadingPhoto = false;
+          });
+          _addPhotoLog('❌ Photo upload failed: ${result['message']}');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload photo: ${result['message']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+        _addPhotoLog('❌ Error uploading photo: $e');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      _addPhotoLog('⚠️ No image selected');
     }
   }
 
   void _removeImage() {
+    _addPhotoLog('🗑️ _removeImage() - Removing selected image');
     setState(() {
       _selectedImageFile = null;
       _uploadedPhotoUrl = null;
@@ -269,6 +380,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         backgroundColor: Colors.orange,
       ),
     );
+    _addPhotoLog('✅ Image removed successfully');
+  }
+
+  // Helper method to add logs to screen display
+  void _addPhotoLog(String message) {
+    final timestamp = DateTime.now().toString().substring(11, 19); // HH:MM:SS
+    final logMessage = '[$timestamp] $message';
+    print(logMessage); // Console log
+    setState(() {
+      _photoLogs.add(logMessage);
+      // Keep only last 20 logs to prevent memory issues
+      if (_photoLogs.length > 20) {
+        _photoLogs.removeAt(0);
+      }
+    });
   }
 
   @override
@@ -294,6 +420,116 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     // Profile Photo Section
                     _buildSectionHeader('Profile Photo', Icons.camera_alt_outlined),
                     const SizedBox(height: 16),
+                    
+                    // Photo Logs Display (for debugging)
+                    if (_showPhotoLogs) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12.0),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8.0),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.bug_report, color: Colors.blue.shade700, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Photo Debug Logs',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _showPhotoLogs = !_showPhotoLogs;
+                                    });
+                                  },
+                                  child: Icon(
+                                    _showPhotoLogs ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                    color: Colors.blue.shade700,
+                                    size: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_showPhotoLogs) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 120,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: _photoLogs.map((log) => Text(
+                                      log,
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 10,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    )).toList(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _photoLogs.clear();
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red.shade100,
+                                        foregroundColor: Colors.red.shade700,
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        minimumSize: const Size(0, 32),
+                                      ),
+                                      child: const Text('Clear Logs', style: TextStyle(fontSize: 12)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        _addPhotoLog('🔄 Manual refresh - Current state:');
+                                        _addPhotoLog('   Selected file: ${_selectedImageFile?.path ?? "None"}');
+                                        _addPhotoLog('   Uploaded URL: $_uploadedPhotoUrl');
+                                        _addPhotoLog('   Current URL: $_currentUserPhotoUrl');
+                                        _addPhotoLog('   Is uploading: $_isUploadingPhoto');
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green.shade100,
+                                        foregroundColor: Colors.green.shade700,
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        minimumSize: const Size(0, 32),
+                                      ),
+                                      child: const Text('Refresh State', style: TextStyle(fontSize: 12)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     
                     // Profile Photo Card
                     Container(
@@ -1332,12 +1568,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Widget _buildRoleCheckbox(String role) {
     return GestureDetector(
       onTap: () {
-              final currentValue = _roleCheckboxes[role] ?? false;
-      final newValue = !currentValue;
-      
+        final currentValue = _roleCheckboxes[role] ?? false;
+        final newValue = !currentValue;
+        
+        print('🏷️ Role checkbox tapped: "$role" - Current: $currentValue, New: $newValue');
+        
         setState(() {
-        _roleCheckboxes[role] = newValue;
+          _roleCheckboxes[role] = newValue;
         });
+        
+        // Log all selected roles after change
+        final selectedRoles = _roleCheckboxes.entries
+            .where((entry) => entry.value == true)
+            .map((entry) => entry.key)
+            .toList();
+        print('🏷️ All selected roles after change: $selectedRoles');
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1433,10 +1678,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ),
                   onSelect: (Country country) {
+                    print('🌍 Country selected: ${country.name} (${country.phoneCode}) - Flag: ${country.flagEmoji}');
                     setState(() {
                       _selectedCountryCode = '+${country.phoneCode}';
                       _selectedCountryFlag = country.flagEmoji;
                     });
+                    print('🌍 Updated country code: $_selectedCountryCode, flag: $_selectedCountryFlag');
                   },
                 );
               },
@@ -1510,6 +1757,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   void _saveChanges() async {
+    print('💾 _saveChanges() - Starting profile update process...');
+    
     // Show loading
     setState(() {
       _isLoading = true;
@@ -1518,14 +1767,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     try {
       // Prepare phone number with country code
       final fullPhoneNumber = '$_selectedCountryCode ${_phoneController.text.trim()}';
+      print('📱 Full phone number prepared: "$fullPhoneNumber"');
       
       // Prepare selected roles
       final selectedRoles = _roleCheckboxes.entries
           .where((entry) => entry.value == true)
           .map((entry) => entry.key)
           .toList();
+      print('🏷️ Selected roles: $selectedRoles');
 
-      // Call ActionService to update profile
+      // Log all form data being sent
+      print('📋 Form data to be sent:');
+      print('   - Full Name: "${_fullNameController.text.trim()}"');
+      print('   - Email: "${_emailController.text.trim()}"');
+      print('   - Phone Number: "$fullPhoneNumber"');
+      print('   - Designation: "${_designationController.text.trim()}"');
+      print('   - Company: "${_companyController.text.trim()}"');
+      print('   - Location: "${_locationController.text.trim()}"');
+      print('   - User Tags: $selectedRoles');
+      print('   - Profile Photo URL: $_uploadedPhotoUrl');
+      _addPhotoLog('💾 Profile photo URL being sent: $_uploadedPhotoUrl');
+
+      // Call ActionService to update profile (S3 URL only, no file upload)
+      print('📡 Calling ActionService.updateUserProfile()...');
       final result = await ActionService.updateUserProfile(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
@@ -1534,14 +1798,22 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         company: _companyController.text.trim(),
         full_address: _locationController.text.trim(),
         userTags: selectedRoles,
-        profilePhotoFile: _selectedImageFile, // Pass the selected file for upload
+        profilePhotoUrl: _uploadedPhotoUrl, // S3 URL only
       );
+
+      print('📡 ActionService.updateUserProfile() result: $result');
 
       setState(() {
         _isLoading = false;
       });
       
       if (result['success']) {
+        print('✅ Profile update successful!');
+        print('📥 Response data: ${result['data']}');
+        print('📥 Response message: ${result['message']}');
+        _addPhotoLog('✅ Profile update successful!');
+        _addPhotoLog('📥 Response data: ${result['data']}');
+        
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1551,27 +1823,41 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           ),
         );
         
-        // Clear selected file after successful upload
+        // Store the updated profile photo URL before clearing
+        final updatedProfilePhoto = result['data']?['profilePhoto'] ?? _uploadedPhotoUrl;
+        print('🖼️ Updated profile photo URL: $updatedProfilePhoto');
+        
+        // Clear selected file and uploaded URL after successful upload
         setState(() {
           _selectedImageFile = null;
+          _uploadedPhotoUrl = null;
         });
+        print('🧹 Cleared temporary photo data');
         
         // Navigate back with updated data
-    final updatedData = {
-      'fullName': _fullNameController.text,
-      'email': _emailController.text,
+        final updatedData = {
+          'fullName': _fullNameController.text,
+          'email': _emailController.text,
           'phoneNumber': fullPhoneNumber,
-      'designation': _designationController.text,
-      'company': _companyController.text,
-      'location': _locationController.text,
+          'designation': _designationController.text,
+          'company': _companyController.text,
+          'location': _locationController.text,
           'selectedRoles': selectedRoles,
-          'profilePhoto': result['data']?['profilePhoto'] ?? _uploadedPhotoUrl, // Use the updated profile photo from response
+          'profilePhoto': updatedProfilePhoto, // Use the stored profile photo URL
         };
         
+        print('📤 Navigating back with updated data: $updatedData');
         Navigator.pop(context, updatedData);
       } else {
+        print('❌ Profile update failed!');
+        print('📥 Error status code: ${result['statusCode']}');
+        print('📥 Error message: ${result['message']}');
+        _addPhotoLog('❌ Profile update failed!');
+        _addPhotoLog('📥 Error status code: ${result['statusCode']}');
+        _addPhotoLog('📥 Error message: ${result['message']}');
+        
         // Show error message
-    ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to update profile'),
             backgroundColor: Colors.red,
@@ -1580,6 +1866,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         );
       }
     } catch (error) {
+      print('❌ Exception during profile update: $error');
+      print('❌ Error type: ${error.runtimeType}');
+      
       setState(() {
         _isLoading = false;
       });

@@ -23,6 +23,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
+  // Log display state for profile screen
+  List<String> _profileLogs = [];
+  bool _showProfileLogs = true;
+
+  // Helper method to add logs to screen display
+  void _addProfileLog(String message) {
+    final timestamp = DateTime.now().toString().substring(11, 19); // HH:MM:SS
+    final logMessage = '[$timestamp] $message';
+    print(logMessage); // Console log
+    setState(() {
+      _profileLogs.add(logMessage);
+      // Keep only last 15 logs to prevent memory issues
+      if (_profileLogs.length > 15) {
+        _profileLogs.removeAt(0);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,20 +59,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
+    _addProfileLog('🔄 _loadUserData() - Starting to load user data...');
     try {
       // Only fetch fresh data from API
+      _addProfileLog('📡 Calling ActionService.getCurrentUser()...');
       final apiResult = await ActionService.getCurrentUser();
 
       if (apiResult['success'] == true) {
         final freshUserData = apiResult['data'];
+        _addProfileLog('✅ API call successful');
+        _addProfileLog('📋 Profile photo from API: ${freshUserData?['profilePhoto']}');
 
         // Update cached data in StorageService (for other parts of app)
         await StorageService.saveUserData(freshUserData);
+        _addProfileLog('💾 User data saved to storage');
 
         setState(() {
           _userData = freshUserData;
           _isLoading = false;
         });
+        _addProfileLog('✅ Profile screen updated with fresh data');
 
         // Set initial values for form fields from fresh data
         _fullNameController.text =
@@ -88,6 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         _locationController.text = locationText;
       } else {
+        _addProfileLog('❌ API call failed: ${apiResult['message']}');
         // API failed - show error and empty state
         setState(() {
           _userData = null;
@@ -112,6 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (error) {
+      _addProfileLog('❌ Network error: $error');
       // Network error - show error and empty state
       setState(() {
         _userData = null;
@@ -1027,6 +1053,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditForm(BuildContext context) async {
+    _addProfileLog('✏️ _showEditForm() - Opening edit form...');
     // Show loading while fetching fresh user data
     showDialog(
       context: context,
@@ -1046,10 +1073,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     Map<String, dynamic>? freshUserData;
     try {
+      _addProfileLog('📡 Fetching fresh user data for edit...');
       final apiResult = await ActionService.getCurrentUser();
       if (apiResult['success'] == true) {
         freshUserData = apiResult['data'];
+        _addProfileLog('✅ Fresh data fetched successfully');
+        _addProfileLog('📋 Current profile photo: ${freshUserData?['profilePhoto']}');
       } else {
+        _addProfileLog('❌ Failed to fetch fresh data: ${apiResult['message']}');
         // API failed - show error and don't proceed
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1063,6 +1094,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return; // Don't proceed to edit screen
       }
     } catch (e) {
+      _addProfileLog('❌ Error fetching fresh data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error fetching profile: $e'),
@@ -1086,13 +1118,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (result != null) {
+      _addProfileLog('📤 Edit form returned with result: $result');
+      _addProfileLog('📋 Profile photo from result: ${result['profilePhoto']}');
+      
       // Refresh user data from API to get the most up-to-date information
       try {
+        _addProfileLog('🔄 Refreshing user data from API after edit...');
+        _addProfileLog('📡 Calling ActionService.getCurrentUser()...');
         final apiResult = await ActionService.getCurrentUser();
+        
+        _addProfileLog('📥 API Response Status: ${apiResult['statusCode']}');
+        _addProfileLog('📥 API Response Success: ${apiResult['success']}');
+        _addProfileLog('📥 API Response Message: ${apiResult['message']}');
+        
         if (apiResult['success'] == true) {
-          setState(() {
-            _userData = apiResult['data'];
-          });
+          _addProfileLog('✅ API refresh successful');
+          _addProfileLog('📋 Full API Response Data: ${apiResult['data']}');
+          _addProfileLog('📋 Profile photo from API: ${apiResult['data']?['profilePhoto']}');
+          _addProfileLog('📋 Expected profile photo: ${result['profilePhoto']}');
+          
+          // Check if API returned the updated photo
+          final apiPhoto = apiResult['data']?['profilePhoto'];
+          final expectedPhoto = result['profilePhoto'];
+          
+          if (apiPhoto == expectedPhoto) {
+            _addProfileLog('✅ Database has updated profile photo!');
+          } else {
+            _addProfileLog('❌ Database still has old profile photo!');
+            _addProfileLog('🔍 API Photo: $apiPhoto');
+            _addProfileLog('🔍 Expected: $expectedPhoto');
+            _addProfileLog('⚠️ Backend database update issue detected!');
+          }
+          
+          // If API returned old photo but we have updated photo, preserve the updated one
+          if (apiResult['data']?['profilePhoto'] != result['profilePhoto'] && result['profilePhoto'] != null) {
+            _addProfileLog('🛡️ Preserving updated profile photo from edit form');
+            final preservedData = {...apiResult['data'], 'profilePhoto': result['profilePhoto']};
+            setState(() {
+              _userData = preservedData;
+            });
+            _addProfileLog('✅ Profile screen updated with preserved photo');
+          } else {
+            setState(() {
+              _userData = apiResult['data'];
+            });
+            _addProfileLog('✅ Profile screen updated with new data');
+          }
           
           // Update form controllers with fresh data
           _fullNameController.text = _userData?['fullName'] ?? _userData?['name'] ?? '';
@@ -1123,12 +1194,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             locationText = (_userData?['location'] ?? '').toString();
           }
           _locationController.text = locationText;
+        } else {
+          _addProfileLog('❌ API refresh failed: ${apiResult['message']}');
         }
       } catch (error) {
+        _addProfileLog('❌ Error refreshing from API: $error');
+        _addProfileLog('🔄 Falling back to returned data...');
         // Fallback to using returned data if API refresh fails
         setState(() {
           _userData = {...?_userData, ...result};
         });
+        _addProfileLog('✅ Profile screen updated with fallback data');
         
         _fullNameController.text = result['fullName'] ?? _fullNameController.text;
         _emailController.text = result['email'] ?? _emailController.text;
@@ -1137,6 +1213,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _companyController.text = result['company'] ?? _companyController.text;
         _locationController.text = result['location'] ?? _locationController.text;
       }
+    } else {
+      _addProfileLog('⚠️ Edit form returned null (no changes made)');
     }
   }
 }

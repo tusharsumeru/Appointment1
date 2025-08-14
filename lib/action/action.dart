@@ -11,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://bca48ea6d868.ngrok-free.app/api/v3'; // API base URL
+      'https://f3d13cddd467.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -5125,7 +5125,7 @@ class ActionService {
     }
   }
 
-  // Update user profile with file upload or S3 URL
+  // Update user profile with S3 URL only (no file upload)
   static Future<Map<String, dynamic>> updateUserProfile({
     required String fullName,
     required String email,
@@ -5134,8 +5134,7 @@ class ActionService {
     String? company,
     required String full_address,
     required List<String> userTags,
-    File? profilePhotoFile,
-    String? profilePhotoUrl, // Add support for S3 URL
+    String? profilePhotoUrl, // S3 URL only
   }) async {
     try {
       // Get authentication token
@@ -5195,54 +5194,17 @@ class ActionService {
 
       // Handle userTags as array - send as userTags
       if (userTags.isNotEmpty) {
-        request.fields['userTags'] = userTags.join(',');
+        // Send userTags as JSON array string
+        request.fields['userTags'] = jsonEncode(userTags);
       }
 
-      // Add S3 URL if present (preferred over file upload)
+      // Add S3 URL if present (no file upload needed)
       if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
-        request.fields['profilePhoto'] = profilePhotoUrl;
+        request.fields['profilePhoto'] = profilePhotoUrl; // Database field name is 'profilePhoto'
         print('📤 Sending profile photo URL: $profilePhotoUrl');
-      }
-
-      // Add file if present (only if no S3 URL provided)
-      if (profilePhotoFile != null && (profilePhotoUrl == null || profilePhotoUrl.isEmpty)) {
-        final fileName = profilePhotoFile.path.split('/').last;
-        final fileExtension = fileName.split('.').last.toLowerCase();
-
-        // Validate file type
-        final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!allowedExtensions.contains(fileExtension)) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'message':
-                'Profile photo must be a valid image file (JPG, PNG, GIF).',
-          };
-        }
-
-        // Check file size (max 5MB)
-        final fileSize = await profilePhotoFile.length();
-        if (fileSize > 5 * 1024 * 1024) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'message': 'Profile photo size must be less than 5MB.',
-          };
-        }
-
-        // Add file to request
-        final fileStream = http.ByteStream(profilePhotoFile.openRead());
-        final fileLength = await profilePhotoFile.length();
-
-        final multipartFile = http.MultipartFile(
-          'file',
-          fileStream,
-          fileLength,
-          filename: fileName,
-          contentType: MediaType('image', fileExtension),
-        );
-
-        request.files.add(multipartFile);
+        print('📤 Field name: profilePhoto (matches database)');
+      } else {
+        print('📤 No profile photo URL provided');
       }
 
       // Send request
@@ -5258,6 +5220,7 @@ class ActionService {
       
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       print('📥 Parsed response data: $responseData');
+      print('📥 Profile photo in response: ${responseData['data']?['profilePhoto']}');
 
       if (response.statusCode == 200) {
         print('📥 Response status is 200, checking for data...');
