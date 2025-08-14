@@ -5192,10 +5192,18 @@ class ActionService {
         'display_name': full_address.trim(),
       });
 
-      // Handle userTags as array - send as userTags
+      // Handle userTags as array - send as both userTags and additionalRoles
       if (userTags.isNotEmpty) {
-        // Send userTags as JSON array string
-        request.fields['userTags'] = jsonEncode(userTags);
+        // Send userTags using indexed keys to ensure all values are sent
+        for (int i = 0; i < userTags.length; i++) {
+          request.fields['userTags[$i]'] = userTags[i];
+        }
+        // Also send as additionalRoles in case backend expects that field
+        for (int i = 0; i < userTags.length; i++) {
+          request.fields['additionalRoles[$i]'] = userTags[i];
+        }
+        print('📤 Sending userTags as indexed array: $userTags');
+        print('📤 Also sending as additionalRoles: $userTags');
       }
 
       // Add S3 URL if present (no file upload needed)
@@ -5210,6 +5218,12 @@ class ActionService {
       // Send request
       print('📤 Sending profile update request with fields: ${request.fields}');
       print('📤 Sending profile update request with files: ${request.files.length}');
+      
+      // Debug: Print each field individually
+      print('📤 Individual fields being sent:');
+      request.fields.forEach((key, value) {
+        print('📤 Field: $key = $value');
+      });
       
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -5233,6 +5247,8 @@ class ActionService {
           print('✅ User data saved successfully to storage');
         } else {
           print('⚠️ No data in response, not updating storage');
+          print('⚠️ This might indicate that the backend is not returning updated user data');
+          print('⚠️ The profile update was successful but no user data was returned');
         }
         
         return {

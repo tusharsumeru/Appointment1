@@ -57,12 +57,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     'Trustee': false,
     'State Apex / STC': false,
   };
+  
+  // Validate role lengths
+  void _validateRoles() {
+    print('🔍 Validating role lengths...');
+    for (final entry in _roleCheckboxes.entries) {
+      final length = entry.key.length;
+      print('🏷️ Role "${entry.key}": $length characters');
+      if (length > 50) {
+        print('❌ Role "${entry.key}" exceeds 50 characters!');
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     print('🚀 ProfileEditScreen.initState() - Starting initialization...');
     print('📋 Received userData: ${widget.userData}');
+    _validateRoles(); // Validate role lengths
     _initializeControllers();
     print('✅ ProfileEditScreen.initState() - Initialization completed');
   }
@@ -184,6 +197,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         : null;
     
     print('🏷️ Roles field received: $rolesDynamic (type: ${rolesDynamic.runtimeType})');
+    print('🏷️ additionalRoles from userData: ${widget.userData?['additionalRoles']}');
+    print('🏷️ userTags from userData: ${widget.userData?['userTags']}');
+    print('🏷️ selectedRoles from userData: ${widget.userData?['selectedRoles']}');
+    print('🏷️ roles from userData: ${widget.userData?['roles']}');
     
     List<String> roles = [];
     
@@ -1421,6 +1438,48 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           _buildRoleCheckbox('Trustee'),
                           const SizedBox(height: 12),
                           _buildRoleCheckbox('State Apex / STC'),
+                          
+                          // Debug information for additional roles
+                          if (_showPhotoLogs) ...[
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '🔍 Additional Roles Debug Info:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Selected Roles: ${_roleCheckboxes.entries.where((e) => e.value).map((e) => e.key).join(', ')}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Total Selected: ${_roleCheckboxes.entries.where((e) => e.value).length}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1775,6 +1834,24 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .map((entry) => entry.key)
           .toList();
       print('🏷️ Selected roles: $selectedRoles');
+      
+      // Validate role lengths before sending
+      for (final role in selectedRoles) {
+        if (role.length > 50) {
+          print('❌ Role "$role" exceeds 50 characters (${role.length} chars)');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Role "$role" is too long. Maximum 50 characters allowed.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
 
       // Log all form data being sent
       print('📋 Form data to be sent:');
@@ -1790,6 +1867,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       // Call ActionService to update profile (S3 URL only, no file upload)
       print('📡 Calling ActionService.updateUserProfile()...');
+      print('📡 userTags being sent: $selectedRoles');
+      print('📡 userTags type: ${selectedRoles.runtimeType}');
+      print('📡 userTags length: ${selectedRoles.length}');
+      
+      // Log each role being sent
+      for (int i = 0; i < selectedRoles.length; i++) {
+        print('📡 userTags[$i]: "${selectedRoles[i]}" (${selectedRoles[i].length} chars)');
+      }
+      
       final result = await ActionService.updateUserProfile(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),

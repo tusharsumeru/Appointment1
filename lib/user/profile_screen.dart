@@ -1153,14 +1153,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // If API returned old photo but we have updated photo, preserve the updated one
           if (apiResult['data']?['profilePhoto'] != result['profilePhoto'] && result['profilePhoto'] != null) {
             _addProfileLog('🛡️ Preserving updated profile photo from edit form');
-            final preservedData = {...apiResult['data'], 'profilePhoto': result['profilePhoto']};
+            final preservedData = <String, dynamic>{...apiResult['data'] as Map<String, dynamic>, 'profilePhoto': result['profilePhoto']};
             setState(() {
               _userData = preservedData;
             });
             _addProfileLog('✅ Profile screen updated with preserved photo');
           } else {
             setState(() {
-              _userData = apiResult['data'];
+              _userData = apiResult['data'] as Map<String, dynamic>?;
             });
             _addProfileLog('✅ Profile screen updated with new data');
           }
@@ -1202,7 +1202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _addProfileLog('🔄 Falling back to returned data...');
         // Fallback to using returned data if API refresh fails
         setState(() {
-          _userData = {...?_userData, ...result};
+          _userData = <String, dynamic>{...?_userData, ...result as Map<String, dynamic>};
         });
         _addProfileLog('✅ Profile screen updated with fallback data');
         
