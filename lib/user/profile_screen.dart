@@ -274,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ],
                               ),
                               child: ClipOval(
-                                child: _userData?['profilePhoto'] != null && _userData!['profilePhoto'].toString().isNotEmpty
+                                child: _userData?['profilePhoto'] != null
                                     ? Image.network(
                                         _userData!['profilePhoto'],
                                         fit: BoxFit.cover,
@@ -861,6 +861,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildTeacherDetail(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTeacherVerificationBox() {
     // Check if user is an AOL teacher
     final aolTeacherData = _userData?['aol_teacher'];
@@ -998,35 +1027,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTeacherDetail(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
     );
   }
 

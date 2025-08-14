@@ -11,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://7a773f642b06.ngrok-free.app/api/v3'; // API base URL
+      'https://bca48ea6d868.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -5125,7 +5125,7 @@ class ActionService {
     }
   }
 
-  // Update user profile with file upload
+  // Update user profile with file upload or S3 URL
   static Future<Map<String, dynamic>> updateUserProfile({
     required String fullName,
     required String email,
@@ -5135,6 +5135,7 @@ class ActionService {
     required String full_address,
     required List<String> userTags,
     File? profilePhotoFile,
+    String? profilePhotoUrl, // Add support for S3 URL
   }) async {
     try {
       // Get authentication token
@@ -5197,8 +5198,14 @@ class ActionService {
         request.fields['additionalRoles'] = jsonEncode(userTags);
       }
 
-      // Add file if present
-      if (profilePhotoFile != null) {
+      // Add S3 URL if present (preferred over file upload)
+      if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
+        request.fields['profilePhoto'] = profilePhotoUrl;
+        print('📤 Sending profile photo URL: $profilePhotoUrl');
+      }
+
+      // Add file if present (only if no S3 URL provided)
+      if (profilePhotoFile != null && (profilePhotoUrl == null || profilePhotoUrl.isEmpty)) {
         final fileName = profilePhotoFile.path.split('/').last;
         final fileExtension = fileName.split('.').last.toLowerCase();
 
@@ -5239,16 +5246,30 @@ class ActionService {
       }
 
       // Send request
+      print('📤 Sending profile update request with fields: ${request.fields}');
+      print('📤 Sending profile update request with files: ${request.files.length}');
+      
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       // Parse response
+      print('📥 Raw response status: ${response.statusCode}');
+      print('📥 Raw response body: ${response.body}');
+      
       final Map<String, dynamic> responseData = jsonDecode(response.body);
+      print('📥 Parsed response data: $responseData');
 
       if (response.statusCode == 200) {
+        print('📥 Response status is 200, checking for data...');
+        print('📥 responseData[\'data\']: ${responseData['data']}');
+        
         // Update cached user data with the response data
         if (responseData['data'] != null) {
+          print('📥 Saving user data to storage: ${responseData['data']}');
           await StorageService.saveUserData(responseData['data']);
+          print('✅ User data saved successfully to storage');
+        } else {
+          print('⚠️ No data in response, not updating storage');
         }
         
         return {

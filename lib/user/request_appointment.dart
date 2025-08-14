@@ -136,16 +136,21 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       final designation = userData?['designation'] ?? '';
       final company = userData?['company'] ?? '';
       
-      // Handle teacher status - check both aol_teacher and isTeacher fields
+      // Handle teacher status - check atolValidationData.success field inside aol_teacher
       bool isTeacher = false;
-      if (userData?['aol_teacher'] != null) {
-        isTeacher = userData!['aol_teacher'] == true;
-        print('👨‍🏫 Teacher status from aol_teacher: $isTeacher');
-      } else if (userData?['isTeacher'] != null) {
-        isTeacher = userData!['isTeacher'] == true;
-        print('👨‍🏫 Teacher status from isTeacher: $isTeacher');
+      
+      // Debug prints to show what values are coming in
+    
+      
+      if (userData?['aol_teacher'] != null && 
+          userData!['aol_teacher'] is Map<String, dynamic> &&
+          userData!['aol_teacher']['atolValidationData'] != null &&
+          userData!['aol_teacher']['atolValidationData']['success'] == true) {
+        isTeacher = true;
+        print('👨‍🏫 Teacher status: YES (aol_teacher.atolValidationData.success = true)');
       } else {
-        print('👨‍🏫 No teacher status found, defaulting to false');
+        isTeacher = false;
+        print('👨‍🏫 Teacher status: NO (aol_teacher.atolValidationData.success != true or field not found)');
       }
       
       print('📝 Form field values set:');
@@ -383,7 +388,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
                   // Teacher Question
                   const Text(
-                    'Are you an Art Of Living teacher? (Read-only)',
+                    'Are you an Art Of Living teacher?',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
