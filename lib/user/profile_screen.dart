@@ -112,15 +112,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (error) {
-      print('Error loading user data: $error');
-
       // Network error - show error and empty state
       setState(() {
         _userData = null;
         _isLoading = false;
       });
-
-      print('🔄 Setting default values due to error...');
 
       // Clear form fields
       _fullNameController.text = '';
@@ -1129,7 +1125,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _locationController.text = locationText;
         }
       } catch (error) {
-        print('Error refreshing user data after edit: $error');
         // Fallback to using returned data if API refresh fails
         setState(() {
           _userData = {...?_userData, ...result};

@@ -5193,9 +5193,9 @@ class ActionService {
         'display_name': full_address.trim(),
       });
 
-      // Handle userTags as array - send as additionalRoles
+      // Handle userTags as array - send as userTags
       if (userTags.isNotEmpty) {
-        request.fields['additionalRoles'] = jsonEncode(userTags);
+        request.fields['userTags'] = userTags.join(',');
       }
 
       // Add S3 URL if present (preferred over file upload)

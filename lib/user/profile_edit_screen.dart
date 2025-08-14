@@ -135,13 +135,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _currentUserPhotoUrl = widget.userData?['profilePhoto'];
 
     // Initialize role checkboxes from current user data if available
-    print('🔍 Profile Edit Screen: Initializing role checkboxes');
-    print('📊 User data keys: ${widget.userData?.keys.toList()}');
-    print('📊 selectedRoles: ${widget.userData?['selectedRoles']}');
-    print('📊 roles: ${widget.userData?['roles']}');
-    print('📊 userTags: ${widget.userData?['userTags']}');
-    print('📊 additionalRoles: ${widget.userData?['additionalRoles']}');
-    
+    // Backend might return either 'additionalRoles' or 'userTags' - handle both
     final dynamic rolesDynamic = widget.userData != null
         ? (widget.userData!['additionalRoles'] ??
             widget.userData!['userTags'] ??
@@ -149,21 +143,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             widget.userData!['roles'])
         : null;
     
-    print('📊 Selected rolesDynamic: $rolesDynamic');
-    print('📊 Type of rolesDynamic: ${rolesDynamic.runtimeType}');
-    
     List<String> roles = [];
     
     if (rolesDynamic is List) {
       roles = rolesDynamic.map((e) => e.toString()).toList();
-      print('✅ Parsed roles from List: $roles');
     } else if (rolesDynamic is String) {
       try {
         final List<dynamic> parsedRoles = json.decode(rolesDynamic);
         roles = parsedRoles.map((e) => e.toString()).toList();
-        print('✅ Parsed roles from JSON string: $roles');
       } catch (e) {
-        print('❌ Error parsing roles JSON: $e');
+        // Error parsing roles JSON
       }
     }
     
@@ -172,9 +161,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         final isSelected = roles.contains(entry.key);
         _roleCheckboxes[entry.key] = isSelected;
       }
-      print('✅ Role checkboxes initialized: $_roleCheckboxes');
-    } else {
-      print('⚠️ No roles found to initialize');
     }
   }
 
@@ -251,21 +237,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   // Photo upload functions with validation and S3 upload (same as appointment details screen)
   Future<void> _pickImage(ImageSource source) async {
-    print('📸 Starting profile photo pick process...');
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      print('📸 Profile image selected: ${pickedFile.path}');
-      print('📸 File size: ${await File(pickedFile.path).length()} bytes');
-
       // Store the selected file for later upload with profile update
       setState(() {
         _selectedImageFile = File(pickedFile.path);
         _isUploadingPhoto = false;
       });
-
-      print('💾 Profile photo file stored for later upload');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -273,8 +253,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           backgroundColor: Colors.blue,
         ),
       );
-    } else {
-      print('⚠️ No image selected for profile');
     }
   }
 
@@ -284,8 +262,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       _uploadedPhotoUrl = null;
       _isUploadingPhoto = false;
     });
-    
-    print('🗑️ Profile photo removed');
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1548,16 +1524,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .where((entry) => entry.value == true)
           .map((entry) => entry.key)
           .toList();
-      
-      print('📤 Profile Edit Screen: Preparing to save changes');
-      print('📊 Selected roles: $selectedRoles');
-      print('📊 Full name: ${_fullNameController.text.trim()}');
-      print('📊 Email: ${_emailController.text.trim()}');
-      print('📊 Phone: $fullPhoneNumber');
-      print('📊 Designation: ${_designationController.text.trim()}');
-      print('📊 Company: ${_companyController.text.trim()}');
-      print('📊 Location: ${_locationController.text.trim()}');
-      print('📊 Profile photo file: ${_selectedImageFile?.path}');
 
       // Call ActionService to update profile
       final result = await ActionService.updateUserProfile(
@@ -1574,14 +1540,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       setState(() {
         _isLoading = false;
       });
-
-      print('📥 Profile Edit Screen: API Response received');
-      print('📊 Success: ${result['success']}');
-      print('📊 Message: ${result['message']}');
-      print('📊 Data: ${result['data']}');
-      print('📊 Profile photo in response: ${result['data']?['profilePhoto']}');
-      print('📊 User tags in response: ${result['data']?['userTags']}');
-      print('📊 Additional roles in response: ${result['data']?['additionalRoles']}');
       
       if (result['success']) {
         // Show success message
