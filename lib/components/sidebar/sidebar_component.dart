@@ -162,8 +162,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
       );
 
       try {
-        // Clear all stored data
-        await StorageService.logout();
+        // Clear local auth data
+        await StorageService.clearAuthData();
         
         // Close loading dialog
         Navigator.of(context).pop();
@@ -198,7 +198,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
     // Get user role for conditional menu items
     String? userRole = _userData?['role']?.toString().toLowerCase();
     bool isSecretary = userRole == 'secretary';
-    bool isAdmin = userRole == 'admin';
+    bool isAdmin = userRole == 'admin' || userRole == 'super-admin';
+    bool isSuperAdmin = userRole == 'super-admin';
     bool isUser = userRole == 'user' || userRole == 'client';
 
     return Drawer(
@@ -261,8 +262,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ),
 
-          // Secretary-specific menu items
-          if (isSecretary) ...[
+          // Secretary and Super Admin menu items
+          if (isSecretary || isSuperAdmin) ...[
             ListTile(
               leading: const Icon(Icons.inbox, color: Colors.deepPurple),
               title: const Text('Inbox'),
@@ -388,8 +389,10 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ],
 
+
+
           // Admin-specific menu items (to be implemented)
-          if (isAdmin) ...[
+          if (isAdmin && !isSuperAdmin) ...[
             ListTile(
               leading: const Icon(
                 Icons.admin_panel_settings,

@@ -7,11 +7,12 @@ import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'storage_service.dart';
 import 'jwt_utils.dart'; // Added import for JwtUtils
+import '../services/notification_service.dart'; // Added import for NotificationService
 
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://348a97e843ce.ngrok-free.app/api/v3'; // API base URL
+      'https://c8740a8d1f9a.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -1076,6 +1077,7 @@ class ActionService {
     String? venueLabel, // Added venueLabel parameter
     String? arrivalTime,
     Map<String, dynamic>? scheduleConfirmation,
+    String? userId, // Added userId for notification
   }) async {
     try {
       // Get token from storage
@@ -1199,7 +1201,46 @@ class ActionService {
       }
 
       if (response.statusCode == 200) {
-        // Success
+        // Success - now send notification to the user
+        if (responseData['data']?['userId'] != null) {
+          try {
+            // Prepare notification content
+            final notificationTitle = 'Appointment Scheduled! ✅';
+            final notificationBody =
+                'Your appointment has been scheduled for $scheduledDate at $scheduledTime${venueLabel != null ? ' at $venueLabel' : ''}.';
+
+            // Prepare notification data
+            final notificationData = {
+              'type': 'appointment_scheduled',
+              'appointmentId': appointmentId,
+              'userId': responseData['data']['userId'],
+              'timestamp': DateTime.now().toIso8601String(),
+              'action': 'view_appointment',
+              'screen': 'appointment_details',
+              'meetingType': meetingType,
+              'venueId': venueId,
+              'venueLabel': venueLabel,
+            };
+
+            // Send notification using NotificationService
+            await NotificationService.sendToDevice(
+              token: responseData['data']['fcmToken'] ?? '',
+              title: notificationTitle,
+              body: notificationBody,
+              data: notificationData,
+            );
+
+            print(
+              '✅ [NOTIFICATION] Sent appointment schedule notification to user',
+            );
+          } catch (notificationError) {
+            print(
+              '⚠️ [NOTIFICATION] Failed to send notification: $notificationError',
+            );
+            // Don't fail the whole operation if notification fails
+          }
+        }
+
         return {
           'success': true,
           'statusCode': 200,
@@ -5464,6 +5505,1162 @@ class ActionService {
         'success': false,
         'message': 'Network error: $e',
         'error': e.toString(),
+      };
+    }
+  }
+
+  // Add FCM token to user's database record
+  static Future<Map<String, dynamic>> addFCMToken({
+    required String token,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {'token': token};
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/fcm-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Notifications enabled successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to enable notifications',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send login notification
+  static Future<Map<String, dynamic>> sendLoginNotification({
+    required String userId,
+    Map<String, dynamic>? loginInfo,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'loginInfo':
+            loginInfo ??
+            {
+              'deviceInfo': 'Flutter Mobile App',
+              'location': 'Mobile Device',
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/login';
+      print('📤 Calling login notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Login notification API response status: ${response.statusCode}',
+      );
+      print('📤 Login notification API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse login notification response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Login notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send login notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send signup notification
+  static Future<Map<String, dynamic>> sendSignupNotification({
+    required String userId,
+    Map<String, dynamic>? signupInfo,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'signupInfo':
+            signupInfo ??
+            {
+              'source': 'mobile_app',
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/notifications/signup'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Signup notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send signup notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send role-specific notification
+  static Future<Map<String, dynamic>> sendRoleNotification({
+    required String role,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'role': role,
+        'notification': {'title': title, 'body': body},
+        'data': data ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/send-to-role';
+      print('📤 Calling role notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📤 Role notification API response status: ${response.statusCode}');
+      print('📤 Role notification API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse role notification response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Role notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send role notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send notification to specific user
+  static Future<Map<String, dynamic>> sendUserNotification({
+    required String userId,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'notification': {'title': title, 'body': body},
+        'data': data ?? {},
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/notifications/send-to-user'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'User notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send user notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send test notification to current user
+  static Future<Map<String, dynamic>> sendTestNotification({
+    String? title,
+    String? body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'title': title ?? 'Test Notification',
+        'body':
+            body ??
+            'This is a test notification from Sri Sri Appointment system.',
+        'data': data ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/test';
+      print('📤 Calling test notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📤 Test notification API response status: ${response.statusCode}');
+      print('📤 Test notification API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse test notification response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Test notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send test notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send notification to multiple users
+  static Future<Map<String, dynamic>> sendNotificationToMultiple({
+    required List<String> userIds,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? options,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userIds': userIds,
+        'title': title,
+        'body': body,
+        'data': data ?? {},
+        'options': options ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/send-multiple';
+      print('📤 Calling multiple notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Multiple notification API response status: ${response.statusCode}',
+      );
+      print('📤 Multiple notification API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse multiple notification response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Notifications sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to send notifications',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send notification to topic
+  static Future<Map<String, dynamic>> sendTopicNotification({
+    required String topic,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? options,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'topic': topic,
+        'title': title,
+        'body': body,
+        'data': data ?? {},
+        'options': options ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/send-topic';
+      print('📤 Calling topic notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Topic notification API response status: ${response.statusCode}',
+      );
+      print('📤 Topic notification API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse topic notification response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Topic notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to send topic notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Subscribe to topic
+  static Future<Map<String, dynamic>> subscribeToTopic({
+    required String topic,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {'topic': topic};
+
+      // Make API call
+      final url = '$baseUrl/notifications/subscribe-topic';
+      print('📤 Calling subscribe topic API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📤 Subscribe topic API response status: ${response.statusCode}');
+      print('📤 Subscribe topic API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse subscribe topic response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Subscribed to topic successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to subscribe to topic',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Unsubscribe from topic
+  static Future<Map<String, dynamic>> unsubscribeFromTopic({
+    required String topic,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {'topic': topic};
+
+      // Make API call
+      final url = '$baseUrl/notifications/unsubscribe-topic';
+      print('📤 Calling unsubscribe topic API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📤 Unsubscribe topic API response status: ${response.statusCode}');
+      print('📤 Unsubscribe topic API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse unsubscribe topic response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Unsubscribed from topic successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to unsubscribe from topic',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Subscribe tokens to topic (public endpoint)
+  static Future<Map<String, dynamic>> subscribeToTopicPublic({
+    required List<String> tokens,
+    required String topic,
+  }) async {
+    try {
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'tokens': tokens,
+        'topic': topic,
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/subscribe-topic-public';
+      print('📤 Calling public subscribe topic API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Public subscribe topic API response status: ${response.statusCode}',
+      );
+      print('📤 Public subscribe topic API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse public subscribe topic response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ?? 'Subscribed to topic successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to subscribe to topic',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get user's FCM tokens
+  static Future<Map<String, dynamic>> getUserTokens() async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Make API call
+      final url = '$baseUrl/notifications/tokens';
+      print('📤 Calling get user tokens API: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+      );
+
+      print('📤 Get user tokens API response status: ${response.statusCode}');
+      print('📤 Get user tokens API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse get user tokens response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'User FCM tokens retrieved successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to get user tokens',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send appointment creation notification
+  static Future<Map<String, dynamic>> sendAppointmentCreatedNotification({
+    required String userId,
+    required String appointmentId,
+    Map<String, dynamic>? appointmentData,
+    Map<String, dynamic>? notificationData,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'appointmentId': appointmentId,
+        'appointmentData': appointmentData ?? {},
+        'notificationData': notificationData ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/appointment-created';
+      print('📤 Calling appointment created notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Appointment created notification API response status: ${response.statusCode}',
+      );
+      print(
+        '📤 Appointment created notification API response body: ${response.body}',
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(
+          '❌ Failed to parse appointment created notification response as JSON: $e',
+        );
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Appointment creation notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to send appointment creation notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send appointment update notification
+  static Future<Map<String, dynamic>> sendAppointmentUpdatedNotification({
+    required String userId,
+    required String appointmentId,
+    Map<String, dynamic>? appointmentData,
+    String updateType = 'updated',
+    Map<String, dynamic>? notificationData,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'appointmentId': appointmentId,
+        'appointmentData': appointmentData ?? {},
+        'updateType': updateType,
+        'notificationData': notificationData ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/appointment-updated';
+      print('📤 Calling appointment updated notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Appointment updated notification API response status: ${response.statusCode}',
+      );
+      print(
+        '📤 Appointment updated notification API response body: ${response.body}',
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(
+          '❌ Failed to parse appointment updated notification response as JSON: $e',
+        );
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Appointment update notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to send appointment update notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Send profile update notification
+  static Future<Map<String, dynamic>> sendProfileUpdateNotification({
+    required String userId,
+    Map<String, dynamic>? profileData,
+    Map<String, dynamic>? notificationData,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'userId': userId,
+        'profileData': profileData ?? {},
+        'notificationData': notificationData ?? {},
+      };
+
+      // Make API call
+      final url = '$baseUrl/notifications/profile-updated';
+      print('📤 Calling profile update notification API: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+        '📤 Profile update notification API response status: ${response.statusCode}',
+      );
+      print(
+        '📤 Profile update notification API response body: ${response.body}',
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(
+          '❌ Failed to parse profile update notification response as JSON: $e',
+        );
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Profile update notification sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to send profile update notification',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
       };
     }
   }

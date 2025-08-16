@@ -188,26 +188,12 @@ class _SplashScreenState extends State<SplashScreen>
       String? userRole = userData['role']?.toString().toLowerCase();
 
       if (mounted) {
-        if (userRole == 'secretary') {
-          // Secretary role - navigate to appointment management interface
+        if (userRole == 'secretary' || userRole == 'admin' || userRole == 'super-admin') {
+          // Secretary, Admin, and Super-Admin roles - navigate to secretary interface
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const InboxScreen(),
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-              transitionDuration: const Duration(milliseconds: 800),
-            ),
-          );
-        } else if (userRole == 'admin') {
-          // Admin role - navigate to admin interface (to be implemented)
-          // TODO: Replace with AdminScreen when implemented
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const HomeScreen(),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);

@@ -31,8 +31,8 @@ class _ReminderFormState extends State<ReminderForm> {
   
   // Form values
   String _selectedDate = '';
-  String _selectedTime = '16:30';
-  String _selectedArrivalTime = '17:15';
+  String _selectedTime = '';
+  String _selectedArrivalTime = '';
   String _selectedScheduleDate = '';
   String _selectedScheduleTime = '';
   String _selectedMeetingType = 'in_person'; // Set default to 'in_person'
@@ -40,7 +40,7 @@ class _ReminderFormState extends State<ReminderForm> {
   String _selectedVenueName = 'Select a venue';
   
   // Checkbox states
-  bool _tbsReq = true;
+  bool _tbsReq = false;
   bool _dontSendEmailSms = false;
   bool _sendArrivalTime = false;
   bool _scheduleEmailSms = false;
@@ -439,6 +439,11 @@ class _ReminderFormState extends State<ReminderForm> {
                       onChanged: _isLoading ? null : (value) {
                         setState(() {
                           _tbsReq = value ?? false;
+                          // When TBS/Req is checked, set time to 16:30
+                          if (_tbsReq) {
+                            _selectedTime = '16:30';
+                            _timeController.text = _selectedTime;
+                          }
                         });
                       },
                       controlAffinity: ListTileControlAffinity.leading,
@@ -633,6 +638,17 @@ class _ReminderFormState extends State<ReminderForm> {
                                            orElse: () => <String, dynamic>{},
                                          );
                                          _selectedVenueName = selectedVenue['name']?.toString() ?? 'Select a venue';
+                                         
+                                         // Set specific times based on venue selection
+                                         if (_selectedVenueName.toLowerCase().contains('satsang backstage')) {
+                                           _selectedTime = '18:15';
+                                           _timeController.text = _selectedTime;
+                                           print('   ⏰ Auto-set time to 18:15 for Satsang backstage');
+                                         } else if (_selectedVenueName.toLowerCase().contains('gurukul')) {
+                                           _selectedTime = '09:00';
+                                           _timeController.text = _selectedTime;
+                                           print('   ⏰ Auto-set time to 09:00 for Gurukul');
+                                         }
                                        });
                                        print('   🏛️  Selected venue name: $_selectedVenueName');
                                      }

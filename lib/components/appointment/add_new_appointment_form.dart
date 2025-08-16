@@ -596,6 +596,9 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
         Navigator.of(context).pop();
 
         if (result['success']) {
+          // Send appointment creation notification
+          await _sendAppointmentCreatedNotification(result['data']);
+          
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1741,5 +1744,64 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
         ),
       ),
     );
+  }
+
+  // Send appointment creation notification
+  Future<void> _sendAppointmentCreatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      final appointmentId = appointmentData?['_id']?.toString() ?? appointmentData?['id']?.toString();
+      
+      if (appointmentId == null) {
+        print('⚠️ Appointment ID not found, skipping notification');
+        print('🔍 Appointment data: $appointmentData');
+        return;
+      }
+
+      print('🎉 Sending appointment creation notification for appointment: $appointmentId');
+
+      // For admin/secretary forms, we'll use the userId from the appointment data
+      // since this is an admin creating an appointment for someone else
+      final userId = appointmentData?['userId']?.toString() ?? 
+                    'admin_created';
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['fullName'] ?? _fullNameController.text,
+        'date': appointmentData?['preferredDate'] ?? _dateController.text,
+        'time': appointmentData?['preferredTime'] ?? _timeController.text,
+        'venue': appointmentData?['venue'] ?? _selectedVenue,
+        'purpose': appointmentData?['purpose'] ?? _purposeController.text,
+        'numberOfPeople': appointmentData?['numberOfPeople'] ?? _noPeopleController.text,
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'admin_appointment_creation',
+        'userRole': 'admin', // This is an admin form
+        'timestamp': DateTime.now().toIso8601String(),
+        'createdBy': 'admin',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentCreatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment creation notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment creation notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment creation notification: $e');
+      // Don't block the appointment creation flow if notification fails
+    }
   }
 }

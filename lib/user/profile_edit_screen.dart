@@ -1370,6 +1370,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       });
 
       if (result['success']) {
+        // Send profile update notification
+        await _sendProfileUpdateNotification(result['data']);
+        
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1419,6 +1422,70 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           duration: const Duration(seconds: 3),
         ),
       );
+    }
+  }
+
+  // Send profile update notification
+  Future<void> _sendProfileUpdateNotification(Map<String, dynamic>? profileData) async {
+    try {
+      // Get current user data from widget
+      final userData = widget.userData;
+      if (userData == null) {
+        print('⚠️ User data not found, skipping profile update notification');
+        return;
+      }
+
+      final userId = userData['_id']?.toString() ?? userData['userId']?.toString() ?? userData['id']?.toString();
+      
+      if (userId == null) {
+        print('⚠️ User ID not found, skipping notification');
+        return;
+      }
+
+      print('👤 Sending profile update notification for user: $userId');
+
+      // Prepare profile data for notification
+      final notificationProfileData = {
+        'fullName': profileData?['fullName'] ?? _fullNameController.text,
+        'email': profileData?['email'] ?? _emailController.text,
+        'phoneNumber': profileData?['phoneNumber'] ?? '$_selectedCountryCode ${_phoneController.text.trim()}',
+        'designation': profileData?['designation'] ?? _designationController.text,
+        'company': profileData?['company'] ?? _companyController.text,
+        'location': profileData?['full_address'] ?? _locationController.text,
+        'userTags': profileData?['userTags'] ?? _roleCheckboxes.entries
+            .where((entry) => entry.value == true)
+            .map((entry) => entry.key)
+            .toList(),
+        'profilePhoto': profileData?['profilePhoto'] ?? _uploadedPhotoUrl,
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'profile_update',
+        'userRole': userData['role']?.toString() ?? 'user',
+        'timestamp': DateTime.now().toIso8601String(),
+        'updateType': 'profile_updated',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendProfileUpdateNotification(
+        userId: userId,
+        profileData: notificationProfileData,
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Profile update notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send profile update notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending profile update notification: $e');
+      // Don't block the profile update flow if notification fails
     }
   }
 } 

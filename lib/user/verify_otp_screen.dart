@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../action/action.dart';
+import '../action/storage_service.dart';
+import '../auth/notification_setup_screen.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   final String email;
@@ -123,8 +125,40 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
             ),
           );
           
+          // Send signup notification after successful verification
+          try {
+            final userData = await StorageService.getUserData() ?? {};
+            if (userData['_id'] != null || userData['id'] != null) {
+              final notificationResult = await ActionService.sendSignupNotification(
+                userId: userData['_id'] ?? userData['id'],
+                signupInfo: {
+                  'source': 'mobile_app',
+                  'timestamp': DateTime.now().toIso8601String(),
+                  'verificationMethod': 'email_otp',
+                },
+              );
+              
+              if (notificationResult['success']) {
+                print('✅ Signup notification sent successfully');
+              } else {
+                print('⚠️ Failed to send signup notification: ${notificationResult['message']}');
+              }
+            }
+          } catch (e) {
+            print('❌ Error sending signup notification: $e');
+          }
+          
           // Navigate to FCM setup screen after successful verification
-          Navigator.of(context).pushNamedAndRemoveUntil('/fcm-setup', (route) => false);
+          // Get user data from storage or use default
+          final userData = await StorageService.getUserData() ?? {};
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => NotificationSetupScreen(
+                isNewUser: true,
+                userData: userData,
+              ),
+            ),
+          );
         } else {
           // OTP verification failed
           ScaffoldMessenger.of(context).showSnackBar(

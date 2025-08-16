@@ -6,6 +6,7 @@ import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
 import '../user/signup_screen.dart';
+import 'notification_setup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,6 +61,26 @@ class _LoginScreenState extends State<LoginScreen> {
             // Save user data if available
             if (data['user'] != null) {
               await StorageService.saveUserData(data['user']);
+              
+              // Send login notification
+              try {
+                final notificationResult = await ActionService.sendLoginNotification(
+                  userId: data['user']['_id'] ?? data['user']['id'],
+                  loginInfo: {
+                    'deviceInfo': 'Flutter Mobile App',
+                    'location': 'Mobile Device',
+                    'timestamp': DateTime.now().toIso8601String(),
+                  },
+                );
+                
+                if (notificationResult['success']) {
+                  print('✅ Login notification sent successfully');
+                } else {
+                  print('⚠️ Failed to send login notification: ${notificationResult['message']}');
+                }
+              } catch (e) {
+                print('❌ Error sending login notification: $e');
+              }
             }
             
             // Check user role and navigate accordingly
@@ -105,61 +126,37 @@ class _LoginScreenState extends State<LoginScreen> {
     String? userRole = userData?['role']?.toString().toLowerCase();
     
     if (mounted) {
-      if (userRole == 'secretary') {
-        // Secretary role - navigate to appointment management interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Secretary.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+      if (userRole == 'secretary' || userRole == 'admin' || userRole == 'super-admin') {
+        // Secretary, Admin, and Super-Admin roles - always show notification setup for now
+        // TODO: Check from backend if user has FCM tokens stored
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const InboxScreen(),
-          ),
-        );
-      } else if (userRole == 'admin') {
-        // Admin role - navigate to admin interface (to be implemented)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Admin.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // TODO: Navigate to admin interface
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(), // Temporary - replace with AdminScreen
+            builder: (context) => NotificationSetupScreen(
+              isNewUser: false,
+              userData: userData ?? {},
+            ),
           ),
         );
       } else if (userRole == 'guard') {
-        // Guard role - navigate to guard interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Guard.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+        // Guard role - always show notification setup for now
+        // TODO: Check from backend if user has FCM tokens stored
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const GuardScreen(),
+            builder: (context) => NotificationSetupScreen(
+              isNewUser: false,
+              userData: userData ?? {},
+            ),
           ),
         );
       } else if (userRole == 'user' || userRole == 'client') {
-        // Regular user/client role - navigate to user interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as User.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+        // Regular user/client role - always show notification setup for now
+        // TODO: Check from backend if user has FCM tokens stored
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const UserScreen(),
+            builder: (context) => NotificationSetupScreen(
+              isNewUser: false,
+              userData: userData ?? {},
+            ),
           ),
         );
       } else {

@@ -819,6 +819,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       print('📥 ActionService result: $result');
 
       if (result['success'] == true) {
+        // Send appointment creation notification
+        await _sendAppointmentCreatedNotification(result['data']);
+        
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3556,6 +3559,71 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         return Icons.directions;
       default:
         return Icons.location_on;
+    }
+  }
+
+  // Send appointment creation notification
+  Future<void> _sendAppointmentCreatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      // Get current user data
+      final userData = await StorageService.getUserData();
+      if (userData == null) {
+        print('⚠️ User data not found, skipping appointment notification');
+        return;
+      }
+
+      final userId = userData['_id']?.toString() ?? userData['userId']?.toString() ?? userData['id']?.toString();
+      final appointmentId = appointmentData?['_id']?.toString() ?? appointmentData?['id']?.toString();
+      
+      if (userId == null || appointmentId == null) {
+        print('⚠️ User ID or Appointment ID not found, skipping notification');
+        print('🔍 User ID: $userId, Appointment ID: $appointmentId');
+        return;
+      }
+
+      print('🎉 Sending appointment creation notification for appointment: $appointmentId');
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   widget.personalInfo['fullName'] ?? 'User',
+        'date': appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               _fromDateController.text,
+        'time': 'Scheduled', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 'Selected Location',
+        'purpose': appointmentData?['appointmentPurpose'] ?? _appointmentPurposeController.text,
+        'numberOfUsers': appointmentData?['numberOfUsers'] ?? _numberOfUsersController.text,
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'user_appointment_request',
+        'userRole': userData['role']?.toString() ?? 'user',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentCreatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment creation notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment creation notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment creation notification: $e');
+      // Don't block the appointment creation flow if notification fails
     }
   }
 

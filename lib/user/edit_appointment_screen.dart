@@ -841,6 +841,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
 
       if (result['success'] == true) {
+        // Send appointment update notification
+        await _sendAppointmentUpdatedNotification(result['data']);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Appointment updated successfully!'),
@@ -3076,6 +3079,84 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           backgroundColor: Colors.green,
         ),
       );
+    }
+  }
+
+  // Send appointment update notification
+  Future<void> _sendAppointmentUpdatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      // Get current user data
+      final userData = await StorageService.getUserData();
+      if (userData == null) {
+        print('⚠️ User data not found, skipping appointment update notification');
+        return;
+      }
+
+      final userId = userData['_id']?.toString() ?? userData['userId']?.toString() ?? userData['id']?.toString();
+      final appointmentId = widget.appointmentData?['appointmentId']?.toString() ?? 
+                           widget.appointmentData?['_id']?.toString() ?? 
+                           appointmentData?['_id']?.toString() ?? 
+                           appointmentData?['id']?.toString();
+      
+      if (userId == null || appointmentId == null) {
+        print('⚠️ User ID or Appointment ID not found, skipping notification');
+        print('🔍 User ID: $userId, Appointment ID: $appointmentId');
+        return;
+      }
+
+      print('🔄 Sending appointment update notification for appointment: $appointmentId');
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   widget.appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   'User',
+        'date': appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               widget.appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               _fromDateController.text,
+        'time': 'Updated', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 
+                widget.appointmentData?['appointmentLocation'] ?? 
+                'Selected Location',
+        'purpose': appointmentData?['appointmentPurpose'] ?? 
+                  widget.appointmentData?['appointmentPurpose'] ?? 
+                  _appointmentPurposeController.text,
+        'numberOfUsers': appointmentData?['numberOfUsers'] ?? 
+                        widget.appointmentData?['numberOfUsers'] ?? 
+                        _numberOfUsersController.text,
+        'appointmentType': widget.appointmentData?['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'user_appointment_update',
+        'userRole': userData['role']?.toString() ?? 'user',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.appointmentData?['appointmentType'] ?? 'myself',
+        'updateType': 'updated',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentUpdatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        updateType: 'updated',
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment update notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment update notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment update notification: $e');
+      // Don't block the appointment update flow if notification fails
     }
   }
 }

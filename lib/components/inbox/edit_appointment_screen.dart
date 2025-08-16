@@ -930,6 +930,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
 
       if (result['success']) {
+        // Send appointment update notification
+        await _sendAppointmentUpdatedNotification(result['data']);
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -3129,6 +3132,78 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       ],
     );
+  }
+
+  // Send appointment update notification
+  Future<void> _sendAppointmentUpdatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      final appointmentId = _getAppointmentId();
+      
+      if (appointmentId.isEmpty) {
+        print('⚠️ Appointment ID not found, skipping notification');
+        return;
+      }
+
+      print('🔄 Sending appointment update notification for appointment: $appointmentId');
+
+      // For admin edit forms, we'll use the userId from the appointment data
+      final userId = appointmentData?['userId']?.toString() ?? 
+                    widget.appointment['userId']?.toString() ?? 
+                    'admin_updated';
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   widget.appointment['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   'User',
+        'date': appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               widget.appointment['preferredDateRange']?['fromDate'] ?? 
+               _fromDateController.text,
+        'time': 'Updated', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 
+                widget.appointment['appointmentLocation'] ?? 
+                _selectedLocation ?? 'Selected Location',
+        'purpose': appointmentData?['appointmentPurpose'] ?? 
+                  widget.appointment['appointmentPurpose'] ?? 
+                  _purposeController.text,
+        'numberOfUsers': appointmentData?['numberOfUsers'] ?? 
+                        widget.appointment['numberOfUsers'] ?? 
+                        _numberOfPeopleController.text,
+        'appointmentType': widget.appointment['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'admin_appointment_update',
+        'userRole': 'admin', // This is an admin form
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.appointment['appointmentType'] ?? 'myself',
+        'updateType': 'updated',
+        'updatedBy': 'admin',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentUpdatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        updateType: 'updated',
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment update notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment update notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment update notification: $e');
+      // Don't block the appointment update flow if notification fails
+    }
   }
 
   Widget _buildPhotoNotUploadedState(int guestIndex) {
