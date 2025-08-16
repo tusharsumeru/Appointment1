@@ -124,7 +124,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
           );
           
           // Navigate to FCM setup screen after successful verification
-          Navigator.of(context).pushNamedAndRemoveUntil('/fcm-setup', (route) => false);
+          Navigator.of(context).pushNamedAndRemoveUntil('/user', (route) => false);
         } else {
           // OTP verification failed
           ScaffoldMessenger.of(context).showSnackBar(

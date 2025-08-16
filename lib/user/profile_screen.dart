@@ -918,7 +918,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final atolValidationData = aolTeacherData?['atolValidationData'];
     
     // Check if teacher verification is successful
-    final bool isTeacherVerified = atolValidationData?['success'] == true;
+    final bool isTeacherVerified = atolValidationData?['verified'] == true;
     
     if (!isTeacherVerified) {
       // Show "Not an AOL Teacher" message
@@ -952,21 +952,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Not an AOL Teacher',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  'No teacher verification found',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
+                                                Text(
+                                  'No',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
               ],
             ),
           ],
