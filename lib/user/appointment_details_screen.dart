@@ -140,6 +140,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
     
+    // If more than 10 people, don't create dynamic cards
+    if (peopleCount > 10) {
+      // Clear all existing controllers and data
+      for (var guest in _guestControllers) {
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+      }
+      _guestControllers.clear();
+      _guestImages.clear();
+      _guestUploading.clear();
+      _guestCountries.clear();
+      
+      setState(() {});
+      _validateForm();
+      return;
+    }
+    
     // If we're reducing the number of guests, dispose extra controllers from the end
     if (_guestControllers.length > guestCount) {
       for (int i = guestCount; i < _guestControllers.length; i++) {
@@ -157,7 +175,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _guestControllers.removeRange(guestCount, _guestControllers.length);
     }
     
-    // If we need more guests, add them at the bottom
+    // If we need more guests, add them at the bottom (only if <= 10 people total)
     while (_guestControllers.length < guestCount) {
       int guestNumber = _guestControllers.length + 1;
       
@@ -207,34 +225,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       print('✅ Main guest photo validation passed: not required for appointment type ${widget.personalInfo['appointmentType']}');
     }
     
-    // Validate guest information if any
+    // Validate guest information if any (only for <= 10 people)
     bool guestFormValid = true;
-    for (int i = 0; i < _guestControllers.length; i++) {
-      var guest = _guestControllers[i];
-      int guestNumber = i + 1;
-      
-      if (guest['name']?.text.isEmpty == true ||
-          guest['phone']?.text.isEmpty == true ||
-          guest['age']?.text.isEmpty == true) {
-        guestFormValid = false;
-        print('❌ Guest $guestNumber validation failed: missing basic info');
-        break;
-      }
-      
-      // Check if photo is required and provided for guests aged 12+
-      final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-      if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
-        guestFormValid = false;
-        print('❌ Guest $guestNumber validation failed: photo required for age $age but not provided');
-        break;
-      }
-      
-      // Log successful validation for this guest
-      if (age >= 12 && _guestImages.containsKey(guestNumber)) {
-        print('✅ Guest $guestNumber validation passed: photo provided for age $age');
-        print('📸 Guest $guestNumber photo URL: ${_guestImages[guestNumber]}');
-      } else if (age < 12) {
-        print('✅ Guest $guestNumber validation passed: no photo required for age $age');
+    final peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    
+    if (peopleCount > 10) {
+      // For more than 10 people, no guest validation needed
+      print('✅ Large group validation passed: ${peopleCount} people - no individual details required');
+      guestFormValid = true;
+    } else {
+      // Validate individual guest details for <= 10 people
+      for (int i = 0; i < _guestControllers.length; i++) {
+        var guest = _guestControllers[i];
+        int guestNumber = i + 1;
+        
+        if (guest['name']?.text.isEmpty == true ||
+            guest['phone']?.text.isEmpty == true ||
+            guest['age']?.text.isEmpty == true) {
+          guestFormValid = false;
+          print('❌ Guest $guestNumber validation failed: missing basic info');
+          break;
+        }
+        
+        // Check if photo is required and provided for guests aged 12+
+        final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+        if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
+          guestFormValid = false;
+          print('❌ Guest $guestNumber validation failed: photo required for age $age but not provided');
+          break;
+        }
+        
+        // Log successful validation for this guest
+        if (age >= 12 && _guestImages.containsKey(guestNumber)) {
+          print('✅ Guest $guestNumber validation passed: photo provided for age $age');
+          print('📸 Guest $guestNumber photo URL: ${_guestImages[guestNumber]}');
+        } else if (age < 12) {
+          print('✅ Guest $guestNumber validation passed: no photo required for age $age');
+        }
       }
     }
     
@@ -711,8 +738,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         print('📱 Debug - phone in personalInfo: ${widget.personalInfo['phone']} (type: ${widget.personalInfo['phone'].runtimeType})');
       }
 
-      // Add accompanyUsers if there are additional users
-      if (_guestControllers.isNotEmpty) {
+      // Add accompanyUsers if there are additional users (only for <= 10 people)
+      final peopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+      if (_guestControllers.isNotEmpty && peopleCount <= 10) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
@@ -742,6 +770,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointmentData['accompanyUsers'] = {
           'numberOfUsers': accompanyUsers.length,
           'users': accompanyUsers,
+        };
+      } else if (peopleCount > 10) {
+        // For more than 10 people, just send the total count without individual details
+        print('📋 Large group appointment: ${peopleCount} people - no individual details required');
+        appointmentData['accompanyUsers'] = {
+          'numberOfUsers': peopleCount, // Use the total number as entered by user
+          'users': [], // Empty array since individual details not required
         };
       }
 
@@ -919,7 +954,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           Text(
                             _isLoadingReferenceInfo 
                                 ? 'Loading your information...'
-                                : 'Your reference details (read-only)',
+                                : 'Your reference details',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey.shade600,
@@ -949,7 +984,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           ] else ...[
                             // Reference Name
                             _buildReferenceField(
-                              label: 'Reference Name (Read-only)',
+                              label: 'Reference Name',
                               controller: _referenceNameController,
                               placeholder: 'Your name will appear here',
                               isReadOnly: true,
@@ -958,7 +993,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             
                             // Reference Email
                             _buildReferenceField(
-                              label: 'Reference Email (Read-only)',
+                              label: 'Reference Email',
                               controller: _referenceEmailController,
                               placeholder: 'Your email will appear here',
                               keyboardType: TextInputType.emailAddress,
@@ -968,7 +1003,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             
                             // Reference Phone
                             _buildReferencePhoneField(
-                              label: 'Reference Phone (Read-only)',
+                              label: 'Reference Phone',
                               controller: _referencePhoneController,
                               isReadOnly: true,
                             ),
@@ -1236,7 +1271,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                             ),
                                           ] else ...[
                                             const Text(
-                                              'Photo selected but not uploaded',
+                                              'Photo Not uploaded,Retry Upload',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w600,
                                                 color: Colors.orange,
@@ -1448,6 +1483,52 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       Map<String, TextEditingController> guest = entry.value;
                       return _buildGuestCard(index + 1, guest);
                     }).toList(),
+                    const SizedBox(height: 20),
+                  ] else if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 10) ...[
+                    // Show message for more than 10 people
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.orange.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.orange.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Large Group Appointment',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'For appointments with more than 10 people, additional person details are not required.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
                   ],
 
@@ -2430,60 +2511,34 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            // Country Code Dropdown
-            Container(
-              width: 80,
-              decoration: BoxDecoration(
-                border: Border.all(color: isReadOnly ? Colors.grey[400]! : Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(8),
-                color: isReadOnly ? Colors.grey[200] : Colors.white,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('🇮🇳', style: TextStyle(fontSize: 16)),
-                  const SizedBox(width: 4),
-                  const Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
-                ],
-              ),
+        // Phone Number Field (without country code)
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          enabled: !isReadOnly,
+          decoration: InputDecoration(
+            hintText: 'Enter phone number',
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            filled: true,
+            fillColor: isReadOnly ? Colors.grey[100] : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
             ),
-            const SizedBox(width: 8),
-            // Phone Number Field
-            Expanded(
-              child: TextField(
-                controller: controller,
-                keyboardType: TextInputType.phone,
-                enabled: !isReadOnly,
-                decoration: InputDecoration(
-                  hintText: 'Enter phone number',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: isReadOnly ? Colors.grey[100] : Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  disabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[400]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.deepPurple),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-              ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
             ),
-          ],
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.deepPurple),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          ),
         ),
       ],
     );

@@ -12,7 +12,7 @@ import '../services/notification_service.dart'; // Added import for Notification
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://c8740a8d1f9a.ngrok-free.app/api/v3'; // API base URL
+      'https://18e6c97e062d.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -5166,7 +5166,7 @@ class ActionService {
     }
   }
 
-  // Update user profile with file upload
+  // Update user profile with S3 URL only (no file upload)
   static Future<Map<String, dynamic>> updateUserProfile({
     required String fullName,
     required String email,
@@ -5175,7 +5175,7 @@ class ActionService {
     String? company,
     required String full_address,
     required List<String> userTags,
-    File? profilePhotoFile,
+    String? profilePhotoUrl, // S3 URL only
   }) async {
     try {
       // Get authentication token
@@ -5233,63 +5233,72 @@ class ActionService {
         'display_name': full_address.trim(),
       });
 
-      // Handle userTags as array - send as additionalRoles
+      // Handle userTags as array - send as both userTags and additionalRoles
       if (userTags.isNotEmpty) {
-        request.fields['additionalRoles'] = jsonEncode(userTags);
+        // Send userTags using indexed keys to ensure all values are sent
+        for (int i = 0; i < userTags.length; i++) {
+          request.fields['userTags[$i]'] = userTags[i];
+        }
+        // Also send as additionalRoles in case backend expects that field
+        for (int i = 0; i < userTags.length; i++) {
+          request.fields['additionalRoles[$i]'] = userTags[i];
+        }
+        print('📤 Sending userTags as indexed array: $userTags');
+        print('📤 Also sending as additionalRoles: $userTags');
       }
 
-      // Add file if present
-      if (profilePhotoFile != null) {
-        final fileName = profilePhotoFile.path.split('/').last;
-        final fileExtension = fileName.split('.').last.toLowerCase();
-
-        // Validate file type
-        final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!allowedExtensions.contains(fileExtension)) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'message':
-                'Profile photo must be a valid image file (JPG, PNG, GIF).',
-          };
-        }
-
-        // Check file size (max 5MB)
-        final fileSize = await profilePhotoFile.length();
-        if (fileSize > 5 * 1024 * 1024) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'message': 'Profile photo size must be less than 5MB.',
-          };
-        }
-
-        // Add file to request
-        final fileStream = http.ByteStream(profilePhotoFile.openRead());
-        final fileLength = await profilePhotoFile.length();
-
-        final multipartFile = http.MultipartFile(
-          'file',
-          fileStream,
-          fileLength,
-          filename: fileName,
-          contentType: MediaType('image', fileExtension),
-        );
-
-        request.files.add(multipartFile);
+      // Add S3 URL if present (no file upload needed)
+      if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
+        request.fields['profilePhoto'] =
+            profilePhotoUrl; // Database field name is 'profilePhoto'
+        print('📤 Sending profile photo URL: $profilePhotoUrl');
+        print('📤 Field name: profilePhoto (matches database)');
+      } else {
+        print('📤 No profile photo URL provided');
       }
 
       // Send request
+      print('📤 Sending profile update request with fields: ${request.fields}');
+      print(
+        '📤 Sending profile update request with files: ${request.files.length}',
+      );
+
+      // Debug: Print each field individually
+      print('📤 Individual fields being sent:');
+      request.fields.forEach((key, value) {
+        print('📤 Field: $key = $value');
+      });
+
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       // Parse response
+      print('📥 Raw response status: ${response.statusCode}');
+      print('📥 Raw response body: ${response.body}');
+
       final Map<String, dynamic> responseData = jsonDecode(response.body);
+      print('📥 Parsed response data: $responseData');
+      print(
+        '📥 Profile photo in response: ${responseData['data']?['profilePhoto']}',
+      );
 
       if (response.statusCode == 200) {
+        print('📥 Response status is 200, checking for data...');
+        print('📥 responseData[\'data\']: ${responseData['data']}');
+
         // Update cached user data with the response data
         if (responseData['data'] != null) {
+          print('📥 Saving user data to storage: ${responseData['data']}');
           await StorageService.saveUserData(responseData['data']);
+          print('✅ User data saved successfully to storage');
+        } else {
+          print('⚠️ No data in response, not updating storage');
+          print(
+            '⚠️ This might indicate that the backend is not returning updated user data',
+          );
+          print(
+            '⚠️ The profile update was successful but no user data was returned',
+          );
         }
 
         return {

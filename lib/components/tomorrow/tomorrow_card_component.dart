@@ -1571,51 +1571,16 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
   }
 
   void _navigateToAppointmentDetails(Map<String, dynamic> appointment) async {
-    // Check if this is a quick appointment
-    final apptType = appointment['appt_type']?.toString();
-    final quickApt = appointment['quick_apt'];
-    
-    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
-      // For quick appointments, show a dialog with quick appointment details
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text(_getAppointmentName(appointment)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Quick Appointment Details'),
-                const SizedBox(height: 8),
-                Text('Purpose: ${_getQuickAppointmentPurpose(appointment)}'),
-                if (_getQuickAppointmentEmail(appointment).isNotEmpty)
-                  Text('Email: ${_getQuickAppointmentEmail(appointment)}'),
-                if (_getQuickAppointmentPhone(appointment).isNotEmpty)
-                  Text('Phone: ${_getQuickAppointmentPhone(appointment)}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      );
-    } else {
-      // For regular appointments, navigate to detail page
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AppointmentDetailPage(
-            appointment: appointment,
-            isFromScheduleScreens: true,
-          ),
+    // For all appointments (including quick appointments), navigate directly to detail page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentDetailPage(
+          appointment: appointment,
+          isFromScheduleScreens: true,
         ),
-      );
-    }
+      ),
+    );
   }
 
   String _getQuickAppointmentPurpose(Map<String, dynamic> appointment) {

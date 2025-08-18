@@ -216,10 +216,27 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forward Request Logs'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text(
+          'Forward Request Logs',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.deepOrange, Colors.orange, Colors.orangeAccent],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 4,
+        shadowColor: Colors.orange.withOpacity(0.3),
+        centerTitle: false,
       ),
       body: Container(
         color: Colors.grey[50],

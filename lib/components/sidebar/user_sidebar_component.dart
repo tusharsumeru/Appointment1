@@ -115,7 +115,7 @@ class _UserSidebarComponentState extends State<UserSidebarComponent> {
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.deepPurple, Colors.purple],
+            colors: [Colors.deepOrange, Colors.orange],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

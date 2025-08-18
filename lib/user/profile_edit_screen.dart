@@ -11,10 +11,7 @@ import '../action/action.dart';
 class ProfileEditScreen extends StatefulWidget {
   final Map<String, dynamic>? userData;
 
-  const ProfileEditScreen({
-    super.key,
-    required this.userData,
-  });
+  const ProfileEditScreen({super.key, required this.userData});
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -27,22 +24,27 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _designationController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  
+
   // Photo upload state
   File? _selectedImageFile;
   bool _isUploadingPhoto = false;
   String? _uploadedPhotoUrl;
   bool _isLoading = false;
-  
+  String? _currentUserPhotoUrl; // Store current user's photo URL
+
+  // Log display state for profile picture
+  List<String> _photoLogs = [];
+  bool _showPhotoLogs = true; // Set to true to show logs on screen
+
   // Phone number state (same as signup screen)
   String _selectedCountryCode = '+91';
   String _selectedCountryFlag = '🇮🇳';
-  
+
   // Location search state (replicated from signup screen)
   List<String> _locationSuggestions = [];
   bool _isLoadingLocations = false;
   Timer? _locationDebounceTimer;
-  
+
   // Role checkboxes state
   final Map<String, bool> _roleCheckboxes = {
     'Ashramite': false,
@@ -53,14 +55,31 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     'State Apex / STC': false,
   };
 
+  // Validate role lengths
+  void _validateRoles() {
+    print('🔍 Validating role lengths...');
+    for (final entry in _roleCheckboxes.entries) {
+      final length = entry.key.length;
+      print('🏷️ Role "${entry.key}": $length characters');
+      if (length > 50) {
+        print('❌ Role "${entry.key}" exceeds 50 characters!');
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    print('🚀 ProfileEditScreen.initState() - Starting initialization...');
+    print('📋 Received userData: ${widget.userData}');
+    _validateRoles(); // Validate role lengths
     _initializeControllers();
+    print('✅ ProfileEditScreen.initState() - Initialization completed');
   }
 
   @override
   void dispose() {
+    print('🧹 ProfileEditScreen.dispose() - Cleaning up resources...');
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -69,91 +88,186 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _locationController.dispose();
     _locationDebounceTimer?.cancel();
     super.dispose();
+    print('✅ ProfileEditScreen.dispose() - Cleanup completed');
   }
 
   void _initializeControllers() {
-    _fullNameController.text =
-        (widget.userData?['fullName'] ?? widget.userData?['name'] ?? '').toString();
-    _emailController.text = (widget.userData?['email'] ?? '').toString();
+    print(
+      '🔧 _initializeControllers() - Starting controller initialization...',
+    );
+
+    // Initialize full name
+    final fullName =
+        (widget.userData?['fullName'] ?? widget.userData?['name'] ?? '')
+            .toString();
+    _fullNameController.text = fullName;
+    print('📝 Full Name initialized: "$fullName"');
+
+    // Initialize email
+    final email = (widget.userData?['email'] ?? '').toString();
+    _emailController.text = email;
+    print('📧 Email initialized: "$email"');
 
     // Phone mapping: supports {countryCode, number} or plain string, and initialize country picker
-    final dynamic phoneField = widget.userData?['phoneNumber'] ?? widget.userData?['phone'];
+    final dynamic phoneField =
+        widget.userData?['phoneNumber'] ?? widget.userData?['phone'];
     String mappedPhone = '';
+    print(
+      '📱 Phone field received: $phoneField (type: ${phoneField.runtimeType})',
+    );
+
     if (phoneField is Map) {
       final cc = (phoneField['countryCode'] ?? '').toString();
       final num = (phoneField['number'] ?? '').toString();
+      print('📱 Phone is Map - Country Code: "$cc", Number: "$num"');
       if (cc.isNotEmpty) {
         _selectedCountryCode = cc;
         // Try to find matching flag (simplified - you might want to add a mapping)
-        if (cc == '+91') _selectedCountryFlag = '🇮🇳';
-        else if (cc == '+1') _selectedCountryFlag = '🇺🇸';
-        else if (cc == '+44') _selectedCountryFlag = '🇬🇧';
-        else _selectedCountryFlag = '🇺🇳'; // default
+        if (cc == '+91')
+          _selectedCountryFlag = '🇮🇳';
+        else if (cc == '+1')
+          _selectedCountryFlag = '🇺🇸';
+        else if (cc == '+44')
+          _selectedCountryFlag = '🇬🇧';
+        else
+          _selectedCountryFlag = '🇺🇳'; // default
+        print(
+          '🌍 Country code set to: $_selectedCountryCode with flag: $_selectedCountryFlag',
+        );
       }
       mappedPhone = num; // Only the number part goes to the input field
     } else if (phoneField is String) {
       // Try to extract country code from string like "+91 7209657008"
       final phoneStr = phoneField.trim();
+      print('📱 Phone is String: "$phoneStr"');
       if (phoneStr.startsWith('+')) {
         final spaceIndex = phoneStr.indexOf(' ');
         if (spaceIndex > 0) {
           final cc = phoneStr.substring(0, spaceIndex);
           final num = phoneStr.substring(spaceIndex + 1);
           _selectedCountryCode = cc;
-          if (cc == '+91') _selectedCountryFlag = '🇮🇳';
-          else if (cc == '+1') _selectedCountryFlag = '🇺🇸';
-          else if (cc == '+44') _selectedCountryFlag = '🇬🇧';
-          else _selectedCountryFlag = '🇺🇳';
+          if (cc == '+91')
+            _selectedCountryFlag = '🇮🇳';
+          else if (cc == '+1')
+            _selectedCountryFlag = '🇺🇸';
+          else if (cc == '+44')
+            _selectedCountryFlag = '🇬🇧';
+          else
+            _selectedCountryFlag = '🇺🇳';
           mappedPhone = num; // Only the number part goes to the input field
+          print('🌍 Extracted country code: $cc, number: $num');
         } else {
           // If no space, treat as just country code, leave phone empty
           mappedPhone = '';
+          print('⚠️ Phone string has no space, treating as country code only');
         }
       } else {
         // If doesn't start with +, treat as just the number
         mappedPhone = phoneStr;
+        print(
+          '📱 Phone doesn\'t start with +, treating as number only: "$mappedPhone"',
+        );
       }
     }
     _phoneController.text = mappedPhone;
+    print('📱 Final phone number set: "$mappedPhone"');
 
-    _designationController.text = (widget.userData?['designation'] ?? '').toString();
-    _companyController.text = (widget.userData?['company'] ?? '').toString();
+    // Initialize designation
+    final designation = (widget.userData?['designation'] ?? '').toString();
+    _designationController.text = designation;
+    print('💼 Designation initialized: "$designation"');
+
+    // Initialize company
+    final company = (widget.userData?['company'] ?? '').toString();
+    _companyController.text = company;
+    print('🏢 Company initialized: "$company"');
 
     // Location mapping: prefer full_address.street, fallback to location
     final dynamic fullAddress = widget.userData?['full_address'];
     String mappedLocation = '';
+    print(
+      '📍 Full address received: $fullAddress (type: ${fullAddress.runtimeType})',
+    );
+
     if (fullAddress is Map) {
       mappedLocation = (fullAddress['street'] ?? '').toString();
+      print('📍 Location from full_address.street: "$mappedLocation"');
     }
     if (mappedLocation.isEmpty) {
       mappedLocation = (widget.userData?['location'] ?? '').toString();
+      print('📍 Location from location field: "$mappedLocation"');
     }
     _locationController.text = mappedLocation;
+    print('📍 Final location set: "$mappedLocation"');
+
+    // Store current user's profile photo URL
+    _currentUserPhotoUrl = widget.userData?['profilePhoto'];
+    print('🖼️ Current profile photo URL: $_currentUserPhotoUrl');
+    _addPhotoLog('🖼️ Current profile photo URL: $_currentUserPhotoUrl');
 
     // Initialize role checkboxes from current user data if available
+    // Backend might return either 'additionalRoles' or 'userTags' - handle both
     final dynamic rolesDynamic = widget.userData != null
-        ? (widget.userData!['selectedRoles'] ??
-            widget.userData!['roles'] ??
-            widget.userData!['userTags'])
+        ? (widget.userData!['additionalRoles'] ??
+              widget.userData!['userTags'] ??
+              widget.userData!['selectedRoles'] ??
+              widget.userData!['roles'])
         : null;
-    
+
+    print(
+      '🏷️ Roles field received: $rolesDynamic (type: ${rolesDynamic.runtimeType})',
+    );
+    print(
+      '🏷️ additionalRoles from userData: ${widget.userData?['additionalRoles']}',
+    );
+    print('🏷️ userTags from userData: ${widget.userData?['userTags']}');
+    print(
+      '🏷️ selectedRoles from userData: ${widget.userData?['selectedRoles']}',
+    );
+    print('🏷️ roles from userData: ${widget.userData?['roles']}');
+
+    List<String> roles = [];
+
     if (rolesDynamic is List) {
-      final List<String> roles = rolesDynamic.map((e) => e.toString()).toList();
-      
+      roles = rolesDynamic.map((e) => e.toString()).toList();
+      print('🏷️ Roles is List: $roles');
+    } else if (rolesDynamic is String) {
+      try {
+        final List<dynamic> parsedRoles = json.decode(rolesDynamic);
+        roles = parsedRoles.map((e) => e.toString()).toList();
+        print('🏷️ Roles parsed from JSON string: $roles');
+      } catch (e) {
+        print('❌ Error parsing roles JSON: $e');
+      }
+    }
+
+    if (roles.isNotEmpty) {
       for (final entry in _roleCheckboxes.entries.toList()) {
         final isSelected = roles.contains(entry.key);
         _roleCheckboxes[entry.key] = isSelected;
+        if (isSelected) {
+          print('✅ Role selected: ${entry.key}');
+        }
       }
+    } else {
+      print('⚠️ No roles found in user data');
     }
+
+    print(
+      '✅ _initializeControllers() - All controllers initialized successfully',
+    );
   }
 
   // Location search (same approach as in signup screen)
   Future<void> _fetchLocations(String query) async {
+    print('🔍 _fetchLocations() - Query: "$query"');
+
     if (query.isEmpty) {
       setState(() {
         _locationSuggestions = [];
         _isLoadingLocations = false;
       });
+      print('🔍 Query is empty, clearing suggestions');
       return;
     }
 
@@ -162,13 +276,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
 
     try {
+      print('🌐 Making API call to OpenStreetMap for location suggestions...');
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
+        ),
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'AppointmentApp/1.0',
         },
       );
+
+      print('🌐 Location API response status: ${response.statusCode}');
+      print('🌐 Location API response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -183,6 +303,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
         });
+        print('✅ Location suggestions loaded: $suggestions');
       } else {
         final suggestions = <String>[
           '$query, New York, USA',
@@ -195,8 +316,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
         });
+        print('⚠️ Using fallback location suggestions: $suggestions');
       }
     } catch (e) {
+      print('❌ Error fetching locations: $e');
       final suggestions = <String>[
         '$query, New York, USA',
         '$query, London, UK',
@@ -208,60 +331,120 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _locationSuggestions = suggestions;
         _isLoadingLocations = false;
       });
+      print('⚠️ Using error fallback location suggestions: $suggestions');
     }
   }
 
   void _onLocationChanged(String value) {
+    print('📍 _onLocationChanged() - Value: "$value"');
     _locationDebounceTimer?.cancel();
     _locationDebounceTimer = Timer(const Duration(milliseconds: 500), () {
       _fetchLocations(value);
     });
   }
 
-  // Photo upload functions with validation and S3 upload (same as appointment details screen)
+  // Photo upload functions with S3 URL only (no file upload)
   Future<void> _pickImage(ImageSource source) async {
-    print('📸 Starting profile photo pick process...');
+    _addPhotoLog('📸 _pickImage() - Source: $source');
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      print('📸 Profile image selected: ${pickedFile.path}');
-      print('📸 File size: ${await File(pickedFile.path).length()} bytes');
+      _addPhotoLog('📸 Image picked: ${pickedFile.path}');
+      _addPhotoLog('📸 Image name: ${pickedFile.name}');
+      _addPhotoLog('📸 Image size: ${pickedFile.length} bytes');
 
-      // Store the selected file for later upload with profile update
+      // Show uploading state immediately
       setState(() {
         _selectedImageFile = File(pickedFile.path);
-        _isUploadingPhoto = false;
+        _isUploadingPhoto = true;
       });
 
-      print('💾 Profile photo file stored for later upload');
+      try {
+        _addPhotoLog('📤 Starting photo upload to S3...');
+        // Upload photo to S3 and get URL
+        final result = await ActionService.uploadAndValidateProfilePhoto(
+          File(pickedFile.path),
+        );
+        _addPhotoLog('📤 Upload result: $result');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Photo selected! Click "Save Changes" to upload.'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+        if (result['success']) {
+          final s3Url =
+              result['s3Url'] ??
+              result['data']?['s3Url'] ??
+              result['data']?['url'];
+          setState(() {
+            _uploadedPhotoUrl = s3Url;
+            _isUploadingPhoto = false;
+          });
+          _addPhotoLog('✅ Photo uploaded successfully. S3 URL: $s3Url');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Photo uploaded successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          setState(() {
+            _isUploadingPhoto = false;
+          });
+          _addPhotoLog('❌ Photo upload failed: ${result['message']}');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload photo: ${result['message']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+        _addPhotoLog('❌ Error uploading photo: $e');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } else {
-      print('⚠️ No image selected for profile');
+      _addPhotoLog('⚠️ No image selected');
     }
   }
 
   void _removeImage() {
+    _addPhotoLog('🗑️ _removeImage() - Removing selected image');
     setState(() {
       _selectedImageFile = null;
       _uploadedPhotoUrl = null;
       _isUploadingPhoto = false;
     });
-    
-    print('🗑️ Profile photo removed');
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Photo removed'),
         backgroundColor: Colors.orange,
       ),
     );
+    _addPhotoLog('✅ Image removed successfully');
+  }
+
+  // Helper method to add logs to screen display
+  void _addPhotoLog(String message) {
+    final timestamp = DateTime.now().toString().substring(11, 19); // HH:MM:SS
+    final logMessage = '[$timestamp] $message';
+    print(logMessage); // Console log
+    setState(() {
+      _photoLogs.add(logMessage);
+      // Keep only last 20 logs to prevent memory issues
+      if (_photoLogs.length > 20) {
+        _photoLogs.removeAt(0);
+      }
+    });
   }
 
   @override
@@ -283,11 +466,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 20),
-                    
+
                     // Profile Photo Section
-                    _buildSectionHeader('Profile Photo', Icons.camera_alt_outlined),
+                    _buildSectionHeader(
+                      'Profile Photo',
+                      Icons.camera_alt_outlined,
+                    ),
                     const SizedBox(height: 16),
-                    
+
+
+
                     // Profile Photo Card
                     Container(
                       width: double.infinity,
@@ -303,7 +491,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ),
                         ],
                       ),
-                                            child: Column(
+                      child: Column(
                         children: [
                           // Profile Photo Display
                           Container(
@@ -323,31 +511,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                     return Image.file(
                                       _selectedImageFile!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.lightGreen.shade50,
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 60,
-                                            color: Colors.green,
-                                          ),
-                                        );
-                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.lightGreen.shade50,
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 60,
+                                                color: Colors.green,
+                                              ),
+                                            );
+                                          },
                                     );
-                                  } else if (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty && _uploadedPhotoUrl!.toString().isNotEmpty) {
+                                  } else if (_uploadedPhotoUrl != null &&
+                                      _uploadedPhotoUrl!.isNotEmpty) {
                                     return Image.network(
                                       _uploadedPhotoUrl!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.lightGreen.shade50,
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 60,
-                                            color: Colors.green,
-                                          ),
-                                        );
-                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.lightGreen.shade50,
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 60,
+                                                color: Colors.green,
+                                              ),
+                                            );
+                                          },
+                                    );
+                                  } else if (_currentUserPhotoUrl != null &&
+                                      _currentUserPhotoUrl!.isNotEmpty) {
+                                    return Image.network(
+                                      _currentUserPhotoUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.lightGreen.shade50,
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 60,
+                                                color: Colors.green,
+                                              ),
+                                            );
+                                          },
                                     );
                                   } else {
                                     return Container(
@@ -364,14 +572,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          
+
                           // Profile Photo Status Text
                           Text(
                             _selectedImageFile != null
                                 ? 'New Photo Selected'
-                                : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
-                                    ? 'Uploaded Profile Photo'
-                                    : 'No Profile Photo',
+                                : _uploadedPhotoUrl != null &&
+                                      _uploadedPhotoUrl!.isNotEmpty
+                                ? 'Uploaded Profile Photo'
+                                : _currentUserPhotoUrl != null &&
+                                      _currentUserPhotoUrl!.isNotEmpty
+                                ? 'Current Profile Photo'
+                                : ' ',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -379,145 +591,170 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          
+
                           Text(
                             _selectedImageFile != null
                                 ? 'Click "Save Changes" to upload'
-                                : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty
-                                    ? 'Successfully uploaded to server'
-                                    : 'Upload a profile photo',
+                                : _uploadedPhotoUrl != null &&
+                                      _uploadedPhotoUrl!.isNotEmpty
+                                ? 'Successfully uploaded to server'
+                                : _currentUserPhotoUrl != null &&
+                                      _currentUserPhotoUrl!.isNotEmpty
+                                ? 'Your current profile photo'
+                                : 'Upload a new profile photo',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.green.shade600,
                             ),
                           ),
                           const SizedBox(height: 20),
-                          
-                          // Show upload status
-                          if (_isUploadingPhoto) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.blue[200]!),
-                              ),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+
+                          // Photo Upload Options
+                          Column(
+                            children: [
+                              // Upload from Device Card
+                              GestureDetector(
+                                onTap: () => _pickImage(ImageSource.gallery),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
                                     ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Uploading and validating photo...',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.blue,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Please wait',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          
-                          // Show photo preview (either selected file or uploaded URL)
-                          if (_selectedImageFile != null || (_uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty)) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.green[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.green[200]!),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Photo preview and success message
-                                  Row(
+                                  child: Row(
                                     children: [
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          color: Colors.grey[200],
+                                      Icon(
+                                        Icons.upload_file,
+                                        color: Colors.blue.shade700,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Upload from Device',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Choose an existing photo',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: _selectedImageFile != null
-                                              ? Image.file(
-                                                  _selectedImageFile!,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return const Icon(
-                                                      Icons.check_circle,
-                                                      color: Colors.green,
-                                                      size: 24,
-                                                    );
-                                                  },
-                                                )
-                                              : _uploadedPhotoUrl != null && _uploadedPhotoUrl!.isNotEmpty && _uploadedPhotoUrl!.toString().isNotEmpty
-                                                  ? Image.network(
-                                                      _uploadedPhotoUrl!,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return const Icon(
-                                                          Icons.check_circle,
-                                                          color: Colors.green,
-                                                          size: 24,
-                                                        );
-                                                      },
-                                                    )
-                                                  : const Icon(
-                                                      Icons.check_circle,
-                                                      color: Colors.green,
-                                                      size: 24,
-                                                    ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Take Photo Card
+                              GestureDetector(
+                                onTap: () => _pickImage(ImageSource.camera),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.blue.shade700,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Take Photo',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Use your device camera',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // Show upload status
+                              if (_isUploadingPhoto) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.blue[200]!,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.blue[600]!,
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              _selectedImageFile != null
-                                                  ? 'Photo selected for upload'
-                                                  : 'Photo uploaded successfully',
+                                            const Text(
+                                              'Uploading and validating photo...',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.green,
+                                                color: Colors.blue,
                                                 fontSize: 14,
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              _selectedImageFile != null
-                                                  ? 'File: ${_selectedImageFile!.path.split('/').last}'
-                                                  : 'S3 URL: ${_uploadedPhotoUrl!.isNotEmpty ? _uploadedPhotoUrl!.substring(0, 30) + '...' : 'N/A'}',
+                                              'Please wait',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
@@ -528,91 +765,298 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                       ),
                                     ],
                                   ),
-                                  
-                                  const SizedBox(height: 12),
-                                  
-                                  // Action buttons - one below the other
-                                  Column(
-                                    children: [
-                                      // Upload Different Photo
-                                      GestureDetector(
-                                        onTap: () => _pickImage(ImageSource.gallery),
-                                        child: Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue[50],
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.blue[200]!),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.upload_file,
-                                                color: Colors.blue[700],
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Upload Different Photo',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.blue[700],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      const SizedBox(height: 6),
-                                      
-                                      // Take New Photo
-                                      GestureDetector(
-                                        onTap: () => _pickImage(ImageSource.camera),
-                                        child: Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange[50],
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.orange[200]!),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.camera_alt,
-                                                color: Colors.orange[700],
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Take New Photo',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.orange[700],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      
+                                ),
+                              ],
 
+                              // Show photo preview (either selected file, uploaded URL, or current user photo)
+                              if (_selectedImageFile != null ||
+                                  (_uploadedPhotoUrl != null &&
+                                      _uploadedPhotoUrl!.isNotEmpty) ||
+                                  (_currentUserPhotoUrl != null &&
+                                      _currentUserPhotoUrl!.isNotEmpty)) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.green[200]!,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Photo preview and success message
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              color: Colors.grey[200],
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child: _selectedImageFile != null
+                                                  ? Image.file(
+                                                      _selectedImageFile!,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) {
+                                                            return const Icon(
+                                                              Icons
+                                                                  .check_circle,
+                                                              color:
+                                                                  Colors.green,
+                                                              size: 24,
+                                                            );
+                                                          },
+                                                    )
+                                                  : _uploadedPhotoUrl != null &&
+                                                        _uploadedPhotoUrl!
+                                                            .isNotEmpty
+                                                  ? Image.network(
+                                                      _uploadedPhotoUrl!,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) {
+                                                            return const Icon(
+                                                              Icons
+                                                                  .check_circle,
+                                                              color:
+                                                                  Colors.green,
+                                                              size: 24,
+                                                            );
+                                                          },
+                                                    )
+                                                  : _currentUserPhotoUrl !=
+                                                            null &&
+                                                        _currentUserPhotoUrl!
+                                                            .isNotEmpty
+                                                  ? Image.network(
+                                                      _currentUserPhotoUrl!,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) {
+                                                            return const Icon(
+                                                              Icons
+                                                                  .check_circle,
+                                                              color:
+                                                                  Colors.green,
+                                                              size: 24,
+                                                            );
+                                                          },
+                                                    )
+                                                  : const Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.green,
+                                                      size: 24,
+                                                    ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _selectedImageFile != null
+                                                      ? 'Photo selected for upload'
+                                                      : _uploadedPhotoUrl !=
+                                                                null &&
+                                                            _uploadedPhotoUrl!
+                                                                .isNotEmpty
+                                                      ? 'Photo uploaded successfully'
+                                                      : 'Current profile photo',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.green,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  _selectedImageFile != null
+                                                      ? 'File: ${_selectedImageFile!.path.split('/').last}'
+                                                      : _uploadedPhotoUrl !=
+                                                                null &&
+                                                            _uploadedPhotoUrl!
+                                                                .isNotEmpty
+                                                      ? 'S3 URL: ${_uploadedPhotoUrl!.isNotEmpty ? _uploadedPhotoUrl!.substring(0, 30) + '...' : 'N/A'}'
+                                                      : 'Current profile photo',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 12),
+
+                                      // Action buttons - one below the other
+                                      Column(
+                                        children: [
+                                          // Upload Different Photo
+                                          GestureDetector(
+                                            onTap: () =>
+                                                _pickImage(ImageSource.gallery),
+                                            child: Container(
+                                              width: double.infinity,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 8,
+                                                    horizontal: 12,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[50],
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: Colors.blue[200]!,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.upload_file,
+                                                    color: Colors.blue[700],
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Upload Different Photo',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Colors.blue[700],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          const SizedBox(height: 6),
+
+                                          // Take New Photo
+                                          GestureDetector(
+                                            onTap: () =>
+                                                _pickImage(ImageSource.camera),
+                                            child: Container(
+                                              width: double.infinity,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 8,
+                                                    horizontal: 12,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange[50],
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: Colors.orange[200]!,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.camera_alt,
+                                                    color: Colors.orange[700],
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Take New Photo',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Colors.orange[700],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          const SizedBox(height: 6),
+
+                                          // Remove Photo
+                                          GestureDetector(
+                                            onTap: _removeImage,
+                                            child: Container(
+                                              width: double.infinity,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 8,
+                                                    horizontal: 12,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red[50],
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: Colors.red[200]!,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.delete_outline,
+                                                    color: Colors.red[700],
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Remove Photo',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Colors.red[700],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                ),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Personal Information Card
                     Container(
                       width: double.infinity,
@@ -658,21 +1102,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your basic account information.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
+
                           const SizedBox(height: 20),
-                          
+
                           // Form Fields
                           _buildFormField('Full Name', _fullNameController),
                           const SizedBox(height: 16),
-                          
+
                           // Email field (read-only)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,38 +1127,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                 enabled: false, // Make email read-only
                                 decoration: InputDecoration(
                                   filled: true,
-                                  fillColor: Colors.grey.shade100, // Different color to indicate disabled
+                                  fillColor: Colors
+                                      .grey
+                                      .shade100, // Different color to indicate disabled
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
                                   disabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                 ),
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey.shade600, // Different text color for disabled
+                                  color: Colors
+                                      .grey
+                                      .shade600, // Different text color for disabled
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          
+
                           _buildPhoneNumberField(),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Professional Details Card
                     Container(
                       width: double.infinity,
@@ -768,28 +1217,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your professional background.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
+
                           const SizedBox(height: 20),
-                          
+
                           // Form Fields
-                          _buildFormField('Designation', _designationController),
+                          _buildFormField(
+                            'Designation',
+                            _designationController,
+                          ),
                           const SizedBox(height: 16),
-                          
-                          _buildFormField('Company/Organization', _companyController),
+
+                          _buildFormField(
+                            'Company/Organization',
+                            _companyController,
+                          ),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Location Card
                     Container(
                       width: double.infinity,
@@ -835,43 +1282,31 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
-                          // Subtitle
-                          Text(
-                            'Your current location.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
+
                           const SizedBox(height: 20),
-                          
+
                           // Form Field
                           // Searchable location field with suggestions (same as signup screen)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Location',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _locationController,
                                 decoration: InputDecoration(
                                   hintText: 'Start typing your location...',
-                                  prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                                  prefixIcon: const Icon(
+                                    Icons.location_on_outlined,
+                                    color: Colors.grey,
+                                  ),
                                   suffixIcon: _isLoadingLocations
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
                                           child: Padding(
                                             padding: EdgeInsets.all(8.0),
-                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
                                           ),
                                         )
                                       : null,
@@ -879,17 +1314,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                   fillColor: Colors.grey.shade50,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.deepPurple),
+                                    borderSide: const BorderSide(
+                                      color: Colors.deepPurple,
+                                    ),
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                 ),
                                 onChanged: _onLocationChanged,
                                 validator: (value) {
@@ -905,7 +1349,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withOpacity(0.1),
@@ -927,7 +1373,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                         ),
                                         onTap: () {
                                           setState(() {
-                                            _locationController.text = _locationSuggestions[index];
+                                            _locationController.text =
+                                                _locationSuggestions[index];
                                             _locationSuggestions = [];
                                           });
                                         },
@@ -940,9 +1387,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Additional Roles Card
                     Container(
                       width: double.infinity,
@@ -988,7 +1435,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
+
                           // Subtitle
                           Text(
                             'Your roles and responsibilities.',
@@ -998,7 +1445,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          
+
                           // Role Checkboxes
                           _buildRoleCheckbox('Ashramite'),
                           const SizedBox(height: 12),
@@ -1011,16 +1458,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           _buildRoleCheckbox('Trustee'),
                           const SizedBox(height: 12),
                           _buildRoleCheckbox('State Apex / STC'),
+
+
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
-            
+
             // Save Button at Bottom
             Container(
               padding: const EdgeInsets.all(16.0),
@@ -1056,7 +1505,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             ),
                             SizedBox(width: 12),
@@ -1070,12 +1521,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ],
                         )
                       : const Text(
-                    'Save Changes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                          'Save Changes',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -1094,11 +1545,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             color: Colors.deepPurple.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8.0),
           ),
-          child: Icon(
-            icon,
-            color: Colors.deepPurple,
-            size: 20,
-          ),
+          child: Icon(icon, color: Colors.deepPurple, size: 20),
         ),
         const SizedBox(width: 12),
         Text(
@@ -1143,7 +1590,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
           style: const TextStyle(
             fontSize: 16,
@@ -1154,26 +1604,34 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ],
     );
   }
-  
+
   Widget _buildRoleCheckbox(String role) {
     return GestureDetector(
       onTap: () {
-              final currentValue = _roleCheckboxes[role] ?? false;
-      final newValue = !currentValue;
-      
+        final currentValue = _roleCheckboxes[role] ?? false;
+        final newValue = !currentValue;
+
+        print(
+          '🏷️ Role checkbox tapped: "$role" - Current: $currentValue, New: $newValue',
+        );
+
         setState(() {
-        _roleCheckboxes[role] = newValue;
+          _roleCheckboxes[role] = newValue;
         });
+
+        // Log all selected roles after change
+        final selectedRoles = _roleCheckboxes.entries
+            .where((entry) => entry.value == true)
+            .map((entry) => entry.key)
+            .toList();
+        print('🏷️ All selected roles after change: $selectedRoles');
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.lightGreen.shade50,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.lightGreen.shade200,
-            width: 1,
-          ),
+          border: Border.all(color: Colors.lightGreen.shade200, width: 1),
         ),
         child: Row(
           children: [
@@ -1182,23 +1640,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: _roleCheckboxes[role] == true ? Colors.green : Colors.white,
+                color: _roleCheckboxes[role] == true
+                    ? Colors.green
+                    : Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: _roleCheckboxes[role] == true ? Colors.green : Colors.lightGreen.shade300,
+                  color: _roleCheckboxes[role] == true
+                      ? Colors.green
+                      : Colors.lightGreen.shade300,
                   width: 2,
                 ),
               ),
               child: _roleCheckboxes[role] == true
-                  ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    )
+                  ? const Icon(Icons.check, color: Colors.white, size: 16)
                   : null,
             ),
             const SizedBox(width: 16),
-            
+
             // Role Text
             Expanded(
               child: Text(
@@ -1206,7 +1664,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: _roleCheckboxes[role] == true ? Colors.green.shade700 : Colors.grey.shade700,
+                  color: _roleCheckboxes[role] == true
+                      ? Colors.green.shade700
+                      : Colors.grey.shade700,
                 ),
               ),
             ),
@@ -1241,7 +1701,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   countryListTheme: CountryListThemeData(
                     flagSize: 25,
                     backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
                     bottomSheetHeight: 500,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(20.0),
@@ -1259,16 +1722,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ),
                   onSelect: (Country country) {
+                    print(
+                      '🌍 Country selected: ${country.name} (${country.phoneCode}) - Flag: ${country.flagEmoji}',
+                    );
                     setState(() {
                       _selectedCountryCode = '+${country.phoneCode}';
                       _selectedCountryFlag = country.flagEmoji;
                     });
+                    print(
+                      '🌍 Updated country code: $_selectedCountryCode, flag: $_selectedCountryFlag',
+                    );
                   },
                 );
               },
               child: Container(
                 height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -1292,7 +1764,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 20),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -1319,7 +1795,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Colors.deepPurple),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -1336,6 +1815,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   void _saveChanges() async {
+    print('💾 _saveChanges() - Starting profile update process...');
+
     // Show loading
     setState(() {
       _isLoading = true;
@@ -1343,27 +1824,74 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
     try {
       // Prepare phone number with country code
-      final fullPhoneNumber = '$_selectedCountryCode ${_phoneController.text.trim()}';
-      
+      final fullPhoneNumber =
+          '$_selectedCountryCode ${_phoneController.text.trim()}';
+      print('📱 Full phone number prepared: "$fullPhoneNumber"');
+
       // Prepare selected roles
       final selectedRoles = _roleCheckboxes.entries
           .where((entry) => entry.value == true)
           .map((entry) => entry.key)
           .toList();
-      
+      print('🏷️ Selected roles: $selectedRoles');
 
+      // Validate role lengths before sending
+      for (final role in selectedRoles) {
+        if (role.length > 50) {
+          print('❌ Role "$role" exceeds 50 characters (${role.length} chars)');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Role "$role" is too long. Maximum 50 characters allowed.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
 
-             // Call ActionService to update profile
-       final result = await ActionService.updateUserProfile(
-         fullName: _fullNameController.text.trim(),
-         email: _emailController.text.trim(),
-         phoneNumber: fullPhoneNumber,
-         designation: _designationController.text.trim(),
-         company: _companyController.text.trim(),
-         full_address: _locationController.text.trim(),
-         userTags: selectedRoles,
-         profilePhotoFile: _selectedImageFile, // Pass the selected file for upload
-       );
+      // Log all form data being sent
+      print('📋 Form data to be sent:');
+      print('   - Full Name: "${_fullNameController.text.trim()}"');
+      print('   - Email: "${_emailController.text.trim()}"');
+      print('   - Phone Number: "$fullPhoneNumber"');
+      print('   - Designation: "${_designationController.text.trim()}"');
+      print('   - Company: "${_companyController.text.trim()}"');
+      print('   - Location: "${_locationController.text.trim()}"');
+      print('   - User Tags: $selectedRoles');
+      print('   - Profile Photo URL: $_uploadedPhotoUrl');
+      _addPhotoLog('💾 Profile photo URL being sent: $_uploadedPhotoUrl');
+
+      // Call ActionService to update profile (S3 URL only, no file upload)
+      print('📡 Calling ActionService.updateUserProfile()...');
+      print('📡 userTags being sent: $selectedRoles');
+      print('📡 userTags type: ${selectedRoles.runtimeType}');
+      print('📡 userTags length: ${selectedRoles.length}');
+
+      // Log each role being sent
+      for (int i = 0; i < selectedRoles.length; i++) {
+        print(
+          '📡 userTags[$i]: "${selectedRoles[i]}" (${selectedRoles[i].length} chars)',
+        );
+      }
+
+      final result = await ActionService.updateUserProfile(
+        fullName: _fullNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phoneNumber: fullPhoneNumber,
+        designation: _designationController.text.trim(),
+        company: _companyController.text.trim(),
+        full_address: _locationController.text.trim(),
+        userTags: selectedRoles,
+        profilePhotoUrl: _uploadedPhotoUrl, // S3 URL only
+      );
+
+      print('📡 ActionService.updateUserProfile() result: $result');
 
       setState(() {
         _isLoading = false;
@@ -1372,7 +1900,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       if (result['success']) {
         // Send profile update notification
         await _sendProfileUpdateNotification(result['data']);
-        
+
+        print('✅ Profile update successful!');
+        print('📥 Response data: ${result['data']}');
+        print('📥 Response message: ${result['message']}');
+        _addPhotoLog('✅ Profile update successful!');
+        _addPhotoLog('📥 Response data: ${result['data']}');
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1381,28 +1915,44 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
-        
-        // Clear selected file after successful upload
+
+        // Store the updated profile photo URL before clearing
+        final updatedProfilePhoto =
+            result['data']?['profilePhoto'] ?? _uploadedPhotoUrl;
+        print('🖼️ Updated profile photo URL: $updatedProfilePhoto');
+
+        // Clear selected file and uploaded URL after successful upload
         setState(() {
           _selectedImageFile = null;
+          _uploadedPhotoUrl = null;
         });
-        
+        print('🧹 Cleared temporary photo data');
+
         // Navigate back with updated data
-    final updatedData = {
-      'fullName': _fullNameController.text,
-      'email': _emailController.text,
+        final updatedData = {
+          'fullName': _fullNameController.text,
+          'email': _emailController.text,
           'phoneNumber': fullPhoneNumber,
-      'designation': _designationController.text,
-      'company': _companyController.text,
-      'location': _locationController.text,
+          'designation': _designationController.text,
+          'company': _companyController.text,
+          'location': _locationController.text,
           'selectedRoles': selectedRoles,
-          'profilePhoto': result['data']?['profilePhoto'] ?? _uploadedPhotoUrl, // Use the updated profile photo from response
+          'profilePhoto':
+              updatedProfilePhoto, // Use the stored profile photo URL
         };
-        
+
+        print('📤 Navigating back with updated data: $updatedData');
         Navigator.pop(context, updatedData);
       } else {
+        print('❌ Profile update failed!');
+        print('📥 Error status code: ${result['statusCode']}');
+        print('📥 Error message: ${result['message']}');
+        _addPhotoLog('❌ Profile update failed!');
+        _addPhotoLog('📥 Error status code: ${result['statusCode']}');
+        _addPhotoLog('📥 Error message: ${result['message']}');
+
         // Show error message
-    ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to update profile'),
             backgroundColor: Colors.red,
@@ -1411,10 +1961,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         );
       }
     } catch (error) {
+      print('❌ Exception during profile update: $error');
+      print('❌ Error type: ${error.runtimeType}');
+
       setState(() {
         _isLoading = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating profile: $error'),
@@ -1426,7 +1979,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   // Send profile update notification
-  Future<void> _sendProfileUpdateNotification(Map<String, dynamic>? profileData) async {
+  Future<void> _sendProfileUpdateNotification(
+    Map<String, dynamic>? profileData,
+  ) async {
     try {
       // Get current user data from widget
       final userData = widget.userData;
@@ -1435,8 +1990,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         return;
       }
 
-      final userId = userData['_id']?.toString() ?? userData['userId']?.toString() ?? userData['id']?.toString();
-      
+      final userId =
+          userData['_id']?.toString() ??
+          userData['userId']?.toString() ??
+          userData['id']?.toString();
+
       if (userId == null) {
         print('⚠️ User ID not found, skipping notification');
         return;
@@ -1448,14 +2006,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       final notificationProfileData = {
         'fullName': profileData?['fullName'] ?? _fullNameController.text,
         'email': profileData?['email'] ?? _emailController.text,
-        'phoneNumber': profileData?['phoneNumber'] ?? '$_selectedCountryCode ${_phoneController.text.trim()}',
-        'designation': profileData?['designation'] ?? _designationController.text,
+        'phoneNumber':
+            profileData?['phoneNumber'] ??
+            '$_selectedCountryCode ${_phoneController.text.trim()}',
+        'designation':
+            profileData?['designation'] ?? _designationController.text,
         'company': profileData?['company'] ?? _companyController.text,
         'location': profileData?['full_address'] ?? _locationController.text,
-        'userTags': profileData?['userTags'] ?? _roleCheckboxes.entries
-            .where((entry) => entry.value == true)
-            .map((entry) => entry.key)
-            .toList(),
+        'userTags':
+            profileData?['userTags'] ??
+            _roleCheckboxes.entries
+                .where((entry) => entry.value == true)
+                .map((entry) => entry.key)
+                .toList(),
         'profilePhoto': profileData?['profilePhoto'] ?? _uploadedPhotoUrl,
       };
 
@@ -1479,13 +2042,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         print('✅ Profile update notification sent successfully');
         print('📱 Notification ID: ${result['data']?['notificationId']}');
       } else {
-        print('⚠️ Failed to send profile update notification: ${result['message']}');
+        print(
+          '⚠️ Failed to send profile update notification: ${result['message']}',
+        );
         print('🔍 Error details: ${result['error']}');
       }
-
     } catch (e) {
       print('❌ Error sending profile update notification: $e');
       // Don't block the profile update flow if notification fails
     }
   }
-} 
+}

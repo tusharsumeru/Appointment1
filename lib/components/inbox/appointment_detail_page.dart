@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'user_images_screen.dart';
 import 'edit_appointment_screen.dart';
 import 'appointment_schedule_form.dart';
@@ -611,8 +612,27 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
 
-    return widget.appointment['userCurrentDesignation']?.toString() ?? 
-           widget.appointment['email']?.toString() ?? 'Unknown';
+    // For "myself" appointments, get name from createdBy
+    if (appointmentType?.toLowerCase() == 'myself') {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final fullName = createdBy['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+
+    // Fallback - try createdBy for any appointment type
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final fullName = createdBy['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return fullName;
+      }
+    }
+
+    return widget.appointment['email']?.toString() ?? 'Unknown';
   }
 
   String _getAppointmentRole() {
@@ -646,6 +666,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
 
+    // For all other appointments (including "myself"), use userCurrentDesignation
     return widget.appointment['userCurrentDesignation']?.toString() ?? '';
   }
 
@@ -666,7 +687,23 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
 
+    // For all other appointments (including "myself"), use userCurrentCompany
     return widget.appointment['userCurrentCompany']?.toString() ?? '';
+  }
+
+  String _getAppointmentRoleAndCompany() {
+    final role = _getAppointmentRole();
+    final company = _getAppointmentCompany();
+    
+    if (role.isNotEmpty && company.isNotEmpty) {
+      return '$role at $company';
+    } else if (role.isNotEmpty) {
+      return role;
+    } else if (company.isNotEmpty) {
+      return company;
+    } else {
+      return '';
+    }
   }
 
   String _getAppointmentImageUrl() {
@@ -1347,53 +1384,42 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         final from = DateTime.tryParse(fromDate);
         final to = DateTime.tryParse(toDate);
         if (from != null && to != null) {
-          return '${from.day}/${from.month}/${from.year} - ${to.day}/${to.month}/${to.year}';
+          // Format dates as "Aug 29, 2025"
+          final fromFormatted = _formatDateToReadable(from);
+          final toFormatted = _formatDateToReadable(to);
+          
+          // Calculate difference in days
+          // final difference = to.difference(from).inDays;
+          // final dayText = difference == 1 ? 'day' : 'days';
+          
+          return '$fromFormatted To $toFormatted';
         }
       }
     }
     return 'Not specified';
   }
 
-  int _getAttendeeCount() {
-    // Check if this is a guest appointment
-    final appointmentType = widget.appointment['appointmentType']?.toString();
-    final guestInformation = widget.appointment['guestInformation'];
+  String _formatDateToReadable(DateTime date) {
+    final months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
     
-    // Check if this is a guest appointment (either by appointmentType or by having guest data)
-    if (appointmentType?.toLowerCase() == 'guest' || 
-        (guestInformation is Map<String, dynamic> && 
-         guestInformation['fullName']?.toString().isNotEmpty == true)) {
-      // For guest appointments: 1 (guest) + number of accompanying users
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
-        return 1 + (numberOfUsers as int); // Guest + accompanying users
-      }
-      return 1; // Just the guest if no accompanying users
-    } else if (appointmentType?.toLowerCase() == 'myself') {
-      // For myself appointments: 1 (main user) + number of accompanying users
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
-        return 1 + (numberOfUsers as int); // Main user + accompanying users
-      }
-      return 1; // Just the main user if no accompanying users
-    } else {
-      // Regular appointment logic
-      // Check if guest exists in new structure
-      final guest = widget.appointment['guest'];
-      if (guest != null) {
-        return 2; // Main user + guest
-      }
+    final monthName = months[date.month];
+    return '$monthName ${date.day}, ${date.year}';
+  }
+
+  int _getAttendeeCount() {
+    final accompanyUsers = widget.appointment['accompanyUsers'];
+    if (accompanyUsers is Map<String, dynamic>) {
+      final users = accompanyUsers['users'] ?? [];
       
-      // Fallback to old accompanyUsers structure
-      final accompanyUsers = widget.appointment['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final count = accompanyUsers['numberOfUsers'] ?? 1;
-        return count;
+      // Total attendees = 1 (main user) + number of accompanying users
+      if (users is List) {
+        return 1 + users.length;
       }
-      return 1;
     }
+    return 1;
   }
 
 
@@ -1680,6 +1706,95 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
   }
 
+  // Helper methods for schedule screens main card
+  String _getAppointmentPurpose() {
+    // First check for quick appointment purpose
+    if (_isQuickAppointment()) {
+      final quickPurpose = _getQuickAppointmentPurpose();
+      if (quickPurpose.isNotEmpty) {
+        return quickPurpose;
+      }
+    }
+    
+    // Check regular appointment purpose/subject
+    final purpose = widget.appointment['appointmentPurpose']?.toString() ?? 
+                   widget.appointment['appointmentSubject']?.toString() ?? 
+                   'Not specified';
+    return purpose;
+  }
+
+  String _getTeacherStatus() {
+    // Check if user is a verified teacher
+    if (_isTeacher()) {
+      return 'Yes, ${_getTeacherType()}';
+    }
+    return 'No';
+  }
+
+  String _getMeetingType() {
+    // Check virtual meeting details
+    final virtualMeetingDetails = widget.appointment['virtualMeetingDetails'];
+    if (virtualMeetingDetails is Map<String, dynamic>) {
+      final isVirtualMeeting = virtualMeetingDetails['isVirtualMeeting'] == true;
+      if (isVirtualMeeting) {
+        return 'Online';
+      }
+    }
+    
+    // Check meeting type field
+    final meetingType = widget.appointment['meetingType']?.toString();
+    if (meetingType != null) {
+      switch (meetingType.toLowerCase()) {
+        case 'online':
+        case 'virtual':
+          return 'Online';
+        case 'in_person':
+        case 'in-person':
+        case 'offline':
+          return 'In-person';
+        default:
+          return 'In-person'; // Default assumption
+      }
+    }
+    
+    return 'In-person'; // Default
+  }
+
+  String _getAssignedSecretary() {
+    // Check if there's an assigned secretary in the appointment
+    final assignedSecretary = widget.appointment['assignedSecretary'];
+    if (assignedSecretary is Map<String, dynamic>) {
+      final secretaryName = assignedSecretary['fullName']?.toString() ?? 
+                           assignedSecretary['name']?.toString();
+      if (secretaryName != null && secretaryName.isNotEmpty) {
+        return secretaryName;
+      }
+    } else if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
+      return assignedSecretary;
+    }
+    
+    // Check appointmentLocation for assigned secretary
+    final appointmentLocation = widget.appointment['appointmentLocation'];
+    if (appointmentLocation is Map<String, dynamic>) {
+      final assignedSecretaries = appointmentLocation['assignedSecretaries'];
+      if (assignedSecretaries is List && assignedSecretaries.isNotEmpty) {
+        final firstSecretary = assignedSecretaries.first;
+        if (firstSecretary is Map<String, dynamic>) {
+          final secretaryId = firstSecretary['secretaryId'];
+          if (secretaryId is Map<String, dynamic>) {
+            final secretaryName = secretaryId['fullName']?.toString() ?? 
+                                 secretaryId['name']?.toString();
+            if (secretaryName != null && secretaryName.isNotEmpty) {
+              return secretaryName;
+            }
+          }
+        }
+      }
+    }
+    
+    return 'Not assigned';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1716,11 +1831,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 _buildAccompanyingUsersSection(),
               ],
               
-              // Teacher Verification Section - Only show if user is verified
-              if (_isTeacher()) ...[
+              // Teacher Verification Section - Only show if user is verified and NOT a guest appointment
+              if (_isTeacher() && !_isGuestAppointment()) ...[
                 _buildTeacherVerificationSection(),
               ] else ...[
-                // Basic Information Section for non-verified users
+                // Basic Information Section for non-verified users or guest appointments
                 _buildBasicInformationSection(),
               ],
               
@@ -2225,23 +2340,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _getAppointmentRole(),
+                      _getAppointmentRoleAndCompany(),
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[600],
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getAppointmentCompany(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                      maxLines: null,
+                      overflow: TextOverflow.visible,
                     ),
                   ],
                 ),
@@ -2251,11 +2356,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           const SizedBox(height: 20),
           
-          // Request Details
-          _buildMainCardDetailRow('Request ID', _getAppointmentId(), Icons.tag),
-          _buildMainCardDetailRow('Date Range', _getDateRange(), Icons.calendar_today),
-          _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
-          _buildMainCardDetailRow('Number of People', '${_getAttendeeCount()} People', Icons.people),
+          // Request Details - Different for schedule screens
+          if (widget.isFromScheduleScreens) ...[
+            // Show Purpose, Teacher status, Meeting type, and Assigned Secretary for schedule screens
+            _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
+            _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
+            _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
+            _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.assignment_ind),
+          ] else ...[
+            // Show original details for other screens
+            _buildMainCardDetailRowWithCopy('Appoitnment ID', _getAppointmentId(), Icons.tag),
+            _buildMainCardDetailRow('Req. Dates', _getDateRange(), Icons.calendar_today),
+            _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
+            _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
+          ],
           
 
           
@@ -2617,28 +2731,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           ),
           const SizedBox(height: 20),
           
-          // Basic Details - Show regular appointment details (quick appointment details are shown in dedicated section)
+          // For non-verified teachers, show only purpose and tags
+          // Purpose
           if (!_isQuickAppointment()) ...[
-            if (_getQuickAppointmentEmail().isNotEmpty) ...[
-              _buildDetailRow('Email', _getQuickAppointmentEmail(), Icons.email),
-            ],
-            if (_getQuickAppointmentPhone().isNotEmpty) ...[
-              _buildDetailRow('Phone Number', _getQuickAppointmentPhone(), Icons.phone),
-            ],
             if (_getQuickAppointmentPurpose().isNotEmpty) ...[
               _buildDetailRow('Purpose', _getQuickAppointmentPurpose(), Icons.info),
             ] else ...[
               _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
             ],
-            if (_getQuickAppointmentRemarks().isNotEmpty) ...[
-              _buildDetailRow('Remarks for Gurudev', _getQuickAppointmentRemarks(), Icons.note),
-            ],
           ] else ...[
             // For quick appointments, show basic info without duplicating quick appointment data
             _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
           ],
-          _buildDetailRow('Are you an Art Of Living teacher', 'No', Icons.school),
-          _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
+          
+          // Tags
+          _buildUserTagsRow(),
         ],
       ),
     );
@@ -2734,11 +2841,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           const SizedBox(height: 16),
           
-          // Additional Details
+          // Purpose and Tags only
           _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
-          _buildDetailRow('Are you an Art Of Living teacher', 'Yes, ${_getTeacherType()}', Icons.school),
-          _buildDetailRow('Programs eligible to teach', _getTeacherPrograms(), Icons.book),
-          _buildDetailRow('Are you seeking Online or In-person appointment', 'In-person', Icons.person),
           _buildUserTagsRow(),
         ],
       ),
@@ -3125,7 +3229,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                             ),
                             const Spacer(),
                             Text(
-                              '${_upcomingAppointments.length} items',
+                              '${_upcomingAppointments.where((appointment) {
+                                if (appointment is Map<String, dynamic>) {
+                                  final status = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
+                                  return status == 'scheduled' || status == 'confirmed';
+                                }
+                                return false;
+                              }).length} items',
                               style: TextStyle(
                                 color: Colors.blue[600],
                                 fontSize: 12,
@@ -3145,7 +3255,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
                             child: Column(
-                              children: _upcomingAppointments.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
+                              children: _upcomingAppointments.where((appointment) {
+                                // Filter to show only scheduled appointments, not pending ones
+                                if (appointment is Map<String, dynamic>) {
+                                  final status = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
+                                  return status == 'scheduled' || status == 'confirmed';
+                                }
+                                return false;
+                              }).map((appointment) {
                                 try {
                                   return _buildAppointmentItem(
                                     appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
@@ -3427,25 +3544,78 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Icon(icon, size: 20, color: Colors.grey[600]),
           const SizedBox(width: 12),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$label: ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
                       fontWeight: FontWeight.w500,
                     ),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
+                  ),
+                  TextSpan(
+                    text: value,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              maxLines: null,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainCardDetailRowWithCopy(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.lightBlue[100], // Ocean blue background
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.lightBlue[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.lightBlue[800],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _copyToClipboard(value),
+                  borderRadius: BorderRadius.circular(2),
+                  child: Icon(
+                    Icons.copy,
+                    size: 14,
+                    color: Colors.lightBlue[700],
                   ),
                 ),
               ],
@@ -3454,6 +3624,33 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ],
       ),
     );
+  }
+
+  // Copy to clipboard method
+  Future<void> _copyToClipboard(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Copied "$text" to clipboard'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to copy: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   // Edit appointment handler
