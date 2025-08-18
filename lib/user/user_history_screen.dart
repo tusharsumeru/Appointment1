@@ -16,6 +16,7 @@ class UserHistoryScreen extends StatefulWidget {
 class _UserHistoryScreenState extends State<UserHistoryScreen> {
   List<Map<String, dynamic>> appointments = [];
   bool isLoading = true;
+  bool isLoadingMore = false; // Track loading state for "Load More" button
   bool hasError = false;
   String errorMessage = '';
   int currentPage = 1;
@@ -26,7 +27,6 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
   void initState() {
     super.initState();
     _loadUserAppointments();
-    _testDateCalculations(); // Add test method call
   }
 
   Future<void> _loadUserAppointments({bool refresh = false}) async {
@@ -139,15 +139,22 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
   }
 
   Future<void> _loadMoreAppointments() async {
-    if (!hasMoreData || isLoading) return;
+    if (!hasMoreData || isLoading || isLoadingMore) return;
     
     if (mounted) {
       setState(() {
+        isLoadingMore = true;
         currentPage++;
       });
     }
     
     await _loadUserAppointments();
+    
+    if (mounted) {
+      setState(() {
+        isLoadingMore = false;
+      });
+    }
   }
 
   @override
@@ -263,79 +270,137 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
     return RefreshIndicator(
       onRefresh: () => _loadUserAppointments(refresh: true),
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: appointments.length + (hasMoreData ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == appointments.length) {
-            // Load more indicator
-            if (hasMoreData) {
-              // Use addPostFrameCallback to defer the load until after the current build
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _loadMoreAppointments();
-              });
-              return const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }
-
-          final appointment = appointments[index];
-          return UserAppointmentCard(
-            appointmentId: appointment['appointmentId'] ?? 'N/A',
-            status: appointment['appointmentStatus']?['status'] ?? 'Unknown',
-            userName: appointment['createdBy']?['fullName'] ?? 'N/A',
-            userTitle: appointment['userCurrentDesignation'] ?? 'N/A',
-            company: appointment['userCurrentCompany'] ?? 'N/A',
-            profilePhoto: appointment['profilePhoto'],
-            appointmentDateRange: _formatDateRange(appointment),
-            attendeesCount: _calculateTotalAttendees(appointment),
-            attendeePhotos: _extractAttendeePhotos(appointment),
-            purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
-            assignedTo: _formatAssignedSecretary(appointment),
-            dateRange: _formatPreferredDateRange(appointment),
-            daysCount: _calculateDaysCount(appointment),
-            email: appointment['email'] ?? 'N/A',
-            phone: _formatPhoneNumber(appointment),
-            location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
-            appointmentData: appointment, // Pass the complete appointment data
-            onEditPressed: () async {
-              print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditAppointmentScreen(
-                    appointmentData: appointment,
-                  ),
-                ),
-              );
-              print('🔄 Returned from edit screen with result: $result');
-              // Refresh the appointments list after returning from edit screen
-              // Only refresh if the edit was successful (result == true)
-              if (result == true) {
-                print('🔄 Refreshing appointments list...');
-                // Use addPostFrameCallback to defer the refresh until after the current build
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadUserAppointments(refresh: true);
-                });
-                // Show a brief success message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Appointment updated successfully!'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
+      child: Column(
+        children: [
+          // Appointments List
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: appointments.length,
+              itemBuilder: (context, index) {
+                final appointment = appointments[index];
+                return UserAppointmentCard(
+                  appointmentId: appointment['appointmentId'] ?? 'N/A',
+                  status: appointment['appointmentStatus']?['status'] ?? 'Unknown',
+                  userName: appointment['createdBy']?['fullName'] ?? 'N/A',
+                  userTitle: appointment['userCurrentDesignation'] ?? 'N/A',
+                  company: appointment['userCurrentCompany'] ?? 'N/A',
+                  profilePhoto: appointment['profilePhoto'],
+                  appointmentDateRange: _formatDateRange(appointment),
+                  attendeesCount: _calculateTotalAttendees(appointment),
+                  attendeePhotos: _extractAttendeePhotos(appointment),
+                  purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
+                  assignedTo: _formatAssignedSecretary(appointment),
+                  dateRange: _formatPreferredDateRange(appointment),
+                  daysCount: _calculateDaysCount(appointment),
+                  email: appointment['email'] ?? 'N/A',
+                  phone: _formatPhoneNumber(appointment),
+                  location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
+                  appointmentData: appointment, // Pass the complete appointment data
+                  onEditPressed: () async {
+                    print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditAppointmentScreen(
+                          appointmentData: appointment,
+                        ),
+                      ),
+                    );
+                    print('🔄 Returned from edit screen with result: $result');
+                    // Refresh the appointments list after returning from edit screen
+                    // Only refresh if the edit was successful (result == true)
+                    if (result == true) {
+                      print('🔄 Refreshing appointments list...');
+                      // Use addPostFrameCallback to defer the refresh until after the current build
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _loadUserAppointments(refresh: true);
+                      });
+                      // Show a brief success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Appointment updated successfully!'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } else {
+                      print('🔄 No refresh needed - edit was not successful');
+                    }
+                  },
                 );
-              } else {
-                print('🔄 No refresh needed - edit was not successful');
-              }
-            },
-          );
-        },
+              },
+            ),
+          ),
+          
+          // Pagination Info
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Showing ${appointments.length} appointments',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Page $currentPage of $totalPages',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Load More Button
+          if (hasMoreData)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: isLoadingMore ? null : () => _loadMoreAppointments(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: isLoadingMore
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Loading...'),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.keyboard_arrow_down),
+                          const SizedBox(width: 8),
+                          Text('Load More'),
+                        ],
+                      ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -562,66 +627,5 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       print('Error calculating total attendees: $e');
       return 1; // Return 1 if there's an error (at least the main user)
     }
-  }
-
-  // Test method to validate date calculations
-  void _testDateCalculations() {
-    print('🧪 Testing date calculations...');
-    
-    // Test case 1: Same day (31-31)
-    final testAppointment1 = {
-      'appointmentId': 'TEST-1',
-      'preferredDateRange': {
-        'fromDate': '2024-01-31',
-        'toDate': '2024-01-31',
-      }
-    };
-    final result1 = _calculateDaysCount(testAppointment1);
-    print('🧪 Test 1 (31-31): Expected 1, Got $result1');
-    
-    // Test case 2: Two consecutive days (28-29)
-    final testAppointment2 = {
-      'appointmentId': 'TEST-2',
-      'preferredDateRange': {
-        'fromDate': '2024-01-28',
-        'toDate': '2024-01-29',
-      }
-    };
-    final result2 = _calculateDaysCount(testAppointment2);
-    print('🧪 Test 2 (28-29): Expected 2, Got $result2');
-    
-    // Test case 3: Three days (28-30)
-    final testAppointment3 = {
-      'appointmentId': 'TEST-3',
-      'preferredDateRange': {
-        'fromDate': '2024-01-28',
-        'toDate': '2024-01-30',
-      }
-    };
-    final result3 = _calculateDaysCount(testAppointment3);
-    print('🧪 Test 3 (28-30): Expected 3, Got $result3');
-    
-    // Test case 4: Cross month (31 Jan - 2 Feb)
-    final testAppointment4 = {
-      'appointmentId': 'TEST-4',
-      'preferredDateRange': {
-        'fromDate': '2024-01-31',
-        'toDate': '2024-02-02',
-      }
-    };
-    final result4 = _calculateDaysCount(testAppointment4);
-    print('🧪 Test 4 (31 Jan - 2 Feb): Expected 3, Got $result4');
-    
-    // Test case 5: Single day scheduled appointment
-    final testAppointment5 = {
-      'appointmentId': 'TEST-5',
-      'scheduledDateTime': {
-        'date': '2024-01-31',
-      }
-    };
-    final result5 = _calculateDaysCount(testAppointment5);
-    print('🧪 Test 5 (Single day scheduled): Expected 1, Got $result5');
-    
-    print('🧪 Date calculation tests completed');
   }
 } 
