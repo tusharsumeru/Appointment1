@@ -5,6 +5,7 @@ import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
+import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -159,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const UserScreen(),
+            builder: (context) => const AppointmentTypeSelectionScreen(),
           ),
         );
       } else {

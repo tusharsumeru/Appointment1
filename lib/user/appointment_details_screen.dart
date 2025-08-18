@@ -39,7 +39,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   
   // Guest Information Controllers
   final TextEditingController _guestNameController = TextEditingController();
-  final TextEditingController _guestEmailController = TextEditingController(text: 'guest@email.com');
+  final TextEditingController _guestEmailController = TextEditingController();
   final TextEditingController _guestPhoneController = TextEditingController();
   final TextEditingController _guestDesignationController = TextEditingController();
   final TextEditingController _guestCompanyController = TextEditingController();
@@ -212,18 +212,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         _fromDateController.text.isNotEmpty &&
         _toDateController.text.isNotEmpty;
     
+    // Validate main guest phone number if appointment type is guest
+    bool mainGuestPhoneValid = true;
+    if (widget.personalInfo['appointmentType'] == 'guest') {
+      if (_guestPhoneController.text.isEmpty || _guestPhoneController.text.length != 10) {
+        mainGuestPhoneValid = false;
+      }
+    }
+    
     // Validate main guest photo if appointment type is guest
     bool mainGuestPhotoValid = true;
     if (widget.personalInfo['appointmentType'] == 'guest') {
       if (_mainGuestPhotoUrl == null) {
         mainGuestPhotoValid = false;
-        print('❌ Main guest photo validation failed: photo required but not provided');
-      } else {
-        print('✅ Main guest photo validation passed: photo provided');
-        print('📸 Main guest photo URL: $_mainGuestPhotoUrl');
       }
-    } else {
-      print('✅ Main guest photo validation passed: not required for appointment type ${widget.personalInfo['appointmentType']}');
     }
     
     // Validate guest information if any (only for <= 10 people)
@@ -232,7 +234,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     
     if (peopleCount > 10) {
       // For more than 10 people, no guest validation needed
-      print('✅ Large group validation passed: ${peopleCount} people - no individual details required');
       guestFormValid = true;
     } else {
       // Validate individual guest details for <= 10 people
@@ -242,9 +243,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         
         if (guest['name']?.text.isEmpty == true ||
             guest['phone']?.text.isEmpty == true ||
+            guest['phone']?.text.length != 10 ||
             guest['age']?.text.isEmpty == true) {
           guestFormValid = false;
-          print('❌ Guest $guestNumber validation failed: missing basic info');
           break;
         }
         
@@ -252,25 +253,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
         if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
           guestFormValid = false;
-          print('❌ Guest $guestNumber validation failed: photo required for age $age but not provided');
           break;
-        }
-        
-        // Log successful validation for this guest
-        if (age >= 12 && _guestImages.containsKey(guestNumber)) {
-          print('✅ Guest $guestNumber validation passed: photo provided for age $age');
-          print('📸 Guest $guestNumber photo URL: ${_guestImages[guestNumber]}');
-        } else if (age < 12) {
-          print('✅ Guest $guestNumber validation passed: no photo required for age $age');
         }
       }
     }
     
     setState(() {
-      _isFormValid = basicFormValid && mainGuestPhotoValid && guestFormValid;
+      _isFormValid = basicFormValid && mainGuestPhoneValid && mainGuestPhotoValid && guestFormValid;
     });
-    
-    print('📋 Form validation result: basicFormValid=$basicFormValid, mainGuestPhotoValid=$mainGuestPhotoValid, guestFormValid=$guestFormValid, _isFormValid=$_isFormValid');
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -3179,8 +3169,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                child: TextField(
                  controller: _guestPhoneController,
                  keyboardType: TextInputType.phone,
+                 maxLength: 10,
+                 inputFormatters: [
+                   FilteringTextInputFormatter.digitsOnly,
+                 ],
+                 onChanged: (value) {
+                   // Validate phone number length
+                   if (value.length == 10) {
+                     // Phone number is valid
+                     setState(() {});
+                   }
+                 },
                  decoration: InputDecoration(
-                   hintText: 'Enter phone number',
+                   hintText: 'Enter 10-digit phone number',
                    hintStyle: TextStyle(color: Colors.grey[400]),
                    filled: true,
                    fillColor: Colors.white,
@@ -3196,7 +3197,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                      borderRadius: BorderRadius.circular(8),
                      borderSide: const BorderSide(color: Colors.deepPurple),
                    ),
+                   errorBorder: OutlineInputBorder(
+                     borderRadius: BorderRadius.circular(8),
+                     borderSide: BorderSide(color: Colors.red[300]!),
+                   ),
+                   focusedErrorBorder: OutlineInputBorder(
+                     borderRadius: BorderRadius.circular(8),
+                     borderSide: BorderSide(color: Colors.red[500]!),
+                   ),
                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                   counterText: '',
+                   errorText: _guestPhoneController.text.isNotEmpty && _guestPhoneController.text.length != 10
+                       ? 'Phone number must be 10 digits'
+                       : null,
                  ),
                ),
              ),
@@ -3292,9 +3305,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                child: TextField(
                  controller: controller,
                  keyboardType: TextInputType.phone,
-                 onChanged: (value) => _validateForm(),
+                 maxLength: 10,
+                 inputFormatters: [
+                   FilteringTextInputFormatter.digitsOnly,
+                 ],
+                 onChanged: (value) {
+                   _validateForm();
+                   // Validate phone number length
+                   if (value.length == 10) {
+                     // Phone number is valid
+                     setState(() {});
+                   }
+                 },
                  decoration: InputDecoration(
-                   hintText: 'Enter phone number',
+                   hintText: 'Enter 10-digit phone number',
                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                    filled: true,
                    fillColor: Colors.grey[50],
@@ -3310,7 +3334,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                      borderRadius: BorderRadius.circular(8),
                      borderSide: const BorderSide(color: Colors.deepPurple),
                    ),
+                   errorBorder: OutlineInputBorder(
+                     borderRadius: BorderRadius.circular(8),
+                     borderSide: BorderSide(color: Colors.red[300]!),
+                   ),
+                   focusedErrorBorder: OutlineInputBorder(
+                     borderRadius: BorderRadius.circular(8),
+                     borderSide: BorderSide(color: Colors.red[500]!),
+                   ),
                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                   counterText: '',
+                   errorText: controller.text.isNotEmpty && controller.text.length != 10
+                       ? 'Phone number must be 10 digits'
+                       : null,
                  ),
                ),
              ),
