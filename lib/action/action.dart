@@ -177,6 +177,62 @@ class ActionService {
     }
   }
 
+  // Forgot password
+  static Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+  }) async {
+    try {
+      // Validate input
+      if (email.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please enter your email address to continue.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful password reset request
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 
+              '📧 Password reset link sent to your email! Please check your inbox (and spam folder) for instructions.',
+        };
+      } else {
+        // Error response
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 
+              'Failed to send password reset link. Please try again.',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // Get current user data
   static Future<Map<String, dynamic>> getCurrentUser() async {
     try {

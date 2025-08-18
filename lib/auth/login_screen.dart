@@ -7,6 +7,7 @@ import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
+import '../user/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -374,20 +375,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                ),
                              ),
                               const SizedBox(height: 12),
+                              // Forgot Password Button
                               Align(
                                 alignment: Alignment.center,
                                 child: TextButton(
                                   onPressed: () {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Forgot Password coming soon.'),
-                                        duration: Duration(seconds: 2),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const ForgotPasswordScreen(),
                                       ),
                                     );
                                   },
                                   child: const Text(
-                                    'Forgot Password?',
+                                    'Forgot Your Password?',
                                     style: TextStyle(
                                       color: Colors.deepPurple,
                                       fontWeight: FontWeight.w600,
@@ -432,17 +433,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-
-                      // Forgot Password
-                      // TextButton(
-                      //   onPressed: () {
-                      //     // TODO: Navigate to forgot password page
-                      //   },
-                      //   child: const Text(
-                      //     'Forgot Password?',
-                      //     style: TextStyle(color: Colors.deepPurple),
-                      //   ),
-                      // ),
                     ],
                   ),
                 ),
