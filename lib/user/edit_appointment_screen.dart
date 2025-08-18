@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:country_picker/country_picker.dart';
+import '../components/user/photo_validation_bottom_sheet.dart';
 
 class EditAppointmentScreen extends StatefulWidget {
   final Map<String, dynamic>? appointmentData;
@@ -568,16 +569,34 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             setState(() {
               _isMainGuestPhotoUploading = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(result['message'] ?? 'Failed to upload photo')),
+            // Show photo validation guidance bottom sheet
+            PhotoValidationBottomSheet.show(
+              context,
+              onTryAgain: () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _mainGuestPhotoFile = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
             );
           }
         } catch (e) {
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error uploading photo: $e')),
+          // Show photo validation guidance bottom sheet
+          PhotoValidationBottomSheet.show(
+            context,
+            onTryAgain: () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _mainGuestPhotoFile = null;
+                _mainGuestPhotoUrl = null;
+                _isMainGuestPhotoUploading = false;
+              });
+            },
           );
         }
       }
@@ -1358,11 +1377,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           
           print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to upload photo: ${result['message']}'),
-              backgroundColor: Colors.red,
-            ),
+          // Show photo validation guidance bottom sheet
+          PhotoValidationBottomSheet.show(
+            context,
+            onTryAgain: () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
           );
         }
       } catch (e) {
@@ -1372,11 +1396,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         
         print('❌ Error uploading guest $guestNumber photo: $e');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading photo: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // Show photo validation guidance bottom sheet
+        PhotoValidationBottomSheet.show(
+          context,
+          onTryAgain: () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _guestImages.remove(guestNumber);
+              _guestUploading[guestNumber] = false;
+            });
+          },
         );
       }
     }

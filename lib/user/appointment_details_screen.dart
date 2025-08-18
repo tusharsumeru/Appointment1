@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+import '../components/user/photo_validation_bottom_sheet.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
@@ -339,11 +340,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           // Update form validation
           _validateForm();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to upload photo: ${result['message']}'),
-              backgroundColor: Colors.red,
-            ),
+          // Show photo validation guidance bottom sheet
+          PhotoValidationBottomSheet.show(
+            context,
+            onTryAgain: () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _selectedImage = null;
+                _mainGuestPhotoUrl = null;
+                _isMainGuestPhotoUploading = false;
+              });
+            },
           );
         }
       } catch (e) {
@@ -357,11 +364,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Update form validation
         _validateForm();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading photo: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // Show photo validation guidance bottom sheet
+        PhotoValidationBottomSheet.show(
+          context,
+          onTryAgain: () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _selectedImage = null;
+              _mainGuestPhotoUrl = null;
+              _isMainGuestPhotoUploading = false;
+            });
+          },
         );
       }
     } else {
@@ -427,11 +440,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           
           print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to upload photo: ${result['message']}'),
-              backgroundColor: Colors.red,
-            ),
+          // Show photo validation guidance bottom sheet
+          PhotoValidationBottomSheet.show(
+            context,
+            onTryAgain: () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
           );
         }
       } catch (e) {
@@ -441,11 +459,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         
         print('❌ Error uploading guest $guestNumber photo: $e');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading photo: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // Show photo validation guidance bottom sheet
+        PhotoValidationBottomSheet.show(
+          context,
+          onTryAgain: () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _guestImages.remove(guestNumber);
+              _guestUploading[guestNumber] = false;
+            });
+          },
         );
       }
     }

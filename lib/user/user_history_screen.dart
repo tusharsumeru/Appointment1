@@ -450,61 +450,42 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateDaysCount(Map<String, dynamic> appointment) {
     try {
-      print('🔍 _calculateDaysCount called for appointment: ${appointment['appointmentId']}');
-      
       // Check for preferred date range ONLY - this is the only source for day calculation
       final preferredDateRange = appointment['preferredDateRange'];
-      print('📅 preferredDateRange: $preferredDateRange');
       
       if (preferredDateRange != null) {
         final fromDate = preferredDateRange['fromDate'];
         final toDate = preferredDateRange['toDate'];
         
-        print('📅 fromDate: $fromDate');
-        print('📅 toDate: $toDate');
-        
         if (fromDate != null && toDate != null) {
           final from = DateTime.parse(fromDate);
           final to = DateTime.parse(toDate);
-          
-          print('📅 Parsed from: ${from.toString()}');
-          print('📅 Parsed to: ${to.toString()}');
-          print('📅 from.day: ${from.day}, from.month: ${from.month}, from.year: ${from.year}');
-          print('📅 to.day: ${to.day}, to.month: ${to.month}, to.year: ${to.year}');
           
           // Calculate the difference in days and add 1 to include both start and end dates
           // Example: 28-30 = 28, 29, 30 = 3 days
           final difference = to.difference(from).inDays;
           final totalDays = difference + 1;
           
-          print('📅 Date range calculation: ${from.day}/${from.month}/${from.year} to ${to.day}/${to.month}/${to.year}');
-          print('📅 Raw difference in days: $difference');
-          print('📅 Total days (inclusive): $totalDays');
-          
           // Additional validation for edge cases
           if (from.isAtSameMomentAs(to)) {
-            print('📅 Same day detected, returning 1');
             return 1;
           }
           
           if (difference < 0) {
-            print('⚠️ Warning: Negative difference detected! fromDate is after toDate');
-            print('📅 This might indicate a data issue');
+            // Warning: Negative difference detected! fromDate is after toDate
+            // This might indicate a data issue
           }
           
           return totalDays;
         } else {
-          print('📅 Missing fromDate or toDate in preferredDateRange');
+          // Missing fromDate or toDate in preferredDateRange
         }
       } else {
-        print('📅 No preferredDateRange found');
+        // No preferredDateRange found
       }
       
-      print('📅 No preferredDateRange found, returning 0');
       return 0;
     } catch (e) {
-      print('❌ Error calculating days count: $e');
-      print('❌ Error stack trace: ${StackTrace.current}');
       return 0;
     }
   }
