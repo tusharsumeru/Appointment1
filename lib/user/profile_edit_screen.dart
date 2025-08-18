@@ -1834,6 +1834,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .map((entry) => entry.key)
           .toList();
       print('🏷️ Selected roles: $selectedRoles');
+      print('🏷️ Number of selected roles: ${selectedRoles.length}');
+      print('🏷️ All role checkboxes state: $_roleCheckboxes');
+      
+      if (selectedRoles.isEmpty) {
+        print('🏷️ No roles selected - this should clear all existing roles');
+      }
       
       // Validate role lengths before sending
       for (final role in selectedRoles) {

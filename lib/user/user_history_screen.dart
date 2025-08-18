@@ -26,6 +26,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
   void initState() {
     super.initState();
     _loadUserAppointments();
+    _testDateCalculations(); // Add test method call
   }
 
   Future<void> _loadUserAppointments({bool refresh = false}) async {
@@ -384,33 +385,61 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateDaysCount(Map<String, dynamic> appointment) {
     try {
-      // Check for scheduled date
-      final scheduledDateTime = appointment['scheduledDateTime'];
-      if (scheduledDateTime != null) {
-        final scheduledDate = scheduledDateTime['date'];
-        if (scheduledDate != null) {
-          final date = DateTime.parse(scheduledDate);
-          final now = DateTime.now();
-          final difference = date.difference(now).inDays;
-          return difference.abs();
-        }
-      }
+      print('🔍 _calculateDaysCount called for appointment: ${appointment['appointmentId']}');
       
-      // Check for preferred date range - calculate duration between fromDate and toDate
+      // Check for preferred date range ONLY - this is the only source for day calculation
       final preferredDateRange = appointment['preferredDateRange'];
+      print('📅 preferredDateRange: $preferredDateRange');
+      
       if (preferredDateRange != null) {
         final fromDate = preferredDateRange['fromDate'];
         final toDate = preferredDateRange['toDate'];
         
+        print('📅 fromDate: $fromDate');
+        print('📅 toDate: $toDate');
+        
         if (fromDate != null && toDate != null) {
           final from = DateTime.parse(fromDate);
           final to = DateTime.parse(toDate);
+          
+          print('📅 Parsed from: ${from.toString()}');
+          print('📅 Parsed to: ${to.toString()}');
+          print('📅 from.day: ${from.day}, from.month: ${from.month}, from.year: ${from.year}');
+          print('📅 to.day: ${to.day}, to.month: ${to.month}, to.year: ${to.year}');
+          
+          // Calculate the difference in days and add 1 to include both start and end dates
+          // Example: 28-30 = 28, 29, 30 = 3 days
           final difference = to.difference(from).inDays;
-          return difference + 1; // Add 1 to include both start and end dates
+          final totalDays = difference + 1;
+          
+          print('📅 Date range calculation: ${from.day}/${from.month}/${from.year} to ${to.day}/${to.month}/${to.year}');
+          print('📅 Raw difference in days: $difference');
+          print('📅 Total days (inclusive): $totalDays');
+          
+          // Additional validation for edge cases
+          if (from.isAtSameMomentAs(to)) {
+            print('📅 Same day detected, returning 1');
+            return 1;
+          }
+          
+          if (difference < 0) {
+            print('⚠️ Warning: Negative difference detected! fromDate is after toDate');
+            print('📅 This might indicate a data issue');
+          }
+          
+          return totalDays;
+        } else {
+          print('📅 Missing fromDate or toDate in preferredDateRange');
         }
+      } else {
+        print('📅 No preferredDateRange found');
       }
+      
+      print('📅 No preferredDateRange found, returning 0');
       return 0;
     } catch (e) {
+      print('❌ Error calculating days count: $e');
+      print('❌ Error stack trace: ${StackTrace.current}');
       return 0;
     }
   }
@@ -533,5 +562,66 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       print('Error calculating total attendees: $e');
       return 1; // Return 1 if there's an error (at least the main user)
     }
+  }
+
+  // Test method to validate date calculations
+  void _testDateCalculations() {
+    print('🧪 Testing date calculations...');
+    
+    // Test case 1: Same day (31-31)
+    final testAppointment1 = {
+      'appointmentId': 'TEST-1',
+      'preferredDateRange': {
+        'fromDate': '2024-01-31',
+        'toDate': '2024-01-31',
+      }
+    };
+    final result1 = _calculateDaysCount(testAppointment1);
+    print('🧪 Test 1 (31-31): Expected 1, Got $result1');
+    
+    // Test case 2: Two consecutive days (28-29)
+    final testAppointment2 = {
+      'appointmentId': 'TEST-2',
+      'preferredDateRange': {
+        'fromDate': '2024-01-28',
+        'toDate': '2024-01-29',
+      }
+    };
+    final result2 = _calculateDaysCount(testAppointment2);
+    print('🧪 Test 2 (28-29): Expected 2, Got $result2');
+    
+    // Test case 3: Three days (28-30)
+    final testAppointment3 = {
+      'appointmentId': 'TEST-3',
+      'preferredDateRange': {
+        'fromDate': '2024-01-28',
+        'toDate': '2024-01-30',
+      }
+    };
+    final result3 = _calculateDaysCount(testAppointment3);
+    print('🧪 Test 3 (28-30): Expected 3, Got $result3');
+    
+    // Test case 4: Cross month (31 Jan - 2 Feb)
+    final testAppointment4 = {
+      'appointmentId': 'TEST-4',
+      'preferredDateRange': {
+        'fromDate': '2024-01-31',
+        'toDate': '2024-02-02',
+      }
+    };
+    final result4 = _calculateDaysCount(testAppointment4);
+    print('🧪 Test 4 (31 Jan - 2 Feb): Expected 3, Got $result4');
+    
+    // Test case 5: Single day scheduled appointment
+    final testAppointment5 = {
+      'appointmentId': 'TEST-5',
+      'scheduledDateTime': {
+        'date': '2024-01-31',
+      }
+    };
+    final result5 = _calculateDaysCount(testAppointment5);
+    print('🧪 Test 5 (Single day scheduled): Expected 1, Got $result5');
+    
+    print('🧪 Date calculation tests completed');
   }
 } 

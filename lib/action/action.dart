@@ -5193,6 +5193,10 @@ class ActionService {
       });
 
       // Handle userTags as array - send as both userTags and additionalRoles
+      // Always send userTags field, even when empty, to clear existing roles if needed
+      print('📤 userTags received: $userTags (length: ${userTags.length})');
+      print('📤 userTags is empty: ${userTags.isEmpty}');
+      
       if (userTags.isNotEmpty) {
         // Send userTags using indexed keys to ensure all values are sent
         for (int i = 0; i < userTags.length; i++) {
@@ -5204,6 +5208,13 @@ class ActionService {
         }
         print('📤 Sending userTags as indexed array: $userTags');
         print('📤 Also sending as additionalRoles: $userTags');
+      } else {
+        // Send 'none' to indicate no roles selected (clear existing roles)
+        request.fields['userTags'] = 'No Roles selected';
+        request.fields['additionalRoles'] = 'No Roles selected';
+        print('📤 Sending "none" for userTags to indicate no roles selected');
+        print('📤 Also sending "none" for additionalRoles to indicate no roles selected');
+        print('📤 This should tell the backend to remove all existing roles');
       }
 
       // Add S3 URL if present (no file upload needed)
