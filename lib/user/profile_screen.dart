@@ -143,7 +143,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: Builder(
@@ -174,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: _isLoading
             ? const Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
                 ),
               )
             : _userData == null
@@ -215,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Retry'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
+                        backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
@@ -260,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.deepPurple.withOpacity(0.3),
+                                  color: const Color(0xFFF97316).withOpacity(0.3),
                                   width: 3,
                                 ),
                                 boxShadow: [
@@ -279,24 +290,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         errorBuilder:
                                             (context, error, stackTrace) {
                                               return Container(
-                                                color: Colors.deepPurple
+                                                color: const Color(0xFFF97316)
                                                     .withOpacity(0.1),
                                                 child: const Icon(
                                                   Icons.person,
                                                   size: 40,
-                                                  color: Colors.deepPurple,
+                                                  color: const Color(0xFFF97316),
                                                 ),
                                               );
                                             },
                                       )
                                     : Container(
-                                        color: Colors.deepPurple.withOpacity(
+                                        color: const Color(0xFFF97316).withOpacity(
                                           0.1,
                                         ),
                                         child: const Icon(
                                           Icons.person,
                                           size: 40,
-                                          color: Colors.deepPurple,
+                                          color: const Color(0xFFF97316),
                                         ),
                                       ),
                               ),
@@ -725,7 +736,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _showEditForm(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
+                            backgroundColor: const Color(0xFFF97316),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(

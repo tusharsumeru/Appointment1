@@ -218,17 +218,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Center(
-                                child: Text(
-                                  'THE ART OF LIVING',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.deepPurple,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
+                                                             child: Center(
+                                 child: Container(
+                                   decoration: const BoxDecoration(
+                                     gradient: LinearGradient(
+                                       colors: [
+                                         Color(0xFFFF6B35), // Orange
+                                         Color(0xFFFFD93D), // Yellow
+                                       ],
+                                       begin: Alignment.centerLeft,
+                                       end: Alignment.centerRight,
+                                     ),
+                                   ),
+                                   child: const Text(
+                                     'THE ART OF LIVING',
+                                     style: TextStyle(
+                                       fontSize: 18,
+                                       fontWeight: FontWeight.bold,
+                                       color: Colors.white,
+                                     ),
+                                     textAlign: TextAlign.center,
+                                   ),
+                                 ),
+                               ),
                             );
                           },
                         ),
@@ -277,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                                  borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 2),
                                 ),
                               ),
                               validator: (value) {
@@ -311,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 focusedBorder: const OutlineInputBorder(
                                   borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                                  borderSide: BorderSide(color: Color(0xFFFF6B35), width: 2),
                                 ),
                               ),
                               validator: (value) {
@@ -387,14 +399,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     );
                                   },
-                                  child: const Text(
-                                    'Forgot Your Password?',
-                                    style: TextStyle(
-                                      color: Colors.deepPurple,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
+                                                                     child: const Text(
+                                     'Forgot Your Password?',
+                                                                           style: TextStyle(
+                                        color: Color(0xFFE65100),
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                   ),
                                 ),
                               ),
                            ],
@@ -421,15 +433,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            child: const Text(
-                              'Create Account',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.deepPurple,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
+                                                         child: const Text(
+                               'Create Account',
+                                                               style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFE65100),
+                                  decoration: TextDecoration.underline,
+                                ),
+                             ),
                           ),
                         ],
                       ),

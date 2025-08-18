@@ -910,7 +910,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Appointment Details'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -1088,7 +1099,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       children: [
                         Icon(
                           Icons.camera_alt,
-                          color: Colors.blue.shade700,
+                          color: const Color(0xFFF97316),
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -1130,7 +1141,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               children: [
                                 Icon(
                                   Icons.upload_file,
-                                  color: Colors.blue.shade700,
+                                  color: const Color(0xFFF97316),
                                   size: 32,
                                 ),
                                 const SizedBox(width: 16),
@@ -1177,7 +1188,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               children: [
                                 Icon(
                                   Icons.camera_alt,
-                                  color: Colors.blue.shade700,
+                                  color: const Color(0xFFF97316),
                                   size: 32,
                                 ),
                                 const SizedBox(width: 16),
@@ -1694,7 +1705,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     child: ElevatedButton(
                       onPressed: _isFormValid ? _submitForm : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
+                        backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -1758,7 +1769,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: const BorderSide(color: Color(0xFFF97316)),
             ),
             suffixIcon: hasDropdown
                 ? Icon(Icons.arrow_drop_down, color: Colors.grey[600])
@@ -1973,7 +1984,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 children: [
                   Icon(
                     Icons.camera_alt,
-                    color: Colors.blue.shade700,
+                    color: const Color(0xFFF97316),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -2015,7 +2026,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         children: [
                           Icon(
                             Icons.upload_file,
-                            color: Colors.blue.shade700,
+                            color: const Color(0xFFF97316),
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -2063,7 +2074,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         children: [
                           Icon(
                             Icons.camera_alt,
-                            color: Colors.blue.shade700,
+                            color: const Color(0xFFF97316),
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -2582,7 +2593,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                children: [
                  Icon(
                    Icons.location_on,
-                   color: Colors.deepPurple,
+                   color: const Color(0xFFF97316),
                    size: 20,
                  ),
                  const SizedBox(width: 12),
@@ -2854,7 +2865,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
              decoration: BoxDecoration(
                border: Border.all(
                  color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
-                     ? Colors.deepPurple
+                     ? const Color(0xFFF97316)
                      : Colors.grey[300]!,
                ),
                borderRadius: BorderRadius.circular(8),
@@ -2864,7 +2875,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                children: [
                  Icon(
                    Icons.person,
-                   color: Colors.deepPurple,
+                   color: const Color(0xFFF97316),
                    size: 20,
                  ),
                  const SizedBox(width: 12),
@@ -2974,7 +2985,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                padding: const EdgeInsets.all(20),
                child: Row(
                  children: [
-                   Icon(Icons.person, color: Colors.deepPurple, size: 24),
+                   Icon(Icons.person, color: const Color(0xFFF97316), size: 24),
                    const SizedBox(width: 12),
                    const Text(
                      'Select Secretary',
@@ -2998,21 +3009,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                    // None option at the top
                    ListTile(
                      leading: CircleAvatar(
-                       backgroundColor: _selectedSecretary == null ? Colors.deepPurple : Colors.grey[300],
+                       backgroundColor: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.grey[300],
                        child: Icon(
                          Icons.person_off,
                          color: _selectedSecretary == null ? Colors.white : Colors.grey[600],
                          size: 20,
                        ),
                      ),
-                     title: Text(
-                       'None - I am not in touch with any secretary',
-                       style: TextStyle(
-                         fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
-                         color: _selectedSecretary == null ? Colors.deepPurple : Colors.black87,
+                                            title: Text(
+                         'None - I am not in touch with any secretary',
+                         style: TextStyle(
+                           fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
+                           color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.black87,
+                         ),
                        ),
-                     ),
-                     trailing: _selectedSecretary == null ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+                       trailing: _selectedSecretary == null ? const Icon(Icons.check_circle, color: Color(0xFFF97316)) : null,
                      onTap: () {
                        setState(() {
                          _selectedSecretary = null;
@@ -3047,7 +3058,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                      
                      return ListTile(
                        leading: CircleAvatar(
-                         backgroundColor: isSelected ? Colors.deepPurple : Colors.grey[300],
+                         backgroundColor: isSelected ? const Color(0xFFF97316) : Colors.grey[300],
                          child: Text(
                            secretaryName.isNotEmpty ? secretaryName[0].toUpperCase() : '?',
                            style: TextStyle(
@@ -3060,10 +3071,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                          secretaryName,
                          style: TextStyle(
                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                           color: isSelected ? Colors.deepPurple : Colors.black87,
+                           color: isSelected ? const Color(0xFFF97316) : Colors.black87,
                          ),
                        ),
-                       trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+                       trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFFF97316)) : null,
                        onTap: () {
                          setState(() {
                            _selectedSecretary = secretary['id'];

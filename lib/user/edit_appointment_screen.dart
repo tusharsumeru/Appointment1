@@ -1056,7 +1056,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, color: Colors.deepPurple, size: 24),
+                    Icon(Icons.location_on, color: const Color(0xFFF97316), size: 24),
                     const SizedBox(width: 12),
                   const Text(
                       'Select Location',
@@ -1087,17 +1087,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           return ListTile(
                             leading: Icon(
                               Icons.location_on,
-                              color: isSelected ? Colors.deepPurple : Colors.grey[600],
+                              color: isSelected ? const Color(0xFFF97316) : Colors.grey[600],
                             ),
                             title: Text(
                               locationName,
                               style: TextStyle(
                                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                color: isSelected ? Colors.deepPurple : Colors.black87,
+                                color: isSelected ? const Color(0xFFF97316) : Colors.black87,
                               ),
                             ),
                             trailing: isSelected
-                                ? Icon(Icons.check, color: Colors.deepPurple)
+                                ? Icon(Icons.check, color: const Color(0xFFF97316))
                                 : null,
                             onTap: () {
                               setState(() {
@@ -1251,7 +1251,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  Icon(Icons.person, color: Colors.deepPurple, size: 24),
+                  Icon(Icons.person, color: const Color(0xFFF97316), size: 24),
                   const SizedBox(width: 12),
                   const Text(
                     'Select Secretary',
@@ -1276,17 +1276,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   ListTile(
                     leading: Icon(
                       Icons.person_off,
-                      color: _selectedSecretary == null ? Colors.deepPurple : Colors.grey[600],
+                      color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.grey[600],
                     ),
                     title: Text(
                       'None - I am not in touch with any secretary',
                       style: TextStyle(
                         fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
-                        color: _selectedSecretary == null ? Colors.deepPurple : Colors.black87,
+                        color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.black87,
                       ),
                     ),
                     trailing: _selectedSecretary == null
-                        ? Icon(Icons.check, color: Colors.deepPurple)
+                        ? Icon(Icons.check, color: const Color(0xFFF97316))
                         : null,
                     onTap: () {
                                   setState(() {
@@ -1307,17 +1307,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     return ListTile(
                       leading: Icon(
                         Icons.person,
-                        color: isSelected ? Colors.deepPurple : Colors.grey[600],
+                        color: isSelected ? const Color(0xFFF97316) : Colors.grey[600],
                       ),
                       title: Text(
                         secretaryName,
                         style: TextStyle(
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          color: isSelected ? Colors.deepPurple : Colors.black87,
+                          color: isSelected ? const Color(0xFFF97316) : Colors.black87,
                         ),
                       ),
                       trailing: isSelected
-                          ? Icon(Icons.check, color: Colors.deepPurple)
+                          ? Icon(Icons.check, color: const Color(0xFFF97316))
                           : null,
                       onTap: () {
                         setState(() {
@@ -1800,7 +1800,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
+                    color: const Color(0xFFF97316).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -1808,7 +1808,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.deepPurple,
+                      color: Color(0xFFF97316),
                     ),
                   ),
                 ),
@@ -1845,7 +1845,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 children: [
                   Icon(
                     Icons.camera_alt,
-                    color: Colors.blue.shade700,
+                    color: const Color(0xFFF97316),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -1887,7 +1887,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         children: [
                           Icon(
                             Icons.upload_file,
-                            color: Colors.blue.shade700,
+                            color: const Color(0xFFF97316),
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -1935,7 +1935,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         children: [
                           Icon(
                             Icons.camera_alt,
-                            color: Colors.blue.shade700,
+                            color: const Color(0xFFF97316),
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -2116,7 +2116,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       children: [
                                         Icon(
                                           Icons.upload_file,
-                                          color: Colors.blue[700],
+                                          color: const Color(0xFFF97316),
                                           size: 16,
                                         ),
                                         const SizedBox(width: 8),
@@ -2223,7 +2223,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Appointment'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -2450,11 +2461,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           // Guest Photo Section
         Row(
           children: [
-                              Icon(
+                                                            Icon(
                                 Icons.camera_alt,
-                                color: Colors.blue.shade700,
+                                color: const Color(0xFFF97316),
                                 size: 20,
-            ),
+                              ),
             const SizedBox(width: 8),
                               const Text(
                                 'Guest Photo',
@@ -2603,22 +2614,22 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             const SizedBox(height: 12),
                             Column(
                               children: [
-                                // Upload Different Photo
+                                                                // Upload Different Photo
                                 GestureDetector(
                                   onTap: () => _pickMainGuestImage(ImageSource.gallery),
-      child: Container(
+                                  child: Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
+                                    decoration: BoxDecoration(
                                       color: Colors.blue[50],
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(color: Colors.blue[200]!),
                                     ),
-          child: Row(
-            children: [
+                                    child: Row(
+                                      children: [
                                         Icon(
                                           Icons.upload_file,
-                                          color: Colors.blue[700],
+                                          color: const Color(0xFFF97316),
                                           size: 16,
                                         ),
                                         const SizedBox(width: 8),
@@ -2765,7 +2776,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         children: [
                                           Icon(
                                             Icons.upload_file,
-                                            color: Colors.blue[700],
+                                            color: const Color(0xFFF97316),
                                             size: 16,
                                           ),
                                           const SizedBox(width: 8),
@@ -2944,9 +2955,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     width: 48,
                                     height: 48,
                                     decoration: BoxDecoration(
-                                      color: Colors.deepPurple,
+                                      color: const Color(0xFFF97316),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.deepPurple),
+                                      border: Border.all(color: const Color(0xFFF97316)),
                                     ),
                                     child: const Icon(
                                       Icons.add,
@@ -3030,7 +3041,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           child: ElevatedButton(
                             onPressed: _isFormValid && !_isSaving ? _saveAppointment : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.deepPurple,
+                              backgroundColor: const Color(0xFFF97316),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),

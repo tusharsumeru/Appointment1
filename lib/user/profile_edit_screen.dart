@@ -347,7 +347,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -510,7 +521,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                      children: [
                                        Icon(
                                          Icons.upload_file,
-                                         color: Colors.blue.shade700,
+                                         color: const Color(0xFFF97316),
                                          size: 32,
                                        ),
                                        const SizedBox(width: 16),
@@ -558,7 +569,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                      children: [
                                        Icon(
                                          Icons.camera_alt,
-                                         color: Colors.blue.shade700,
+                                         color: const Color(0xFFF97316),
                                          size: 32,
                                        ),
                                        const SizedBox(width: 16),
@@ -922,7 +933,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.deepPurple),
+                                    borderSide: const BorderSide(color: Color(0xFFF97316)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 ),
@@ -1076,7 +1087,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _saveChanges,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: const Color(0xFFF97316),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -1128,12 +1139,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
-            color: Colors.deepPurple.withOpacity(0.1),
+            color: const Color(0xFFF97316).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8.0),
           ),
           child: Icon(
             icon,
-            color: Colors.deepPurple,
+            color: const Color(0xFFF97316),
             size: 20,
           ),
         ),
@@ -1178,7 +1189,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: const BorderSide(color: Color(0xFFF97316)),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
@@ -1354,7 +1365,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.deepPurple),
+                    borderSide: const BorderSide(color: Color(0xFFF97316)),
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),

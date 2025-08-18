@@ -47,14 +47,25 @@ class _GuardScreenState extends State<GuardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Guard Screen'),
-        backgroundColor: const Color(0xFF1a237e),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
       ),
       drawer: _buildDrawer(),
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1a237e)),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
               ),
             )
           : SingleChildScrollView(
@@ -67,9 +78,9 @@ class _GuardScreenState extends State<GuardScreen> {
                     padding: const EdgeInsets.all(20.0),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF1a237e), Color(0xFF3949ab)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFF97316), Color(0xFFEAB308)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
                       borderRadius: BorderRadius.circular(12.0),
                       boxShadow: [
@@ -285,9 +296,9 @@ class _GuardScreenState extends State<GuardScreen> {
             padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF1a237e), Color(0xFF3949ab)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                colors: [Color(0xFFF97316), Color(0xFFEAB308)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
             ),
             child: Column(
@@ -369,7 +380,7 @@ class _GuardScreenState extends State<GuardScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.dashboard,
-                    color: Color(0xFF1a237e),
+                    color: Color(0xFFF97316),
                   ),
                   title: const Text(
                     'Guard Dashboard',
@@ -378,7 +389,7 @@ class _GuardScreenState extends State<GuardScreen> {
                     ),
                   ),
                   selected: true,
-                  selectedTileColor: const Color(0xFF1a237e).withOpacity(0.1),
+                  selectedTileColor: const Color(0xFFF97316).withOpacity(0.1),
                   onTap: () {
                     Navigator.of(context).pop(); // Close drawer
                   },

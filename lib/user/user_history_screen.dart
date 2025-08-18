@@ -162,7 +162,18 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My History'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         leading: Builder(
           builder: (context) => IconButton(
@@ -367,7 +378,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
               child: ElevatedButton(
                 onPressed: isLoadingMore ? null : () => _loadMoreAppointments(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color(0xFFF97316),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
