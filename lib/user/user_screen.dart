@@ -15,7 +15,18 @@ class _UserScreenState extends State<UserScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Dashboard'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: Builder(
@@ -40,7 +51,7 @@ class _UserScreenState extends State<UserScreen> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+                  color: const Color(0xFFF97316),
                 ),
               ),
               const SizedBox(height: 40),
@@ -63,7 +74,7 @@ class _UserScreenState extends State<UserScreen> {
                     Icon(
                       Icons.home,
                       size: 48,
-                      color: Colors.deepPurple,
+                      color: const Color(0xFFF97316),
                     ),
                     SizedBox(height: 16),
                     Text(

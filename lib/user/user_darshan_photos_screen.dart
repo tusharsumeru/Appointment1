@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UserDarshanPhotosScreen extends StatefulWidget {
   final String personName;
@@ -90,91 +92,35 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
 
   Future<void> _downloadImage(String imageUrl, int photoNumber) async {
     try {
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Downloading image...'),
-              ],
-            ),
-          );
-        },
-      );
-
-      // Download the image
-      final response = await http.get(Uri.parse(imageUrl));
+      final Uri url = Uri.parse(imageUrl);
       
-      if (response.statusCode == 200) {
-        // Get the downloads directory
-        Directory? directory;
-        if (Platform.isAndroid) {
-          directory = await getExternalStorageDirectory();
-        } else {
-          directory = await getApplicationDocumentsDirectory();
-        }
-
-        if (directory != null) {
-          // Create filename with person name and photo number
-          final fileName = '${widget.personName.replaceAll(' ', '_')}_Photo_$photoNumber.jpg';
-          final filePath = '${directory.path}/$fileName';
-          
-          // Write the file
-          final file = File(filePath);
-          await file.writeAsBytes(response.bodyBytes);
-          
-          // Close loading dialog
-          Navigator.of(context).pop();
-          
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Image downloaded successfully!\nSaved as: $fileName'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        } else {
-          // Close loading dialog
-          Navigator.of(context).pop();
-          
-          // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to access storage directory'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      // Try to open in browser directly
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
-        // Close loading dialog
-        Navigator.of(context).pop();
-        
-        // Show error message
+        // If canLaunchUrl returns false, try anyway with external application
+        try {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          // If that fails, try platform default
+          try {
+            await launchUrl(url, mode: LaunchMode.platformDefault);
+          } catch (e) {
+            // Final fallback: in-app web view
+            await launchUrl(url, mode: LaunchMode.inAppWebView);
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to download image'),
+          SnackBar(
+            content: Text('Error opening image: $e'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
       }
-    } catch (e) {
-      // Close loading dialog if it's open
-      Navigator.of(context).pop();
-      
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error downloading image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 

@@ -350,7 +350,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               ? null
                               : _handleTeacherVerification,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
+                            backgroundColor: const Color(0xFFF97316),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -433,7 +433,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+              borderSide: BorderSide(color: Color(0xFFF97316), width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -560,7 +560,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                    borderSide: BorderSide(color: Color(0xFFF97316), width: 2),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,

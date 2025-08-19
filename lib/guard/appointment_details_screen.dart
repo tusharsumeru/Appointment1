@@ -621,7 +621,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFF1a237e).withOpacity(0.3),
+                  color: const Color(0xFFF97316).withOpacity(0.3),
                   width: 2,
                 ),
                 boxShadow: [
@@ -644,35 +644,35 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           return Container(
-                            color: const Color(0xFF1a237e).withOpacity(0.1),
+                            color: const Color(0xFFF97316).withOpacity(0.1),
                             child: Center(
                               child: CircularProgressIndicator(
                                 value: loadingProgress.expectedTotalBytes != null
                                     ? loadingProgress.cumulativeBytesLoaded / 
                                       loadingProgress.expectedTotalBytes!
                                     : null,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1a237e)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
                               ),
                             ),
                           );
                         },
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
-                            color: const Color(0xFF1a237e).withOpacity(0.1),
+                            color: const Color(0xFFF97316).withOpacity(0.1),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Icon(
                                   Icons.person,
                                   size: 100,
-                                  color: Color(0xFF1a237e),
+                                  color: Color(0xFFF97316),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Image not available',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: const Color(0xFF1a237e).withOpacity(0.7),
+                                    color: const Color(0xFFF97316).withOpacity(0.7),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -682,21 +682,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         },
                       )
                     : Container(
-                        color: const Color(0xFF1a237e).withOpacity(0.1),
+                        color: const Color(0xFFF97316).withOpacity(0.1),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(
                               Icons.person,
                               size: 100,
-                              color: Color(0xFF1a237e),
+                              color: Color(0xFFF97316),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'No profile photo',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: const Color(0xFF1a237e).withOpacity(0.7),
+                                color: const Color(0xFFF97316).withOpacity(0.7),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -819,7 +819,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Appointment Details'),
-        backgroundColor: const Color(0xFF1a237e),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -831,7 +842,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1a237e)),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
               ),
             )
           : errorMessage != null
@@ -880,9 +891,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF1a237e), Color(0xFF3949ab)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFF97316), Color(0xFFEAB308)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
                           ),
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [

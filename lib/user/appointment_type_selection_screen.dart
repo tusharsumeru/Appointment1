@@ -43,7 +43,18 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
     return Scaffold(
       appBar: AppBar(
         title: const Text('Appointment Type'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: Builder(
@@ -112,7 +123,7 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
                     child: ElevatedButton(
                       onPressed: _selectedAppointmentType != null ? _continueToRequestAppointment : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
+                        backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(

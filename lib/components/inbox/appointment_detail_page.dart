@@ -2363,12 +2363,20 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
             _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.assignment_ind),
+            // Show attachment if exists
+            if (_getAttachmentUrl().isNotEmpty) ...[
+              _buildMainCardDetailRowWithAttachment('Attachment', _getAttachmentFilename(), Icons.attach_file),
+            ],
           ] else ...[
             // Show original details for other screens
             _buildMainCardDetailRowWithCopy('Appoitnment ID', _getAppointmentId(), Icons.tag),
             _buildMainCardDetailRow('Req. Dates', _getDateRange(), Icons.calendar_today),
             _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
             _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
+            // Show attachment if exists
+            if (_getAttachmentUrl().isNotEmpty) ...[
+              _buildMainCardDetailRowWithAttachment('Attachment', _getAttachmentFilename(), Icons.attach_file),
+            ],
           ],
           
 
@@ -3626,6 +3634,71 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
+  Widget _buildMainCardDetailRowWithAttachment(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: _openAttachment,
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.blue[50]!.withOpacity(0.5),
+                      Colors.indigo[50]!.withOpacity(0.3),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue[100]!.withOpacity(0.4),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View Attachment',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.open_in_new,
+                      size: 12,
+                      color: Colors.blue[600],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Copy to clipboard method
   Future<void> _copyToClipboard(String text) async {
     try {
@@ -3645,6 +3718,33 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to copy: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // Copy attachment URL to clipboard method
+  Future<void> _copyAttachmentUrlToClipboard(String url) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Attachment URL copied to clipboard'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to copy URL: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 2),
           ),
@@ -4284,5 +4384,196 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ),
       );
     }
+  }
+
+  // Helper method to get attachment URL
+  String _getAttachmentUrl() {
+    return widget.appointment['appointmentAttachment']?.toString() ?? '';
+  }
+
+  // Helper method to get attachment filename
+  String _getAttachmentFilename() {
+    final attachmentUrl = _getAttachmentUrl();
+    if (attachmentUrl.isNotEmpty) {
+      // Extract filename from URL
+      final uri = Uri.parse(attachmentUrl);
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        return pathSegments.last;
+      }
+    }
+    return 'Attachment';
+  }
+
+  // Helper method to get file extension
+  String _getFileExtension() {
+    final filename = _getAttachmentFilename();
+    if (filename.contains('.')) {
+      return filename.split('.').last.toLowerCase();
+    }
+    return '';
+  }
+
+  // Helper method to get file icon based on extension
+  IconData _getFileIcon() {
+    final extension = _getFileExtension();
+    switch (extension) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'xls':
+      case 'xlsx':
+        return Icons.table_chart;
+      case 'ppt':
+      case 'pptx':
+        return Icons.slideshow;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return Icons.image;
+      case 'txt':
+        return Icons.text_snippet;
+      default:
+        return Icons.attach_file;
+    }
+  }
+
+  // Helper method to get file type color
+  Color _getFileColor() {
+    final extension = _getFileExtension();
+    switch (extension) {
+      case 'pdf':
+        return Colors.red;
+      case 'doc':
+      case 'docx':
+        return Colors.blue;
+      case 'xls':
+      case 'xlsx':
+        return Colors.green;
+      case 'ppt':
+      case 'pptx':
+        return Colors.orange;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return Colors.purple;
+      case 'txt':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Method to open attachment
+  Future<void> _openAttachment() async {
+    final attachmentUrl = _getAttachmentUrl();
+    if (attachmentUrl.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No attachment available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final Uri url = Uri.parse(attachmentUrl);
+      
+      // Try to open in browser directly
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // If canLaunchUrl returns false, try anyway with external application
+        try {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          // If that fails, try platform default
+          try {
+            await launchUrl(url, mode: LaunchMode.platformDefault);
+          } catch (e) {
+            // Final fallback: in-app web view
+            await launchUrl(url, mode: LaunchMode.inAppWebView);
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening attachment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Build attachment section
+  Widget _buildAttachmentSection() {
+    final attachmentUrl = _getAttachmentUrl();
+    
+    if (attachmentUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: InkWell(
+        onTap: _openAttachment,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.blue[50]!.withOpacity(0.5),
+                Colors.indigo[50]!.withOpacity(0.3),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.blue[100]!.withOpacity(0.4),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.attach_file,
+                color: Colors.blue[600],
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'View Attachment',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue[700],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.open_in_new,
+                color: Colors.blue[600],
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

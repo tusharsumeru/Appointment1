@@ -116,7 +116,16 @@ class _UserSidebarState extends State<UserSidebar> {
         children: [
           // Header
           Container(
-            decoration: const BoxDecoration(color: Colors.deepPurple),
+            decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFF97316), // Orange
+              Color(0xFFEAB308), // Yellow
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
             padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,7 +142,7 @@ class _UserSidebarState extends State<UserSidebar> {
                       ? const Icon(
                           Icons.person,
                           size: 30,
-                          color: Colors.deepPurple,
+                          color: const Color(0xFFF97316),
                         )
                       : null,
                 ),
@@ -172,7 +181,7 @@ class _UserSidebarState extends State<UserSidebar> {
 
           // Navigation Items
           ListTile(
-            leading: const Icon(Icons.add_circle_outline, color: Colors.deepPurple),
+                            leading: const Icon(Icons.add_circle_outline, color: Color(0xFFF97316)),
             title: const Text('Request Appointment'),
             onTap: () {
               Navigator.pop(context); // Close drawer
@@ -186,7 +195,7 @@ class _UserSidebarState extends State<UserSidebar> {
           ),
 
           ListTile(
-            leading: const Icon(Icons.history, color: Colors.deepPurple),
+                            leading: const Icon(Icons.history, color: Color(0xFFF97316)),
             title: const Text('My History'),
             onTap: () {
               Navigator.pop(context); // Close drawer
@@ -200,7 +209,7 @@ class _UserSidebarState extends State<UserSidebar> {
           ),
 
           ListTile(
-            leading: const Icon(Icons.person_outline, color: Colors.deepPurple),
+                            leading: const Icon(Icons.person_outline, color: Color(0xFFF97316)),
             title: const Text('Profile'),
             onTap: () {
               Navigator.pop(context); // Close drawer

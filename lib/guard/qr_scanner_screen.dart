@@ -20,7 +20,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('QR Scanner'),
-        backgroundColor: const Color(0xFF1a237e),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -94,7 +105,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               onPressed: () async {
                 await controller.toggleTorch();
               },
-              backgroundColor: const Color(0xFF1a237e),
+              backgroundColor: const Color(0xFFF97316),
               child: const Icon(Icons.flash_on, color: Colors.white),
             ),
           ),

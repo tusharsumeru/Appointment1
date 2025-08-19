@@ -388,7 +388,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -542,167 +553,157 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
+                          
+                                                     // Photo Upload Options
+                           Column(
+                             children: [
+                               // Upload from Device Card
+                               GestureDetector(
+                                 onTap: () => _pickImage(ImageSource.gallery),
+                                 child: Container(
+                                   width: double.infinity,
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     border: Border.all(color: Colors.grey.shade300),
+                                     borderRadius: BorderRadius.circular(12),
+                                     color: Colors.white,
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       Icon(
+                                         Icons.upload_file,
+                                         color: const Color(0xFFF97316),
+                                         size: 32,
+                                       ),
+                                       const SizedBox(width: 16),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Upload from Device',
+                                               style: TextStyle(
+                                                 fontSize: 16,
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.black87,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 4),
+                                             Text(
+                                               'Choose an existing photo',
+                                               style: TextStyle(
+                                                 fontSize: 14,
+                                                 color: Colors.grey.shade600,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                               const SizedBox(height: 12),
+                               
+                               // Take Photo Card
+                               GestureDetector(
+                                 onTap: () => _pickImage(ImageSource.camera),
+                                 child: Container(
+                                   width: double.infinity,
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     border: Border.all(color: Colors.grey.shade300),
+                                     borderRadius: BorderRadius.circular(12),
+                                     color: Colors.white,
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       Icon(
+                                         Icons.camera_alt,
+                                         color: const Color(0xFFF97316),
+                                         size: 32,
+                                       ),
+                                       const SizedBox(width: 16),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Take Photo',
+                                               style: TextStyle(
+                                                 fontSize: 16,
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.black87,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 4),
+                                             Text(
+                                               'Use your device camera',
+                                               style: TextStyle(
+                                                 fontSize: 14,
+                                                 color: Colors.grey.shade600,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                               
+                               // Show upload status
+                               if (_isUploadingPhoto) ...[
+                                 const SizedBox(height: 16),
+                                 Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: Colors.blue[50],
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(color: Colors.blue[200]!),
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       SizedBox(
+                                         width: 20,
+                                         height: 20,
+                                         child: CircularProgressIndicator(
+                                           strokeWidth: 2,
+                                           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             const Text(
+                                               'Uploading and validating photo...',
+                                               style: TextStyle(
+                                                 fontWeight: FontWeight.w600,
+                                                 color: Colors.blue,
+                                                 fontSize: 14,
+                                               ),
+                                             ),
+                                             const SizedBox(height: 2),
+                                             Text(
+                                               'Please wait',
+                                               style: TextStyle(
+                                                 fontSize: 12,
+                                                 color: Colors.grey[600],
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
+                               
 
-                          // Photo Upload Options
-                          Column(
-                            children: [
-                              // Upload from Device Card
-                              GestureDetector(
-                                onTap: () => _pickImage(ImageSource.gallery),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.upload_file,
-                                        color: Colors.blue.shade700,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Upload from Device',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Choose an existing photo',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-
-                              // Take Photo Card
-                              GestureDetector(
-                                onTap: () => _pickImage(ImageSource.camera),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.blue.shade700,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Take Photo',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Use your device camera',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              // Show upload status
-                              if (_isUploadingPhoto) ...[
-                                const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue[50],
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.blue[200]!,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                Colors.blue[600]!,
-                                              ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Uploading and validating photo...',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.blue,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Please wait',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                             ],
+                           ),
                         ],
                       ),
                     ),
@@ -978,9 +979,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Colors.deepPurple,
-                                    ),
+                                    borderSide: const BorderSide(color: Color(0xFFF97316)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1138,7 +1137,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _saveChanges,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: const Color(0xFFF97316),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -1192,10 +1191,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
-            color: Colors.deepPurple.withOpacity(0.1),
+            color: const Color(0xFFF97316).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8.0),
           ),
-          child: Icon(icon, color: Colors.deepPurple, size: 20),
+          child: Icon(
+            icon,
+            color: const Color(0xFFF97316),
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
         Text(
@@ -1238,7 +1241,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: const BorderSide(color: Color(0xFFF97316)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -1426,7 +1429,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.deepPurple),
+                    borderSide: const BorderSide(color: Color(0xFFF97316)),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,

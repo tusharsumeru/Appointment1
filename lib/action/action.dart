@@ -248,6 +248,62 @@ class ActionService {
     }
   }
 
+  // Forgot password
+  static Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+  }) async {
+    try {
+      // Validate input
+      if (email.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please enter your email address to continue.',
+        };
+      }
+
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+      };
+
+      // Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Successful password reset request
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 
+              '📧 Password reset link sent to your email! Please check your inbox (and spam folder) for instructions.',
+        };
+      } else {
+        // Error response
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 
+              'Failed to send password reset link. Please try again.',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // Get current user data
   static Future<Map<String, dynamic>> getCurrentUser() async {
     try {
@@ -4127,40 +4183,103 @@ class ActionService {
       });
 
       print('DEBUG API: Clean update data: $cleanUpdateData');
+      print('DEBUG API: Has attachment file: ${attachmentFile != null}');
+      print('DEBUG API: Attachment file name: ${attachmentFile?.name}');
+      print('DEBUG API: Attachment file path: ${attachmentFile?.path}');
+      print('DEBUG API: Attachment file size: ${attachmentFile?.size}');
 
-      // Try JSON request instead of multipart for now
       final uri = Uri.parse('$baseUrl/appointment/$appointmentId/enhanced');
 
-      final response = await http.put(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(cleanUpdateData),
-      );
-
-      print('DEBUG API: Response status code: ${response.statusCode}');
-      print('DEBUG API: Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return {
-          'success': true,
-          'statusCode': 200,
-          'data': data['data'],
-          'message': data['message'] ?? 'Appointment updated successfully',
-        };
+      // If there's an attachment file, use multipart request
+      if (attachmentFile != null && attachmentFile.path != null) {
+        print('DEBUG API: Using multipart request with attachment');
+        
+        // Create multipart request
+        final request = http.MultipartRequest('PUT', uri);
+        
+        // Add authorization header
+        request.headers['Authorization'] = 'Bearer $token';
+        
+        // Add JSON data fields directly
+        cleanUpdateData.forEach((key, value) {
+          if (value is Map || value is List) {
+            request.fields[key] = jsonEncode(value);
+          } else {
+            request.fields[key] = value.toString();
+          }
+        });
+        
+        // Add file - use the field name that multer expects
+        final file = await http.MultipartFile.fromPath(
+          'appointmentAttachment', // This should match the multer field name
+          attachmentFile.path!,
+          filename: attachmentFile.name,
+        );
+        request.files.add(file);
+        
+        print('DEBUG API: Sending multipart request with file: ${attachmentFile.name}');
+        print('DEBUG API: File field name: appointmentAttachment');
+        print('DEBUG API: Form fields: ${request.fields}');
+        
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        
+        print('DEBUG API: Multipart response status code: ${response.statusCode}');
+        print('DEBUG API: Multipart response body: ${response.body}');
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return {
+            'success': true,
+            'statusCode': 200,
+            'data': data['data'],
+            'message': data['message'] ?? 'Appointment updated successfully',
+          };
+        } else {
+          final errorData = jsonDecode(response.body);
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'message': errorData['message'] ?? 'Failed to update appointment',
+            'error': errorData['error'],
+          };
+        }
       } else {
-        final errorData = jsonDecode(response.body);
-        return {
-          'success': false,
-          'statusCode': response.statusCode,
-          'message': errorData['message'] ?? 'Failed to update appointment',
-          'error': errorData['error'],
-        };
+        // No attachment file, use JSON request
+        print('DEBUG API: Using JSON request without attachment');
+        
+        final response = await http.put(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(cleanUpdateData),
+        );
+
+        print('DEBUG API: JSON response status code: ${response.statusCode}');
+        print('DEBUG API: JSON response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return {
+            'success': true,
+            'statusCode': 200,
+            'data': data['data'],
+            'message': data['message'] ?? 'Appointment updated successfully',
+          };
+        } else {
+          final errorData = jsonDecode(response.body);
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'message': errorData['message'] ?? 'Failed to update appointment',
+            'error': errorData['error'],
+          };
+        }
       }
     } catch (error) {
+      print('DEBUG API: Error in updateAppointmentEnhanced: $error');
       return {
         'success': false,
         'statusCode': 500,

@@ -469,16 +469,16 @@ class UserAppointmentCard extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: (headerColor ?? Colors.deepPurple).withOpacity(0.1),
+                        color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: (headerColor ?? Colors.deepPurple).withOpacity(0.3)),
+                        border: Border.all(color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.description,
                             size: 20,
-                            color: headerColor ?? Colors.deepPurple,
+                            color: headerColor ?? const Color(0xFFF97316),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -491,7 +491,7 @@ class UserAppointmentCard extends StatelessWidget {
                                       'Purpose of Meeting',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: headerColor ?? Colors.deepPurple,
+                                        color: headerColor ?? const Color(0xFFF97316),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -502,7 +502,7 @@ class UserAppointmentCard extends StatelessWidget {
                                   purpose,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: (headerColor ?? Colors.deepPurple).withOpacity(0.8),
+                                    color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.8),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -583,7 +583,7 @@ class UserAppointmentCard extends StatelessWidget {
                              style: ElevatedButton.styleFrom(
                                backgroundColor: _isScheduled() 
                                    ? Colors.grey.shade400 
-                                   : (headerColor ?? Colors.deepPurple),
+                                   : (headerColor ?? const Color(0xFFF97316)),
                                foregroundColor: Colors.white,
                                padding: const EdgeInsets.symmetric(vertical: 16),
                                shape: RoundedRectangleBorder(

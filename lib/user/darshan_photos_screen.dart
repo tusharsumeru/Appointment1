@@ -541,7 +541,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'View and manage your darshan photos with Gurudev',
+                'Click on a person above to view their darshan photos',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -619,15 +619,15 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                 const SizedBox(height: 32),
               ],
 
-              // Matched Darshan Photos Section
-              const Text(
-                'Matched Darshan Photos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
+              // // Matched Darshan Photos Section
+              // const Text(
+              //   'Matched Darshan Photos',
+              //   style: TextStyle(
+              //     fontSize: 20,
+              //     fontWeight: FontWeight.w600,
+              //     color: Colors.black87,
+              //   ),
+              // ),
               const SizedBox(height: 16),
 
               if (isLoading)
@@ -661,30 +661,8 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                   ),
                 )
               else
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.person_search,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Click on a person above to view their darshan photos',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const SizedBox.shrink(),
+
             ],
           ),
         ),

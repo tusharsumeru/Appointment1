@@ -227,7 +227,18 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('$_appointmentTypeText'),
-        backgroundColor: Colors.deepPurple,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFF97316), // Orange
+                Color(0xFFEAB308), // Yellow
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -244,7 +255,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
                   ),
                   SizedBox(height: 16),
                   Text(
@@ -431,7 +442,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                     child: ElevatedButton(
                       onPressed: _showSuccessAndNavigate, // FIXED: Always enabled for testing
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
+                        backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(

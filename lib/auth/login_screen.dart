@@ -8,6 +8,7 @@ import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
 import 'notification_setup_screen.dart';
+import '../user/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -219,17 +220,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Center(
-                                child: Text(
-                                  'THE ART OF LIVING',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.deepPurple,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
+                                                             child: Center(
+                                 child: Container(
+                                   decoration: const BoxDecoration(
+                                     gradient: LinearGradient(
+                                       colors: [
+                                         Color(0xFFFF6B35), // Orange
+                                         Color(0xFFFFD93D), // Yellow
+                                       ],
+                                       begin: Alignment.centerLeft,
+                                       end: Alignment.centerRight,
+                                     ),
+                                   ),
+                                   child: const Text(
+                                     'THE ART OF LIVING',
+                                     style: TextStyle(
+                                       fontSize: 18,
+                                       fontWeight: FontWeight.bold,
+                                       color: Colors.white,
+                                     ),
+                                     textAlign: TextAlign.center,
+                                   ),
+                                 ),
+                               ),
                             );
                           },
                         ),
@@ -279,8 +292,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(12),
                                   ),
-                                  borderSide: BorderSide(
-                                    color: Colors.deepPurple,
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFFF6B35),
                                     width: 2,
                                   ),
                                 ),
@@ -325,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     Radius.circular(12),
                                   ),
                                   borderSide: BorderSide(
-                                    color: Colors.deepPurple,
+                                    color: Color(0xFFFF6B35),
                                     width: 2,
                                   ),
                                 ),
@@ -342,94 +355,80 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 24),
 
-                            // Login Button
-                            Container(
-                              height: 56, // h-14 equivalent
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFF97316),
-                                    Color(0xFFEAB308),
-                                  ], // orange-500 to yellow-500
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  12,
-                                ), // rounded-xl equivalent
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: _isLoading ? null : _handleLogin,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    child: Center(
-                                      child: _isLoading
-                                          ? const SizedBox(
-                                              height: 20,
-                                              width: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                      Color
-                                                    >(Colors.white),
-                                              ),
-                                            )
-                                          : const Text(
-                                              'Login',
-                                              style: TextStyle(
-                                                fontSize:
-                                                    18, // text-lg equivalent
-                                                fontWeight: FontWeight
-                                                    .w600, // font-semibold equivalent
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.center,
-                              child: TextButton(
-                                onPressed: () {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Forgot Password coming soon.',
+                             // Login Button
+                             Container(
+                               height: 56, // h-14 equivalent
+                               decoration: BoxDecoration(
+                                 gradient: const LinearGradient(
+                                   colors: [Color(0xFFF97316), Color(0xFFEAB308)], // orange-500 to yellow-500
+                                   begin: Alignment.centerLeft,
+                                   end: Alignment.centerRight,
+                                 ),
+                                 borderRadius: BorderRadius.circular(12), // rounded-xl equivalent
+                                 boxShadow: [
+                                   BoxShadow(
+                                     color: Colors.black.withOpacity(0.1),
+                                     blurRadius: 8,
+                                     offset: const Offset(0, 4),
+                                   ),
+                                 ],
+                               ),
+                               child: Material(
+                                 color: Colors.transparent,
+                                 child: InkWell(
+                                   onTap: _isLoading ? null : _handleLogin,
+                                   borderRadius: BorderRadius.circular(12),
+                                   child: Container(
+                                     padding: const EdgeInsets.symmetric(vertical: 16),
+                                     child: Center(
+                                       child: _isLoading
+                                           ? const SizedBox(
+                                               height: 20,
+                                               width: 20,
+                                               child: CircularProgressIndicator(
+                                                 strokeWidth: 2,
+                                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                               ),
+                                             )
+                                           : const Text(
+                                               'Login',
+                                               style: TextStyle(
+                                                 fontSize: 18, // text-lg equivalent
+                                                 fontWeight: FontWeight.w600, // font-semibold equivalent
+                                                 color: Colors.white,
+                                               ),
+                                             ),
+                                     ),
+                                   ),
+                                 ),
+                               ),
+                             ),
+                              const SizedBox(height: 12),
+                              // Forgot Password Button
+                              Align(
+                                alignment: Alignment.center,
+                                child: TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const ForgotPasswordScreen(),
                                       ),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                child: const Text(
-                                  'Forgot Password?',
-                                  style: TextStyle(
-                                    color: Colors.deepPurple,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.underline,
-                                  ),
+                                    );
+                                  },
+                                                                     child: const Text(
+                                     'Forgot Your Password?',
+                                                                           style: TextStyle(
+                                        color: Color(0xFFE65100),
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                           ],
+                         ),
+                       ),
                       const SizedBox(height: 16),
 
                       // Create Account Text
@@ -448,29 +447,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            child: const Text(
-                              'Create Account',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.deepPurple,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
+                                                         child: const Text(
+                               'Create Account',
+                                                               style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFE65100),
+                                  decoration: TextDecoration.underline,
+                                ),
+                             ),
                           ),
                         ],
                       ),
-
-                      // Forgot Password
-                      // TextButton(
-                      //   onPressed: () {
-                      //     // TODO: Navigate to forgot password page
-                      //   },
-                      //   child: const Text(
-                      //     'Forgot Password?',
-                      //     style: TextStyle(color: Colors.deepPurple),
-                      //   ),
-                      // ),
                     ],
                   ),
                 ),
