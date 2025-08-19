@@ -19,8 +19,8 @@ class StorageService {
   static const String _fcmTokenKey = 'fcm_token';
 
   // Get API URL from ActionService
-  static String getApiUrl() {
-    return ActionService.baseUrl;
+  static Future<String> getApiUrl() async {
+    return await ActionService.baseUrl;
   }
 
   // Save authentication token

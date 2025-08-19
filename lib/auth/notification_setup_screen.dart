@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../main/home_screen.dart';
 import '../main/inbox_screen.dart';
 import '../user/user_screen.dart';
+import '../user/user_history_screen.dart';
 import '../guard/guard_screen.dart';
 import '../action/action.dart';
 
@@ -234,7 +235,7 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
       );
     } else {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const UserScreen()),
+        MaterialPageRoute(builder: (context) => const UserHistoryScreen()),
         (route) => false,
       );
     }

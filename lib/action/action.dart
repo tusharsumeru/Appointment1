@@ -10,9 +10,79 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 import '../services/notification_service.dart'; // Added import for NotificationService
 
 class ActionService {
-  static const String baseUrl =
-      // API base URL
-      'https://18e6c97e062d.ngrok-free.app/api/v3'; // API base URL
+  // Global base URL variable
+  static String? _baseUrl;
+  
+  // Initialize base URL (call this once at app startup)
+  static Future<void> initializeBaseUrl() async {
+    try {
+      print('🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl');
+      
+      final response = await http.get(
+        Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      print('🌐 [DEBUG] Base URL API Status Code: ${response.statusCode}');
+      print('🌐 [DEBUG] Base URL API Response: ${response.body}');
+      
+      if (response.statusCode != 200) {
+        print('❌ [ERROR] Base URL API failed with status: ${response.statusCode}');
+        throw Exception('Failed to fetch base URL: HTTP ${response.statusCode}');
+      }
+      
+      final data = jsonDecode(response.body);
+      final baseUrl = data['url'];
+      _baseUrl = '$baseUrl/api/v3';
+      
+      print('✅ [DEBUG] Retrieved base URL: $baseUrl');
+      print('✅ [DEBUG] Full API URL: $_baseUrl');
+    } catch (error) {
+      print('❌ [ERROR] Failed to fetch base URL: $error');
+      throw Exception('Failed to fetch base URL: $error');
+    }
+  }
+
+  // Global getter for base URL
+  static String get baseUrl {
+    if (_baseUrl == null) {
+      throw Exception('Base URL not initialized! Call ActionService.initializeBaseUrl() first.');
+    }
+    return _baseUrl!;
+  }
+
+  // Dynamic base URL fetched from database (deprecated - use initializeBaseUrl instead)
+  static Future<String> get _oldBaseUrl async {
+    try {
+      print('🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl');
+      
+      final response = await http.get(
+        Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      print('🌐 [DEBUG] Base URL API Status Code: ${response.statusCode}');
+      print('🌐 [DEBUG] Base URL API Response: ${response.body}');
+      
+      if (response.statusCode != 200) {
+        print('❌ [ERROR] Base URL API failed with status: ${response.statusCode}');
+        // Fallback to hardcoded URL if API fails
+        return 'https://aptdev.sumerudigital.com/api/v3';
+      }
+      
+      final data = jsonDecode(response.body);
+      final baseUrl = data['url'];
+      final fullUrl = '$baseUrl/api/v3';
+      
+      print('✅ [DEBUG] Retrieved base URL: $baseUrl');
+      print('✅ [DEBUG] Full API URL: $fullUrl');
+      return fullUrl;
+    } catch (error) {
+      print('❌ [ERROR] Failed to fetch base URL: $error');
+      // Fallback to hardcoded URL if there's an error
+      return 'https://aptdev.sumerudigital.com/api/v3';
+    }
+  }
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -5234,6 +5304,10 @@ class ActionService {
       });
 
       // Handle userTags as array - send as both userTags and additionalRoles
+      // Always send userTags field, even when empty, to clear existing roles if needed
+      print('📤 userTags received: $userTags (length: ${userTags.length})');
+      print('📤 userTags is empty: ${userTags.isEmpty}');
+
       if (userTags.isNotEmpty) {
         // Send userTags using indexed keys to ensure all values are sent
         for (int i = 0; i < userTags.length; i++) {
@@ -5245,6 +5319,15 @@ class ActionService {
         }
         print('📤 Sending userTags as indexed array: $userTags');
         print('📤 Also sending as additionalRoles: $userTags');
+      } else {
+        // Send 'none' to indicate no roles selected (clear existing roles)
+        request.fields['userTags'] = 'No Roles selected';
+        request.fields['additionalRoles'] = 'No Roles selected';
+        print('📤 Sending "none" for userTags to indicate no roles selected');
+        print(
+          '📤 Also sending "none" for additionalRoles to indicate no roles selected',
+        );
+        print('📤 This should tell the backend to remove all existing roles');
       }
 
       // Add S3 URL if present (no file upload needed)

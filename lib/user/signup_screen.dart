@@ -17,18 +17,18 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Personal Information Controllers
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   // Professional Details Controllers
   final _designationController = TextEditingController();
   final _companyController = TextEditingController();
   final _locationController = TextEditingController();
-  
+
   // State Variables
   bool _isPasswordVisible = false;
   bool _isLoading = false;
@@ -36,17 +36,17 @@ class _SignupScreenState extends State<SignupScreen> {
   Set<String> _selectedRoles = {};
   String _selectedCountryCode = '+91';
   String _selectedCountryFlag = '🇮🇳';
-  
+
   // Location variables
   List<String> _locationSuggestions = [];
   bool _isLoadingLocations = false;
   Timer? _locationDebounceTimer;
-  
+
   // Image picker
   final ImagePicker _imagePicker = ImagePicker();
   File? _selectedImageFile;
   String? _selectedImagePath;
-  
+
   // Teacher verification
   final _teacherCodeController = TextEditingController();
   final _teacherEmailController = TextEditingController();
@@ -56,7 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isValidatingTeacher = false;
   bool _isTeacherVerified = false;
   Map<String, dynamic>? _teacherVerificationData;
-  
+
   @override
   void dispose() {
     _fullNameController.dispose();
@@ -90,7 +90,9 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       // Using OpenStreetMap Nominatim API
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
+        ),
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'AppointmentApp/1.0', // Required by Nominatim
@@ -100,14 +102,14 @@ class _SignupScreenState extends State<SignupScreen> {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         final List<String> suggestions = [];
-        
+
         for (var place in data) {
           final displayName = place['display_name'] as String?;
           if (displayName != null) {
             suggestions.add(displayName);
           }
         }
-        
+
         setState(() {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
@@ -121,7 +123,7 @@ class _SignupScreenState extends State<SignupScreen> {
           '$query, Sydney, Australia',
           '$query, Toronto, Canada',
         ];
-        
+
         setState(() {
           _locationSuggestions = suggestions;
           _isLoadingLocations = false;
@@ -136,7 +138,7 @@ class _SignupScreenState extends State<SignupScreen> {
         '$query, Sydney, Australia',
         '$query, Toronto, Canada',
       ];
-      
+
       setState(() {
         _locationSuggestions = suggestions;
         _isLoadingLocations = false;
@@ -147,7 +149,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void _onLocationChanged(String value) {
     // Cancel previous timer
     _locationDebounceTimer?.cancel();
-    
+
     // Set new timer for debouncing
     _locationDebounceTimer = Timer(const Duration(milliseconds: 500), () {
       _fetchLocations(value);
@@ -163,7 +165,7 @@ class _SignupScreenState extends State<SignupScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
@@ -189,7 +191,7 @@ class _SignupScreenState extends State<SignupScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
@@ -295,7 +297,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ],
             ),
           ),
-          
+
           // Form Content
           Flexible(
             child: SingleChildScrollView(
@@ -311,7 +313,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     isRequired: true,
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Teacher Email
                   _buildTeacherTextField(
                     controller: _teacherEmailController,
@@ -321,11 +323,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     isRequired: true,
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Teacher Phone Number
                   _buildTeacherPhoneField(),
                   const SizedBox(height: 24),
-                  
+
                   // Action Buttons
                   Row(
                     children: [
@@ -344,7 +346,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isValidatingTeacher ? null : _handleTeacherVerification,
+                          onPressed: _isValidatingTeacher
+                              ? null
+                              : _handleTeacherVerification,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepPurple,
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -358,7 +362,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                   width: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : const Text('Verify'),
@@ -429,7 +435,10 @@ class _SignupScreenState extends State<SignupScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.deepPurple, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
         ),
       ],
@@ -453,10 +462,7 @@ class _SignupScreenState extends State<SignupScreen> {
             SizedBox(width: 4),
             Text(
               '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -472,7 +478,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   countryListTheme: CountryListThemeData(
                     flagSize: 25,
                     backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
                     bottomSheetHeight: 500,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(20.0),
@@ -522,7 +531,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 20),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -549,7 +562,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.deepPurple, width: 2),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
@@ -591,8 +607,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       // Prepare teacher phone number
-      final teacherPhoneNumber = '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
-      
+      final teacherPhoneNumber =
+          '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
+
       // Call AOL teacher validation API
       final result = await ActionService.validateAolTeacher(
         teacherCode: _teacherCodeController.text.trim(),
@@ -607,20 +624,24 @@ class _SignupScreenState extends State<SignupScreen> {
       if (result['success']) {
         // Validation successful
         Navigator.of(context).pop();
-        
+
         // Store verification data and update state
         print('🔍 Teacher verification result: $result');
         print('🔍 Teacher verification data: ${result['data']}');
-        
+
         setState(() {
-          _selectedTeacherType = _selectedTeacherType == 'part-time' ? 'part-time' : 'full-time';
+          _selectedTeacherType = _selectedTeacherType == 'part-time'
+              ? 'part-time'
+              : 'full-time';
           _isTeacherVerified = true;
           _teacherVerificationData = result['data'];
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? '✅ AOL teacher verified successfully!'),
+            content: Text(
+              result['message'] ?? '✅ AOL teacher verified successfully!',
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 4),
           ),
@@ -639,12 +660,9 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() {
         _isValidatingTeacher = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $error'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
       );
     }
   }
@@ -674,19 +692,21 @@ class _SignupScreenState extends State<SignupScreen> {
 
       try {
         // Prepare user data
-        final fullPhoneNumber = '$_selectedCountryCode ${_phoneController.text.trim()}';
-        
+        final fullPhoneNumber =
+            '$_selectedCountryCode ${_phoneController.text.trim()}';
+
         // Prepare teacher verification data
         String? teacherCode;
         String? teacherEmail;
         String? teacherMobile;
-        
+
         if (_selectedTeacherType != 'no') {
           teacherCode = _teacherCodeController.text.trim();
           teacherEmail = _teacherEmailController.text.trim();
-          teacherMobile = '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
+          teacherMobile =
+              '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
         }
-        
+
         // Call registration API
         final result = await ActionService.registerUser(
           fullName: _fullNameController.text.trim(),
@@ -698,7 +718,9 @@ class _SignupScreenState extends State<SignupScreen> {
           full_address: _locationController.text.trim(),
           userTags: _selectedRoles.toList(),
           aol_teacher: _selectedTeacherType != 'no',
-          teacher_type: _selectedTeacherType == 'no' ? null : _selectedTeacherType,
+          teacher_type: _selectedTeacherType == 'no'
+              ? null
+              : _selectedTeacherType,
           teachercode: teacherCode,
           teacheremail: teacherEmail,
           mobilenumber: teacherMobile,
@@ -714,17 +736,19 @@ class _SignupScreenState extends State<SignupScreen> {
             // Registration successful
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Registration successful! Please check your email for OTP verification.'),
+                content: Text(
+                  result['message'] ??
+                      'Registration successful! Please check your email for OTP verification.',
+                ),
                 backgroundColor: Colors.green,
               ),
             );
-            
+
             // Navigate to OTP verification screen
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => VerifyOtpScreen(
-                  email: _emailController.text.trim(),
-                ),
+                builder: (context) =>
+                    VerifyOtpScreen(email: _emailController.text.trim()),
               ),
             );
           } else {
@@ -741,7 +765,7 @@ class _SignupScreenState extends State<SignupScreen> {
         setState(() {
           _isLoading = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -767,10 +791,7 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         title: const Text(
           'Create Account',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
       ),
       body: SafeArea(
@@ -806,7 +827,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         null,
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Personal Information Form Fields
                       _buildTextField(
                         controller: _fullNameController,
@@ -816,24 +837,24 @@ class _SignupScreenState extends State<SignupScreen> {
                         isRequired: true,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       _buildTextField(
                         controller: _emailController,
                         label: 'Email Address',
-                        hint: 'your@email.com',
+                        hint: 'Enter your email address',
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         isRequired: true,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       _buildPasswordField(),
                       const SizedBox(height: 16),
-                      
+
                       _buildPhoneNumberField(),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Professional Details Section
                       _buildSectionHeader(
                         'Professional Details',
@@ -841,7 +862,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         null,
                       ),
                       const SizedBox(height: 24),
-                      
+
                       _buildTextField(
                         controller: _designationController,
                         label: 'Designation',
@@ -850,7 +871,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         isRequired: true,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       _buildTextField(
                         controller: _companyController,
                         label: 'Company/Organization',
@@ -859,12 +880,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         isRequired: true,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Teacher Type Selection
                       _buildTeacherTypeSelection(),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Location Section
                       _buildSectionHeader(
                         'Location',
@@ -872,16 +893,16 @@ class _SignupScreenState extends State<SignupScreen> {
                         null,
                       ),
                       const SizedBox(height: 24),
-                      
+
                       _buildLocationField(),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Profile Photo Section
                       _buildProfilePhotoSection(),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Additional Roles Section
                       _buildSectionHeader(
                         'Additional Roles',
@@ -889,26 +910,29 @@ class _SignupScreenState extends State<SignupScreen> {
                         null,
                       ),
                       const SizedBox(height: 24),
-                      
+
                       _buildRolesSelection(),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Submit Button
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleSignup,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ).copyWith(
-                            backgroundColor: MaterialStateProperty.all(Colors.transparent),
-                          ),
+                          style:
+                              ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ).copyWith(
+                                backgroundColor: MaterialStateProperty.all(
+                                  Colors.transparent,
+                                ),
+                              ),
                           child: Container(
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
@@ -932,11 +956,15 @@ class _SignupScreenState extends State<SignupScreen> {
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           'Complete Registration',
@@ -994,10 +1022,7 @@ class _SignupScreenState extends State<SignupScreen> {
           padding: EdgeInsets.only(left: icon != null ? 36 : 0),
           child: Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
         ),
       ],
@@ -1040,10 +1065,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(width: 8),
               Text(
                 helperText,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
           ],
@@ -1069,14 +1091,21 @@ class _SignupScreenState extends State<SignupScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
           validator: (value) {
             if (isRequired && (value == null || value.isEmpty)) {
               return '$label is required';
             }
-            if (keyboardType == TextInputType.emailAddress && value != null && value.isNotEmpty) {
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+            if (keyboardType == TextInputType.emailAddress &&
+                value != null &&
+                value.isNotEmpty) {
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
                 return 'Please enter a valid email';
               }
             }
@@ -1104,10 +1133,7 @@ class _SignupScreenState extends State<SignupScreen> {
             SizedBox(width: 4),
             Text(
               '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -1139,7 +1165,10 @@ class _SignupScreenState extends State<SignupScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -1172,10 +1201,7 @@ class _SignupScreenState extends State<SignupScreen> {
             SizedBox(width: 4),
             Text(
               '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -1186,7 +1212,10 @@ class _SignupScreenState extends State<SignupScreen> {
               controller: _locationController,
               decoration: InputDecoration(
                 hintText: 'Start typing your location...',
-                prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                prefixIcon: const Icon(
+                  Icons.location_on_outlined,
+                  color: Colors.grey,
+                ),
                 suffixIcon: _isLoadingLocations
                     ? const SizedBox(
                         width: 20,
@@ -1211,7 +1240,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
               onChanged: _onLocationChanged,
               validator: (value) {
@@ -1249,7 +1281,8 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       onTap: () {
                         setState(() {
-                          _locationController.text = _locationSuggestions[index];
+                          _locationController.text =
+                              _locationSuggestions[index];
                           _locationSuggestions = [];
                         });
                       },
@@ -1280,10 +1313,7 @@ class _SignupScreenState extends State<SignupScreen> {
             SizedBox(width: 4),
             Text(
               '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -1299,7 +1329,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   countryListTheme: CountryListThemeData(
                     flagSize: 25,
                     backgroundColor: Colors.white,
-                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
                     bottomSheetHeight: 500,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(20.0),
@@ -1326,7 +1359,10 @@ class _SignupScreenState extends State<SignupScreen> {
               },
               child: Container(
                 height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
@@ -1350,7 +1386,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 20),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -1362,7 +1402,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
-                  hintText: '9876543210',
+                  hintText: '',
                   filled: true,
                   fillColor: Colors.grey.shade50.withOpacity(0.5),
                   border: OutlineInputBorder(
@@ -1375,9 +1415,15 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade400,
+                      width: 2,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -1411,47 +1457,40 @@ class _SignupScreenState extends State<SignupScreen> {
             SizedBox(width: 4),
             Text(
               '*',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        
+
         // Show verified teacher data if teacher is verified
         if (_isTeacherVerified && _teacherVerificationData != null)
           _buildVerifiedTeacherDisplay()
         else
           // Show radio buttons for teacher type selection
-          Row(
+          Column(
             children: [
-              Expanded(
-                child: _buildRadioOption(
-                  value: 'no',
-                  label: 'No',
-                  isSelected: _selectedTeacherType == 'no',
-                  onTap: () => setState(() => _selectedTeacherType = 'no'),
-                ),
+              _buildRadioOption(
+                value: 'no',
+                label: 'No',
+                isSelected: _selectedTeacherType == 'no',
+                onTap: () => setState(() => _selectedTeacherType = 'no'),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildRadioOption(
-                  value: 'part-time',
-                  label: 'Yes - Part-time',
-                  isSelected: _selectedTeacherType == 'part-time',
-                  onTap: () => setState(() => _selectedTeacherType = 'part-time'),
-                ),
+              const SizedBox(height: 12),
+              _buildRadioOption(
+                value: 'part-time',
+                label: 'Yes - Part-time',
+                isSelected: _selectedTeacherType == 'part-time',
+                onTap: () =>
+                    setState(() => _selectedTeacherType = 'part-time'),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildRadioOption(
-                  value: 'full-time',
-                  label: 'Yes - Full-time',
-                  isSelected: _selectedTeacherType == 'full-time',
-                  onTap: () => setState(() => _selectedTeacherType = 'full-time'),
-                ),
+              const SizedBox(height: 12),
+              _buildRadioOption(
+                value: 'full-time',
+                label: 'Yes - Full-time',
+                isSelected: _selectedTeacherType == 'full-time',
+                onTap: () =>
+                    setState(() => _selectedTeacherType = 'full-time'),
               ),
             ],
           ),
@@ -1460,10 +1499,14 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildVerifiedTeacherDisplay() {
-    final teacherDetails = _teacherVerificationData?['validationResult']?['apiResponse']?['teacherdetails'] ?? {};
+    final teacherDetails =
+        _teacherVerificationData?['validationResult']?['apiResponse']?['teacherdetails'] ??
+        {};
     final teacherCode = _teacherVerificationData?['teacherCode'] ?? '';
-    final teacherType = _selectedTeacherType == 'part-time' ? 'Part-time Teacher' : 'Full-time Teacher';
-    
+    final teacherType = _selectedTeacherType == 'part-time'
+        ? 'Part-time Teacher'
+        : 'Full-time Teacher';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1484,11 +1527,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   color: Colors.green.shade500,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: const Icon(Icons.check, color: Colors.white, size: 16),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1516,17 +1555,23 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Teacher details grid
           Column(
             children: [
               _buildTeacherDetailRow('Name:', teacherDetails['name'] ?? 'N/A'),
               _buildTeacherDetailRow('Teacher Code:', teacherCode),
-              _buildTeacherDetailRow('Type:', teacherDetails['teacher_type'] ?? 'N/A'),
-              _buildTeacherDetailRow('Programs:', teacherDetails['program_types_can_teach'] ?? 'N/A'),
+              _buildTeacherDetailRow(
+                'Type:',
+                teacherDetails['teacher_type'] ?? 'N/A',
+              ),
+              _buildTeacherDetailRow(
+                'Programs:',
+                teacherDetails['program_types_can_teach'] ?? 'N/A',
+              ),
             ],
           ),
-          
+
           // Change teacher status button
           const SizedBox(height: 12),
           GestureDetector(
@@ -1565,10 +1610,7 @@ class _SignupScreenState extends State<SignupScreen> {
             width: 100,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
           ),
           Expanded(
@@ -1620,7 +1662,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 shape: BoxShape.circle,
                 color: isSelected ? Colors.green.shade500 : Colors.transparent,
                 border: Border.all(
-                  color: isSelected ? Colors.green.shade500 : Colors.grey.shade300,
+                  color: isSelected
+                      ? Colors.green.shade500
+                      : Colors.grey.shade300,
                 ),
               ),
               child: isSelected
@@ -1634,7 +1678,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.green.shade800 : Colors.grey.shade700,
+                  color: isSelected
+                      ? Colors.green.shade800
+                      : Colors.grey.shade700,
                 ),
               ),
             ),
@@ -1657,7 +1703,11 @@ class _SignupScreenState extends State<SignupScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.grey.shade50, Colors.white, Colors.grey.shade50.withOpacity(0.5)],
+                colors: [
+                  Colors.grey.shade50,
+                  Colors.white,
+                  Colors.grey.shade50.withOpacity(0.5),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1751,10 +1801,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -1806,10 +1853,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 Text(
                   _selectedImagePath?.split('/').last ?? 'Image',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -1851,7 +1895,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildRoleOption(String role) {
     final isSelected = _selectedRoles.contains(role);
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -1879,7 +1923,9 @@ class _SignupScreenState extends State<SignupScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
-                  color: isSelected ? Colors.green.shade500 : Colors.grey.shade300,
+                  color: isSelected
+                      ? Colors.green.shade500
+                      : Colors.grey.shade300,
                 ),
                 color: isSelected ? Colors.green.shade500 : Colors.transparent,
               ),
@@ -1894,7 +1940,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.green.shade800 : Colors.grey.shade700,
+                  color: isSelected
+                      ? Colors.green.shade800
+                      : Colors.grey.shade700,
                 ),
               ),
             ),
@@ -1903,4 +1951,4 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-} 
+}

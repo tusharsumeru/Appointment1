@@ -8,6 +8,7 @@ import '../action/action.dart';
 import '../action/jwt_utils.dart';
 import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
+import '../user/appointment_type_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -215,11 +216,11 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           );
         } else if (userRole == 'user' || userRole == 'client') {
-          // Regular user/client role - navigate to user interface
+          // Regular user/client role - navigate to appointment type selection
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  const UserScreen(),
+                  const AppointmentTypeSelectionScreen(),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);

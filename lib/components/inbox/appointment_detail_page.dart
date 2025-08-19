@@ -4008,14 +4008,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
   }
 
-  void _showQRCodeDialog(Map<String, dynamic> appointment) {
+  void _showQRCodeDialog(Map<String, dynamic> appointment) async {
     final appointmentId = appointment['appointmentId']?.toString();
     if (appointmentId == null) {
       _showSnackBar('Error: Appointment ID not found', isError: true);
       return;
     }
     // Use the correct domain for QR codes from action.dart
-    final qrUrl = '${ActionService.baseUrl}/public/qr-codes/qr-$appointmentId.png';
+    final String baseUrl = await ActionService.baseUrl;
+    final qrUrl = '$baseUrl/public/qr-codes/qr-$appointmentId.png';
     final patientName = _getAppointmentName();
     
     // Debug: Print the URL to console

@@ -403,14 +403,14 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                           // OTP Input Fields
                           Center(
                             child: Container(
-                              constraints: const BoxConstraints(maxWidth: 320),
+                              constraints: const BoxConstraints(maxWidth: 350),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: List.generate(6, (index) {
                                   return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                                    width: 48,
                                     child: SizedBox(
-                                      width: 48,
                                       height: 48,
                                       child: TextFormField(
                                         controller: _otpControllers[index],

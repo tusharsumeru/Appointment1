@@ -172,25 +172,11 @@ class _UserSidebarState extends State<UserSidebar> {
 
           // Navigation Items
           ListTile(
-            leading: const Icon(Icons.home, color: Colors.deepPurple),
-            title: const Text('Home'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UserScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
             leading: const Icon(Icons.add_circle_outline, color: Colors.deepPurple),
             title: const Text('Request Appointment'),
             onTap: () {
               Navigator.pop(context); // Close drawer
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const AppointmentTypeSelectionScreen(),

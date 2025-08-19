@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../action/action.dart';
 import 'user_sidebar.dart';
+import 'user_darshan_photos_screen.dart';
 
 class DarshanPhotosScreen extends StatefulWidget {
   final String appointmentId;
@@ -38,7 +38,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDarshanPhotos();
+    _loadReferencePhotos(); // Only load reference photos initially
     _scrollController.addListener(_onScroll);
   }
 
@@ -55,8 +55,58 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
     }
   }
 
-  void _loadDarshanPhotos() async {
+  void _loadReferencePhotos() async {
     if (isLoading) return;
+    
+    setState(() {
+      isLoading = true;
+      hasError = false;
+      errorMessage = '';
+    });
+
+    try {
+      final result = await ActionService.getFaceMatchResultByAppointmentId(
+        widget.appointmentId,
+      );
+
+      if (result['success'] == true) {
+        final data = result['data'];
+        
+        setState(() {
+          apiData = data;
+          isLoading = false;
+          // Don't load photos initially, just store the API data
+          allDarshanPhotos.clear();
+          displayedPhotos.clear();
+        });
+      } else {
+        // Check if the error is about face match results not found
+        String backendMessage = result['message'] ?? 'Failed to load reference photos';
+        String displayMessage = backendMessage;
+        
+        // Replace backend message with user-friendly message
+        if (backendMessage.toLowerCase().contains('face match result not found') ||
+            backendMessage.toLowerCase().contains('not found for this appointment')) {
+          displayMessage = 'No user data found for this appointment.';
+        }
+        
+        setState(() {
+          isLoading = false;
+          hasError = true;
+          errorMessage = displayMessage;
+        });
+      }
+    } catch (error) {
+      setState(() {
+        isLoading = false;
+        hasError = true;
+        errorMessage = 'Network error. Please check your connection and try again.';
+      });
+    }
+  }
+
+  void _loadDarshanPhotosForUser(String personName) async {
+    if (isLoading || apiData == null) return;
     
     setState(() {
       isLoading = true;
@@ -68,16 +118,11 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
     });
 
     try {
-      final result = await ActionService.getFaceMatchResultByAppointmentId(
-        widget.appointmentId,
-      );
-
-      if (result['success'] == true) {
-        final data = result['data'];
-        final processedPhotos = _processApiData(data);
-        
+      // Filter photos for the specific user from already loaded API data
+      final processedPhotos = _processApiDataForUser(apiData!, personName);
+      
+      if (processedPhotos.isNotEmpty) {
         setState(() {
-          apiData = data;
           allDarshanPhotos = processedPhotos;
           displayedPhotos = _getPaginatedPhotos(processedPhotos, 1);
           isLoading = false;
@@ -87,14 +132,14 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
         setState(() {
           isLoading = false;
           hasError = true;
-          errorMessage = result['message'] ?? 'Failed to load darshan photos';
+          errorMessage = 'No darshan photos found for $personName in the last 90 days.';
         });
       }
     } catch (error) {
       setState(() {
         isLoading = false;
         hasError = true;
-        errorMessage = 'Network error. Please check your connection and try again.';
+        errorMessage = 'Error processing photos for $personName.';
       });
     }
   }
@@ -149,7 +194,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
     if (users != null) {
       for (final user in users) {
         final fullName = user['fullName'] ?? 'Unknown';
-        final userType = user['userType'] ?? 'accompany';
+        final userType = user['userType'] ?? 'main';
         final apiResult = user['apiResult'];
         
         // Only add one image per user
@@ -182,7 +227,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
       if (faceMatchResults != null) {
         for (final result in faceMatchResults) {
           final fullName = result['fullName'] ?? 'Unknown';
-          final userType = result['userType'] ?? 'accompany';
+          final userType = result['userType'] ?? 'main';
           final apiResult = result['apiResult'];
           
           // Only add one image per user
@@ -205,6 +250,78 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                 'totalMatches': matchedImages.length, // Show total matches count
               });
               addedUsers.add(fullName);
+            }
+          }
+        }
+      }
+    }
+
+    return photos;
+  }
+
+  List<Map<String, dynamic>> _processApiDataForUser(Map<String, dynamic> data, String targetPersonName) {
+    final List<Map<String, dynamic>> photos = [];
+    
+    // Check for new API structure (users array directly)
+    final users = data['users'] as List<dynamic>?;
+    
+    if (users != null) {
+      for (final user in users) {
+        final fullName = user['fullName'] ?? 'Unknown';
+        final userType = user['userType'] ?? 'main';
+        final apiResult = user['apiResult'];
+        
+        // Only process photos for the selected user
+        if (fullName == targetPersonName && apiResult != null) {
+          final List<Map<String, dynamic>> matchedImages = _extractMatchedImages(apiResult);
+          
+          // Add ALL matched images for this user, not just the first one
+          for (int i = 0; i < matchedImages.length; i++) {
+            final matchedImage = matchedImages[i];
+            photos.add({
+              'id': '${matchedImage['image_name']}_${fullName}_$i',
+              'imageUrl': matchedImage['image_name'],
+              'personName': fullName,
+              'date': matchedImage['image_date'] ?? 'Unknown',
+              'userType': userType,
+              'createdAt': user['createdAt'],
+              'score': matchedImage['score'],
+              'albumId': matchedImage['album_id'],
+              'daysAgo': matchedImage['days_ago'],
+              'totalMatches': matchedImages.length,
+            });
+          }
+        }
+      }
+    } else {
+      // Fallback to old structure (faceMatchResults)
+      final faceMatchResults = data['faceMatchResults'] as List<dynamic>?;
+      
+      if (faceMatchResults != null) {
+        for (final result in faceMatchResults) {
+          final fullName = result['fullName'] ?? 'Unknown';
+          final userType = result['userType'] ?? 'main';
+          final apiResult = result['apiResult'];
+          
+          // Only process photos for the selected user
+          if (fullName == targetPersonName && apiResult != null) {
+            final List<Map<String, dynamic>> matchedImages = _extractMatchedImages(apiResult);
+            
+            // Add ALL matched images for this user, not just the first one
+            for (int i = 0; i < matchedImages.length; i++) {
+              final matchedImage = matchedImages[i];
+              photos.add({
+                'id': '${matchedImage['image_name']}_${fullName}_$i',
+                'imageUrl': matchedImage['image_name'],
+                'personName': fullName,
+                'date': matchedImage['image_date'] ?? 'Unknown',
+                'userType': userType,
+                'createdAt': result['createdAt'],
+                'score': matchedImage['score'],
+                'albumId': matchedImage['album_id'],
+                'daysAgo': matchedImage['days_ago'],
+                'totalMatches': matchedImages.length,
+              });
             }
           }
         }
@@ -262,7 +379,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
       if (users != null) {
         for (final user in users) {
           final fullName = user['fullName'] ?? 'Unknown';
-          final userType = user['userType'] ?? 'accompany';
+          final userType = user['userType'] ?? 'main';
           
           if (!addedNames.contains(fullName)) {
             addedNames.add(fullName);
@@ -285,7 +402,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
         if (faceMatchResults != null) {
           for (final result in faceMatchResults) {
             final fullName = result['fullName'] ?? 'Unknown';
-            final userType = result['userType'] ?? 'accompany';
+            final userType = result['userType'] ?? 'main';
             final profilePhotoUrl = result['profilePhotoUrl'];
             
             if (!addedNames.contains(fullName)) {
@@ -319,17 +436,68 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
   }
 
   void _onPersonSelected(String? personName) {
-    setState(() {
-      selectedPerson = selectedPerson == personName ? null : personName;
-    });
+    if (personName == null || apiData == null) return;
+    
+    // Navigate to user-specific darshan photos screen
+    _navigateToUserPhotosScreen(personName);
+  }
+  
+  void _navigateToUserPhotosScreen(String personName) {
+    if (apiData == null) return;
+    
+    // Find user data
+    String profilePhotoUrl = '';
+    String userType = 'main';
+    
+    // Check for new API structure (users array directly)
+    final users = apiData!['users'] as List<dynamic>?;
+    
+    if (users != null) {
+      for (final user in users) {
+        final fullName = user['fullName'] ?? 'Unknown';
+        if (fullName == personName) {
+          profilePhotoUrl = user['profilePhotoUrl']?.toString() ?? '';
+          userType = user['userType'] ?? 'main';
+          break;
+        }
+      }
+    } else {
+      // Fallback to old structure
+      final faceMatchResults = apiData!['faceMatchResults'] as List<dynamic>?;
+      if (faceMatchResults != null) {
+        for (final result in faceMatchResults) {
+          final fullName = result['fullName'] ?? 'Unknown';
+          if (fullName == personName) {
+            profilePhotoUrl = result['profilePhotoUrl']?.toString() ?? '';
+            userType = result['userType'] ?? 'main';
+            break;
+          }
+        }
+      }
+    }
+    
+    // If profile photo is empty, use appointment data fallback
+    if (profilePhotoUrl.isEmpty) {
+      profilePhotoUrl = widget.appointmentData['profilePhoto']?.toString() ?? '';
+    }
+    
+    // Get all photos for this user
+    final userPhotos = _processApiDataForUser(apiData!, personName);
+    
+    // Navigate to user photos screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserDarshanPhotosScreen(
+          personName: personName,
+          profilePhotoUrl: profilePhotoUrl,
+          darshanPhotos: userPhotos,
+          userType: userType,
+        ),
+      ),
+    );
   }
 
-  void _viewImage(Map<String, dynamic> photo) {
-    final imageUrl = photo['imageUrl'];
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      launchUrl(Uri.parse(imageUrl), mode: LaunchMode.externalApplication);
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -354,7 +522,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
       drawer: const UserSidebar(),
       body: RefreshIndicator(
         onRefresh: () async {
-          _loadDarshanPhotos();
+          _loadReferencePhotos();
         },
         child: SingleChildScrollView(
           controller: _scrollController,
@@ -404,15 +572,8 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                       child: Column(
                         children: [
                           Container(
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              boxShadow: isSelected ? [
-                                BoxShadow(
-                                  color: Colors.orange.withOpacity(0.3),
-                                  blurRadius: 12,
-                                  spreadRadius: 4,
-                                ),
-                              ] : null,
                             ),
                             child: Stack(
                               children: [
@@ -422,16 +583,9 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: isSelected ? Colors.orange : Colors.orange.shade400,
-                                      width: isSelected ? 4 : 2,
+                                      color: Colors.orange.shade400,
+                                      width: 2,
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
                                   ),
                                   child: ClipOval(
                                     child: _buildOptimizedImage(
@@ -443,32 +597,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                                     ),
                                   ),
                                 ),
-                                if (isSelected)
-                                  Positioned(
-                                    top: -8,
-                                    left: -8,
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.star,
-                                        size: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
+
                               ],
                             ),
                           ),
@@ -481,14 +610,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                               color: Colors.black87,
                             ),
                           ),
-                          Text(
-                            isMain ? 'Main Appointee' : 'Accompany',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isMain ? Colors.orange.shade600 : Colors.grey.shade500,
-                            ),
-                          ),
+
                         ],
                       ),
                     );
@@ -534,59 +656,34 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
                           color: Colors.red.shade700,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadDarshanPhotos,
-                        child: const Text('Retry'),
-                      ),
+
                     ],
                   ),
                 )
-              else if (filteredPhotos.isEmpty)
+              else
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: Text(
-                      'No darshan photos found',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Column(
-                  children: [
-                    ...filteredPhotos.map((photo) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildDarshanPhotoCard(photo),
-                    )),
-                    
-                    // Load more indicator
-                    if (isLoadingMore)
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(
-                          child: CircularProgressIndicator(),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_search,
+                          size: 64,
+                          color: Colors.grey,
                         ),
-                      ),
-                    
-                    // End of list indicator
-                    if (!hasMoreData && filteredPhotos.isNotEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(
-                          child: Text(
-                            'No more photos to load',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Click on a person above to view their darshan photos',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
                           ),
                         ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -638,133 +735,5 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
     );
   }
 
-  Widget _buildDarshanPhotoCard(Map<String, dynamic> photo) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 300,
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: _buildOptimizedImage(
-                    imageUrl: photo['imageUrl'],
-                    width: double.infinity,
-                    height: double.infinity,
-                    fit: BoxFit.cover,
-                    placeholder: Container(
-                      color: Colors.grey.shade300,
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      onTap: () => _viewImage(photo),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.3),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 16,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: ElevatedButton(
-                      onPressed: () => _viewImage(photo),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'View Image',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        photo['personName'],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Date: ${photo['date']}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      if (photo['totalMatches'] != null && photo['totalMatches'] > 1)
-                        Text(
-                          '${photo['totalMatches']} total matches found',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 } 

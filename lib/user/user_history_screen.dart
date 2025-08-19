@@ -16,6 +16,7 @@ class UserHistoryScreen extends StatefulWidget {
 class _UserHistoryScreenState extends State<UserHistoryScreen> {
   List<Map<String, dynamic>> appointments = [];
   bool isLoading = true;
+  bool isLoadingMore = false; // Track loading state for "Load More" button
   bool hasError = false;
   String errorMessage = '';
   int currentPage = 1;
@@ -138,15 +139,22 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
   }
 
   Future<void> _loadMoreAppointments() async {
-    if (!hasMoreData || isLoading) return;
+    if (!hasMoreData || isLoading || isLoadingMore) return;
     
     if (mounted) {
       setState(() {
+        isLoadingMore = true;
         currentPage++;
       });
     }
     
     await _loadUserAppointments();
+    
+    if (mounted) {
+      setState(() {
+        isLoadingMore = false;
+      });
+    }
   }
 
   @override
@@ -176,20 +184,20 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         color: Colors.grey.shade50,
         child: Column(
           children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              child: const Text(
-                'My Appointment History',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+            // // Header
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(20),
+            //   child: const Text(
+            //     'My Appointment History',
+            //     style: TextStyle(
+            //       fontSize: 24,
+            //       fontWeight: FontWeight.bold,
+            //       color: Colors.black87,
+            //     ),
+            //     textAlign: TextAlign.center,
+            //   ),
+            // ),
             
             // Content
             Expanded(
@@ -262,79 +270,137 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
     return RefreshIndicator(
       onRefresh: () => _loadUserAppointments(refresh: true),
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: appointments.length + (hasMoreData ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == appointments.length) {
-            // Load more indicator
-            if (hasMoreData) {
-              // Use addPostFrameCallback to defer the load until after the current build
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _loadMoreAppointments();
-              });
-              return const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }
-
-          final appointment = appointments[index];
-          return UserAppointmentCard(
-            appointmentId: appointment['appointmentId'] ?? 'N/A',
-            status: appointment['appointmentStatus']?['status'] ?? 'Unknown',
-            userName: appointment['createdBy']?['fullName'] ?? 'N/A',
-            userTitle: appointment['userCurrentDesignation'] ?? 'N/A',
-            company: appointment['userCurrentCompany'] ?? 'N/A',
-            profilePhoto: appointment['profilePhoto'],
-            appointmentDateRange: _formatDateRange(appointment),
-            attendeesCount: _calculateTotalAttendees(appointment),
-            attendeePhotos: _extractAttendeePhotos(appointment),
-            purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
-            assignedTo: _formatAssignedSecretary(appointment),
-            dateRange: _formatPreferredDateRange(appointment),
-            daysCount: _calculateDaysCount(appointment),
-            email: appointment['email'] ?? 'N/A',
-            phone: _formatPhoneNumber(appointment),
-            location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
-            appointmentData: appointment, // Pass the complete appointment data
-            onEditPressed: () async {
-              print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditAppointmentScreen(
-                    appointmentData: appointment,
-                  ),
-                ),
-              );
-              print('🔄 Returned from edit screen with result: $result');
-              // Refresh the appointments list after returning from edit screen
-              // Only refresh if the edit was successful (result == true)
-              if (result == true) {
-                print('🔄 Refreshing appointments list...');
-                // Use addPostFrameCallback to defer the refresh until after the current build
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadUserAppointments(refresh: true);
-                });
-                // Show a brief success message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Appointment updated successfully!'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
+      child: Column(
+        children: [
+          // Appointments List
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: appointments.length,
+              itemBuilder: (context, index) {
+                final appointment = appointments[index];
+                return UserAppointmentCard(
+                  appointmentId: appointment['appointmentId'] ?? 'N/A',
+                  status: appointment['appointmentStatus']?['status'] ?? 'Unknown',
+                  userName: appointment['createdBy']?['fullName'] ?? 'N/A',
+                  userTitle: appointment['userCurrentDesignation'] ?? 'N/A',
+                  company: appointment['userCurrentCompany'] ?? 'N/A',
+                  profilePhoto: appointment['profilePhoto'],
+                  appointmentDateRange: _formatDateRange(appointment),
+                  attendeesCount: _calculateTotalAttendees(appointment),
+                  attendeePhotos: _extractAttendeePhotos(appointment),
+                  purpose: appointment['appointmentPurpose'] ?? appointment['appointmentSubject'] ?? 'N/A',
+                  assignedTo: _formatAssignedSecretary(appointment),
+                  dateRange: _formatPreferredDateRange(appointment),
+                  daysCount: _calculateDaysCount(appointment),
+                  email: appointment['email'] ?? 'N/A',
+                  phone: _formatPhoneNumber(appointment),
+                  location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
+                  appointmentData: appointment, // Pass the complete appointment data
+                  onEditPressed: () async {
+                    print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditAppointmentScreen(
+                          appointmentData: appointment,
+                        ),
+                      ),
+                    );
+                    print('🔄 Returned from edit screen with result: $result');
+                    // Refresh the appointments list after returning from edit screen
+                    // Only refresh if the edit was successful (result == true)
+                    if (result == true) {
+                      print('🔄 Refreshing appointments list...');
+                      // Use addPostFrameCallback to defer the refresh until after the current build
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _loadUserAppointments(refresh: true);
+                      });
+                      // Show a brief success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Appointment updated successfully!'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } else {
+                      print('🔄 No refresh needed - edit was not successful');
+                    }
+                  },
                 );
-              } else {
-                print('🔄 No refresh needed - edit was not successful');
-              }
-            },
-          );
-        },
+              },
+            ),
+          ),
+          
+          // Pagination Info
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Showing ${appointments.length} appointments',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Page $currentPage of $totalPages',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Load More Button
+          if (hasMoreData)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: isLoadingMore ? null : () => _loadMoreAppointments(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: isLoadingMore
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Loading...'),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.keyboard_arrow_down),
+                          const SizedBox(width: 8),
+                          Text('Load More'),
+                        ],
+                      ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -384,20 +450,9 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateDaysCount(Map<String, dynamic> appointment) {
     try {
-      // Check for scheduled date
-      final scheduledDateTime = appointment['scheduledDateTime'];
-      if (scheduledDateTime != null) {
-        final scheduledDate = scheduledDateTime['date'];
-        if (scheduledDate != null) {
-          final date = DateTime.parse(scheduledDate);
-          final now = DateTime.now();
-          final difference = date.difference(now).inDays;
-          return difference.abs();
-        }
-      }
-      
-      // Check for preferred date range - calculate duration between fromDate and toDate
+      // Check for preferred date range ONLY - this is the only source for day calculation
       final preferredDateRange = appointment['preferredDateRange'];
+      
       if (preferredDateRange != null) {
         final fromDate = preferredDateRange['fromDate'];
         final toDate = preferredDateRange['toDate'];
@@ -405,10 +460,30 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         if (fromDate != null && toDate != null) {
           final from = DateTime.parse(fromDate);
           final to = DateTime.parse(toDate);
+          
+          // Calculate the difference in days and add 1 to include both start and end dates
+          // Example: 28-30 = 28, 29, 30 = 3 days
           final difference = to.difference(from).inDays;
-          return difference + 1; // Add 1 to include both start and end dates
+          final totalDays = difference + 1;
+          
+          // Additional validation for edge cases
+          if (from.isAtSameMomentAs(to)) {
+            return 1;
+          }
+          
+          if (difference < 0) {
+            // Warning: Negative difference detected! fromDate is after toDate
+            // This might indicate a data issue
+          }
+          
+          return totalDays;
+        } else {
+          // Missing fromDate or toDate in preferredDateRange
         }
+      } else {
+        // No preferredDateRange found
       }
+      
       return 0;
     } catch (e) {
       return 0;

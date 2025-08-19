@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'auth/splash_screen.dart';
 import 'main/home_screen.dart';
+import 'action/action.dart';
 import 'main/inbox_screen.dart';
 import 'main/dashboard_screen.dart';
 import 'main/assigned_to_me_screen.dart';
@@ -40,6 +41,17 @@ void main() async {
   
   print('🚀 Starting app initialization...');
   print('📱 Platform: ${Platform.operatingSystem}');
+  
+  // Initialize base URL
+  print('🌐 Initializing base URL...');
+  try {
+    await ActionService.initializeBaseUrl();
+    print('✅ Base URL initialized successfully');
+  } catch (e) {
+    print('❌ Base URL initialization failed: $e');
+    print('🚨 App cannot start without base URL. Please check your network connection.');
+    return; // Stop app initialization if base URL fails
+  }
   
   try {
     print('🔥 Initializing Firebase...');

@@ -5,6 +5,7 @@ import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
+import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
 import 'notification_setup_screen.dart';
 
@@ -57,32 +58,35 @@ class _LoginScreenState extends State<LoginScreen> {
           final data = result['data'];
           if (data != null && data['token'] != null) {
             await StorageService.saveToken(data['token']);
-            
+
             // Save user data if available
             if (data['user'] != null) {
               await StorageService.saveUserData(data['user']);
-              
+
               // Send login notification
               try {
-                final notificationResult = await ActionService.sendLoginNotification(
-                  userId: data['user']['_id'] ?? data['user']['id'],
-                  loginInfo: {
-                    'deviceInfo': 'Flutter Mobile App',
-                    'location': 'Mobile Device',
-                    'timestamp': DateTime.now().toIso8601String(),
-                  },
-                );
-                
+                final notificationResult =
+                    await ActionService.sendLoginNotification(
+                      userId: data['user']['_id'] ?? data['user']['id'],
+                      loginInfo: {
+                        'deviceInfo': 'Flutter Mobile App',
+                        'location': 'Mobile Device',
+                        'timestamp': DateTime.now().toIso8601String(),
+                      },
+                    );
+
                 if (notificationResult['success']) {
                   print('✅ Login notification sent successfully');
                 } else {
-                  print('⚠️ Failed to send login notification: ${notificationResult['message']}');
+                  print(
+                    '⚠️ Failed to send login notification: ${notificationResult['message']}',
+                  );
                 }
               } catch (e) {
                 print('❌ Error sending login notification: $e');
               }
             }
-            
+
             // Check user role and navigate accordingly
             await _handleRoleBasedNavigation(data['user']);
           }
@@ -91,7 +95,9 @@ class _LoginScreenState extends State<LoginScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Login failed. Please try again.'),
+                content: Text(
+                  result['message'] ?? 'Login failed. Please try again.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
@@ -101,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -114,7 +120,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleRoleBasedNavigation(Map<String, dynamic>? userData) async {
+  Future<void> _handleRoleBasedNavigation(
+    Map<String, dynamic>? userData,
+  ) async {
     if (userData == null) {
       // If no user data, try to get it from the API
       final userResult = await ActionService.getCurrentUser();
@@ -124,28 +132,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     String? userRole = userData?['role']?.toString().toLowerCase();
-    
+
     if (mounted) {
-      if (userRole == 'secretary' || userRole == 'admin' || userRole == 'super-admin') {
-        // Secretary, Admin, and Super-Admin roles - always show notification setup for now
-        // TODO: Check from backend if user has FCM tokens stored
+      if (userRole == 'secretary' ||
+          userRole == 'admin' ||
+          userRole == 'super-admin') {
+        // Secretary, Admin, and Super-Admin roles - navigate directly to inbox screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => NotificationSetupScreen(
-              isNewUser: false,
-              userData: userData ?? {},
-            ),
+            builder: (context) => const InboxScreen(),
           ),
         );
       } else if (userRole == 'guard') {
-        // Guard role - always show notification setup for now
-        // TODO: Check from backend if user has FCM tokens stored
+        // Guard role - navigate directly to guard screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => NotificationSetupScreen(
-              isNewUser: false,
-              userData: userData ?? {},
-            ),
+            builder: (context) => const GuardScreen(),
           ),
         );
       } else if (userRole == 'user' || userRole == 'client') {
@@ -163,11 +165,13 @@ class _LoginScreenState extends State<LoginScreen> {
         // Unknown role or no role - show error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Access denied. Your role (${userRole ?? 'unknown'}) is not authorized.'),
+            content: Text(
+              '❌ Access denied. Your role (${userRole ?? 'unknown'}) is not authorized.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
-        
+
         // Logout the user since they don't have proper access
         await StorageService.logout();
       }
@@ -186,9 +190,11 @@ class _LoginScreenState extends State<LoginScreen> {
               key: _formKey,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                             MediaQuery.of(context).padding.top - 
-                             MediaQuery.of(context).padding.bottom - 48, // 48 for padding
+                  minHeight:
+                      MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom -
+                      48, // 48 for padding
                 ),
                 child: IntrinsicHeight(
                   child: Column(
@@ -241,10 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       const Text(
                         'Sign in to your account',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 48),
@@ -268,18 +271,27 @@ class _LoginScreenState extends State<LoginScreen> {
                                 hintText: 'Enter your email',
                                 prefixIcon: Icon(Icons.email_outlined),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Colors.deepPurple,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter your email';
                                 }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                if (!RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                ).hasMatch(value)) {
                                   return 'Please enter a valid email';
                                 }
                                 return null;
@@ -297,16 +309,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 prefixIcon: const Icon(Icons.lock_outlined),
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
                                   ),
                                   onPressed: _togglePasswordVisibility,
                                 ),
                                 border: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Colors.deepPurple,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
@@ -318,83 +339,97 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }
                                 return null;
                               },
-                                                         ),
-                             const SizedBox(height: 24),
+                            ),
+                            const SizedBox(height: 24),
 
-                             // Login Button
-                             Container(
-                               height: 56, // h-14 equivalent
-                               decoration: BoxDecoration(
-                                 gradient: const LinearGradient(
-                                   colors: [Color(0xFFF97316), Color(0xFFEAB308)], // orange-500 to yellow-500
-                                   begin: Alignment.centerLeft,
-                                   end: Alignment.centerRight,
-                                 ),
-                                 borderRadius: BorderRadius.circular(12), // rounded-xl equivalent
-                                 boxShadow: [
-                                   BoxShadow(
-                                     color: Colors.black.withOpacity(0.1),
-                                     blurRadius: 8,
-                                     offset: const Offset(0, 4),
-                                   ),
-                                 ],
-                               ),
-                               child: Material(
-                                 color: Colors.transparent,
-                                 child: InkWell(
-                                   onTap: _isLoading ? null : _handleLogin,
-                                   borderRadius: BorderRadius.circular(12),
-                                   child: Container(
-                                     padding: const EdgeInsets.symmetric(vertical: 16),
-                                     child: Center(
-                                       child: _isLoading
-                                           ? const SizedBox(
-                                               height: 20,
-                                               width: 20,
-                                               child: CircularProgressIndicator(
-                                                 strokeWidth: 2,
-                                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                               ),
-                                             )
-                                           : const Text(
-                                               'Login',
-                                               style: TextStyle(
-                                                 fontSize: 18, // text-lg equivalent
-                                                 fontWeight: FontWeight.w600, // font-semibold equivalent
-                                                 color: Colors.white,
-                                               ),
-                                             ),
-                                     ),
-                                   ),
-                                 ),
-                               ),
-                             ),
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.center,
-                                child: TextButton(
-                                  onPressed: () {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Forgot Password coming soon.'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text(
-                                    'Forgot Password?',
-                                    style: TextStyle(
-                                      color: Colors.deepPurple,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.underline,
+                            // Login Button
+                            Container(
+                              height: 56, // h-14 equivalent
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFF97316),
+                                    Color(0xFFEAB308),
+                                  ], // orange-500 to yellow-500
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  12,
+                                ), // rounded-xl equivalent
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _isLoading ? null : _handleLogin,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    child: Center(
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.white),
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Login',
+                                              style: TextStyle(
+                                                fontSize:
+                                                    18, // text-lg equivalent
+                                                fontWeight: FontWeight
+                                                    .w600, // font-semibold equivalent
+                                                color: Colors.white,
+                                              ),
+                                            ),
                                     ),
                                   ),
                                 ),
                               ),
-                           ],
-                         ),
-                       ),
+                            ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.center,
+                              child: TextButton(
+                                onPressed: () {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Forgot Password coming soon.',
+                                      ),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    color: Colors.deepPurple,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
 
                       // Create Account Text
@@ -403,10 +438,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           const Text(
                             "Don't have an account? ",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -449,4 +481,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-} 
+}

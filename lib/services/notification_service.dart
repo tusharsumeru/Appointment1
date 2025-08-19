@@ -225,9 +225,11 @@ class NotificationService {
   // Get token from your server (recommended approach)
   static Future<String?> _getTokenFromServer() async {
     try {
+      final String url = await ActionService.baseUrl;
+      
       final response = await http.get(
         Uri.parse(
-          '${ActionService.baseUrl}/auth/fcm-oauth-token',
+          '$url/auth/fcm-oauth-token',
         ),
       );
 
