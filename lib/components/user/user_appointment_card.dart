@@ -533,6 +533,7 @@ class UserAppointmentCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             onTap: () {
                               // Open the attachment URL
+                              print('🔄 Attachment URL clicked: $appointmentAttachment');
                               _openAttachmentUrl(context, appointmentAttachment!);
                             },
                             child: Row(
@@ -761,18 +762,47 @@ class UserAppointmentCard extends StatelessWidget {
     return false;
   }
 
-  // Open attachment URL
+  // Open attachment URL in browser
   Future<void> _openAttachmentUrl(BuildContext context, String url) async {
     try {
-      final Uri uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Clean and validate the URL
+      String cleanUrl = url.trim();
+      
+      // Add protocol if missing
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://$cleanUrl';
+      }
+      
+      print('🔄 Attempting to open URL: $cleanUrl');
+      
+      final Uri uri = Uri.parse(cleanUrl);
+      
+      // Check if URL can be launched
+      final canLaunch = await canLaunchUrl(uri);
+      print('🔄 Can launch URL: $canLaunch');
+      
+      if (canLaunch) {
+        final launched = await launchUrl(
+          uri, 
+          mode: LaunchMode.externalApplication,
+        );
+        print('🔄 URL launched successfully: $launched');
+        
+        if (!launched && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to open attachment in browser'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       } else {
         // Show error if URL cannot be launched
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Could not open attachment: $url'),
+              content: Text('Cannot open attachment URL: $cleanUrl'),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 3),
             ),
@@ -780,11 +810,12 @@ class UserAppointmentCard extends StatelessWidget {
         }
       }
     } catch (e) {
+      print('🔄 Error opening attachment URL: $e');
       // Show error if there's an exception
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error opening attachment: $e'),
+            content: Text('Error opening attachment: ${e.toString()}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),

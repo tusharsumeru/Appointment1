@@ -690,14 +690,25 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'userCurrentDesignation': widget.personalInfo['designation'] ?? '', // Changed from 'Office Operations Specialist'
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
-        'preferredDateRange': {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        },
         'appointmentLocation': _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
         'assignedSecretary': _selectedSecretary, // Send null when no secretary is selected
         'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
       };
+
+      // Priority-based date range logic
+      if (_isAttendingProgram) {
+        // FIRST PRIORITY: If attending program, use program dates for preferred date range
+        appointmentData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        };
+      } else {
+        // SECOND PRIORITY: If not attending program, use preferred date range
+        appointmentData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        };
+      }
       
 
 
