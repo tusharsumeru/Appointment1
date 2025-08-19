@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../user/darshan_photos_screen.dart';
 
 class UserAppointmentCard extends StatelessWidget {
@@ -21,6 +22,7 @@ class UserAppointmentCard extends StatelessWidget {
   final VoidCallback? onEditPressed;
   final Color? headerColor;
   final Map<String, dynamic>? appointmentData;
+  final String? appointmentAttachment;
 
   const UserAppointmentCard({
     super.key,
@@ -43,6 +45,7 @@ class UserAppointmentCard extends StatelessWidget {
     this.onEditPressed,
     this.headerColor,
     this.appointmentData,
+    this.appointmentAttachment,
   });
 
 
@@ -512,6 +515,72 @@ class UserAppointmentCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    // Attachments Section - Only show if attachment exists
+                    if (appointmentAttachment != null && appointmentAttachment!.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              // Open the attachment URL
+                              _openAttachmentUrl(context, appointmentAttachment!);
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.attach_file,
+                                  size: 20,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Attachments',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Click to view attachment',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade500,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.open_in_new,
+                                  size: 20,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 16),
 
                     // Assignment and Date Range
@@ -690,5 +759,37 @@ class UserAppointmentCard extends StatelessWidget {
     }
     
     return false;
+  }
+
+  // Open attachment URL
+  Future<void> _openAttachmentUrl(BuildContext context, String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // Show error if URL cannot be launched
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open attachment: $url'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Show error if there's an exception
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening attachment: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 } 

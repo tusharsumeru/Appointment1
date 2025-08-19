@@ -11,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://1d79ae411e26.ngrok-free.app/api/v3'; // API base URL
+      'https://438d9d4bfc18.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,
@@ -3633,7 +3633,7 @@ class ActionService {
             final mimeType = _getMimeType(fileExtension);
 
             final attachmentMultipart = http.MultipartFile(
-              'attachment',
+              'appointmentAttachment',
               attachmentStream,
               attachmentLength,
               filename: fileName,
@@ -5341,12 +5341,16 @@ class ActionService {
   }
 
   ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
-  // Create appointment method using enhanced API
+  // Create appointment method using enhanced API with file attachment support
   static Future<Map<String, dynamic>> createAppointment(
-    Map<String, dynamic> appointmentData,
-  ) async {
+    Map<String, dynamic> appointmentData, {
+    File? attachmentFile,
+  }) async {
     try {
       print('🚀 Creating appointment with data: $appointmentData');
+      if (attachmentFile != null) {
+        print('📎 Attachment file: ${attachmentFile.path}');
+      }
 
       final token = await StorageService.getToken();
       if (token == null) {
@@ -5354,10 +5358,10 @@ class ActionService {
       }
 
       // Add default secretary ID if not provided
-      if (appointmentData['assignedSecretary'] == null) {
-        appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
-        print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
-      }
+      // if (appointmentData['assignedSecretary'] == null) {
+      //   appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
+      //   print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
+      // }
 
       // Log the final appointment data being sent
       print('📋 Final appointment data to be sent:');
@@ -5386,37 +5390,129 @@ class ActionService {
       print('   - assignedSecretary: ${appointmentData['assignedSecretary']}');
       print('   - guestInformation: ${appointmentData['guestInformation']}');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/appointment'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(appointmentData),
-      );
+      // Check if we have an attachment file
+      if (attachmentFile != null && await attachmentFile.exists()) {
+        // Use multipart request for file upload
+        print('📎 Creating multipart request with file attachment');
+        
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/appointment'),
+        );
 
-      print('📡 API Response Status: ${response.statusCode}');
-      print('📡 API Response Body: ${response.body}');
+        // Add authorization header
+        request.headers['Authorization'] = 'Bearer $token';
 
-      final responseData = jsonDecode(response.body);
+        // Add all appointment data as fields
+        appointmentData.forEach((key, value) {
+          if (value != null) {
+            if (value is Map || value is List) {
+              // Convert complex objects to JSON strings
+              request.fields[key] = jsonEncode(value);
+            } else {
+              request.fields[key] = value.toString();
+            }
+          }
+        });
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        print('✅ Appointment created successfully!');
-        return {
-          'success': true,
-          'data': responseData['data'],
-          'message':
-              responseData['message'] ?? 'Appointment created successfully',
-          'statusCode': response.statusCode,
-        };
+        // Add the attachment file
+        try {
+          print('📎 Adding attachment file to request: ${attachmentFile.path}');
+          final fileStream = http.ByteStream(attachmentFile.openRead());
+          final fileLength = await attachmentFile.length();
+          print('📎 File size: ${fileLength} bytes');
+
+          // Get file extension and name
+          final fileName = attachmentFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'pdf';
+          final mimeType = _getMimeType(fileExtension);
+
+          final fileMultipart = http.MultipartFile(
+            'appointmentAttachment', // Field name expected by the backend
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(fileMultipart);
+          print('📎 Attachment file added successfully to multipart request');
+        } catch (fileError) {
+          print('❌ Error adding attachment file: $fileError');
+          return {
+            'success': false,
+            'message': 'Error processing attachment file: ${fileError.toString()}',
+          };
+        }
+
+        print('📤 Sending multipart request to: ${request.url}');
+        print('📤 Request headers: ${request.headers}');
+        print('📤 Total files being sent: ${request.files.length}');
+
+        // Send the request
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        print('📥 API Response Status: ${response.statusCode}');
+        print('📥 API Response Body: ${response.body}');
+
+        final responseData = jsonDecode(response.body);
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          print('✅ Appointment created successfully with attachment!');
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Appointment created successfully',
+            'statusCode': response.statusCode,
+          };
+        } else {
+          print('❌ Failed to create appointment: ${responseData['message']}');
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to create appointment',
+            'error': responseData['error'],
+            'statusCode': response.statusCode,
+          };
+        }
       } else {
-        print('❌ Failed to create appointment: ${responseData['message']}');
-        return {
-          'success': false,
-          'message': responseData['message'] ?? 'Failed to create appointment',
-          'error': responseData['error'],
-          'statusCode': response.statusCode,
-        };
+        // Use regular JSON request if no attachment
+        print('📤 Sending JSON request without attachment');
+        
+        final response = await http.post(
+          Uri.parse('$baseUrl/appointment'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(appointmentData),
+        );
+
+        print('📡 API Response Status: ${response.statusCode}');
+        print('📡 API Response Body: ${response.body}');
+
+        final responseData = jsonDecode(response.body);
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          print('✅ Appointment created successfully!');
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Appointment created successfully',
+            'statusCode': response.statusCode,
+          };
+        } else {
+          print('❌ Failed to create appointment: ${responseData['message']}');
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to create appointment',
+            'error': responseData['error'],
+            'statusCode': response.statusCode,
+          };
+        }
       }
     } catch (e) {
       print('❌ Error creating appointment: $e');

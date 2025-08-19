@@ -195,20 +195,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         color: Colors.grey.shade50,
         child: Column(
           children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              child: const Text(
-                'My Appointment History',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+
             
             // Content
             Expanded(
@@ -308,6 +295,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
                   phone: _formatPhoneNumber(appointment),
                   location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
                   appointmentData: appointment, // Pass the complete appointment data
+                  appointmentAttachment: appointment['appointmentAttachment'], // Pass the attachment URL
                   onEditPressed: () async {
                     print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
                     final result = await Navigator.push(
