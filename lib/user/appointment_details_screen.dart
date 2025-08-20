@@ -140,11 +140,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _updateGuestControllers() {
-    int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-    int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
+    int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     
-    // If more than 10 people, don't create dynamic cards
-    if (peopleCount > 10) {
+    // If more than 10 accompany users, don't create dynamic cards
+    if (accompanyUsersCount > 10) {
       // Clear all existing controllers and data
       for (var guest in _guestControllers) {
         guest['name']?.dispose();
@@ -161,9 +160,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       return;
     }
     
-    // If we're reducing the number of guests, dispose extra controllers from the end
-    if (_guestControllers.length > guestCount) {
-      for (int i = guestCount; i < _guestControllers.length; i++) {
+    // If we're reducing the number of accompany users, dispose extra controllers from the end
+    if (_guestControllers.length > accompanyUsersCount) {
+      for (int i = accompanyUsersCount; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         guest['name']?.dispose();
         guest['phone']?.dispose();
@@ -175,11 +174,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         _guestUploading.remove(guestNumber);
         _guestCountries.remove(guestNumber);
       }
-      _guestControllers.removeRange(guestCount, _guestControllers.length);
+      _guestControllers.removeRange(accompanyUsersCount, _guestControllers.length);
     }
     
-    // If we need more guests, add them at the bottom (only if <= 10 people total)
-    while (_guestControllers.length < guestCount) {
+    // If we need more accompany users, add them at the bottom (only if <= 10 accompany users total)
+    while (_guestControllers.length < accompanyUsersCount) {
       int guestNumber = _guestControllers.length + 1;
       
       Map<String, TextEditingController> controllers = {
@@ -230,15 +229,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
     }
     
-    // Validate guest information if any (only for <= 10 people)
+    // Validate guest information if any (only for <= 10 accompany users)
     bool guestFormValid = true;
-    final peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     
-    if (peopleCount > 10) {
-      // For more than 10 people, no guest validation needed
+    if (accompanyUsersCount > 10) {
+      // For more than 10 accompany users, no guest validation needed
       guestFormValid = true;
     } else {
-      // Validate individual guest details for <= 10 people
+      // Validate individual guest details for <= 10 accompany users
       for (int i = 0; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
@@ -692,7 +691,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'appointmentLocation': _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
         'assignedSecretary': _selectedSecretary, // Send null when no secretary is selected
-        'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
+        'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1, // +1 for main user
       };
 
       // Priority-based date range logic
@@ -712,9 +711,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       
 
 
-      // Add accompanyUsers if there are additional users (only for <= 10 people)
-      final peopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
-      if (_guestControllers.isNotEmpty && peopleCount <= 10) {
+      // Add accompanyUsers if there are additional users (only for <= 10 accompany users)
+      final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+      if (_guestControllers.isNotEmpty && accompanyUsersCount <= 10) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
@@ -744,10 +743,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'numberOfUsers': accompanyUsers.length,
           'users': accompanyUsers,
         };
-      } else if (peopleCount > 10) {
-        // For more than 10 people, just send the total count without individual details
+      } else if (accompanyUsersCount > 10) {
+        // For more than 10 accompany users, just send the total count without individual details
         appointmentData['accompanyUsers'] = {
-          'numberOfUsers': peopleCount, // Use the total number as entered by user
+          'numberOfUsers': accompanyUsersCount, // Use the accompany users count as entered by user
           'users': [], // Empty array since individual details not required
         };
       }
@@ -1543,23 +1542,117 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   _buildSecretaryButton(),
                   const SizedBox(height: 20),
 
-                  // Number of People
-                  _buildTextField(
-                    label: 'Number of People',
-                    controller: _numberOfUsersController,
-                    placeholder: 'Number of people (including yourself)',
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      _updateGuestControllers();
-                      _validateForm();
-                    },
+                  // Number of Accompany Users with + and - buttons
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Accompany Users',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          // Minus button
+                          GestureDetector(
+                            onTap: () {
+                              int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+                              if (currentCount > 0) {
+                                setState(() {
+                                  _numberOfUsersController.text = (currentCount - 1).toString();
+                                });
+                                _updateGuestControllers();
+                                _validateForm();
+                              }
+                            },
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: const Icon(
+                                Icons.remove,
+                                color: Colors.black87,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          
+                          // Number display
+                          Expanded(
+                            child: Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _numberOfUsersController.text.isEmpty ? '0' : _numberOfUsersController.text,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          
+                          // Plus button
+                          GestureDetector(
+                            onTap: () {
+                              int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+                              setState(() {
+                                _numberOfUsersController.text = (currentCount + 1).toString();
+                              });
+                              _updateGuestControllers();
+                              _validateForm();
+                            },
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF97316),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFF97316)),
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Number of people accompanying you',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
                   // Guest Information Cards
                   if (_guestControllers.isNotEmpty) ...[
                     const Text(
-                      'Additional Person Details',
+                      'Accompany User Details',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1568,7 +1661,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Please provide details for additional persons',
+                      'Please provide details for accompany users',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black54,
@@ -1582,7 +1675,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     }).toList(),
                     const SizedBox(height: 20),
                   ] else if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 10) ...[
-                    // Show message for more than 10 people
+                    // Show message for more than 10 accompany users
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -1617,7 +1710,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'For appointments with more than 10 people, additional person details are not required.',
+                            'For appointments with more than 10 accompany users, additional person details are not required.',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade700,
@@ -2142,7 +2235,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Guest $guestNumber',
+                    'Accompany User $guestNumber',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

@@ -11,7 +11,7 @@ import 'jwt_utils.dart'; // Added import for JwtUtils
 class ActionService {
   static const String baseUrl =
       // API base URL
-      'https://b3df1d2b7484.ngrok-free.app/api/v3'; // API base URL
+      'https://d82093b5298d.ngrok-free.app/api/v3'; // API base URL
 
   static Future<Map<String, dynamic>> getAllSecretaries({
     int page = 1,

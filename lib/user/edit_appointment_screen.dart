@@ -256,18 +256,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       print('DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers');
       if (accompanyUsers != null && accompanyUsers['users'] != null) {
         final List<dynamic> users = accompanyUsers['users'];
-        // If users array is empty, set to 1 (just main user)
-        if (users.isEmpty) {
-          _numberOfUsersController.text = '1';
-          print('DEBUG LOAD: Set numberOfUsers to 1 (empty users array)');
-        } else {
-          // Set number of users to 1 (main user) + number of accompanying users
-          _numberOfUsersController.text = (users.length + 1).toString();
-          print('DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (${users.length} accompanying + 1 main)');
-        }
+        // Set number of users to just the accompanying users count
+        _numberOfUsersController.text = users.length.toString();
+        print('DEBUG LOAD: Set numberOfUsers to ${users.length} (accompanying users only)');
       } else {
-        _numberOfUsersController.text = '1';
-        print('DEBUG LOAD: Set numberOfUsers to 1 (no accompanying users)');
+        _numberOfUsersController.text = '0';
+        print('DEBUG LOAD: Set numberOfUsers to 0 (no accompanying users)');
       }
 
       _validateForm();
@@ -751,15 +745,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _updateGuestControllers() {
-    int peopleCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-    int guestCount = peopleCount > 1 ? peopleCount - 1 : 0;
+    int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
     
-    print('DEBUG UPDATE: _updateGuestControllers - peopleCount: $peopleCount, guestCount: $guestCount, current controllers: ${_guestControllers.length}');
+    print('DEBUG UPDATE: _updateGuestControllers - accompanyUsersCount: $accompanyUsersCount, current controllers: ${_guestControllers.length}');
     
     // If we're reducing the number of guests, dispose extra controllers from the end
-    if (_guestControllers.length > guestCount) {
-      print('DEBUG UPDATE: Removing ${_guestControllers.length - guestCount} guest controllers');
-      for (int i = guestCount; i < _guestControllers.length; i++) {
+    if (_guestControllers.length > accompanyUsersCount) {
+      print('DEBUG UPDATE: Removing ${_guestControllers.length - accompanyUsersCount} guest controllers');
+      for (int i = accompanyUsersCount; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         guest['name']?.dispose();
         guest['phone']?.dispose();
@@ -771,12 +764,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestUploading.remove(guestNumber);
         _guestCountries.remove(guestNumber);
       }
-      _guestControllers.removeRange(guestCount, _guestControllers.length);
+      _guestControllers.removeRange(accompanyUsersCount, _guestControllers.length);
       print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
     }
     
     // If we need more guests, add them at the bottom
-    while (_guestControllers.length < guestCount) {
+    while (_guestControllers.length < accompanyUsersCount) {
       int guestNumber = _guestControllers.length + 1;
       
       Map<String, TextEditingController> controllers = {
@@ -823,7 +816,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     
     // Validate guest information if any
     bool guestFormValid = true;
-    if (_guestControllers.isNotEmpty) {
+    final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    if (accompanyUsersCount > 0 && accompanyUsersCount <= 10) {
       for (var guest in _guestControllers) {
         if (guest['name']?.text.isEmpty == true ||
             guest['phone']?.text.isEmpty == true ||
@@ -861,7 +855,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'appointmentLocation': _selectedLocationMongoId,
         'assignedSecretary': _selectedSecretary,
-        'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
+        'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1,
       };
 
       // Priority-based date range logic
@@ -916,7 +910,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Add accompanyUsers if there are additional users
-      if (_guestControllers.isNotEmpty) {
+      final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+      if (accompanyUsersCount > 0) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
@@ -947,8 +942,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         }
         
         updateData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsers.length + 1, // +1 for main user
-          'users': accompanyUsers,
+          'numberOfUsers': accompanyUsersCount,
+          'users': accompanyUsersCount > 10 ? [] : accompanyUsers,
         };
         print('DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users');
       } else {
@@ -956,7 +951,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         updateData['numberOfUsers'] = 1;
         // Try sending empty array instead of null to ensure backend clears the data
         updateData['accompanyUsers'] = {
-          'numberOfUsers': 1,
+          'numberOfUsers': 0,
           'users': [],
         };
         print('DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1');
@@ -1988,7 +1983,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Person $guestNumber',
+                    'Accompany User $guestNumber',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -3057,7 +3052,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Number of People',
+                              'Accompany Users',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -3070,9 +3065,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 // Minus button
                                 GestureDetector(
                                   onTap: () {
-                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
                                     print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
-                                    if (currentCount > 1) {
+                                    if (currentCount > 0) {
                                       print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                                       setState(() {
                                         _numberOfUsersController.text = (currentCount - 1).toString();
@@ -3081,7 +3076,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       _validateForm();
                                       print('DEBUG MINUS: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
                                     } else {
-                                      print('DEBUG MINUS: Cannot reduce below 1 (main user)');
+                                      print('DEBUG MINUS: Cannot reduce below 0 (no accompanying users)');
                                     }
                                   },
                                   child: Container(
@@ -3113,7 +3108,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        _numberOfUsersController.text.isEmpty ? '1' : _numberOfUsersController.text,
+                                        _numberOfUsersController.text.isEmpty ? '0' : _numberOfUsersController.text,
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w600,
@@ -3128,7 +3123,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 // Plus button
                                 GestureDetector(
                                   onTap: () {
-                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
                                     setState(() {
                                       _numberOfUsersController.text = (currentCount + 1).toString();
                                     });
@@ -3154,7 +3149,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Number of people (including yourself)',
+                              'Number of people accompanying you',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -3165,9 +3160,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         const SizedBox(height: 20),
 
                         // Guest Information Cards (for accompanying users)
-                        if (_guestControllers.isNotEmpty) ...[
+                        if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 0 && (int.tryParse(_numberOfUsersController.text) ?? 0) <= 10) ...[
                           const Text(
-                            'Additional Person Details',
+                            'Accompany User Details',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -3176,7 +3171,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Please provide details for additional persons',
+                            'Please provide details for accompany users',
                   style: TextStyle(
                     fontSize: 14,
                               color: Colors.black54,
@@ -3188,6 +3183,48 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             Map<String, TextEditingController> guest = entry.value;
                             return _buildGuestCard(index + 1, guest);
                           }).toList(),
+                          const SizedBox(height: 20),
+                        ] else if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 10) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.orange.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: Colors.orange.shade700,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Large Group Appointment',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.orange.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'For appointments with more than 10 accompany users, additional person details are not required.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.orange.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 20),
                         ],
 
@@ -3648,8 +3685,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestImages.remove(guestNumber);
         _guestUploading.remove(guestNumber);
         
-        // Update the number of users (main user + accompanying users)
-        _numberOfUsersController.text = (_guestControllers.length + 1).toString();
+        // Update the number of users (just accompanying users)
+        _numberOfUsersController.text = _guestControllers.length.toString();
         
         // Update form validation
         _validateForm();
