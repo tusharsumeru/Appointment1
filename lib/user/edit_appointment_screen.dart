@@ -85,6 +85,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   bool _isLoadingSecretaries = false;
   String? _secretaryErrorMessage;
 
+  // Email validation error
+  String? _guestEmailError;
+
   // Country picker data for guest phone
   Country _selectedCountry = Country(
     phoneCode: '91',
@@ -596,35 +599,32 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             setState(() {
               _isMainGuestPhotoUploading = false;
             });
-            // Show photo validation guidance bottom sheet
-            PhotoValidationBottomSheet.show(
-              context,
-              onTryAgain: () {
-                // Clear any previous state and allow user to pick again
-                setState(() {
-                  _mainGuestPhotoFile = null;
-                  _mainGuestPhotoUrl = null;
-                  _isMainGuestPhotoUploading = false;
-                });
-              },
-            );
-          }
-        } catch (e) {
-          setState(() {
-            _isMainGuestPhotoUploading = false;
-          });
-          // Show photo validation guidance bottom sheet
-          PhotoValidationBottomSheet.show(
-            context,
-            onTryAgain: () {
+            
+            // Show backend error message in dialog
+            final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(errorMessage, () {
               // Clear any previous state and allow user to pick again
               setState(() {
                 _mainGuestPhotoFile = null;
                 _mainGuestPhotoUrl = null;
                 _isMainGuestPhotoUploading = false;
               });
-            },
-          );
+            });
+          }
+        } catch (e) {
+          setState(() {
+            _isMainGuestPhotoUploading = false;
+          });
+          
+          // Show error message in dialog
+          _showPhotoValidationErrorDialog('Error uploading photo: ${e.toString()}', () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _mainGuestPhotoFile = null;
+              _mainGuestPhotoUrl = null;
+              _isMainGuestPhotoUploading = false;
+            });
+          });
         }
       }
     } catch (e) {
@@ -802,7 +802,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   void _validateForm() {
     bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
-        _numberOfUsersController.text.isNotEmpty &&
         _fromDateController.text.isNotEmpty &&
         _toDateController.text.isNotEmpty;
     
@@ -812,6 +811,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       if (_mainGuestPhotoUrl == null) {
         mainGuestPhotoValid = false;
       }
+    }
+    
+    // Validate main guest email if appointment type is guest
+    bool mainGuestEmailValid = true;
+    if (_isGuestAppointment) {
+      mainGuestEmailValid = _guestEmailError == null && _guestEmailController.text.isNotEmpty;
     }
     
     // Validate guest information if any
@@ -837,7 +842,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
     
     setState(() {
-      _isFormValid = basicFormValid && mainGuestPhotoValid && guestFormValid && programDatesValid;
+      _isFormValid = basicFormValid && mainGuestPhotoValid && mainGuestEmailValid && guestFormValid && programDatesValid;
     });
   }
 
@@ -1115,6 +1120,74 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  // Email field with validation
+  Widget _buildEmailField({
+    required String label,
+    required TextEditingController controller,
+    required String placeholder,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.deepPurple),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: (value) {
+            setState(() {
+              // Validate email on change
+              if (value.isEmpty) {
+                _guestEmailError = 'Email is required';
+              } else {
+                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                if (!emailRegex.hasMatch(value)) {
+                  _guestEmailError = 'Please enter a valid email address';
+                } else {
+                  _guestEmailError = null;
+                }
+              }
+            });
+            _validateForm();
+          },
+        ),
+        if (_guestEmailError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _guestEmailError!,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildTextArea({
     required String label,
     required TextEditingController controller,
@@ -1346,20 +1419,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                               'Please select a location first',
                               style: TextStyle(color: Colors.grey[600]),
                             )
-                          : _secretaries.isEmpty
-                              ? Text(
-                                  'Select a secretary',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                )
-                              : Text(
-                                  _getSelectedSecretaryName() ?? 'Select a secretary',
+                          : Text(
+                              _getSelectedSecretaryName() ?? 'Select a secretary',
                               style: TextStyle(
-                                    color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
-                                        ? Colors.black87 
-                                        : Colors.grey[600],
-                                    fontSize: 16,
-                                  ),
-                                ),
+                                color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
+                                    ? Colors.black87 
+                                    : Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                            ),
                 ),
                 Icon(
                   Icons.arrow_drop_down,
@@ -1556,17 +1624,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           
           print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
           
-          // Show photo validation guidance bottom sheet
-          PhotoValidationBottomSheet.show(
-            context,
-            onTryAgain: () {
-              // Clear any previous state and allow user to pick again
-              setState(() {
-                _guestImages.remove(guestNumber);
-                _guestUploading[guestNumber] = false;
-              });
-            },
-          );
+          // Show backend error message in dialog
+          final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
+          _showPhotoValidationErrorDialog('Guest $guestNumber: $errorMessage', () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _guestImages.remove(guestNumber);
+              _guestUploading[guestNumber] = false;
+            });
+          });
         }
       } catch (e) {
         setState(() {
@@ -1575,17 +1641,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         
         print('❌ Error uploading guest $guestNumber photo: $e');
         
-        // Show photo validation guidance bottom sheet
-        PhotoValidationBottomSheet.show(
-          context,
-          onTryAgain: () {
-            // Clear any previous state and allow user to pick again
-            setState(() {
-              _guestImages.remove(guestNumber);
-              _guestUploading[guestNumber] = false;
-            });
-          },
-        );
+        // Show error message in dialog
+        _showPhotoValidationErrorDialog('Guest $guestNumber: Error uploading photo: ${e.toString()}', () {
+          // Clear any previous state and allow user to pick again
+          setState(() {
+            _guestImages.remove(guestNumber);
+            _guestUploading[guestNumber] = false;
+          });
+        });
       }
     }
   }
@@ -2601,11 +2664,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(height: 16),
                           
                           // Guest Email
-                          _buildReferenceField(
+                          _buildEmailField(
                             label: 'Email ID of the Guest',
                             controller: _guestEmailController,
                             placeholder: 'guest@email.com',
-                            keyboardType: TextInputType.emailAddress,
                           ),
                           const SizedBox(height: 16),
                           
@@ -3699,5 +3761,132 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       );
     }
+  }
+
+  void _showPhotoValidationErrorDialog(String errorMessage, VoidCallback onTryAgain) {
+    // Remove "Guest X:" prefix if present
+    String cleanErrorMessage = errorMessage;
+    if (cleanErrorMessage.contains('Guest ') && cleanErrorMessage.contains(': ')) {
+      cleanErrorMessage = cleanErrorMessage.split(': ').skip(1).join(': ');
+    }
+    
+    // Remove "Profile photo validation failed:" prefix if present
+    if (cleanErrorMessage.startsWith('Profile photo validation failed:')) {
+      cleanErrorMessage = cleanErrorMessage.replaceFirst('Profile photo validation failed:', '').trim();
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Photo Validation Failed',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                                         Text(
+                       cleanErrorMessage,
+                       style: TextStyle(
+                         fontSize: 12,
+                         color: Colors.orange.shade700,
+                         fontWeight: FontWeight.w500,
+                       ),
+                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange.shade600,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Please ensure your photo meets our validation requirements',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade700,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Show photo validation guidance bottom sheet
+                PhotoValidationBottomSheet.show(
+                  context,
+                  onTryAgain: onTryAgain,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'View Photo Guidelines',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

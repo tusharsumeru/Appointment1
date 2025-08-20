@@ -283,44 +283,39 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
           );
         } else {
-          // Validation failed - clear the selected file and show bottom sheet
+          // Validation failed - clear the selected file and show error dialog
           setState(() {
             _selectedImageFile = null;
             _isUploadingPhoto = false;
           });
 
-          // Show photo validation guidance bottom sheet
-          PhotoValidationBottomSheet.show(
-            context,
-            onTryAgain: () {
-              // Clear any previous state and allow user to pick again
-              setState(() {
-                _selectedImageFile = null;
-                _uploadedPhotoUrl = null;
-                _isUploadingPhoto = false;
-              });
-            },
-          );
-        }
-      } catch (e) {
-        // Exception occurred - clear the selected file and show bottom sheet
-        setState(() {
-          _selectedImageFile = null;
-          _isUploadingPhoto = false;
-        });
-
-        // Show photo validation guidance bottom sheet
-        PhotoValidationBottomSheet.show(
-          context,
-          onTryAgain: () {
+          // Show backend error message in dialog
+          final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
+          _showPhotoValidationErrorDialog(errorMessage, () {
             // Clear any previous state and allow user to pick again
             setState(() {
               _selectedImageFile = null;
               _uploadedPhotoUrl = null;
               _isUploadingPhoto = false;
             });
-          },
-        );
+          });
+        }
+      } catch (e) {
+        // Exception occurred - clear the selected file and show error dialog
+        setState(() {
+          _selectedImageFile = null;
+          _isUploadingPhoto = false;
+        });
+
+        // Show error message in dialog
+        _showPhotoValidationErrorDialog('Error uploading photo: ${e.toString()}', () {
+          // Clear any previous state and allow user to pick again
+          setState(() {
+            _selectedImageFile = null;
+            _uploadedPhotoUrl = null;
+            _isUploadingPhoto = false;
+          });
+        });
       }
     }
   }
@@ -1486,5 +1481,126 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ),
       );
     }
+  }
+
+  void _showPhotoValidationErrorDialog(String errorMessage, VoidCallback onTryAgain) {
+    // Remove "Profile photo validation failed:" prefix if present
+    if (errorMessage.startsWith('Profile photo validation failed:')) {
+      errorMessage = errorMessage.replaceFirst('Profile photo validation failed:', '').trim();
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Photo Validation Failed',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      errorMessage,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange.shade600,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Please ensure your photo meets our validation requirements',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade700,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Show photo validation guidance bottom sheet
+                PhotoValidationBottomSheet.show(
+                  context,
+                  onTryAgain: onTryAgain,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'View Photo Guidelines',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 } 
