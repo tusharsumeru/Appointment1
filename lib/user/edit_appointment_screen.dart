@@ -87,6 +87,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Email validation error
   String? _guestEmailError;
+  
+  // Date validation errors
+  String? _dateRangeError;
+  String? _programDateRangeError;
 
   // Country picker data for guest phone
   Country _selectedCountry = Country(
@@ -800,10 +804,75 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _validateForm();
   }
 
+  // Helper method to parse date string to DateTime
+  DateTime? _parseDateString(String dateString) {
+    try {
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        return DateTime(year, month, day);
+      }
+    } catch (e) {
+      print('Error parsing date: $e');
+    }
+    return null;
+  }
+
+  // Helper method to validate date range
+  bool _isValidDateRange(String fromDate, String toDate) {
+    if (fromDate.isEmpty || toDate.isEmpty) return true; // Let other validation handle empty dates
+    
+    final fromDateTime = _parseDateString(fromDate);
+    final toDateTime = _parseDateString(toDate);
+    
+    if (fromDateTime == null || toDateTime == null) return true; // Let other validation handle invalid dates
+    
+    return fromDateTime.isBefore(toDateTime);
+  }
+
+  // Helper method to validate date range and set error message
+  bool _validateDateRange(String fromDate, String toDate, String errorType) {
+    if (fromDate.isEmpty || toDate.isEmpty) {
+      if (errorType == 'appointment') {
+        _dateRangeError = null;
+      } else if (errorType == 'program') {
+        _programDateRangeError = null;
+      }
+      return true; // Let other validation handle empty dates
+    }
+    
+    final fromDateTime = _parseDateString(fromDate);
+    final toDateTime = _parseDateString(toDate);
+    
+    if (fromDateTime == null || toDateTime == null) {
+      if (errorType == 'appointment') {
+        _dateRangeError = null;
+      } else if (errorType == 'program') {
+        _programDateRangeError = null;
+      }
+      return true; // Let other validation handle invalid dates
+    }
+    
+    final isValid = fromDateTime.isBefore(toDateTime);
+    
+    if (errorType == 'appointment') {
+      _dateRangeError = isValid ? null : 'From date must be before to date';
+    } else if (errorType == 'program') {
+      _programDateRangeError = isValid ? null : 'Program start date must be before program end date';
+    }
+    
+    return isValid;
+  }
+
   void _validateForm() {
     bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
         _fromDateController.text.isNotEmpty &&
         _toDateController.text.isNotEmpty;
+    
+    // Validate date ranges
+    bool dateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, 'appointment');
     
     // Validate main guest photo if appointment type is guest
     bool mainGuestPhotoValid = true;
@@ -838,11 +907,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (_isAttendingProgram) {
       if (_programFromDateController.text.isEmpty || _programToDateController.text.isEmpty) {
         programDatesValid = false;
+      } else {
+        // Validate program date range
+        programDatesValid = _validateDateRange(_programFromDateController.text, _programToDateController.text, 'program');
       }
     }
     
     setState(() {
-      _isFormValid = basicFormValid && mainGuestPhotoValid && mainGuestEmailValid && guestFormValid && programDatesValid;
+      _isFormValid = basicFormValid && dateRangeValid && mainGuestPhotoValid && mainGuestEmailValid && guestFormValid && programDatesValid;
     });
   }
 
@@ -1773,13 +1845,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     required String label,
     required TextEditingController controller,
     Function()? onTap,
+    String? errorMessage,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+      children: [
         Text(
           label,
-                    style: const TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: Colors.black87,
@@ -1793,12 +1866,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             hintText: 'Select date',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.deepPurple),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             suffixIcon: const Icon(Icons.calendar_today),
           ),
           onTap: onTap,
         ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorMessage,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -3306,6 +3398,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           label: 'From Date',
                           controller: _fromDateController,
                           onTap: () => _selectDate(context, _fromDateController),
+                          errorMessage: _dateRangeError,
                         ),
                         const SizedBox(height: 20),
 
@@ -3314,6 +3407,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           label: 'To Date',
                           controller: _toDateController,
                           onTap: () => _selectDate(context, _toDateController),
+                          errorMessage: _dateRangeError,
                         ),
                         const SizedBox(height: 32),
 
@@ -3598,7 +3692,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     child: Container(
                                       width: double.infinity,
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: const Color(0xFFF97316)),
+                                        border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: TextField(
@@ -3617,6 +3711,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       ),
                                     ),
                                   ),
+                                  if (_programDateRangeError != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _programDateRangeError!,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               
@@ -3640,7 +3744,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     child: Container(
                                       width: double.infinity,
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: const Color(0xFFF97316)),
+                                        border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: TextField(
@@ -3659,6 +3763,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       ),
                                     ),
                                   ),
+                                  if (_programDateRangeError != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _programDateRangeError!,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ],
