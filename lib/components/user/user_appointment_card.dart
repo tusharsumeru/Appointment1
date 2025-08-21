@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../user/darshan_photos_screen.dart';
 
 class UserAppointmentCard extends StatelessWidget {
@@ -21,6 +22,7 @@ class UserAppointmentCard extends StatelessWidget {
   final VoidCallback? onEditPressed;
   final Color? headerColor;
   final Map<String, dynamic>? appointmentData;
+  final String? appointmentAttachment;
 
   const UserAppointmentCard({
     super.key,
@@ -43,6 +45,7 @@ class UserAppointmentCard extends StatelessWidget {
     this.onEditPressed,
     this.headerColor,
     this.appointmentData,
+    this.appointmentAttachment,
   });
 
 
@@ -512,6 +515,73 @@ class UserAppointmentCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    // Attachments Section - Only show if attachment exists
+                    if (appointmentAttachment != null && appointmentAttachment!.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              // Open the attachment URL
+                              print('🔄 Attachment URL clicked: $appointmentAttachment');
+                              _openAttachmentUrl(context, appointmentAttachment!);
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.attach_file,
+                                  size: 20,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Attachments',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Click to view attachment',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade500,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.open_in_new,
+                                  size: 20,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 16),
 
                     // Assignment and Date Range
@@ -690,5 +760,67 @@ class UserAppointmentCard extends StatelessWidget {
     }
     
     return false;
+  }
+
+  // Open attachment URL in browser
+  Future<void> _openAttachmentUrl(BuildContext context, String url) async {
+    try {
+      // Clean and validate the URL
+      String cleanUrl = url.trim();
+      
+      // Add protocol if missing
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://$cleanUrl';
+      }
+      
+      print('🔄 Attempting to open URL: $cleanUrl');
+      
+      final Uri uri = Uri.parse(cleanUrl);
+      
+      // Check if URL can be launched
+      final canLaunch = await canLaunchUrl(uri);
+      print('🔄 Can launch URL: $canLaunch');
+      
+      if (canLaunch) {
+        final launched = await launchUrl(
+          uri, 
+          mode: LaunchMode.externalApplication,
+        );
+        print('🔄 URL launched successfully: $launched');
+        
+        if (!launched && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to open attachment in browser'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // Show error if URL cannot be launched
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Cannot open attachment URL: $cleanUrl'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('🔄 Error opening attachment URL: $e');
+      // Show error if there's an exception
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening attachment: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 } 

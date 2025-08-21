@@ -7,6 +7,7 @@ import 'user_screen.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -52,6 +53,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   String? _selectedLocationId; // Store the selected location ID (locationId for API calls)
   String? _selectedLocationMongoId; // Store the MongoDB _id for form submission
   File? _selectedImage;
+  File? _selectedAttachment; // For file attachments
   bool _isAttendingProgram = false;
   
   // Guest information state
@@ -277,14 +279,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    print('📸 Starting main guest photo pick process...');
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      print('📸 Main guest image selected: ${pickedFile.path}');
-      print('📸 File size: ${await File(pickedFile.path).length()} bytes');
-
       // Show uploading state
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -292,23 +290,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       });
 
       try {
-        print('📤 Starting photo upload for main guest...');
         // Upload photo immediately and get S3 URL
         final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
 
-        print('📥 Upload result for main guest: $result');
-
         if (result['success']) {
           final s3Url = result['s3Url'];
-          print('✅ Main guest photo uploaded successfully!');
-          print('📸 S3 URL: $s3Url');
 
           setState(() {
             _mainGuestPhotoUrl = s3Url;
             _isMainGuestPhotoUploading = false;
           });
-
-          print('💾 Main guest photo URL stored: $_mainGuestPhotoUrl');
           
           // Update form validation
           _validateForm();
@@ -323,9 +314,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
-
-          print('❌ Main guest photo upload failed: ${result['message']}');
-          print('❌ Error details: ${result['error']}');
           
           // Update form validation
           _validateForm();
@@ -347,9 +335,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         setState(() {
           _isMainGuestPhotoUploading = false;
         });
-
-        print('❌ Error uploading main guest photo: $e');
-        print('❌ Error stack trace: ${StackTrace.current}');
         
         // Update form validation
         _validateForm();
@@ -367,8 +352,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           },
         );
       }
-    } else {
-      print('⚠️ No image selected for main guest');
     }
   }
 
@@ -377,8 +360,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _selectedImage = null;
       _mainGuestPhotoUrl = null;
     });
-    
-    print('🗑️ Main guest photo removed');
     
     // Update form validation
     _validateForm();
@@ -391,14 +372,73 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
+  // File attachment methods
+  Future<void> _pickAttachment() async {
+    try {
+      // Import file_picker at the top of the file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 5MB'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _selectedAttachment = File(file.path!);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('File selected: ${file.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking file: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _removeAttachment() {
+    setState(() {
+      _selectedAttachment = null;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Attachment removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
   // Guest image handling methods
   Future<void> _pickGuestImage(ImageSource source, int guestNumber) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      print('📸 Guest $guestNumber image selected: ${pickedFile.path}');
-      
       // Show uploading state
       setState(() {
         _guestUploading[guestNumber] = true;
@@ -415,8 +455,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             _guestUploading[guestNumber] = false;
           });
           
-          print('✅ Guest $guestNumber photo uploaded to S3: $s3Url');
-          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Guest $guestNumber photo uploaded and validated successfully!'),
@@ -427,8 +465,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             _guestUploading[guestNumber] = false;
           });
-          
-          print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
           
           // Show photo validation guidance bottom sheet
           PhotoValidationBottomSheet.show(
@@ -446,8 +482,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         setState(() {
           _guestUploading[guestNumber] = false;
         });
-        
-        print('❌ Error uploading guest $guestNumber photo: $e');
         
         // Show photo validation guidance bottom sheet
         PhotoValidationBottomSheet.show(
@@ -481,34 +515,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Load ashram locations from API
   Future<void> _loadLocations() async {
     try {
-      print('🔄 Loading ashram locations...');
       final result = await ActionService.getAshramLocations();
       
       if (result['success']) {
         final locations = List<Map<String, dynamic>>.from(result['data'] ?? []);
-        print('✅ Loaded ${locations.length} locations from API');
         
         setState(() {
           _locations = locations;
           _isLoadingLocations = false;
         });
-        
-        // Log location details for debugging
-        for (var location in locations) {
-          print('📍 Location: ${location['name']} (ID: ${location['_id']})');
-          print('📍 Location fields: ${location.keys.toList()}');
-          if (location['locationId'] != null) {
-            print('📍 Location has locationId: ${location['locationId']}');
-          }
-        }
       } else {
-        print('❌ Failed to load locations: ${result['message']}');
         setState(() {
           _isLoadingLocations = false;
         });
       }
     } catch (e) {
-      print('❌ Error loading locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
@@ -518,7 +539,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Load secretaries for selected location
   Future<void> _loadSecretariesForLocation(String locationId) async {
     try {
-      print('🔄 Loading secretaries for location: $locationId');
       setState(() {
         _isLoadingSecretaries = true;
         _secretaryErrorMessage = null;
@@ -531,10 +551,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         final locationData = result['data'];
         final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
-        
-        print('✅ Loaded ${assignedSecretaries.length} secretaries from API');
-        print('📋 Raw assignedSecretaries type: ${assignedSecretaries.runtimeType}');
-        print('📋 Raw assignedSecretaries data: $assignedSecretaries');
         
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = [];
@@ -549,8 +565,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               'role': secretaryData['role']?.toString() ?? '',
             });
           } catch (e) {
-            print('⚠️ Error processing secretary data: $e');
-            print('⚠️ Secretary data: $secretary');
+            // Error processing secretary data
           }
         }
 
@@ -558,13 +573,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           _secretaries = secretaries;
           _isLoadingSecretaries = false;
         });
-        
-        // Log secretary details for debugging
-        for (var secretary in secretaries) {
-          print('👤 Secretary: ${secretary['name']} (ID: ${secretary['id']})');
-        }
       } else {
-        print('❌ Failed to load secretaries: ${result['message']}');
         setState(() {
           _isLoadingSecretaries = false;
           _secretaryErrorMessage = result['message'] ?? 'Failed to load secretaries';
@@ -572,7 +581,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         });
       }
     } catch (e) {
-      print('❌ Error loading secretaries: $e');
       setState(() {
         _isLoadingSecretaries = false;
         _secretaryErrorMessage = 'Network error: $e';
@@ -583,97 +591,49 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   // Load reference information from API
   Future<void> _loadReferenceInfo() async {
-    print('🚀 AppointmentDetailsScreen._loadReferenceInfo() - Starting to load reference data...');
-    
     try {
       // First try to get fresh data from API
-      print('📡 Calling ActionService.getCurrentUser() to fetch fresh data...');
       final apiResult = await ActionService.getCurrentUser();
       
       Map<String, dynamic>? userData;
       
       if (apiResult['success'] == true) {
-        print('✅ API call successful, using fresh data');
         userData = apiResult['data'];
       } else {
-        print('⚠️ API call failed, falling back to stored data');
-        print('📡 Calling StorageService.getUserData()...');
         userData = await StorageService.getUserData();
       }
       
-      print('✅ Reference data retrieval completed');
-      print('📋 Raw userData received: $userData');
-      print('📋 userData type: ${userData.runtimeType}');
-      print('📋 userData is null: ${userData == null}');
-      
       if (userData != null) {
-        print('🔍 Detailed userData analysis:');
-        print('   - userData keys: ${userData.keys.toList()}');
-        print('   - userData length: ${userData.length}');
+        // Set initial values for reference fields
+        final fullName = userData['fullName'] ?? userData['name'] ?? '';
+        final email = userData['email'] ?? '';
         
-        // Log each field individually
-        print('📝 Individual field values:');
-        print('   - fullName: ${userData['fullName']} (type: ${userData['fullName']?.runtimeType})');
-        print('   - name: ${userData['name']} (type: ${userData['name']?.runtimeType})');
-        print('   - email: ${userData['email']} (type: ${userData['email']?.runtimeType})');
-        print('   - phoneNumber: ${userData['phoneNumber']} (type: ${userData['phoneNumber']?.runtimeType})');
-        print('   - phone: ${userData['phone']} (type: ${userData['phone']?.runtimeType})');
+        // Handle phone number object structure
+        String phone = '';
+        if (userData['phoneNumber'] != null) {
+          if (userData['phoneNumber'] is Map<String, dynamic>) {
+            final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
+            final countryCode = phoneObj['countryCode'] ?? '';
+            final number = phoneObj['number'] ?? '';
+            phone = '$countryCode$number';
+          } else {
+            phone = userData['phoneNumber'].toString();
+          }
+        } else if (userData['phone'] != null) {
+          phone = userData['phone'].toString();
+        } else {
+          phone = ''; // Explicitly set to empty string
+        }
         
-        // Log ALL fields to see what's actually available
-        print('🔍 ALL fields in userData:');
-        userData.forEach((key, value) {
-          print('   - $key: $value (type: ${value.runtimeType})');
+        setState(() {
+          _referenceNameController.text = fullName;
+          _referenceEmailController.text = email;
+          _referencePhoneController.text = phone;
+          _isLoadingReferenceInfo = false;
         });
       }
       
-      print('🎯 Setting reference field values...');
-      
-      // Set initial values for reference fields with logging
-      final fullName = userData?['fullName'] ?? userData?['name'] ?? '';
-      final email = userData?['email'] ?? '';
-      
-      // Handle phone number object structure
-      String phone = '';
-      if (userData?['phoneNumber'] != null) {
-        if (userData!['phoneNumber'] is Map<String, dynamic>) {
-          final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
-          final countryCode = phoneObj['countryCode'] ?? '';
-          final number = phoneObj['number'] ?? '';
-          phone = '$countryCode$number';
-          print('📱 Phone number extracted: $phone (from phoneNumber object)');
-        } else {
-          phone = userData['phoneNumber'].toString();
-          print('📱 Phone number extracted: $phone (from phoneNumber string)');
-        }
-      } else if (userData?['phone'] != null) {
-        phone = userData!['phone'].toString();
-        print('📱 Phone number extracted: $phone (from phone field)');
-      } else {
-        print('📱 No phone number found in user data');
-        phone = ''; // Explicitly set to empty string
-      }
-      
-      print('📝 Reference field values set:');
-      print('   - fullName: $fullName');
-      print('   - email: $email');
-      print('   - phone: $phone');
-      
-      setState(() {
-        _referenceNameController.text = fullName;
-        _referenceEmailController.text = email;
-        _referencePhoneController.text = phone;
-        _isLoadingReferenceInfo = false;
-      });
-      
-      print('✅ AppointmentDetailsScreen._loadReferenceInfo() completed successfully');
-      
     } catch (error) {
-      print('❌ Error in AppointmentDetailsScreen._loadReferenceInfo(): $error');
-      print('❌ Error type: ${error.runtimeType}');
-      print('❌ Stack trace: ${StackTrace.current}');
-      
-      print('🔄 Setting default values due to error...');
-      
       // Set default values if data loading fails
       setState(() {
         _referenceNameController.text = '';
@@ -681,15 +641,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         _referencePhoneController.text = '';
         _isLoadingReferenceInfo = false;
       });
-      
-      print('✅ Default values set successfully');
     }
   }
 
   void _submitForm() async {
     try {
-      print('🚀 Starting form submission...');
-
       // Show loading indicator
       showDialog(
         context: context,
@@ -714,15 +670,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               'countryCode': phoneValue['countryCode'] ?? '',
               'number': phoneValue['number'] ?? '',
             };
-            print('📱 Debug - personalInfo phone already object; mirrored to phoneNumber');
           } else if (phoneValue is String) {
             final parsed = _parsePhoneStringToObject(phoneValue);
             cleanedPersonalInfo['phoneNumber'] = parsed;
-            print('📱 Debug - Parsed personalInfo phone string to object: $parsed');
           }
         }
       } catch (e) {
-        print('⚠️ Could not normalize personalInfo phone: $e');
+        // Could not normalize personalInfo phone
       }
       
       // Collect all form data
@@ -736,20 +690,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'userCurrentDesignation': widget.personalInfo['designation'] ?? '', // Changed from 'Office Operations Specialist'
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
-        'preferredDateRange': {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        },
         'appointmentLocation': _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
         'assignedSecretary': _selectedSecretary, // Send null when no secretary is selected
         'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
       };
-      
-      // Add debug logging for phone number format
-      print('📱 Debug - widget.personalInfo: ${widget.personalInfo}');
-      if (widget.personalInfo['phone'] != null) {
-        print('📱 Debug - phone in personalInfo: ${widget.personalInfo['phone']} (type: ${widget.personalInfo['phone'].runtimeType})');
+
+      // Priority-based date range logic
+      if (_isAttendingProgram) {
+        // FIRST PRIORITY: If attending program, use program dates for preferred date range
+        appointmentData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        };
+      } else {
+        // SECOND PRIORITY: If not attending program, use preferred date range
+        appointmentData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        };
       }
+      
+
 
       // Add accompanyUsers if there are additional users (only for <= 10 people)
       final peopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
@@ -776,7 +737,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           }
           
           accompanyUsers.add(guestData);
-          print('📱 Debug - accompanyUser $guestNumber phoneNumber: ${guestData['phoneNumber']} (type: ${guestData['phoneNumber'].runtimeType})');
         }
         
         // Structure accompanyUsers as expected by backend
@@ -786,7 +746,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         };
       } else if (peopleCount > 10) {
         // For more than 10 people, just send the total count without individual details
-        print('📋 Large group appointment: ${peopleCount} people - no individual details required');
         appointmentData['accompanyUsers'] = {
           'numberOfUsers': peopleCount, // Use the total number as entered by user
           'users': [], // Empty array since individual details not required
@@ -812,14 +771,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Add main guest photo URL if available
         if (_mainGuestPhotoUrl != null) {
           guestInfo['profilePhotoUrl'] = _mainGuestPhotoUrl;
-          print('📸 Adding main guest photo URL to form: $_mainGuestPhotoUrl');
-        } else {
-          print('⚠️ Main guest photo URL not available');
         }
         
         appointmentData['guestInformation'] = guestInfo;
-        print('📋 Guest information data: $guestInfo');
-        print('📱 Debug - guestInfo.phoneNumber: ${guestInfo['phoneNumber']} (type: ${guestInfo['phoneNumber'].runtimeType})');
       }
 
       // Add reference information if appointment type is guest
@@ -844,27 +798,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointmentData['attendingCourseDetails'] = {
           'courseName': 'General Program',
           'duration': '1 day',
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
         };
       }
 
-      print('📋 Appointment data to send: ${json.encode(appointmentData)}');
-      print('📍 Location IDs - locationId: $_selectedLocationId, mongoId: $_selectedLocationMongoId');
-      print('👤 Selected secretary ID: $_selectedSecretary');
-      if (_selectedSecretary != null) {
-        final selectedSecretary = _secretaries.firstWhere(
-          (secretary) => secretary['id'] == _selectedSecretary,
-          orElse: () => {},
-        );
-        print('👤 Selected secretary name: ${selectedSecretary['name']}');
-      }
 
-      // Use ActionService.createAppointment method
-      final result = await ActionService.createAppointment(appointmentData);
+
+      // Use ActionService.createAppointment method with attachment
+      final result = await ActionService.createAppointment(
+        appointmentData,
+        attachmentFile: _selectedAttachment,
+      );
 
       // Hide loading indicator
       Navigator.pop(context);
-
-      print('📥 ActionService result: $result');
 
       if (result['success'] == true) {
         // Send appointment creation notification
@@ -892,8 +840,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         );
       }
     } catch (e) {
-      print('❌ Error in _submitForm: $e');
-      
       // Hide loading indicator
       Navigator.pop(context);
       
@@ -1462,6 +1408,136 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                    ),
                    const SizedBox(height: 20),
 
+                   // Attachment Section
+                   Container(
+                     width: double.infinity,
+                     padding: const EdgeInsets.all(16),
+                     decoration: BoxDecoration(
+                       color: Colors.grey.shade50,
+                       borderRadius: BorderRadius.circular(12),
+                       border: Border.all(color: Colors.grey.shade300),
+                     ),
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         Row(
+                           children: [
+                             Container(
+                               padding: const EdgeInsets.all(8),
+                               decoration: BoxDecoration(
+                                 color: Colors.grey.shade200,
+                                 borderRadius: BorderRadius.circular(8),
+                               ),
+                               child: Icon(
+                                 Icons.attach_file,
+                                 color: Colors.grey.shade600,
+                                 size: 20,
+                               ),
+                             ),
+                             const SizedBox(width: 12),
+                             const Text(
+                               'Upload Document',
+                               style: TextStyle(
+                                 fontSize: 16,
+                                 fontWeight: FontWeight.w600,
+                                 color: Colors.black87,
+                               ),
+                             ),
+                           ],
+                         ),
+                         const SizedBox(height: 8),
+                         Text(
+                           'Tap to select PDF, DOC, PPT files (up to 5MB)',
+                           style: TextStyle(
+                             fontSize: 14,
+                             color: Colors.grey.shade600,
+                           ),
+                         ),
+                         const SizedBox(height: 12),
+                         GestureDetector(
+                           onTap: _pickAttachment,
+                           child: Container(
+                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                             decoration: BoxDecoration(
+                               color: Colors.white,
+                               borderRadius: BorderRadius.circular(8),
+                               border: Border.all(color: Colors.grey.shade300),
+                             ),
+                             child: const Text(
+                               'Choose File',
+                               style: TextStyle(
+                                 fontSize: 14,
+                                 fontWeight: FontWeight.w500,
+                                 color: Colors.black87,
+                               ),
+                             ),
+                           ),
+                         ),
+                         
+                         // Show selected attachment
+                         if (_selectedAttachment != null) ...[
+                           const SizedBox(height: 16),
+                           Container(
+                             padding: const EdgeInsets.all(12),
+                             decoration: BoxDecoration(
+                               color: Colors.green.shade50,
+                               borderRadius: BorderRadius.circular(8),
+                               border: Border.all(color: Colors.green.shade200),
+                             ),
+                             child: Row(
+                               children: [
+                                 Icon(
+                                   Icons.check_circle,
+                                   color: Colors.green.shade600,
+                                   size: 20,
+                                 ),
+                                 const SizedBox(width: 8),
+                                 Expanded(
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       Text(
+                                         _selectedAttachment!.path.split('/').last,
+                                         style: const TextStyle(
+                                           fontWeight: FontWeight.w600,
+                                           fontSize: 14,
+                                         ),
+                                       ),
+                                       const SizedBox(height: 2),
+                                       Text(
+                                         'File selected successfully',
+                                         style: TextStyle(
+                                           fontSize: 12,
+                                           color: Colors.grey.shade600,
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                                 GestureDetector(
+                                   onTap: _removeAttachment,
+                                   child: Container(
+                                     padding: const EdgeInsets.all(4),
+                                     decoration: BoxDecoration(
+                                       color: Colors.red.shade50,
+                                       borderRadius: BorderRadius.circular(4),
+                                     ),
+                                     child: Icon(
+                                       Icons.close,
+                                       color: Colors.red.shade600,
+                                       size: 16,
+                                     ),
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           ),
+                         ],
+                       ],
+                     ),
+                   ),
+                   const SizedBox(height: 20),
+
                                      // Appointment Location
                    _buildLocationButton(),
                   const SizedBox(height: 20),
@@ -1700,6 +1776,134 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       const Text('Yes'),
                     ],
                   ),
+                  
+                  // Program Date Range Section (only show if user selects Yes)
+                  if (_isAttendingProgram) ...[
+                    const SizedBox(height: 24),
+                    
+                    // Program Date Range Header
+                    Row(
+                      children: [
+                        const Text(
+                          'Program Date Range',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '*',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Program Start and End Date Fields
+                    Column(
+                      children: [
+                        // Program Start Date
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Program Start',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFFF97316),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () => _selectDate(context, _fromDateController),
+                              child: Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFF97316)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: TextField(
+                                  controller: _fromDateController,
+                                  enabled: false,
+                                  decoration: InputDecoration(
+                                    hintText: 'dd-mm-yyyy',
+                                    hintStyle: TextStyle(color: Colors.grey[400]),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                    prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
+                                    suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Program End Date
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Program End',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFFF97316),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () => _selectDate(context, _toDateController),
+                              child: Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFF97316)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: TextField(
+                                  controller: _toDateController,
+                                  enabled: false,
+                                  decoration: InputDecoration(
+                                    hintText: 'dd-mm-yyyy',
+                                    hintStyle: TextStyle(color: Colors.grey[400]),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                    prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
+                                    suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Instructional Text
+                    Text(
+                      'Please enter your program dates. Your appointment will be scheduled during this period.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: const Color(0xFFF97316),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
 
                   // Submit Button
@@ -2664,7 +2868,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                  );
                  _selectedLocationId = selectedLocation['locationId'];
                  _selectedLocationMongoId = selectedLocation['_id'];
-                 print('📍 Selected location: $locationName (locationId: $_selectedLocationId, mongoId: $_selectedLocationMongoId)');
                  
                  // Load secretaries for the selected location
                  if (_selectedLocationId != null) {
@@ -3387,7 +3590,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
          return date.toUtc().toIso8601String();
        }
      } catch (e) {
-       print('❌ Error parsing date "$dateString": $e');
+       // Error parsing date
      }
      
      // Return current date as fallback
@@ -3414,7 +3617,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       final onlyDigits = trimmed.replaceAll(RegExp(r'\D'), '');
       return {'countryCode': defaultCode, 'number': onlyDigits};
     } catch (e) {
-      print('⚠️ Failed to parse phone string "$value": $e');
       return {'countryCode': defaultCode, 'number': ''};
     }
   }
@@ -3449,8 +3651,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     });
 
     try {
-      print('🔍 Searching locations for: "$query"');
-      
       final response = await http.get(
         Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
         headers: {
@@ -3496,16 +3696,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           _isSearchingLocations = false;
         });
         
-        print('✅ Found ${suggestions.length} location suggestions');
+        // Found location suggestions
       } else {
-        print('❌ Location search failed: ${response.statusCode}');
         setState(() {
           _locationSuggestions = [];
           _isSearchingLocations = false;
         });
       }
     } catch (e) {
-      print('❌ Error searching locations: $e');
       setState(() {
         _locationSuggestions = [];
         _isSearchingLocations = false;
@@ -3521,8 +3719,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _locationSuggestions = [];
       _isSearchingLocations = false;
     });
-    
-    print('📍 Selected location: $displayName');
   }
 
   void _clearLocationSuggestions() {
@@ -3761,7 +3957,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         mode: LaunchMode.externalApplication,
       );
     } catch (e) {
-      print('❌ Error launching URL: $e');
       // Show URL in a dialog instead
       showDialog(
         context: context,

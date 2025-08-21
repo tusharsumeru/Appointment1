@@ -5,8 +5,10 @@ import 'user_screen.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:country_picker/country_picker.dart';
 import '../components/user/photo_validation_bottom_sheet.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EditAppointmentScreen extends StatefulWidget {
   final Map<String, dynamic>? appointmentData;
@@ -26,6 +28,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   final TextEditingController _numberOfUsersController = TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
+  
+  // Program Date Range Controllers
+  final TextEditingController _programFromDateController = TextEditingController();
+  final TextEditingController _programToDateController = TextEditingController();
   
   // Reference Information Controllers (for guest appointments)
   final TextEditingController _referenceNameController = TextEditingController();
@@ -48,7 +54,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String? _selectedLocationId;
   String? _selectedLocationMongoId;
   File? _selectedImage;
+  File? _selectedAttachment; // For file attachments
   bool _isAttendingProgram = false;
+  String? _existingAttachmentUrl; // For existing attachment from appointment data
   
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
@@ -124,6 +132,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _numberOfUsersController.dispose();
     _fromDateController.dispose();
     _toDateController.dispose();
+    _programFromDateController.dispose();
+    _programToDateController.dispose();
     _referenceNameController.dispose();
     _referenceEmailController.dispose();
     _referencePhoneController.dispose();
@@ -209,6 +219,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       if (_selectedLocationId != null) {
         _loadSecretaries();
       }
+
+      // Load program attendance data
+      final attendingCourseDetails = appointment['attendingCourseDetails'];
+      if (attendingCourseDetails != null && attendingCourseDetails is Map<String, dynamic>) {
+        _isAttendingProgram = true;
+        
+        // Load program date range
+        final fromDate = attendingCourseDetails['fromDate'];
+        final toDate = attendingCourseDetails['toDate'];
+        
+        if (fromDate != null) {
+          final from = DateTime.parse(fromDate);
+          _programFromDateController.text = '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+        }
+        
+        if (toDate != null) {
+          final to = DateTime.parse(toDate);
+          _programToDateController.text = '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+        }
+      }
+
+      // Load existing attachment URL
+      _existingAttachmentUrl = appointment['appointmentAttachment']?.toString();
 
       // Load guest-specific data if this is a guest appointment
       if (_isGuestAppointment) {
@@ -615,6 +648,66 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _validateForm();
   }
 
+  // File attachment methods
+  Future<void> _pickAttachment() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 5MB'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _selectedAttachment = File(file.path!);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('File selected: ${file.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking file: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _removeAttachment() {
+    setState(() {
+      _selectedAttachment = null;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Attachment removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
   Future<void> _loadReferenceInfo() async {
     try {
       final result = await ActionService.getCurrentUser();
@@ -741,8 +834,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
     }
     
+    // Validate program dates if attending a program
+    bool programDatesValid = true;
+    if (_isAttendingProgram) {
+      if (_programFromDateController.text.isEmpty || _programToDateController.text.isEmpty) {
+        programDatesValid = false;
+      }
+    }
+    
     setState(() {
-      _isFormValid = basicFormValid && mainGuestPhotoValid && guestFormValid;
+      _isFormValid = basicFormValid && mainGuestPhotoValid && guestFormValid && programDatesValid;
     });
   }
 
@@ -758,14 +859,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       Map<String, dynamic> updateData = {
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
-        'preferredDateRange': {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        },
         'appointmentLocation': _selectedLocationMongoId,
         'assignedSecretary': _selectedSecretary,
         'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1,
       };
+
+      // Priority-based date range logic
+      if (_isAttendingProgram) {
+        // FIRST PRIORITY: If attending program, use program dates for preferred date range
+        updateData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_programFromDateController.text),
+          'toDate': _parseDateToISO(_programToDateController.text),
+        };
+      } else {
+        // SECOND PRIORITY: If not attending program, use preferred date range
+        updateData['preferredDateRange'] = {
+          'fromDate': _parseDateToISO(_fromDateController.text),
+          'toDate': _parseDateToISO(_toDateController.text),
+        };
+      }
 
       // Add guest information if appointment type is guest
       if (_isGuestAppointment) {
@@ -850,6 +962,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         print('DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1');
       }
 
+      // Add program attendance data if applicable
+      if (_isAttendingProgram) {
+        updateData['attendingCourseDetails'] = {
+          'courseName': 'General Program',
+          'duration': '1 day',
+          'fromDate': _parseDateToISO(_programFromDateController.text),
+          'toDate': _parseDateToISO(_programToDateController.text),
+        };
+      }
+
       // Call API to update appointment
       final appointmentId = widget.appointmentData?['appointmentId'] ?? 
                            widget.appointmentData?['_id'] ?? '';
@@ -902,6 +1024,68 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       print('Error parsing date: $e');
     }
     return dateString;
+  }
+
+  // Open attachment URL
+  Future<void> _openAttachmentUrl(String url) async {
+    try {
+      // Clean and validate the URL
+      String cleanUrl = url.trim();
+      
+      // Add protocol if missing
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://$cleanUrl';
+      }
+      
+      print('🔄 Attempting to open URL: $cleanUrl');
+      
+      final Uri uri = Uri.parse(cleanUrl);
+      
+      // Check if URL can be launched
+      final canLaunch = await canLaunchUrl(uri);
+      print('🔄 Can launch URL: $canLaunch');
+      
+      if (canLaunch) {
+        final launched = await launchUrl(
+          uri, 
+          mode: LaunchMode.externalApplication,
+        );
+        print('🔄 URL launched successfully: $launched');
+        
+        if (!launched && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to open attachment in browser'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // Show error if URL cannot be launched
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Cannot open attachment URL: $cleanUrl'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('🔄 Error opening attachment URL: $e');
+      // Show error if there's an exception
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening attachment: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   // UI Helper Methods
@@ -3035,6 +3219,367 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           controller: _toDateController,
                           onTap: () => _selectDate(context, _toDateController),
                         ),
+                        const SizedBox(height: 32),
+
+                        // Attachment Section
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.attach_file,
+                                      color: Colors.grey.shade600,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Upload Document',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tap to select PDF, DOC, PPT files (up to 5MB)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              // Show existing attachment if available
+                              if (_existingAttachmentUrl != null && _existingAttachmentUrl!.isNotEmpty) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.blue.shade200),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => _openAttachmentUrl(_existingAttachmentUrl!),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.attach_file,
+                                            size: 20,
+                                            color: Colors.blue.shade600,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      'Existing Attachment',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.blue.shade600,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Click to view attachment',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.blue.shade500,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.open_in_new,
+                                            size: 20,
+                                            color: Colors.blue.shade600,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              GestureDetector(
+                                onTap: _pickAttachment,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: const Text(
+                                    'Choose File',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              // Show selected attachment
+                              if (_selectedAttachment != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.green.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green.shade600,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _selectedAttachment!.path.split('/').last,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'File selected successfully',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: _removeAttachment,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Icon(
+                                            Icons.close,
+                                            color: Colors.red.shade600,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Program Attendance Question
+                        const Text(
+                          'Are you attending any program at the Bangalore Ashram during these dates? *',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Radio<bool>(
+                              value: false,
+                              groupValue: _isAttendingProgram,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isAttendingProgram = value!;
+                                });
+                                _validateForm();
+                              },
+                            ),
+                            const Text('No'),
+                            const SizedBox(width: 32),
+                            Radio<bool>(
+                              value: true,
+                              groupValue: _isAttendingProgram,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isAttendingProgram = value!;
+                                });
+                                _validateForm();
+                              },
+                            ),
+                            const Text('Yes'),
+                          ],
+                        ),
+                        
+                        // Program Date Range Section (only show if user selects Yes)
+                        if (_isAttendingProgram) ...[
+                          const SizedBox(height: 24),
+                          
+                          // Program Date Range Header
+                          Row(
+                            children: [
+                              const Text(
+                                'Program Date Range',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                '*',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Program Start and End Date Fields
+                          Column(
+                            children: [
+                              // Program Start Date
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Program Start',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFFF97316),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  GestureDetector(
+                                    onTap: () => _selectDate(context, _programFromDateController),
+                                    child: Container(
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: const Color(0xFFF97316)),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: TextField(
+                                        controller: _programFromDateController,
+                                        enabled: false,
+                                        decoration: InputDecoration(
+                                          hintText: 'dd-mm-yyyy',
+                                          hintStyle: TextStyle(color: Colors.grey[400]),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                          prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
+                                          suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              
+                              // Program End Date
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Program End',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFFF97316),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  GestureDetector(
+                                    onTap: () => _selectDate(context, _programToDateController),
+                                    child: Container(
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: const Color(0xFFF97316)),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: TextField(
+                                        controller: _programToDateController,
+                                        enabled: false,
+                                        decoration: InputDecoration(
+                                          hintText: 'dd-mm-yyyy',
+                                          hintStyle: TextStyle(color: Colors.grey[400]),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                          prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
+                                          suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          // Instructional Text
+                          Text(
+                            'Please enter your program dates. Your appointment will be scheduled during this period.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: const Color(0xFFF97316),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 32),
 
                         // Save Changes Button

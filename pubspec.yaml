@@ -51,6 +51,11 @@ dependencies:
   firebase_core: ^2.15.0
   firebase_messaging: ^14.6.5
   flutter_local_notifications: ^15.1.1
+  font_awesome_flutter: ^10.6.0
+  share_plus: ^7.2.1
+  dio: ^5.5.0
+  archive: ^3.6.1
+  flutter_file_dialog: ^3.0.2
 
 dev_dependencies:
   flutter_test:

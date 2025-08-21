@@ -283,7 +283,8 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 
+          'message':
+              responseData['message'] ??
               '📧 Password reset link sent to your email! Please check your inbox (and spam folder) for instructions.',
         };
       } else {
@@ -291,7 +292,8 @@ class ActionService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 
+          'message':
+              responseData['message'] ??
               'Failed to send password reset link. Please try again.',
         };
       }
@@ -370,6 +372,115 @@ class ActionService {
           'success': false,
           'statusCode': response.statusCode,
           'message': responseData['message'] ?? 'Failed to get user profile',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
+  // Get sub-user face match results by sub-user ID
+  static Future<Map<String, dynamic>> getSubUserFaceMatchResultBySubUserId(
+    String subUserId, {
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate subUserId
+      if (subUserId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Sub-user ID is required',
+        };
+      }
+
+      // Build query parameters for pagination
+      final queryParams = {'page': page.toString(), 'limit': limit.toString()};
+
+      // Make API call with authorization header
+      final uri = Uri.parse(
+        '$baseUrl/auth/sub-user/$subUserId/face-match-result',
+      ).replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return face match data with pagination
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'pagination': responseData['pagination'],
+          'message':
+              responseData['message'] ??
+              'Sub-user face match results retrieved successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid sub-user ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Face match result not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message':
+              responseData['message'] ??
+              'Face match result not found for this sub-user',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ??
+              'Failed to get sub-user face match results',
         };
       }
     } catch (error) {
@@ -3744,7 +3855,7 @@ class ActionService {
             final mimeType = _getMimeType(fileExtension);
 
             final attachmentMultipart = http.MultipartFile(
-              'attachment',
+              'appointmentAttachment',
               attachmentStream,
               attachmentLength,
               filename: fileName,
@@ -4193,13 +4304,13 @@ class ActionService {
       // If there's an attachment file, use multipart request
       if (attachmentFile != null && attachmentFile.path != null) {
         print('DEBUG API: Using multipart request with attachment');
-        
+
         // Create multipart request
         final request = http.MultipartRequest('PUT', uri);
-        
+
         // Add authorization header
         request.headers['Authorization'] = 'Bearer $token';
-        
+
         // Add JSON data fields directly
         cleanUpdateData.forEach((key, value) {
           if (value is Map || value is List) {
@@ -4208,7 +4319,7 @@ class ActionService {
             request.fields[key] = value.toString();
           }
         });
-        
+
         // Add file - use the field name that multer expects
         final file = await http.MultipartFile.fromPath(
           'appointmentAttachment', // This should match the multer field name
@@ -4216,17 +4327,21 @@ class ActionService {
           filename: attachmentFile.name,
         );
         request.files.add(file);
-        
-        print('DEBUG API: Sending multipart request with file: ${attachmentFile.name}');
+
+        print(
+          'DEBUG API: Sending multipart request with file: ${attachmentFile.name}',
+        );
         print('DEBUG API: File field name: appointmentAttachment');
         print('DEBUG API: Form fields: ${request.fields}');
-        
+
         final streamedResponse = await request.send();
         final response = await http.Response.fromStream(streamedResponse);
-        
-        print('DEBUG API: Multipart response status code: ${response.statusCode}');
+
+        print(
+          'DEBUG API: Multipart response status code: ${response.statusCode}',
+        );
         print('DEBUG API: Multipart response body: ${response.body}');
-        
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           return {
@@ -4247,7 +4362,7 @@ class ActionService {
       } else {
         // No attachment file, use JSON request
         print('DEBUG API: Using JSON request without attachment');
-        
+
         final response = await http.put(
           uri,
           headers: {
@@ -5526,12 +5641,16 @@ class ActionService {
   }
 
   ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
-  // Create appointment method using enhanced API
+  // Create appointment method using enhanced API with file attachment support
   static Future<Map<String, dynamic>> createAppointment(
-    Map<String, dynamic> appointmentData,
-  ) async {
+    Map<String, dynamic> appointmentData, {
+    File? attachmentFile,
+  }) async {
     try {
       print('🚀 Creating appointment with data: $appointmentData');
+      if (attachmentFile != null) {
+        print('📎 Attachment file: ${attachmentFile.path}');
+      }
 
       final token = await StorageService.getToken();
       if (token == null) {
@@ -5539,10 +5658,10 @@ class ActionService {
       }
 
       // Add default secretary ID if not provided
-      if (appointmentData['assignedSecretary'] == null) {
-        appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
-        print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
-      }
+      // if (appointmentData['assignedSecretary'] == null) {
+      //   appointmentData['assignedSecretary'] = '6891a4d3a26a787d5aec5d50';
+      //   print('👤 Added default secretary ID: 6891a4d3a26a787d5aec5d50');
+      // }
 
       // Log the final appointment data being sent
       print('📋 Final appointment data to be sent:');
@@ -5571,37 +5690,132 @@ class ActionService {
       print('   - assignedSecretary: ${appointmentData['assignedSecretary']}');
       print('   - guestInformation: ${appointmentData['guestInformation']}');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/appointment'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(appointmentData),
-      );
+      // Check if we have an attachment file
+      if (attachmentFile != null && await attachmentFile.exists()) {
+        // Use multipart request for file upload
+        print('📎 Creating multipart request with file attachment');
 
-      print('📡 API Response Status: ${response.statusCode}');
-      print('📡 API Response Body: ${response.body}');
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/appointment'),
+        );
 
-      final responseData = jsonDecode(response.body);
+        // Add authorization header
+        request.headers['Authorization'] = 'Bearer $token';
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        print('✅ Appointment created successfully!');
-        return {
-          'success': true,
-          'data': responseData['data'],
-          'message':
-              responseData['message'] ?? 'Appointment created successfully',
-          'statusCode': response.statusCode,
-        };
+        // Add all appointment data as fields
+        appointmentData.forEach((key, value) {
+          if (value != null) {
+            if (value is Map || value is List) {
+              // Convert complex objects to JSON strings
+              request.fields[key] = jsonEncode(value);
+            } else {
+              request.fields[key] = value.toString();
+            }
+          }
+        });
+
+        // Add the attachment file
+        try {
+          print('📎 Adding attachment file to request: ${attachmentFile.path}');
+          final fileStream = http.ByteStream(attachmentFile.openRead());
+          final fileLength = await attachmentFile.length();
+          print('📎 File size: ${fileLength} bytes');
+
+          // Get file extension and name
+          final fileName = attachmentFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'pdf';
+          final mimeType = _getMimeType(fileExtension);
+
+          final fileMultipart = http.MultipartFile(
+            'appointmentAttachment', // Field name expected by the backend
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(fileMultipart);
+          print('📎 Attachment file added successfully to multipart request');
+        } catch (fileError) {
+          print('❌ Error adding attachment file: $fileError');
+          return {
+            'success': false,
+            'message':
+                'Error processing attachment file: ${fileError.toString()}',
+          };
+        }
+
+        print('📤 Sending multipart request to: ${request.url}');
+        print('📤 Request headers: ${request.headers}');
+        print('📤 Total files being sent: ${request.files.length}');
+
+        // Send the request
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        print('📥 API Response Status: ${response.statusCode}');
+        print('📥 API Response Body: ${response.body}');
+
+        final responseData = jsonDecode(response.body);
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          print('✅ Appointment created successfully with attachment!');
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Appointment created successfully',
+            'statusCode': response.statusCode,
+          };
+        } else {
+          print('❌ Failed to create appointment: ${responseData['message']}');
+          return {
+            'success': false,
+            'message':
+                responseData['message'] ?? 'Failed to create appointment',
+            'error': responseData['error'],
+            'statusCode': response.statusCode,
+          };
+        }
       } else {
-        print('❌ Failed to create appointment: ${responseData['message']}');
-        return {
-          'success': false,
-          'message': responseData['message'] ?? 'Failed to create appointment',
-          'error': responseData['error'],
-          'statusCode': response.statusCode,
-        };
+        // Use regular JSON request if no attachment
+        print('📤 Sending JSON request without attachment');
+
+        final response = await http.post(
+          Uri.parse('$baseUrl/appointment'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(appointmentData),
+        );
+
+        print('📡 API Response Status: ${response.statusCode}');
+        print('📡 API Response Body: ${response.body}');
+
+        final responseData = jsonDecode(response.body);
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          print('✅ Appointment created successfully!');
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Appointment created successfully',
+            'statusCode': response.statusCode,
+          };
+        } else {
+          print('❌ Failed to create appointment: ${responseData['message']}');
+          return {
+            'success': false,
+            'message':
+                responseData['message'] ?? 'Failed to create appointment',
+            'error': responseData['error'],
+            'statusCode': response.statusCode,
+          };
+        }
       }
     } catch (e) {
       print('❌ Error creating appointment: $e');
@@ -5614,6 +5828,217 @@ class ActionService {
   }
 
   // Upload and validate profile photo for accompanying users
+  static Future<Map<String, dynamic>> validateProfilePhoto(
+    File photoFile,
+  ) async {
+    try {
+      print('📸 Starting profile photo validation for: ${photoFile.path}');
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/validate-profile-photo'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the photo file
+      if (await photoFile.exists()) {
+        try {
+          print('📸 Adding photo file to request: ${photoFile.path}');
+          final photoStream = http.ByteStream(photoFile.openRead());
+          final photoLength = await photoFile.length();
+          print('📸 Photo file size: ${photoLength} bytes');
+
+          // Get file extension and name
+          final fileName = photoFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'jpg';
+          final mimeType = _getMimeType(fileExtension);
+
+          final photoMultipart = http.MultipartFile(
+            'file', // Field name expected by the API
+            photoStream,
+            photoLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(photoMultipart);
+          print('📸 Photo file added successfully to multipart request');
+        } catch (photoError) {
+          print('❌ Error adding photo file: $photoError');
+          return {
+            'success': false,
+            'message': 'Error processing photo file: ${photoError.toString()}',
+          };
+        }
+      } else {
+        print('⚠️ Photo file does not exist: ${photoFile.path}');
+        return {'success': false, 'message': 'Photo file not found'};
+      }
+
+      print('📤 Sending profile photo validation request to: ${request.url}');
+      print('📤 Request headers: ${request.headers}');
+      print('📤 Total files being sent: ${request.files.length}');
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Profile photo validation response status: ${response.statusCode}');
+      print('📥 Profile photo validation response body: ${response.body}');
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('✅ Profile photo validated successfully!');
+        print('📸 Validation result: ${responseData['data']}');
+
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Profile photo validated successfully',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ Profile photo validation failed: ${errorData['message']}');
+        print('🔍 Error response data: $errorData');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Failed to validate profile photo',
+          'error': errorData['error'],
+          'data': errorData, // Include the full error response data
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error in validateProfilePhoto: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Create sub user with profile photo
+  static Future<Map<String, dynamic>> createSubUser(
+    File photoFile,
+  ) async {
+    try {
+      print('👤 Starting sub user creation with photo: ${photoFile.path}');
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/create-sub-user'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the photo file
+      if (await photoFile.exists()) {
+        try {
+          print('📸 Adding photo file to request: ${photoFile.path}');
+          final photoStream = http.ByteStream(photoFile.openRead());
+          final photoLength = await photoFile.length();
+          print('📸 Photo file size: ${photoLength} bytes');
+
+          // Get file extension and name
+          final fileName = photoFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'jpg';
+          final mimeType = _getMimeType(fileExtension);
+
+          final photoMultipart = http.MultipartFile(
+            'file', // Field name expected by the API
+            photoStream,
+            photoLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(photoMultipart);
+          print('📸 Photo file added successfully to multipart request');
+        } catch (photoError) {
+          print('❌ Error adding photo file: $photoError');
+          return {
+            'success': false,
+            'message': 'Error processing photo file: ${photoError.toString()}',
+          };
+        }
+      } else {
+        print('⚠️ Photo file does not exist: ${photoFile.path}');
+        return {'success': false, 'message': 'Photo file not found'};
+      }
+
+      print('📤 Sending sub user creation request to: ${request.url}');
+      print('📤 Request headers: ${request.headers}');
+      print('📤 Total files being sent: ${request.files.length}');
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Sub user creation response status: ${response.statusCode}');
+      print('📥 Sub user creation response body: ${response.body}');
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('✅ Sub user created successfully!');
+        print('👤 Sub user data: ${responseData['data']}');
+
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Sub user created successfully',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ Sub user creation failed: ${errorData['message']}');
+        print('🔍 Error response data: $errorData');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Failed to create sub user',
+          'error': errorData['error'],
+          'data': errorData, // Include the full error response data
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error in createSubUser: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>> uploadAndValidateProfilePhoto(
     File photoFile,
   ) async {
@@ -5703,10 +6128,12 @@ class ActionService {
       } else {
         final errorData = jsonDecode(response.body);
         print('❌ Photo upload failed: ${errorData['message']}');
+        print('🔍 Error response data: $errorData');
         return {
           'success': false,
           'message': errorData['message'] ?? 'Failed to upload photo',
           'error': errorData['error'],
+          'data': errorData, // Include the full error response data
           'statusCode': response.statusCode,
         };
       }

@@ -290,6 +290,10 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
               itemCount: appointments.length,
               itemBuilder: (context, index) {
                 final appointment = appointments[index];
+                // Debug attachment data
+                final attachmentUrl = appointment['appointmentAttachment'];
+                print('🔄 Appointment ${appointment['appointmentId']} attachment: $attachmentUrl');
+                
                 return UserAppointmentCard(
                   appointmentId: appointment['appointmentId'] ?? 'N/A',
                   status: appointment['appointmentStatus']?['status'] ?? 'Unknown',
@@ -308,6 +312,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
                   phone: _formatPhoneNumber(appointment),
                   location: appointment['currentAddress'] ?? appointment['appointmentLocation']?['name'] ?? 'N/A',
                   appointmentData: appointment, // Pass the complete appointment data
+                  appointmentAttachment: attachmentUrl, // Pass the attachment URL
                   onEditPressed: () async {
                     print('🔄 Edit button pressed for appointment: ${appointment['appointmentId']}');
                     final result = await Navigator.push(
