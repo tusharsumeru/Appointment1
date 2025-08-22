@@ -5,10 +5,12 @@ import '../../action/action.dart';
 
 class PhotoUploadBottomSheet extends StatefulWidget {
   final Function(File file)? onPhotoSelected;
+  final VoidCallback? onSubUserCreated;
 
   const PhotoUploadBottomSheet({
     super.key,
     this.onPhotoSelected,
+    this.onSubUserCreated,
   });
 
   @override
@@ -143,6 +145,11 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
           ),
         );
         
+        // Call the callback to refresh the parent screen
+        if (widget.onSubUserCreated != null) {
+          widget.onSubUserCreated!();
+        }
+        
         // Close the bottom sheet
         Navigator.of(context).pop();
       } else {
@@ -169,36 +176,49 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
   }
 
   bool _isValidationSuccessful(Map<String, dynamic> result) {
+    // Debug: Print the actual result structure
+    print('🔍 [DEBUG VALIDATION] Full result: $result');
+    print('🔍 [DEBUG VALIDATION] result["success"]: ${result['success']}');
+    print('🔍 [DEBUG VALIDATION] result["status"]: ${result['status']}');
+    print('🔍 [DEBUG VALIDATION] result["data"]: ${result['data']}');
+    
     // Check if validation was successful based on response data
     bool isSuccess = result['success'] == true;
     
-    // Also check the status field in the response data
-    if (result['data'] != null && result['data']['status'] != null) {
-      isSuccess = result['data']['status'] != 'non_verified';
+    // Check the status field in the response data (directly in result, not nested under data)
+    if (result['status'] != null) {
+      isSuccess = result['status'] == 'verified';
     }
     
+    // Also check if data contains status (in case it's nested)
+    if (result['data'] != null && result['data']['status'] != null) {
+      isSuccess = result['data']['status'] == 'verified';
+    }
+    
+    print('🔍 [DEBUG VALIDATION] Final isSuccess: $isSuccess');
     return isSuccess;
   }
 
   String _getValidationMessage(Map<String, dynamic> result) {
+    // Debug: Print the actual result structure for message
+    print('🔍 [DEBUG MESSAGE] Full result: $result');
+    print('🔍 [DEBUG MESSAGE] result["status"]: ${result['status']}');
+    print('🔍 [DEBUG MESSAGE] result["reason"]: ${result['reason']}');
+    print('🔍 [DEBUG MESSAGE] result["data"]: ${result['data']}');
+    
     // Handle different response structures from backend
     if (_isValidationSuccessful(result)) {
       return result['message'] ?? 'Photo validated successfully!';
     } else {
       // Handle error messages from backend for non-200 status codes
       // Check if we have the response data with status and reason
-      if (result['data'] != null) {
-        // Handle the structure: {"status": "non_verified", "reason": "multiple_faces_detected! Please upload your image clearly"}
-        if (result['data']['status'] == 'non_verified' && result['data']['reason'] != null) {
-          return result['data']['reason'];
-        }
-        // Handle other data structures
-        if (result['data']['reason'] != null) {
-          return result['data']['reason'];
-        }
-        if (result['data']['message'] != null) {
-          return result['data']['message'];
-        }
+      if (result['status'] == 'non_verified' && result['reason'] != null) {
+        return result['reason'];
+      }
+      
+      // Also check if data contains the reason
+      if (result['data'] != null && result['data']['reason'] != null) {
+        return result['data']['reason'];
       }
       
       // Fallback to other error message fields
@@ -273,254 +293,116 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                 // Show validation result or upload area
                 if (isValidationComplete && validationResult != null && selectedImage != null) ...[
                   // Validation Result with Image
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _isValidationSuccessful(validationResult!)
-                            ? Colors.green
-                            : Colors.red,
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      color: _isValidationSuccessful(validationResult!)
-                          ? Colors.green.shade50
-                          : Colors.red.shade50,
-                    ),
-                    child: Column(
-                      children: [
-                        // Status Title
-                        Text(
-                          _isValidationSuccessful(validationResult!)
-                              ? 'Photo Verified Successfully!'
-                              : 'Photo Validation Failed',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                  Column(
+                    children: [
+                      // Image
+                      Container(
+                        width: double.infinity,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
                             color: _isValidationSuccessful(validationResult!)
-                                ? Colors.green.shade800
-                                : Colors.red.shade800,
+                                ? Colors.transparent
+                                : Colors.red,
+                            width: 2,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        
-                        // Image with Validation Indicators
-                        Stack(
-                          children: [
-                            // Main Image
-                            Container(
-                              width: double.infinity,
-                              height: 300,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: validationResult!['success'] == true
-                                      ? Colors.green.shade200
-                                      : Colors.red.shade200,
-                                  width: 2,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            selectedImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Success Message
+                      Text(
+                        _getValidationMessage(validationResult!),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _isValidationSuccessful(validationResult!)
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _resetValidation,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade200,
+                                foregroundColor: Colors.grey.shade800,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.file(
-                                  selectedImage!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.grey.shade200,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 48,
-                                          color: Colors.grey,
+                              child: const Text('Try Another Photo'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _isValidationSuccessful(validationResult!) && !isCreatingSubUser
+                                  ? _createSubUser
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _isValidationSuccessful(validationResult!)
+                                    ? const Color(0xFFF97316)
+                                    : Colors.grey.shade300,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: isCreatingSubUser
+                                  ? const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
+                                        SizedBox(width: 8),
+                                        Text('Creating...'),
+                                      ],
+                                    )
+                                  : Text(
+                                      _isValidationSuccessful(validationResult!)
+                                          ? 'Create Sub User'
+                                          : 'Create Sub User',
+                                    ),
                             ),
-                            
-                                                         // Validation Indicators
-                             Positioned(
-                               top: 12,
-                               left: 12,
-                               child: Container(
-                                 padding: const EdgeInsets.all(8),
-                                 decoration: BoxDecoration(
-                                   color: _isValidationSuccessful(validationResult!)
-                                       ? Colors.green
-                                       : Colors.red,
-                                   shape: BoxShape.circle,
-                                   boxShadow: [
-                                     BoxShadow(
-                                       color: Colors.black.withOpacity(0.2),
-                                       blurRadius: 4,
-                                       offset: const Offset(0, 2),
-                                     ),
-                                   ],
-                                 ),
-                                 child: Icon(
-                                   _isValidationSuccessful(validationResult!)
-                                       ? Icons.check
-                                       : Icons.close,
-                                   color: Colors.white,
-                                   size: 24,
-                                 ),
-                               ),
-                             ),
-                            
-                                                         // Right side indicator (only for success)
-                             if (_isValidationSuccessful(validationResult!))
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                                                 // Validation Message
-                         Container(
-                           width: double.infinity,
-                           padding: const EdgeInsets.all(16),
-                           decoration: BoxDecoration(
-                             color: _isValidationSuccessful(validationResult!)
-                                 ? Colors.green.shade50
-                                 : Colors.red.shade50,
-                             borderRadius: BorderRadius.circular(8),
-                             border: Border.all(
-                               color: _isValidationSuccessful(validationResult!)
-                                   ? Colors.green.shade200
-                                   : Colors.red.shade200,
-                             ),
-                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    validationResult!['success'] == true
-                                        ? Icons.check_circle
-                                        : Icons.error_outline,
-                                    color: validationResult!['success'] == true
-                                        ? Colors.green.shade600
-                                        : Colors.red.shade600,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                                                     Text(
-                                     _isValidationSuccessful(validationResult!)
-                                         ? 'Validation Result'
-                                         : 'Validation Error',
-                                     style: TextStyle(
-                                       fontSize: 16,
-                                       fontWeight: FontWeight.w600,
-                                       color: _isValidationSuccessful(validationResult!)
-                                           ? Colors.green.shade700
-                                           : Colors.red.shade700,
-                                     ),
-                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                                                             Text(
-                                 _getValidationMessage(validationResult!),
-                                 style: TextStyle(
-                                   fontSize: 14,
-                                   color: _isValidationSuccessful(validationResult!)
-                                       ? Colors.green.shade700
-                                       : Colors.red.shade700,
-                                 ),
-                               ),
-                            ],
                           ),
-                        ),
-                        
-                        const SizedBox(height: 20),
-                        
-                        // Action Buttons
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _resetValidation,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey.shade200,
-                                  foregroundColor: Colors.grey.shade800,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text('Try Another Photo'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                                                         Expanded(
-                               child: ElevatedButton(
-                                 onPressed: _isValidationSuccessful(validationResult!) && !isCreatingSubUser
-                                     ? _createSubUser
-                                     : null,
-                                 style: ElevatedButton.styleFrom(
-                                   backgroundColor: _isValidationSuccessful(validationResult!)
-                                       ? const Color(0xFFF97316)
-                                       : Colors.grey.shade300,
-                                   foregroundColor: Colors.white,
-                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                   shape: RoundedRectangleBorder(
-                                     borderRadius: BorderRadius.circular(8),
-                                   ),
-                                 ),
-                                 child: isCreatingSubUser
-                                     ? const Row(
-                                         mainAxisAlignment: MainAxisAlignment.center,
-                                         children: [
-                                           SizedBox(
-                                             width: 16,
-                                             height: 16,
-                                             child: CircularProgressIndicator(
-                                               strokeWidth: 2,
-                                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                             ),
-                                           ),
-                                           SizedBox(width: 8),
-                                           Text('Creating...'),
-                                         ],
-                                       )
-                                     : Text(
-                                         _isValidationSuccessful(validationResult!)
-                                             ? 'Create Sub User'
-                                             : 'Fix Issues',
-                                       ),
-                               ),
-                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 ] else ...[
                   // Upload area

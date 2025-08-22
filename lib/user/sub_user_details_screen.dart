@@ -297,6 +297,9 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
           faceMatchResults = _extractFaceMatchImages(data);
           paginationInfo = pagination;
           isLoadingFaceMatch = false;
+          // Clear selection when changing pages
+          selectedImageIds.clear();
+          isSelectAll = false;
         });
       } else {
         setState(() {
@@ -838,7 +841,7 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                                   child: ElevatedButton.icon(
                                     onPressed: _downloadSelectedAsZip,
                                     icon: const Icon(Icons.download, size: 16),
-                                    label: const Text('Download'),
+                                    label: Text('Download (${selectedImageIds.length})'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.green,
                                       foregroundColor: Colors.white,
@@ -857,7 +860,7 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                                   child: ElevatedButton.icon(
                                     onPressed: _shareSelectedImages,
                                     icon: const Icon(Icons.share, size: 16),
-                                    label: const Text('Share'),
+                                    label: Text('Share (${selectedImageIds.length})'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: widget.isMainUser ? const Color(0xFFF97316) : Colors.blue,
                                       foregroundColor: Colors.white,

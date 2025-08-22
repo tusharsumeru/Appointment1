@@ -195,20 +195,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         color: Colors.grey.shade50,
         child: Column(
           children: [
-            // // Header
-            // Container(
-            //   width: double.infinity,
-            //   padding: const EdgeInsets.all(20),
-            //   child: const Text(
-            //     'My Appointment History',
-            //     style: TextStyle(
-            //       fontSize: 24,
-            //       fontWeight: FontWeight.bold,
-            //       color: Colors.black87,
-            //     ),
-            //     textAlign: TextAlign.center,
-            //   ),
-            // ),
+
             
             // Content
             Expanded(
@@ -579,20 +566,51 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
     try {
       final List<String> photos = [];
       
-      // Add main user's photo first
-      final mainUserPhoto = appointment['profilePhoto'];
-      if (mainUserPhoto != null && mainUserPhoto.toString().isNotEmpty) {
-        photos.add(mainUserPhoto);
-      }
+      // Check if this is a guest appointment
+      final appointmentType = appointment['appointmentType']?.toString().toLowerCase();
+      final appointmentFor = appointment['appointmentFor'];
+      final isGuestAppointment = appointmentType == 'guest' || 
+                                 (appointmentFor != null && appointmentFor['type']?.toString().toLowerCase() == 'guest');
       
-      // Add accompanying users' photos
-      final accompanyUsers = appointment['accompanyUsers'];
-      if (accompanyUsers != null && accompanyUsers['users'] != null) {
-        final List<dynamic> users = accompanyUsers['users'];
+      if (isGuestAppointment) {
+        // For guest appointments: show guest photo first, then accompanying users
+        // Add guest's photo first
+        final guestInformation = appointment['guestInformation'];
+        if (guestInformation != null && guestInformation is Map<String, dynamic>) {
+          final guestPhoto = guestInformation['profilePhotoUrl'];
+          if (guestPhoto != null && guestPhoto.toString().isNotEmpty) {
+            photos.add(guestPhoto);
+          }
+        }
         
-        for (final user in users) {
-          if (user is Map<String, dynamic> && user['profilePhotoUrl'] != null && user['profilePhotoUrl'].toString().isNotEmpty) {
-            photos.add(user['profilePhotoUrl']);
+        // Add accompanying users' photos
+        final accompanyUsers = appointment['accompanyUsers'];
+        if (accompanyUsers != null && accompanyUsers['users'] != null) {
+          final List<dynamic> users = accompanyUsers['users'];
+          
+          for (final user in users) {
+            if (user is Map<String, dynamic> && user['profilePhotoUrl'] != null && user['profilePhotoUrl'].toString().isNotEmpty) {
+              photos.add(user['profilePhotoUrl']);
+            }
+          }
+        }
+      } else {
+        // For regular appointments: show main user's photo first, then accompanying users
+        // Add main user's photo first
+        final mainUserPhoto = appointment['profilePhoto'];
+        if (mainUserPhoto != null && mainUserPhoto.toString().isNotEmpty) {
+          photos.add(mainUserPhoto);
+        }
+        
+        // Add accompanying users' photos
+        final accompanyUsers = appointment['accompanyUsers'];
+        if (accompanyUsers != null && accompanyUsers['users'] != null) {
+          final List<dynamic> users = accompanyUsers['users'];
+          
+          for (final user in users) {
+            if (user is Map<String, dynamic> && user['profilePhotoUrl'] != null && user['profilePhotoUrl'].toString().isNotEmpty) {
+              photos.add(user['profilePhotoUrl']);
+            }
           }
         }
       }
@@ -605,11 +623,24 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
 
   int _calculateTotalAttendees(Map<String, dynamic> appointment) {
     try {
+      // Check if this is a guest appointment
+      final appointmentType = appointment['appointmentType']?.toString().toLowerCase();
+      final appointmentFor = appointment['appointmentFor'];
+      final isGuestAppointment = appointmentType == 'guest' || 
+                                 (appointmentFor != null && appointmentFor['type']?.toString().toLowerCase() == 'guest');
+      
       // Check for accompanyUsers first (this is the most reliable source)
       final accompanyUsers = appointment['accompanyUsers'];
       if (accompanyUsers is Map<String, dynamic>) {
         final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
-        return numberOfUsers + 1; // Add 1 for the main user
+        
+        if (isGuestAppointment) {
+          // For guest appointments: count guest + accompanying users (don't count main user)
+          return numberOfUsers + 1; // +1 for the guest
+        } else {
+          // For regular appointments: count main user + accompanying users
+          return numberOfUsers + 1; // +1 for the main user
+        }
       }
       
       // Fallback: check for numberOfUsers in main appointment data
@@ -618,11 +649,11 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         return (numberOfUsers as num).toInt();
       }
       
-      // If no data available, return 1 (at least the main user)
+      // If no data available, return 1 (at least the guest or main user)
       return 1;
     } catch (e) {
       print('Error calculating total attendees: $e');
-      return 1; // Return 1 if there's an error (at least the main user)
+      return 1; // Return 1 if there's an error (at least the guest or main user)
     }
   }
 } 

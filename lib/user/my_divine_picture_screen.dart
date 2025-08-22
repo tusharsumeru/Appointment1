@@ -132,6 +132,10 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
             ),
           );
         },
+        onSubUserCreated: () {
+          // Refresh the screen when sub-user is successfully created
+          _loadUserData();
+        },
       ),
     );
   }

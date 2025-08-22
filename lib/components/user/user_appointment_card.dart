@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import '../../user/darshan_photos_screen.dart';
 
@@ -445,32 +446,37 @@ class UserAppointmentCard extends StatelessWidget {
                                         children: attendeePhotos!.asMap().entries.map((entry) {
                                           final index = entry.key;
                                           final photoUrl = entry.value;
+                                          final attendeeName = _getAttendeeName(index);
+                                          
                                           return Positioned(
                                             left: index * 16.0,
-                                            child: Container(
-                                              width: 24,
-                                              height: 24,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: Colors.white,
-                                                  width: 2,
+                                            child: GestureDetector(
+                                              onTap: () => _showImageModal(context, photoUrl, attendeeName),
+                                              child: Container(
+                                                width: 24,
+                                                height: 24,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 2,
+                                                  ),
                                                 ),
-                                              ),
-                                              child: ClipOval(
-                                                child: Image.network(
-                                                  photoUrl,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      color: Colors.grey.shade200,
-                                                      child: const Icon(
-                                                        Icons.person,
-                                                        size: 12,
-                                                        color: Colors.grey,
-                                                      ),
-                                                    );
-                                                  },
+                                                child: ClipOval(
+                                                  child: Image.network(
+                                                    photoUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return Container(
+                                                        color: Colors.grey.shade200,
+                                                        child: const Icon(
+                                                          Icons.person,
+                                                          size: 12,
+                                                          color: Colors.grey,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -860,5 +866,171 @@ class UserAppointmentCard extends StatelessWidget {
         );
       }
     }
+  }
+
+  // Get attendee name based on index
+  String _getAttendeeName(int index) {
+    if (appointmentData == null) return 'User ${index + 1}';
+    
+    try {
+      // Check if this is a guest appointment
+      final appointmentType = appointmentData!['appointmentType']?.toString().toLowerCase();
+      final appointmentFor = appointmentData!['appointmentFor'];
+      final isGuestAppointment = appointmentType == 'guest' || 
+                                 (appointmentFor != null && appointmentFor['type']?.toString().toLowerCase() == 'guest');
+      
+      if (isGuestAppointment) {
+        // For guest appointments: first photo is guest, rest are accompanying users
+        if (index == 0) {
+          // Guest name
+          final guestInformation = appointmentData!['guestInformation'];
+          if (guestInformation != null && guestInformation is Map<String, dynamic>) {
+            return guestInformation['fullName']?.toString() ?? 'Guest';
+          }
+          return 'Guest';
+        } else {
+          // Accompanying user name
+          final accompanyUsers = appointmentData!['accompanyUsers'];
+          if (accompanyUsers != null && accompanyUsers['users'] != null) {
+            final List<dynamic> users = accompanyUsers['users'];
+            final userIndex = index - 1; // Subtract 1 because index 0 is guest
+            if (userIndex < users.length) {
+              final user = users[userIndex];
+              if (user is Map<String, dynamic>) {
+                return user['fullName']?.toString() ?? 'User ${index + 1}';
+              }
+            }
+          }
+          return 'User ${index + 1}';
+        }
+      } else {
+        // For regular appointments: first photo is main user, rest are accompanying users
+        if (index == 0) {
+          // Main user name
+          return appointmentData!['createdBy']?['fullName']?.toString() ?? userName;
+        } else {
+          // Accompanying user name
+          final accompanyUsers = appointmentData!['accompanyUsers'];
+          if (accompanyUsers != null && accompanyUsers['users'] != null) {
+            final List<dynamic> users = accompanyUsers['users'];
+            final userIndex = index - 1; // Subtract 1 because index 0 is main user
+            if (userIndex < users.length) {
+              final user = users[userIndex];
+              if (user is Map<String, dynamic>) {
+                return user['fullName']?.toString() ?? 'User ${index + 1}';
+              }
+            }
+          }
+          return 'User ${index + 1}';
+        }
+      }
+    } catch (e) {
+      return 'User ${index + 1}';
+    }
+  }
+
+  // Show image modal
+  void _showImageModal(BuildContext context, String imageUrl, String name) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Profile Image
+                  Container(
+                    width: 128,
+                    height: 128,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.grey.shade200,
+                        width: 4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: const Icon(
+                              Icons.person,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Name
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Close Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 } 

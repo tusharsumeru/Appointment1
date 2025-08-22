@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -56,6 +57,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isValidatingTeacher = false;
   bool _isTeacherVerified = false;
   Map<String, dynamic>? _teacherVerificationData;
+  String? _teacherVerificationError;
 
   @override
   void dispose() {
@@ -209,6 +211,11 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _showTeacherVerificationBottomSheet() {
+    // Clear any previous error when opening the sheet
+    setState(() {
+      _teacherVerificationError = null;
+    });
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -223,163 +230,202 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildTeacherVerificationBottomSheet() {
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-        minHeight: MediaQuery.of(context).size.height * 0.4,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar for drag gesture
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+    return StatefulBuilder(
+      builder: (BuildContext context, StateSetter setModalState) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            minHeight: MediaQuery.of(context).size.height * 0.4,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
             ),
           ),
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar for drag gesture
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
+              ),
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Teacher Verification',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Please provide your Art of Living teacher details.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Form Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Teacher Verification',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
+                      // Teacher Code
+                      _buildTeacherTextField(
+                        controller: _teacherCodeController,
+                        label: 'Teacher Code',
+                        hint: 'Enter your teacher code',
+                        isRequired: true,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Please provide your Art of Living teacher details.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
+                      const SizedBox(height: 12),
+
+                      // Teacher Email
+                      _buildTeacherTextField(
+                        controller: _teacherEmailController,
+                        label: 'Registered Email',
+                        hint: 'Enter your registered email',
+                        keyboardType: TextInputType.emailAddress,
+                        isRequired: true,
                       ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.grey, size: 20),
-                ),
-              ],
-            ),
-          ),
+                      const SizedBox(height: 12),
 
-          // Form Content
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Teacher Code
-                  _buildTeacherTextField(
-                    controller: _teacherCodeController,
-                    label: 'Teacher Code',
-                    hint: 'Enter your teacher code',
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 12),
+                      // Teacher Phone Number
+                      _buildTeacherPhoneField(),
+                      const SizedBox(height: 24),
 
-                  // Teacher Email
-                  _buildTeacherTextField(
-                    controller: _teacherEmailController,
-                    label: 'Registered Email',
-                    hint: 'Enter your registered email',
-                    keyboardType: TextInputType.emailAddress,
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Teacher Phone Number
-                  _buildTeacherPhoneField(),
-                  const SizedBox(height: 24),
-
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                      // Error Message Display
+                      if (_teacherVerificationError != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade200),
                           ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isValidatingTeacher
-                              ? null
-                              : _handleTeacherVerification,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF97316),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isValidatingTeacher
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Colors.red.shade600,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _teacherVerificationError!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                )
-                              : const Text('Verify'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      ],
+
+                      // Action Buttons
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _isValidatingTeacher
+                                  ? null
+                                  : () => _handleTeacherVerificationWithModalState(setModalState),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF97316),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: _isValidatingTeacher
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Text('Verify'),
+                            ),
+                          ),
+                        ],
                       ),
+                      // Add extra padding at bottom for keyboard
+                      const SizedBox(height: 20),
                     ],
                   ),
-                  // Add extra padding at bottom for keyboard
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -545,9 +591,13 @@ class _SignupScreenState extends State<SignupScreen> {
             Expanded(
               child: TextFormField(
                 controller: _teacherPhoneController,
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 decoration: InputDecoration(
-                  hintText: '9876543210',
+                  hintText: 'Enter your phone number',
                   filled: true,
                   fillColor: Colors.grey.shade50,
                   border: OutlineInputBorder(
@@ -566,6 +616,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     horizontal: 16,
                     vertical: 12,
                   ),
+                  counterText: '', // Hide the character counter
                 ),
               ),
             ),
@@ -576,33 +627,38 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _handleTeacherVerification() async {
+    // This method is kept for backward compatibility
+    _handleTeacherVerificationWithModalState(setState);
+  }
+
+  void _handleTeacherVerificationWithModalState(StateSetter setModalState) async {
+    // Clear any previous error
+    setModalState(() {
+      _teacherVerificationError = null;
+    });
+
     // Validate teacher verification fields
     if (_teacherCodeController.text.isEmpty ||
         _teacherEmailController.text.isEmpty ||
         _teacherPhoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill all required fields'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setModalState(() {
+        _teacherVerificationError = 'Please fill all required fields';
+      });
       return;
     }
 
     // Validate email format
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(_teacherEmailController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setModalState(() {
+        _teacherVerificationError = 'Please enter a valid email address';
+      });
       return;
     }
 
-    setState(() {
+    setModalState(() {
       _isValidatingTeacher = true;
+      _teacherVerificationError = null;
     });
 
     try {
@@ -617,16 +673,19 @@ class _SignupScreenState extends State<SignupScreen> {
         teacherPhone: teacherPhoneNumber,
       );
 
-      setState(() {
+      setModalState(() {
         _isValidatingTeacher = false;
       });
 
+      print('🔍 Teacher verification result: $result');
+      print('🔍 Result success: ${result['success']}');
+      print('🔍 Result message: ${result['message']}');
+      
       if (result['success']) {
         // Validation successful
         Navigator.of(context).pop();
 
         // Store verification data and update state
-        print('🔍 Teacher verification result: $result');
         print('🔍 Teacher verification data: ${result['data']}');
 
         setState(() {
@@ -647,23 +706,27 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         );
       } else {
-        // Validation failed
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Teacher validation failed'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        // Validation failed - show error in the sheet
+        // Prioritize details field if it contains more specific information
+        String errorMessage;
+        if (result['details'] != null && result['details'].toString().isNotEmpty) {
+          errorMessage = '${result['details']}Please try with correct teacher code, email, and phone number.';
+        } else {
+          errorMessage = '${result['message'] ?? 'Teacher validation failed. Please check your details and try again.'}\n\nPlease try with correct teacher code, email, and phone number.';
+        }
+        
+        print('🔍 Setting error message: $errorMessage');
+        print('🔍 Result details: ${result['details']}');
+        setModalState(() {
+          _teacherVerificationError = errorMessage;
+        });
+        print('🔍 Error message set: $_teacherVerificationError');
       }
     } catch (error) {
-      setState(() {
+      setModalState(() {
         _isValidatingTeacher = false;
+        _teacherVerificationError = 'Network error. Please check your connection and try again.';
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
-      );
     }
   }
 
@@ -1400,7 +1463,11 @@ class _SignupScreenState extends State<SignupScreen> {
             Expanded(
               child: TextFormField(
                 controller: _phoneController,
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 decoration: InputDecoration(
                   hintText: '',
                   filled: true,
@@ -1424,6 +1491,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     horizontal: 16,
                     vertical: 12,
                   ),
+                  counterText: '', // Hide the character counter
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
