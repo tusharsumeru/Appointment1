@@ -874,17 +874,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
+        Text(
+          '$label:',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w500,
           ),
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
@@ -957,6 +955,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Get teacher details from API response
     final teacherDetails = atolValidationData?['data']?['teacherdetails'];
     final teacherCode = aolTeacherData?['aolTeacher']?['teacherCode'] ?? 'N/A';
+    final teacherEmail = aolTeacherData?['aolTeacher']?['teacherEmail'] ?? 'N/A';
+    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
     
     return Container(
       width: double.infinity,
@@ -1013,20 +1013,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Teacher Details
-          _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
-          const SizedBox(height: 8),
-          _buildTeacherDetail('Teacher Code', teacherCode),
-          const SizedBox(height: 8),
-          _buildTeacherDetail(
-            'Type',
-            teacherDetails?['teacher_type'] ?? 'N/A',
-          ),
-          const SizedBox(height: 8),
-          _buildTeacherDetail(
-            'Programs',
-            teacherDetails?['program_types_can_teach'] ?? 'N/A',
-          ),
+                     // Teacher Details
+           _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
+           const SizedBox(height: 8),
+           _buildTeacherDetail('Type', teacherType),
+           const SizedBox(height: 8),
+           _buildTeacherDetail('Teacher Code', teacherCode),
+           const SizedBox(height: 8),
+           _buildTeacherDetail('Teacher Email', teacherEmail),
+           const SizedBox(height: 8),
+           _buildTeacherDetail(
+             'Programs',
+             teacherDetails?['program_types_can_teach'] ?? 'N/A',
+           ),
         ],
       ),
     );

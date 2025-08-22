@@ -37,6 +37,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   
   // Form state
   bool _isTeacher = false;
+  String? _teacherType; // Add teacher type field
   bool _isFormValid = false;
   bool _isLoading = true; // Add loading state
   
@@ -138,6 +139,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       
       // Handle teacher status - check atolValidationData.success field inside aol_teacher
       bool isTeacher = false;
+      String? teacherType;
       
       // Debug prints to show what values are coming in
     
@@ -147,7 +149,10 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
           userData!['aol_teacher']['atolValidationData'] != null &&
           userData!['aol_teacher']['atolValidationData']['success'] == true) {
         isTeacher = true;
+        // Extract teacher type
+        teacherType = userData!['aol_teacher']['teacher_type'] ?? 'N/A';
         print('👨‍🏫 Teacher status: YES (aol_teacher.atolValidationData.success = true)');
+        print('👨‍🏫 Teacher type: $teacherType');
       } else {
         isTeacher = false;
         print('👨‍🏫 Teacher status: NO (aol_teacher.atolValidationData.success != true or field not found)');
@@ -168,6 +173,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         _designationController.text = designation;
         _companyController.text = company;
         _isTeacher = isTeacher;
+        _teacherType = teacherType;
         _isLoading = false; // Set loading to false after data is loaded
       });
       
@@ -188,6 +194,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         _designationController.text = '';
         _companyController.text = '';
         _isTeacher = false;
+        _teacherType = null;
         _isLoading = false; // Ensure loading is false on error
       });
       
@@ -434,6 +441,52 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                       ),
                     ],
                   ),
+                  
+                  // Show teacher type if user is a teacher
+                  if (_isTeacher && _teacherType != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.lightGreen.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.lightGreen.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.school,
+                            color: Colors.green.shade600,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Teacher Type: $_teacherType',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Verified AOL Teacher',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
 
                   // Submit Button
