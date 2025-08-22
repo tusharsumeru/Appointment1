@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../user/darshan_photos_screen.dart';
 
@@ -144,12 +145,49 @@ class UserAppointmentCard extends StatelessWidget {
                          ],
                        ],
                      ),
-                     Text(
-                       appointmentId,
-                       style: TextStyle(
-                         color: Colors.grey.shade500,
-                         fontSize: 14,
-                         fontWeight: FontWeight.w500,
+                     GestureDetector(
+                       onTap: () {
+                         Clipboard.setData(ClipboardData(text: appointmentId));
+                         ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(
+                             content: Row(
+                               children: [
+                                 const Icon(
+                                   Icons.copy,
+                                   color: Colors.white,
+                                   size: 20,
+                                 ),
+                                 const SizedBox(width: 8),
+                                 Text('Appointment ID copied: $appointmentId'),
+                               ],
+                             ),
+                             backgroundColor: Colors.green,
+                             duration: const Duration(seconds: 2),
+                             behavior: SnackBarBehavior.floating,
+                             shape: RoundedRectangleBorder(
+                               borderRadius: BorderRadius.circular(8),
+                             ),
+                           ),
+                         );
+                       },
+                       child: Row(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           Text(
+                             appointmentId,
+                             style: TextStyle(
+                               color: Colors.grey.shade500,
+                               fontSize: 14,
+                               fontWeight: FontWeight.w500,
+                             ),
+                           ),
+                           const SizedBox(width: 4),
+                           Icon(
+                             Icons.copy,
+                             size: 16,
+                             color: Colors.grey.shade400,
+                           ),
+                         ],
                        ),
                      ),
                    ],

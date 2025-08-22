@@ -187,8 +187,8 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
     return GestureDetector(
       onTap: () => _onUserTap(user),
       child: Container(
-        width: 120,
-        height: 120,
+        width: 100,
+        height: 100,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
@@ -211,7 +211,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
               color: Colors.grey.shade300,
               child: const Icon(
                 Icons.person,
-                size: 60,
+                size: 50,
                 color: Colors.grey,
               ),
             ),
@@ -353,7 +353,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
                                 // Add Photo button in first position
                                 AddPhotoButton(
                                   onPressed: _onAddPhotoTap,
-                                  size: 120, // Match the size of user cards
+                                  size: 100, // Match the size of user cards
                                   ariaLabel: 'Add Photo',
                                 )
                               else
@@ -361,7 +361,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
                                 _buildUserCard(subUsers[i + j - 1]),
                             // Add empty containers to maintain spacing when less than 3 items
                             for (int j = 0; j < (3 - ((i + 3) > (subUsers.length + 1) ? (subUsers.length + 1) - i : 3)); j++)
-                              const SizedBox(width: 120),
+                              const SizedBox(width: 100),
                           ],
                         ),
                       ),
