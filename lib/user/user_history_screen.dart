@@ -609,7 +609,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       final accompanyUsers = appointment['accompanyUsers'];
       if (accompanyUsers is Map<String, dynamic>) {
         final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
-        return numberOfUsers; ///total number of users
+        return numberOfUsers + 1; // Add 1 for the main user
       }
       
       // Fallback: check for numberOfUsers in main appointment data

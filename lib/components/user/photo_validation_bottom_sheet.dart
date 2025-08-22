@@ -116,7 +116,7 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        '❗ Hmm, that photo doesn\'t seem right.',
+                        'Hmm, that photo doesn\'t seem right.',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -128,7 +128,7 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'To proceed with your appointment request, please upload a clear photo of yourself only — no group photos, no nature shots, no celebrities, and no Gurudev\'s photo.',
+                  'To proceed with your appointment request, please upload a clear photo of yourself only no group photos, no nature shots, no celebrities, and no Gurudev\'s photo.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Color(0xFF475569),
@@ -424,25 +424,32 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
             child: _hasReachedBottom
                 ? SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: GestureDetector(
+                      onTap: () {
                         Navigator.pop(context);
                         widget.onTryAgain?.call();
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF6B35), Color(0xFFFFA726)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        elevation: 2,
-                      ),
-                      child: const Text(
-                        'Got it, I\'ll try again',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            'Got it, I\'ll try again',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),
@@ -451,7 +458,7 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
                     onTap: _scrollToBottom,
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)],
@@ -468,10 +475,10 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF475569),
+                              color: Color(0xFFFF6B35),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           AnimatedBuilder(
                             animation: _bounceAnimation,
                             builder: (context, child) {
@@ -479,7 +486,7 @@ class _PhotoValidationBottomSheetState extends State<PhotoValidationBottomSheet>
                                 offset: Offset(0, _bounceAnimation.value * 4),
                                 child: const Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: Color(0xFF64748B),
+                                  color: Color(0xFFFF6B35),
                                   size: 20,
                                 ),
                               );

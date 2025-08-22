@@ -12,29 +12,35 @@ import '../services/notification_service.dart'; // Added import for Notification
 class ActionService {
   // Global base URL variable
   static String? _baseUrl;
-  
+
   // Initialize base URL (call this once at app startup)
   static Future<void> initializeBaseUrl() async {
     try {
-      print('🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl');
-      
+      print(
+        '🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl',
+      );
+
       final response = await http.get(
         Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       print('🌐 [DEBUG] Base URL API Status Code: ${response.statusCode}');
       print('🌐 [DEBUG] Base URL API Response: ${response.body}');
-      
+
       if (response.statusCode != 200) {
-        print('❌ [ERROR] Base URL API failed with status: ${response.statusCode}');
-        throw Exception('Failed to fetch base URL: HTTP ${response.statusCode}');
+        print(
+          '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
+        );
+        throw Exception(
+          'Failed to fetch base URL: HTTP ${response.statusCode}',
+        );
       }
-      
+
       final data = jsonDecode(response.body);
       final baseUrl = data['url'];
       _baseUrl = '$baseUrl/api/v3';
-      
+
       print('✅ [DEBUG] Retrieved base URL: $baseUrl');
       print('✅ [DEBUG] Full API URL: $_baseUrl');
     } catch (error) {
@@ -46,7 +52,9 @@ class ActionService {
   // Global getter for base URL
   static String get baseUrl {
     if (_baseUrl == null) {
-      throw Exception('Base URL not initialized! Call ActionService.initializeBaseUrl() first.');
+      throw Exception(
+        'Base URL not initialized! Call ActionService.initializeBaseUrl() first.',
+      );
     }
     return _baseUrl!;
   }
@@ -54,26 +62,30 @@ class ActionService {
   // Dynamic base URL fetched from database (deprecated - use initializeBaseUrl instead)
   static Future<String> get _oldBaseUrl async {
     try {
-      print('🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl');
-      
+      print(
+        '🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl',
+      );
+
       final response = await http.get(
         Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       print('🌐 [DEBUG] Base URL API Status Code: ${response.statusCode}');
       print('🌐 [DEBUG] Base URL API Response: ${response.body}');
-      
+
       if (response.statusCode != 200) {
-        print('❌ [ERROR] Base URL API failed with status: ${response.statusCode}');
+        print(
+          '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
+        );
         // Fallback to hardcoded URL if API fails
         return 'https://aptdev.sumerudigital.com/api/v3';
       }
-      
+
       final data = jsonDecode(response.body);
       final baseUrl = data['url'];
       final fullUrl = '$baseUrl/api/v3';
-      
+
       print('✅ [DEBUG] Retrieved base URL: $baseUrl');
       print('✅ [DEBUG] Full API URL: $fullUrl');
       return fullUrl;
@@ -5895,7 +5907,9 @@ class ActionService {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      print('📥 Profile photo validation response status: ${response.statusCode}');
+      print(
+        '📥 Profile photo validation response status: ${response.statusCode}',
+      );
       print('📥 Profile photo validation response body: ${response.body}');
 
       // Parse response
@@ -5908,8 +5922,7 @@ class ActionService {
           'success': true,
           'data': responseData['data'],
           'message':
-              responseData['message'] ??
-              'Profile photo validated successfully',
+              responseData['message'] ?? 'Profile photo validated successfully',
         };
       } else {
         final errorData = jsonDecode(response.body);
@@ -5934,9 +5947,7 @@ class ActionService {
   }
 
   // Create sub user with profile photo
-  static Future<Map<String, dynamic>> createSubUser(
-    File photoFile,
-  ) async {
+  static Future<Map<String, dynamic>> createSubUser(File photoFile) async {
     try {
       print('👤 Starting sub user creation with photo: ${photoFile.path}');
 
@@ -6013,9 +6024,7 @@ class ActionService {
         return {
           'success': true,
           'data': responseData['data'],
-          'message':
-              responseData['message'] ??
-              'Sub user created successfully',
+          'message': responseData['message'] ?? 'Sub user created successfully',
         };
       } else {
         final errorData = jsonDecode(response.body);

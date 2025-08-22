@@ -2386,23 +2386,24 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           // Action Buttons Section
           Row(
             children: [
-              // Edit Button - Half width
+              // Edit Button - Half width (disabled for schedule screens)
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _handleEdit,
+                  onPressed: widget.isFromScheduleScreens ? null : _handleEdit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: widget.isFromScheduleScreens ? Colors.grey[400] : Colors.blue,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Edit',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: widget.isFromScheduleScreens ? Colors.grey[600] : Colors.white,
                     ),
                   ),
                 ),

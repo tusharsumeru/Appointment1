@@ -363,6 +363,30 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
     });
   }
 
+  Widget _buildBulletPoint(String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '• ',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 
 
   Future<void> _downloadSelectedAsZip() async {
@@ -545,7 +569,7 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
       // Use share_plus to share images directly
       await Share.shareXFiles(
         imageFiles,
-        text: 'Check out these divine pictures!',
+        text: 'Your pics detected by DivinePicAI by Sumeru Digital',
         subject: 'Divine Pictures - ${imageFiles.length} image${imageFiles.length > 1 ? 's' : ''}',
       );
 
@@ -608,8 +632,8 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Face Match Results Section (only for sub users)
-            if (!widget.isMainUser) ...[
+            // Face Match Results Section (for all users)
+            ...[
               if (isLoadingFaceMatch && faceMatchResults.isEmpty)
                 const Center(
                   child: Padding(
@@ -648,21 +672,79 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                   ),
                 )
               else if (faceMatchResults.isEmpty)
-                const Center(
+                Container(
+                  margin: const EdgeInsets.only(bottom: 32),
                   child: Column(
                     children: [
+                      const SizedBox(height: 48),
+                      // Icon
                       Icon(
-                        Icons.image_not_supported,
-                        size: 48,
-                        color: Colors.grey,
+                        Icons.image_not_supported_outlined,
+                        size: 96,
+                        color: Colors.grey.shade400,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 24),
+                      
+                      // Title
                       Text(
-                        'No darshan photos found',
+                        'No Divine Pictures Found',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Description
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          'We couldn\'t find any divine pictures for this user in the last 90 days.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Bullet points
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          children: [
+                            _buildBulletPoint('Pictures are searched from the last 90 days'),
+                            const SizedBox(height: 4),
+                            _buildBulletPoint('Make sure the user has attended darshan recently'),
+                            const SizedBox(height: 4),
+                            _buildBulletPoint('Try selecting a different user from above'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: widget.isMainUser ? const Color(0xFFF97316) : Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'View All Users',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -1005,7 +1087,7 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
         border: Border.all(color: userColor, width: 2),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Select checkbox at top right
           Padding(
@@ -1071,21 +1153,16 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
                 Text(
-                  'Divine Picture',
+                  'Divine Picture #${faceMatchResults.indexOf(imageData) + 1}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
                 ),
-                
-                const SizedBox(height: 4),
-                
-                // Score
                 Text(
-                  'Face Match Score: ${(imageData['score'] * 100).toStringAsFixed(2)}',
+                  'Face Match Score: ${(imageData['score'] * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
