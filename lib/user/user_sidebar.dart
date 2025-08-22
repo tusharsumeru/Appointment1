@@ -5,6 +5,7 @@ import 'user_screen.dart';
 import 'user_history_screen.dart';
 import 'profile_screen.dart';
 import 'appointment_type_selection_screen.dart';
+import 'my_divine_picture_screen.dart';
 
 class UserSidebar extends StatefulWidget {
   const UserSidebar({super.key});
@@ -203,6 +204,20 @@ class _UserSidebarState extends State<UserSidebar> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const UserHistoryScreen(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+                            leading: const Icon(Icons.photo_library, color: Color(0xFFF97316)),
+            title: const Text('My Divine Picture'),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MyDivinePictureScreen(),
                 ),
               );
             },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../components/tomorrow/tomorrow_card_component.dart';
 import 'today_screen.dart';
@@ -116,10 +117,27 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tomorrow'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text(
+          'Tomorrow',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.deepOrange, Colors.orange, Colors.orangeAccent],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 4,
+        shadowColor: Colors.orange.withOpacity(0.3),
+        centerTitle: false,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),

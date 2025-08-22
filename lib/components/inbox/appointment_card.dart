@@ -54,9 +54,8 @@ class _AppointmentCardState extends State<AppointmentCard> {
         (guestInformation is Map<String, dynamic> && 
          guestInformation['fullName']?.toString().isNotEmpty == true);
     final String displayName = isGuestAppointment ? _getGuestName() : createdByName;
-    final String displayDesignation = isGuestAppointment ? _getGuestDesignation() : createdByDesignation;
+    final String displayDesignation = isGuestAppointment ? _getGuestDesignationAndCompany() : _getCreatedByDesignationAndCompany();
     final String displayImage = isGuestAppointment ? _getGuestImage() : createdByImage;
-    final String displayCompany = isGuestAppointment ? _getGuestCompany() : '';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -215,18 +214,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        if (isGuestAppointment && displayCompany.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            displayCompany,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -511,8 +498,12 @@ class _AppointmentCardState extends State<AppointmentCard> {
   int _getAttendeeCount() {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
-      final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
-      return numberOfUsers + 1; // Add 1 for the main user
+      final users = accompanyUsers['users'] ?? [];
+      
+      // Total attendees = 1 (main user) + number of accompanying users
+      if (users is List) {
+        return 1 + users.length;
+      }
     }
     return 1;
   }
@@ -765,9 +756,42 @@ class _AppointmentCardState extends State<AppointmentCard> {
 
   String _getCreatedByDesignation() {
     // Use the main appointment's user designation since createdBy doesn't have this field
-    return widget.appointment['userCurrentDesignation']?.toString() ??
-        widget.appointment['userCurrentCompany']?.toString() ??
-        '';
+    return widget.appointment['userCurrentDesignation']?.toString() ?? '';
+  }
+
+  String _getCreatedByCompany() {
+    // Get the company name from the appointment
+    return widget.appointment['userCurrentCompany']?.toString() ?? '';
+  }
+
+  String _getCreatedByDesignationAndCompany() {
+    final designation = _getCreatedByDesignation();
+    final company = _getCreatedByCompany();
+    
+    if (designation.isNotEmpty && company.isNotEmpty) {
+      return '$designation at $company';
+    } else if (designation.isNotEmpty) {
+      return designation;
+    } else if (company.isNotEmpty) {
+      return company;
+    } else {
+      return '';
+    }
+  }
+
+  String _getGuestDesignationAndCompany() {
+    final designation = _getGuestDesignation();
+    final company = _getGuestCompany();
+    
+    if (designation.isNotEmpty && company.isNotEmpty) {
+      return '$designation at $company';
+    } else if (designation.isNotEmpty) {
+      return designation;
+    } else if (company.isNotEmpty) {
+      return company;
+    } else {
+      return '';
+    }
   }
 
   String _getCreatedByImage() {

@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../action/action.dart';
+import '../action/storage_service.dart';
+import '../auth/notification_setup_screen.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   final String email;
 
-  const VerifyOtpScreen({
-    super.key,
-    required this.email,
-  });
+  const VerifyOtpScreen({super.key, required this.email});
 
   @override
   State<VerifyOtpScreen> createState() => _VerifyOtpScreenState();
@@ -20,10 +19,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     6,
     (index) => TextEditingController(),
   );
-  final List<FocusNode> _focusNodes = List.generate(
-    6,
-    (index) => FocusNode(),
-  );
+  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
 
   bool _isLoading = false;
   bool _isResendLoading = false;
@@ -79,7 +75,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
     // Update the complete OTP string
     _enteredOtp = _otpControllers.map((controller) => controller.text).join();
-    
+
     // Auto-verify when all 6 digits are entered
     if (_enteredOtp.length == 6) {
       _verifyOtp();
@@ -117,14 +113,50 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
           // OTP verification successful
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? '🎉 Excellent! Your account is now verified. Welcome to the Art of Living community!'),
+              content: Text(
+                result['message'] ??
+                    '🎉 Excellent! Your account is now verified. Welcome to the Art of Living community!',
+              ),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 3),
             ),
           );
-          
+
+          // Send signup notification after successful verification
+          try {
+            final userData = await StorageService.getUserData() ?? {};
+            if (userData['_id'] != null || userData['id'] != null) {
+              final notificationResult =
+                  await ActionService.sendSignupNotification(
+                    userId: userData['_id'] ?? userData['id'],
+                    signupInfo: {
+                      'source': 'mobile_app',
+                      'timestamp': DateTime.now().toIso8601String(),
+                      'verificationMethod': 'email_otp',
+                    },
+                  );
+
+              if (notificationResult['success']) {
+                print('✅ Signup notification sent successfully');
+              } else {
+                print(
+                  '⚠️ Failed to send signup notification: ${notificationResult['message']}',
+                );
+              }
+            }
+          } catch (e) {
+            print('❌ Error sending signup notification: $e');
+          }
+
           // Navigate to FCM setup screen after successful verification
-          Navigator.of(context).pushNamedAndRemoveUntil('/user', (route) => false);
+          // Get user data from storage or use default
+          final userData = await StorageService.getUserData() ?? {};
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) =>
+                  NotificationSetupScreen(isNewUser: true, userData: userData),
+            ),
+          );
         } else {
           // OTP verification failed
           ScaffoldMessenger.of(context).showSnackBar(
@@ -133,7 +165,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
               backgroundColor: Colors.red,
             ),
           );
-          
+
           // Clear the OTP fields for retry
           for (var controller in _otpControllers) {
             controller.clear();
@@ -146,13 +178,10 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $error'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
         );
       }
     }
@@ -167,9 +196,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
     try {
       // Call the resend OTP API
-      final result = await ActionService.resendOtp(
-        email: widget.email,
-      );
+      final result = await ActionService.resendOtp(email: widget.email);
 
       setState(() {
         _isResendLoading = false;
@@ -179,11 +206,14 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
         if (result['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? '📧 New verification code sent! Please check your inbox for the latest code.'),
+              content: Text(
+                result['message'] ??
+                    '📧 New verification code sent! Please check your inbox for the latest code.',
+              ),
               backgroundColor: Colors.green,
             ),
           );
-          
+
           // Restart the timer
           _startResendTimer();
         } else {
@@ -199,13 +229,10 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       setState(() {
         _isResendLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $error'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
         );
       }
     }
@@ -214,10 +241,10 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
   String _getMaskedEmail() {
     final email = widget.email;
     if (email.length <= 7) return email;
-    
+
     final atIndex = email.indexOf('@');
     if (atIndex <= 3) return email;
-    
+
     final prefix = email.substring(0, 3);
     final suffix = email.substring(atIndex);
     return '$prefix*******$suffix';
@@ -245,7 +272,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 64),
-                  
+
                   // Header Section
                   Column(
                     children: [
@@ -269,7 +296,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Decorative line with dot
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -319,9 +346,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 48),
-                  
+
                   // OTP Form Card
                   Container(
                     constraints: const BoxConstraints(maxWidth: 400),
@@ -370,79 +397,97 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                               ),
                             ],
                           ),
-                          
+
                           const SizedBox(height: 32),
-                          
+
                           // OTP Input Fields
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(6, (index) {
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  right: index < 5 ? 8.0 : 0,
-                                ),
-                                child: SizedBox(
-                                  width: 48,
-                                  height: 48,
-                                  child: TextFormField(
-                                    controller: _otpControllers[index],
-                                    focusNode: _focusNodes[index],
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
+                          Center(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 350),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: List.generate(6, (index) {
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                                    width: 48,
+                                    child: SizedBox(
+                                      height: 48,
+                                      child: TextFormField(
+                                        controller: _otpControllers[index],
+                                        focusNode: _focusNodes[index],
+                                        keyboardType: TextInputType.number,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(1),
+                                        ],
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: const Color(
+                                            0xFFFAFAFA,
+                                          ).withOpacity(0.5), // zinc-50/50
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey.shade200,
+                                            ),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey.shade200,
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey.shade400,
+                                            ),
+                                          ),
+                                          contentPadding: const EdgeInsets.all(12),
+                                        ),
+                                        onChanged: (value) =>
+                                            _onOtpChanged(value, index),
+                                      ),
                                     ),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                      LengthLimitingTextInputFormatter(1),
-                                    ],
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: Colors.grey.shade200),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: Colors.grey.shade200),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: Colors.grey.shade400),
-                                      ),
-                                      contentPadding: const EdgeInsets.all(12),
-                                    ),
-                                    onChanged: (value) => _onOtpChanged(value, index),
-                                  ),
-                                ),
-                              );
-                            }),
+                                  );
+                                }),
+                              ),
+                            ),
                           ),
-                          
+
                           const SizedBox(height: 32),
-                          
+
                           // Verify Button
                           SizedBox(
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _verifyOtp,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ).copyWith(
-                                backgroundColor: MaterialStateProperty.all(Colors.transparent),
-                              ),
+                              style:
+                                  ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ).copyWith(
+                                    backgroundColor: MaterialStateProperty.all(
+                                      Colors.transparent,
+                                    ),
+                                  ),
                               child: Container(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: _isLoading
-                                        ? [Colors.grey.shade400, Colors.grey.shade500]
+                                        ? [
+                                            Colors.grey.shade400,
+                                            Colors.grey.shade500,
+                                          ]
                                         : const [
                                             Color(0xFFF97316), // orange-500
                                             Color(0xFFEAB308), // yellow-500
@@ -466,11 +511,15 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                           width: 20,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
                                           ),
                                         )
                                       : const Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Text(
                                               'Verify Email',
@@ -492,9 +541,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 32),
-                          
+
                           // Resend and Back links
                           Column(
                             children: [
@@ -509,16 +558,21 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: _resendTimer > 0 || _isResendLoading ? null : _resendOtp,
+                                    onTap: _resendTimer > 0 || _isResendLoading
+                                        ? null
+                                        : _resendOtp,
                                     child: _isResendLoading
                                         ? const SizedBox(
                                             width: 12,
                                             height: 12,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                Color(0xFFEA580C), // orange-600
-                                              ),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Color(
+                                                      0xFFEA580C,
+                                                    ), // orange-600
+                                                  ),
                                             ),
                                           )
                                         : Text(
@@ -530,7 +584,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                               fontWeight: FontWeight.w500,
                                               color: _resendTimer > 0
                                                   ? Colors.grey.shade400
-                                                  : const Color(0xFFEA580C), // orange-600
+                                                  : const Color(
+                                                      0xFFEA580C,
+                                                    ), // orange-600
                                             ),
                                           ),
                                   ),
@@ -561,4 +617,4 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       ),
     );
   }
-} 
+}

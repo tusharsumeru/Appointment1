@@ -7,6 +7,7 @@ import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
+import 'notification_setup_screen.dart';
 import '../user/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -58,12 +59,35 @@ class _LoginScreenState extends State<LoginScreen> {
           final data = result['data'];
           if (data != null && data['token'] != null) {
             await StorageService.saveToken(data['token']);
-            
+
             // Save user data if available
             if (data['user'] != null) {
               await StorageService.saveUserData(data['user']);
+
+              // Send login notification
+              try {
+                final notificationResult =
+                    await ActionService.sendLoginNotification(
+                      userId: data['user']['_id'] ?? data['user']['id'],
+                      loginInfo: {
+                        'deviceInfo': 'Flutter Mobile App',
+                        'location': 'Mobile Device',
+                        'timestamp': DateTime.now().toIso8601String(),
+                      },
+                    );
+
+                if (notificationResult['success']) {
+                  print('✅ Login notification sent successfully');
+                } else {
+                  print(
+                    '⚠️ Failed to send login notification: ${notificationResult['message']}',
+                  );
+                }
+              } catch (e) {
+                print('❌ Error sending login notification: $e');
+              }
             }
-            
+
             // Check user role and navigate accordingly
             await _handleRoleBasedNavigation(data['user']);
           }
@@ -72,7 +96,9 @@ class _LoginScreenState extends State<LoginScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Login failed. Please try again.'),
+                content: Text(
+                  result['message'] ?? 'Login failed. Please try again.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
@@ -82,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -95,7 +121,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleRoleBasedNavigation(Map<String, dynamic>? userData) async {
+  Future<void> _handleRoleBasedNavigation(
+    Map<String, dynamic>? userData,
+  ) async {
     if (userData == null) {
       // If no user data, try to get it from the API
       final userResult = await ActionService.getCurrentUser();
@@ -105,74 +133,46 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     String? userRole = userData?['role']?.toString().toLowerCase();
-    
-    if (mounted) {
-      if (userRole == 'secretary') {
-        // Secretary role - navigate to appointment management interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Secretary.'),
-            backgroundColor: Colors.green,
-          ),
-        );
 
+    if (mounted) {
+      if (userRole == 'secretary' ||
+          userRole == 'admin' ||
+          userRole == 'super-admin') {
+        // Secretary, Admin, and Super-Admin roles - navigate directly to inbox screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const InboxScreen(),
           ),
         );
-      } else if (userRole == 'admin') {
-        // Admin role - navigate to admin interface (to be implemented)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Admin.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // TODO: Navigate to admin interface
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(), // Temporary - replace with AdminScreen
-          ),
-        );
       } else if (userRole == 'guard') {
-        // Guard role - navigate to guard interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as Guard.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+        // Guard role - navigate directly to guard screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const GuardScreen(),
           ),
         );
       } else if (userRole == 'user' || userRole == 'client') {
-        // Regular user/client role - navigate to user interface
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Welcome back! You\'re now logged in as User.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+        // Regular user/client role - always show notification setup for now
+        // TODO: Check from backend if user has FCM tokens stored
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const AppointmentTypeSelectionScreen(),
+            builder: (context) => NotificationSetupScreen(
+              isNewUser: false,
+              userData: userData ?? {},
+            ),
           ),
         );
       } else {
         // Unknown role or no role - show error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Access denied. Your role (${userRole ?? 'unknown'}) is not authorized.'),
+            content: Text(
+              '❌ Access denied. Your role (${userRole ?? 'unknown'}) is not authorized.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
-        
+
         // Logout the user since they don't have proper access
         await StorageService.logout();
       }
@@ -191,9 +191,11 @@ class _LoginScreenState extends State<LoginScreen> {
               key: _formKey,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                             MediaQuery.of(context).padding.top - 
-                             MediaQuery.of(context).padding.bottom - 48, // 48 for padding
+                  minHeight:
+                      MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom -
+                      48, // 48 for padding
                 ),
                 child: IntrinsicHeight(
                   child: Column(
@@ -258,10 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       const Text(
                         'Sign in to your account',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 48),
@@ -285,18 +284,27 @@ class _LoginScreenState extends State<LoginScreen> {
                                 hintText: 'Enter your email',
                                 prefixIcon: Icon(Icons.email_outlined),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: const BorderSide(color: Color(0xFFFF6B35), width: 2),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFFF6B35),
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter your email';
                                 }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                if (!RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                ).hasMatch(value)) {
                                   return 'Please enter a valid email';
                                 }
                                 return null;
@@ -314,16 +322,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 prefixIcon: const Icon(Icons.lock_outlined),
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
                                   ),
                                   onPressed: _togglePasswordVisibility,
                                 ),
                                 border: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  borderSide: BorderSide(color: Color(0xFFFF6B35), width: 2),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Color(0xFFFF6B35),
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
@@ -335,8 +352,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }
                                 return null;
                               },
-                                                         ),
-                             const SizedBox(height: 24),
+                            ),
+                            const SizedBox(height: 24),
 
                              // Login Button
                              Container(
@@ -420,10 +437,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           const Text(
                             "Don't have an account? ",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -455,4 +469,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-} 
+}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -266,23 +268,65 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   String _getCreatedByName() {
-    return widget.appointment['createdBy']?['name']?.toString() ?? 
-           widget.appointment['createdBy']?['fullName']?.toString() ?? 
-           'Not specified';
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final name = createdBy['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+        final fullName = createdBy['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByName: $e');
+      return 'Not specified';
+    }
   }
 
   String _getCreatedByEmail() {
-    return widget.appointment['createdBy']?['email']?.toString() ?? 
-           widget.appointment['email']?.toString() ?? 
-           'Not specified';
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final email = createdBy['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+      final email = widget.appointment['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByEmail: $e');
+      return 'Not specified';
+    }
   }
 
   String _getCreatedByPhone() {
-    // Try multiple possible phone field locations
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      // Check for phoneNumber object structure
-      final phoneObj = createdBy['phoneNumber'];
+    try {
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final phoneObj = createdBy['phoneNumber'];
+        if (phoneObj is Map<String, dynamic>) {
+          final countryCode = phoneObj['countryCode']?.toString() ?? '';
+          final number = phoneObj['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            return '$countryCode $number';
+          }
+        }
+        
+        final phone = createdBy['phone']?.toString();
+        if (phone != null && phone.isNotEmpty) {
+          return phone;
+        }
+      }
+      
+      final phoneObj = widget.appointment['phoneNumber'];
       if (phoneObj is Map<String, dynamic>) {
         final countryCode = phoneObj['countryCode']?.toString() ?? '';
         final number = phoneObj['number']?.toString() ?? '';
@@ -291,115 +335,154 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         }
       }
       
-      // Check for phone object structure (fallback)
-      final phoneObj2 = createdBy['phone'];
-      if (phoneObj2 is Map<String, dynamic>) {
-        final countryCode = phoneObj2['countryCode']?.toString() ?? '';
-        final number = phoneObj2['number']?.toString() ?? '';
-        if (countryCode.isNotEmpty && number.isNotEmpty) {
-          return '$countryCode $number';
-        }
-      }
-      
-      // Check for simple string phone fields
-      final phone = createdBy['phone']?.toString() ?? 
-                   createdBy['phoneNumber']?.toString() ?? 
-                   createdBy['mobile']?.toString() ?? 
-                   createdBy['contactNumber']?.toString();
+      final phone = widget.appointment['phone']?.toString();
       if (phone != null && phone.isNotEmpty) {
         return phone;
       }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByPhone: $e');
+      return 'Not specified';
     }
-    
-    // Try direct appointment fields
-    final phoneObj = widget.appointment['phoneNumber'];
-    if (phoneObj is Map<String, dynamic>) {
-      final countryCode = phoneObj['countryCode']?.toString() ?? '';
-      final number = phoneObj['number']?.toString() ?? '';
-      if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode $number';
-      }
-    }
-    
-    // Check for phone object structure (fallback)
-    final phoneObj2 = widget.appointment['phone'];
-    if (phoneObj2 is Map<String, dynamic>) {
-      final countryCode = phoneObj2['countryCode']?.toString() ?? '';
-      final number = phoneObj2['number']?.toString() ?? '';
-      if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode $number';
-      }
-    }
-    
-    // Check for simple string phone fields
-    final phone = widget.appointment['phone']?.toString() ?? 
-                 widget.appointment['phoneNumber']?.toString() ?? 
-                 widget.appointment['mobile']?.toString() ?? 
-                 widget.appointment['contactNumber']?.toString();
-    
-    if (phone != null && phone.isNotEmpty) {
-      return phone;
-    }
-    
-    return 'Not specified';
   }
 
   String _getCreatedByDesignation() {
-    // Try direct appointment fields first (these are the correct ones)
-    final designation = widget.appointment['userCurrentDesignation']?.toString() ?? 
-                       widget.appointment['designation']?.toString() ?? 
-                       widget.appointment['currentDesignation']?.toString() ?? 
-                       widget.appointment['jobTitle']?.toString() ?? 
-                       widget.appointment['title']?.toString() ?? 
-                       widget.appointment['role']?.toString();
-    
-    if (designation != null && designation.isNotEmpty) {
-      return designation;
-    }
-    
-    // Try createdBy fields as fallback
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      final designation2 = createdBy['designation']?.toString() ?? 
-                          createdBy['currentDesignation']?.toString() ?? 
-                          createdBy['jobTitle']?.toString() ?? 
-                          createdBy['title']?.toString() ?? 
-                          createdBy['role']?.toString();
+    try {
+      // Try direct appointment fields first (these are the correct ones)
+      final designation = widget.appointment['userCurrentDesignation']?.toString();
+      if (designation != null && designation.isNotEmpty) {
+        return designation;
+      }
+      
+      final designation2 = widget.appointment['designation']?.toString();
       if (designation2 != null && designation2.isNotEmpty) {
         return designation2;
       }
+      
+      final designation3 = widget.appointment['currentDesignation']?.toString();
+      if (designation3 != null && designation3.isNotEmpty) {
+        return designation3;
+      }
+      
+      final designation4 = widget.appointment['jobTitle']?.toString();
+      if (designation4 != null && designation4.isNotEmpty) {
+        return designation4;
+      }
+      
+      final designation5 = widget.appointment['title']?.toString();
+      if (designation5 != null && designation5.isNotEmpty) {
+        return designation5;
+      }
+      
+      final designation6 = widget.appointment['role']?.toString();
+      if (designation6 != null && designation6.isNotEmpty) {
+        return designation6;
+      }
+      
+      // Try createdBy fields as fallback
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final designation7 = createdBy['designation']?.toString();
+        if (designation7 != null && designation7.isNotEmpty) {
+          return designation7;
+        }
+        
+        final designation8 = createdBy['currentDesignation']?.toString();
+        if (designation8 != null && designation8.isNotEmpty) {
+          return designation8;
+        }
+        
+        final designation9 = createdBy['jobTitle']?.toString();
+        if (designation9 != null && designation9.isNotEmpty) {
+          return designation9;
+        }
+        
+        final designation10 = createdBy['title']?.toString();
+        if (designation10 != null && designation10.isNotEmpty) {
+          return designation10;
+        }
+        
+        final designation11 = createdBy['role']?.toString();
+        if (designation11 != null && designation11.isNotEmpty) {
+          return designation11;
+        }
+      }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByDesignation: $e');
+      return 'Not specified';
     }
-    
-    return 'Not specified';
   }
 
   String _getCreatedByCompany() {
-    // Try direct appointment fields first (these are the correct ones)
-    final company = widget.appointment['userCurrentCompany']?.toString() ?? 
-                   widget.appointment['company']?.toString() ?? 
-                   widget.appointment['currentCompany']?.toString() ?? 
-                   widget.appointment['organization']?.toString() ?? 
-                   widget.appointment['employer']?.toString() ?? 
-                   widget.appointment['workplace']?.toString();
-    
-    if (company != null && company.isNotEmpty) {
-      return company;
-    }
-    
-    // Try createdBy fields as fallback
-    final createdBy = widget.appointment['createdBy'];
-    if (createdBy is Map<String, dynamic>) {
-      final company2 = createdBy['company']?.toString() ?? 
-                      createdBy['currentCompany']?.toString() ?? 
-                      createdBy['organization']?.toString() ?? 
-                      createdBy['employer']?.toString() ?? 
-                      createdBy['workplace']?.toString();
+    try {
+      // Try direct appointment fields first (these are the correct ones)
+      final company = widget.appointment['userCurrentCompany']?.toString();
+      if (company != null && company.isNotEmpty) {
+        return company;
+      }
+      
+      final company2 = widget.appointment['company']?.toString();
       if (company2 != null && company2.isNotEmpty) {
         return company2;
       }
+      
+      final company3 = widget.appointment['currentCompany']?.toString();
+      if (company3 != null && company3.isNotEmpty) {
+        return company3;
+      }
+      
+      final company4 = widget.appointment['organization']?.toString();
+      if (company4 != null && company4.isNotEmpty) {
+        return company4;
+      }
+      
+      final company5 = widget.appointment['employer']?.toString();
+      if (company5 != null && company5.isNotEmpty) {
+        return company5;
+      }
+      
+      final company6 = widget.appointment['workplace']?.toString();
+      if (company6 != null && company6.isNotEmpty) {
+        return company6;
+      }
+      
+      // Try createdBy fields as fallback
+      final createdBy = widget.appointment['createdBy'];
+      if (createdBy is Map<String, dynamic>) {
+        final company7 = createdBy['company']?.toString();
+        if (company7 != null && company7.isNotEmpty) {
+          return company7;
+        }
+        
+        final company8 = createdBy['currentCompany']?.toString();
+        if (company8 != null && company8.isNotEmpty) {
+          return company8;
+        }
+        
+        final company9 = createdBy['organization']?.toString();
+        if (company9 != null && company9.isNotEmpty) {
+          return company9;
+        }
+        
+        final company10 = createdBy['employer']?.toString();
+        if (company10 != null && company10.isNotEmpty) {
+          return company10;
+        }
+        
+        final company11 = createdBy['workplace']?.toString();
+        if (company11 != null && company11.isNotEmpty) {
+          return company11;
+        }
+      }
+      
+      return 'Not specified';
+    } catch (e) {
+      print('Error in _getCreatedByCompany: $e');
+      return 'Not specified';
     }
-    
-    return 'Not specified';
   }
 
   void _initializeGuestData() {
@@ -643,9 +726,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (name.isEmpty) return '';
     final parts = name.split(' ');
     if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      final firstPart = parts[0];
+      final secondPart = parts[1];
+      if (firstPart.isNotEmpty && secondPart.isNotEmpty) {
+        return '${firstPart[0]}${secondPart[0]}'.toUpperCase();
+      } else if (firstPart.isNotEmpty) {
+        return firstPart[0].toUpperCase();
+      }
     }
-    return name[0].toUpperCase();
+    if (name.isNotEmpty) {
+      return name[0].toUpperCase();
+    }
+    return '';
   }
 
   // Load locations from API
@@ -828,9 +920,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         },
       };
 
-      // Debug: Print the update data being sent
-      print('DEBUG: Sending update data: $updateData');
-      print('DEBUG: Appointment ID: $appointmentId');
+      // Show debug info in SnackBar
+      if (_selectedFile != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Uploading file: ${_selectedFile!.name} (${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)}MB)'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No file selected for upload'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
       // Call the API to update appointment
       final result = await ActionService.updateAppointmentEnhanced(
@@ -840,10 +947,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
 
       if (result['success']) {
+        // Send appointment update notification
+        await _sendAppointmentUpdatedNotification(result['data']);
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Appointment updated successfully!'),
+              content: Text('${result['message'] ?? 'Appointment updated successfully!'} (Status: ${result['statusCode']})'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 3),
             ),
@@ -862,7 +972,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(errorMessage),
+              content: Text('$errorMessage (Status: ${result['statusCode']})'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -2125,7 +2235,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx'],
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'jpg', 'jpeg', 'png', 'gif'],
         allowMultiple: false,
       );
 
@@ -2149,6 +2259,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         setState(() {
           _selectedFile = file;
         });
+        
+        print('DEBUG: File selected and set: ${file.name}');
+        print('DEBUG: File path: ${file.path}');
+        print('DEBUG: File size: ${file.size}');
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2403,6 +2517,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildAttachmentField() {
+    final existingAttachment = widget.appointment['appointmentAttachment']?.toString() ?? '';
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2416,13 +2532,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'You can attach a project proposal, report, or invitation (Max size: 5MB)',
+          'You can attach documents (PDF, DOC, DOCX, XLS, XLSX, TXT) or images (JPG, PNG, GIF) (Max size: 5MB)',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
           ),
         ),
         const SizedBox(height: 12),
+        
+        // Show existing attachment if available
+        if (existingAttachment.isNotEmpty) ...[
+          _buildExistingAttachmentDisplay(existingAttachment),
+          const SizedBox(height: 16),
+        ],
         
         // File selection area
         Container(
@@ -2451,57 +2573,118 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildSelectedFileDisplay() {
+    final extension = _selectedFile!.extension ?? '';
+    final fileColor = _getFileColor(extension);
+    
     return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green[200]!),
+      ),
       child: Row(
         children: [
-          Icon(
-            _getFileIcon(_selectedFile!.extension ?? ''),
-            color: Colors.blue[600],
-            size: 20,
+          // File icon with color
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: fileColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              _getFileIcon(extension),
+              color: fileColor,
+              size: 20,
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   _selectedFile!.name,
                   style: TextStyle(
                     color: Colors.black87,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-                Text(
-                  '${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB • ${_selectedFile!.extension?.toUpperCase() ?? 'Unknown'}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        '${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: fileColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        extension.toUpperCase(),
+                        style: TextStyle(
+                          color: fileColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _selectedFile = null;
-              });
-            },
-            icon: Icon(
-              Icons.close,
-              color: Colors.red[600],
-              size: 20,
+          // Remove button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(6),
             ),
-            tooltip: 'Remove file',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 24,
-              minHeight: 24,
+            child: IconButton(
+              onPressed: () {
+                setState(() {
+                  _selectedFile = null;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('File removed'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: Icon(
+                Icons.close,
+                color: Colors.red[600],
+                size: 18,
+              ),
+              tooltip: 'Remove file',
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32,
+              ),
             ),
           ),
         ],
@@ -2514,23 +2697,38 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       onTap: _isPickingFile ? null : _pickFile,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
         child: Row(
           children: [
-            Icon(
-              Icons.attach_file,
-              color: Colors.grey[600],
-              size: 20,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue[100],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                Icons.upload_file,
+                color: Colors.blue[600],
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
-                _isPickingFile ? 'Selecting file...' : 'Choose file (.pdf, .doc, .docx, .ppt, .pptx)',
+                _isPickingFile ? 'Selecting file...' : 'Upload New Attachment',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: Colors.black87,
                   fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
             _isPickingFile
@@ -2542,12 +2740,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
                     ),
                   )
-                : Text(
-                    'Browse',
-                    style: TextStyle(
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
                       color: Colors.blue[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Browse',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
           ],
@@ -2563,12 +2768,224 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       case 'doc':
       case 'docx':
         return Icons.description;
-      case 'ppt':
-      case 'pptx':
-        return Icons.slideshow;
+      case 'xls':
+      case 'xlsx':
+        return Icons.table_chart;
+      case 'txt':
+        return Icons.text_snippet;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return Icons.image;
       default:
         return Icons.attach_file;
     }
+  }
+
+  // Helper method to get attachment filename from URL
+  String _getAttachmentFilename(String attachmentUrl) {
+    if (attachmentUrl.isNotEmpty) {
+      final uri = Uri.parse(attachmentUrl);
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        return pathSegments.last;
+      }
+    }
+    return 'Attachment';
+  }
+
+  // Helper method to get file extension
+  String _getFileExtension(String filename) {
+    if (filename.contains('.')) {
+      return filename.split('.').last.toLowerCase();
+    }
+    return '';
+  }
+
+  // Helper method to get file color based on extension
+  Color _getFileColor(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return Colors.red;
+      case 'doc':
+      case 'docx':
+        return Colors.blue;
+      case 'xls':
+      case 'xlsx':
+        return Colors.green;
+      case 'txt':
+        return Colors.grey;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Method to open existing attachment
+  Future<void> _openExistingAttachment(String attachmentUrl) async {
+    try {
+      final Uri url = Uri.parse(attachmentUrl);
+      
+      // Try to open in browser directly
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // If canLaunchUrl returns false, try anyway with external application
+        try {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          // If that fails, try platform default
+          try {
+            await launchUrl(url, mode: LaunchMode.platformDefault);
+          } catch (e) {
+            // Final fallback: in-app web view
+            await launchUrl(url, mode: LaunchMode.inAppWebView);
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening attachment: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // Build existing attachment display
+  Widget _buildExistingAttachmentDisplay(String attachmentUrl) {
+    final filename = _getAttachmentFilename(attachmentUrl);
+    final extension = _getFileExtension(filename);
+    final fileColor = _getFileColor(extension);
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue[50]!.withOpacity(0.5),
+            Colors.indigo[50]!.withOpacity(0.3),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.blue[100]!.withOpacity(0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(Icons.attach_file, size: 12, color: Colors.grey[400]),
+              const SizedBox(width: 6),
+              Text(
+                'CURRENT ATTACHMENT',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[500],
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Attachment card
+          InkWell(
+            onTap: () => _openExistingAttachment(attachmentUrl),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  // File icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: fileColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      _getFileIcon(extension),
+                      color: fileColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // File details
+                  Expanded(
+                    child: Text(
+                      'Click to view current attachment',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                  
+                  // Open icon
+                  Icon(
+                    Icons.open_in_new,
+                    color: Colors.blue[600],
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Info text
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[600], size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Uploading a new file will replace the current attachment',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorField(String label, String errorMessage) {
@@ -3039,6 +3456,78 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       ],
     );
+  }
+
+  // Send appointment update notification
+  Future<void> _sendAppointmentUpdatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      final appointmentId = _getAppointmentId();
+      
+      if (appointmentId.isEmpty) {
+        print('⚠️ Appointment ID not found, skipping notification');
+        return;
+      }
+
+      print('🔄 Sending appointment update notification for appointment: $appointmentId');
+
+      // For admin edit forms, we'll use the userId from the appointment data
+      final userId = appointmentData?['userId']?.toString() ?? 
+                    widget.appointment['userId']?.toString() ?? 
+                    'admin_updated';
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   widget.appointment['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   'User',
+        'date': appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               widget.appointment['preferredDateRange']?['fromDate'] ?? 
+               _fromDateController.text,
+        'time': 'Updated', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 
+                widget.appointment['appointmentLocation'] ?? 
+                _selectedLocation ?? 'Selected Location',
+        'purpose': appointmentData?['appointmentPurpose'] ?? 
+                  widget.appointment['appointmentPurpose'] ?? 
+                  _purposeController.text,
+        'numberOfUsers': appointmentData?['numberOfUsers'] ?? 
+                        widget.appointment['numberOfUsers'] ?? 
+                        _numberOfPeopleController.text,
+        'appointmentType': widget.appointment['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'admin_appointment_update',
+        'userRole': 'admin', // This is an admin form
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.appointment['appointmentType'] ?? 'myself',
+        'updateType': 'updated',
+        'updatedBy': 'admin',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentUpdatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        updateType: 'updated',
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment update notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment update notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment update notification: $e');
+      // Don't block the appointment update flow if notification fails
+    }
   }
 
   Widget _buildPhotoNotUploadedState(int guestIndex) {

@@ -162,8 +162,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
       );
 
       try {
-        // Clear all stored data
-        await StorageService.logout();
+        // Clear local auth data
+        await StorageService.clearAuthData();
         
         // Close loading dialog
         Navigator.of(context).pop();
@@ -198,7 +198,8 @@ class _SidebarComponentState extends State<SidebarComponent> {
     // Get user role for conditional menu items
     String? userRole = _userData?['role']?.toString().toLowerCase();
     bool isSecretary = userRole == 'secretary';
-    bool isAdmin = userRole == 'admin';
+    bool isAdmin = userRole == 'admin' || userRole == 'super-admin';
+    bool isSuperAdmin = userRole == 'super-admin';
     bool isUser = userRole == 'user' || userRole == 'client';
 
     return Drawer(
@@ -207,7 +208,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
         children: [
           // Header
           Container(
-            decoration: const BoxDecoration(color: Colors.deepPurple),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.deepOrange, Colors.orange],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,7 +231,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
                       ? const Icon(
                           Icons.person,
                           size: 30,
-                          color: Colors.deepPurple,
+                          color: Colors.deepOrange,
                         )
                       : null,
                 ),
@@ -261,10 +268,10 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ),
 
-          // Secretary-specific menu items
-          if (isSecretary) ...[
+          // Secretary and Super Admin menu items
+          if (isSecretary || isSuperAdmin) ...[
             ListTile(
-              leading: const Icon(Icons.inbox, color: Colors.deepPurple),
+              leading: const Icon(Icons.inbox, color: Colors.deepOrange),
               title: const Text('Inbox'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -276,7 +283,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.today, color: Colors.deepPurple),
+              leading: const Icon(Icons.today, color: Colors.deepOrange),
               title: const Text('Today'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -288,7 +295,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.event, color: Colors.deepPurple),
+              leading: const Icon(Icons.event, color: Colors.deepOrange),
               title: const Text('Tomorrow'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -302,7 +309,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.schedule, color: Colors.deepPurple),
+              leading: const Icon(Icons.schedule, color: Colors.deepOrange),
               title: const Text('Upcoming'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -318,7 +325,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ListTile(
               leading: const Icon(
                 Icons.assignment_ind,
-                color: Colors.deepPurple,
+                color: Colors.deepOrange,
               ),
               title: const Text('Assigned to Me'),
               onTap: () {
@@ -333,7 +340,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.star, color: Colors.deepPurple),
+              leading: const Icon(Icons.star, color: Colors.deepOrange),
               title: const Text('Starred'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -347,7 +354,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.deepPurple),
+              leading: const Icon(Icons.delete_outline, color: Colors.deepOrange),
               title: const Text('Deleted Appointments'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -363,7 +370,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ListTile(
               leading: const Icon(
                 Icons.add_circle_outline,
-                color: Colors.deepPurple,
+                color: Colors.deepOrange,
               ),
               title: const Text('Add New'),
               onTap: () {
@@ -376,7 +383,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.search, color: Colors.deepPurple),
+              leading: const Icon(Icons.search, color: Colors.deepOrange),
               title: const Text('Global Search'),
               onTap: () {
                 Navigator.pop(context); // Close drawer
@@ -388,12 +395,14 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ],
 
+
+
           // Admin-specific menu items (to be implemented)
-          if (isAdmin) ...[
+          if (isAdmin && !isSuperAdmin) ...[
             ListTile(
               leading: const Icon(
                 Icons.admin_panel_settings,
-                color: Colors.deepPurple,
+                color: Colors.deepOrange,
               ),
               title: const Text('Admin Dashboard'),
               onTap: () {
@@ -402,7 +411,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.people, color: Colors.deepPurple),
+              leading: const Icon(Icons.people, color: Colors.deepOrange),
               title: const Text('Manage Users'),
               onTap: () {
                 Navigator.pop(context);
@@ -416,7 +425,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ListTile(
               leading: const Icon(
                 Icons.calendar_today,
-                color: Colors.deepPurple,
+                color: Colors.deepOrange,
               ),
               title: const Text('My Appointments'),
               onTap: () {
@@ -425,7 +434,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.history, color: Colors.deepPurple),
+              leading: const Icon(Icons.history, color: Colors.deepOrange),
               title: const Text('Appointment History'),
               onTap: () {
                 Navigator.pop(context);
@@ -435,7 +444,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           ],
           // Quick Darshan Line Navigation Item - Commented out
           // ListTile(
-          //   leading: const Icon(Icons.queue, color: Colors.deepPurple),
+          //   leading: const Icon(Icons.queue, color: Colors.deepOrange),
           //   title: const Text('Quick Darshan Line'),
           //   onTap: () {
           //     Navigator.pop(context); // Close drawer
@@ -449,7 +458,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           // ),
           // Send Bulk Email & SMS Navigation Item - Commented out
           // ListTile(
-          //   leading: const Icon(Icons.email, color: Colors.deepPurple),
+          //   leading: const Icon(Icons.email, color: Colors.deepOrange),
           //   title: const Text('Send Bulk Email & SMS'),
           //   onTap: () {
           //     Navigator.pop(context); // Close drawer
@@ -464,7 +473,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
           // Dashboard Navigation Item
           ListTile(
-            leading: const Icon(Icons.dashboard, color: Colors.deepPurple),
+            leading: const Icon(Icons.dashboard, color: Colors.deepOrange),
             title: const Text('Darshan Line'),
             onTap: () {
               Navigator.pop(context); // Close drawer
@@ -479,7 +488,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
           // User Profile Navigation Item
           // ListTile(
-          //   leading: const Icon(Icons.person, color: Colors.deepPurple),
+          //   leading: const Icon(Icons.person, color: Colors.deepOrange),
           //   title: const Text('User Profile'),
           //   onTap: () {
           //     Navigator.pop(context); // Close drawer

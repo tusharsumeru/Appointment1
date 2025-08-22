@@ -699,99 +699,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     Map<String, dynamic> appointment,
     Map<String, dynamic> category,
   ) {
-    return GestureDetector(
-      onTap: () async {
-        // Check if this is a quick appointment
-        final apptType = appointment['appt_type']?.toString();
-        final quickApt = appointment['quick_apt'];
-        final isQuickAppointment = apptType == 'quick' && 
-                                  quickApt is Map<String, dynamic> && 
-                                  quickApt['isQuickAppointment'] == true;
-
-        if (isQuickAppointment) {
-          // For quick appointments, fetch detailed data using the quick appointment API
-          final appointmentId = appointment['appointmentId']?.toString();
-          if (appointmentId != null && appointmentId.isNotEmpty) {
-            try {
-              // Show loading indicator
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    content: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: const Text(
-                            'Loading quick appointment details...',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-
-              final result = await ActionService.getQuickAppointmentById(appointmentId);
-              
-              // Close loading dialog
-              Navigator.of(context).pop();
-
-              if (result['success'] && result['data'] != null) {
-                // Navigate to appointment detail page with the fetched data
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AppointmentDetailPage(
-                      appointment: result['data'],
-                      isFromScheduleScreens: true,
-                    ),
-                  ),
-                );
-              } else {
-                // Show error message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result['message'] ?? 'Failed to load quick appointment details'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            } catch (e) {
-              // Close loading dialog if still open
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-              
-              // Show error message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error: $e'),
-                  backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            }
-          }
-        } else {
-          // For regular appointments, use the existing flow
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AppointmentDetailPage(
-                appointment: appointment,
-                isFromScheduleScreens: true,
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
+    return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1093,7 +1001,6 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
             child: _buildActionButton(appointment),
           ),
         ],
-      ),
       ),
     );
   }

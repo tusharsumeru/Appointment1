@@ -912,11 +912,27 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Global Search'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text(
+          'Global Search',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.deepOrange, Colors.orange, Colors.orangeAccent],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
+        elevation: 4,
+        shadowColor: Colors.orange.withOpacity(0.3),
+        centerTitle: false,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -979,18 +995,11 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                                           Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFF5722), Color(0xFFFF7043)], // deep orange sunset colors
+                            colors: [Color(0xFFFF9500), Color(0xFFFFD700)], // orange-500 to yellow-500
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           ),
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFF5722).withOpacity(0.4),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
                         ),
                       child: ElevatedButton(
                         onPressed: () => _performSearch(),

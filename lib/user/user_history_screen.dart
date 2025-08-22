@@ -195,7 +195,20 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
         color: Colors.grey.shade50,
         child: Column(
           children: [
-
+            // // Header
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(20),
+            //   child: const Text(
+            //     'My Appointment History',
+            //     style: TextStyle(
+            //       fontSize: 24,
+            //       fontWeight: FontWeight.bold,
+            //       color: Colors.black87,
+            //     ),
+            //     textAlign: TextAlign.center,
+            //   ),
+            // ),
             
             // Content
             Expanded(

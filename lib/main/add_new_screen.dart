@@ -15,10 +15,27 @@ class _AddNewScreenState extends State<AddNewScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA), // zinc-50
       appBar: AppBar(
-        title: const Text('Create Quick Appointment'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black87,
+        title: const Text(
+          'Create Quick Appointment',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.deepOrange, Colors.orange, Colors.orangeAccent],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 4,
+        shadowColor: Colors.orange.withOpacity(0.3),
+        centerTitle: false,
+        foregroundColor: Colors.white,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),

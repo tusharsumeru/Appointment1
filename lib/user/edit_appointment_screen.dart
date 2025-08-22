@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import 'user_screen.dart';
@@ -13,10 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 class EditAppointmentScreen extends StatefulWidget {
   final Map<String, dynamic>? appointmentData;
 
-  const EditAppointmentScreen({
-    super.key,
-    this.appointmentData,
-  });
+  const EditAppointmentScreen({super.key, this.appointmentData});
 
   @override
   State<EditAppointmentScreen> createState() => _EditAppointmentScreenState();
@@ -24,28 +22,39 @@ class EditAppointmentScreen extends StatefulWidget {
 
 class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   // Form controllers
-  final TextEditingController _appointmentPurposeController = TextEditingController();
-  final TextEditingController _numberOfUsersController = TextEditingController();
-  final TextEditingController _fromDateController = TextEditingController();
-  final TextEditingController _toDateController = TextEditingController();
+  final TextEditingController _appointmentPurposeController =
+      TextEditingController();
+  final TextEditingController _numberOfUsersController =
+      TextEditingController();
   
-  // Program Date Range Controllers
-  final TextEditingController _programFromDateController = TextEditingController();
-  final TextEditingController _programToDateController = TextEditingController();
-  
+  // Preferred date range controllers (for appointment scheduling)
+  final TextEditingController _preferredFromDateController = TextEditingController();
+  final TextEditingController _preferredToDateController = TextEditingController();
+
+  // Program date range controllers (for course/program dates)
+  final TextEditingController _programFromDateController =
+      TextEditingController();
+  final TextEditingController _programToDateController =
+      TextEditingController();
+
   // Reference Information Controllers (for guest appointments)
-  final TextEditingController _referenceNameController = TextEditingController();
-  final TextEditingController _referenceEmailController = TextEditingController();
-  final TextEditingController _referencePhoneController = TextEditingController();
-  
+  final TextEditingController _referenceNameController =
+      TextEditingController();
+  final TextEditingController _referenceEmailController =
+      TextEditingController();
+  final TextEditingController _referencePhoneController =
+      TextEditingController();
+
   // Guest Information Controllers (for guest appointments)
   final TextEditingController _guestNameController = TextEditingController();
   final TextEditingController _guestEmailController = TextEditingController();
   final TextEditingController _guestPhoneController = TextEditingController();
-  final TextEditingController _guestDesignationController = TextEditingController();
+  final TextEditingController _guestDesignationController =
+      TextEditingController();
   final TextEditingController _guestCompanyController = TextEditingController();
-  final TextEditingController _guestLocationController = TextEditingController();
-  
+  final TextEditingController _guestLocationController =
+      TextEditingController();
+
   // Form state
   bool _isFormValid = false;
   String? _selectedSecretary;
@@ -56,18 +65,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   File? _selectedImage;
   File? _selectedAttachment; // For file attachments
   bool _isAttendingProgram = false;
-  String? _existingAttachmentUrl; // For existing attachment from appointment data
-  
+  String?
+  _existingAttachmentUrl; // For existing attachment from appointment data
+
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
   Map<int, String> _guestImages = {};
   Map<int, bool> _guestUploading = {};
-  
+
   // Location search state
   List<Map<String, dynamic>> _locationSuggestions = [];
   bool _isSearchingLocations = false;
   String _lastSearchQuery = '';
-  
+
   // Main guest photo state
   String? _mainGuestPhotoUrl;
   bool _isMainGuestPhotoUploading = false;
@@ -76,7 +86,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   // Location data
   List<Map<String, dynamic>> _locations = [];
   bool _isLoadingLocations = true;
-  
+
   // Reference information loading state
   bool _isLoadingReferenceInfo = true;
 
@@ -87,7 +97,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Email validation error
   String? _guestEmailError;
-  
+
   // Date validation errors
   String? _dateRangeError;
   String? _programDateRangeError;
@@ -115,9 +125,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Get appointment type
   String get _appointmentType {
-    return widget.appointmentData?['appointmentType']?.toString().toLowerCase() ?? 
-           widget.appointmentData?['appointmentFor']?['type']?.toString().toLowerCase() ?? 
-           'myself';
+    return widget.appointmentData?['appointmentType']
+            ?.toString()
+            .toLowerCase() ??
+        widget.appointmentData?['appointmentFor']?['type']
+            ?.toString()
+            .toLowerCase() ??
+        'myself';
   }
 
   // Check if this is a guest appointment
@@ -137,8 +151,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   void dispose() {
     _appointmentPurposeController.dispose();
     _numberOfUsersController.dispose();
-    _fromDateController.dispose();
-    _toDateController.dispose();
+    _preferredFromDateController.dispose();
+    _preferredToDateController.dispose();
     _programFromDateController.dispose();
     _programToDateController.dispose();
     _referenceNameController.dispose();
@@ -150,14 +164,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _guestDesignationController.dispose();
     _guestCompanyController.dispose();
     _guestLocationController.dispose();
-    
+
     // Dispose guest controllers
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
     }
-    
+
     super.dispose();
   }
 
@@ -171,25 +185,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
     try {
       final appointment = widget.appointmentData!;
-      
+
       // Load basic appointment data
-      _appointmentPurposeController.text = appointment['appointmentPurpose']?.toString() ?? 
-                                          appointment['appointmentSubject']?.toString() ?? '';
-      
-      // Load date range
+      _appointmentPurposeController.text =
+          appointment['appointmentPurpose']?.toString() ??
+          appointment['appointmentSubject']?.toString() ??
+          '';
+
+      // Load preferred date range
       final preferredDateRange = appointment['preferredDateRange'];
       if (preferredDateRange != null) {
         final fromDate = preferredDateRange['fromDate'];
         final toDate = preferredDateRange['toDate'];
-        
+
         if (fromDate != null) {
           final from = DateTime.parse(fromDate);
-          _fromDateController.text = '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+          _preferredFromDateController.text =
+              '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
         }
-        
+
         if (toDate != null) {
           final to = DateTime.parse(toDate);
-          _toDateController.text = '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+          _preferredToDateController.text =
+              '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
         }
       }
 
@@ -197,7 +215,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final appointmentLocation = appointment['appointmentLocation'];
       if (appointmentLocation != null) {
         if (appointmentLocation is Map<String, dynamic>) {
-          _selectedAppointmentLocation = appointmentLocation['name']?.toString();
+          _selectedAppointmentLocation = appointmentLocation['name']
+              ?.toString();
           _selectedLocationId = appointmentLocation['locationId']?.toString();
           _selectedLocationMongoId = appointmentLocation['_id']?.toString();
         } else {
@@ -209,7 +228,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final assignedSecretary = appointment['assignedSecretary'];
       print('🔍 Loading assignedSecretary data: $assignedSecretary');
       print('🔍 assignedSecretary type: ${assignedSecretary.runtimeType}');
-      
+
       if (assignedSecretary is Map<String, dynamic>) {
         print('🔍 assignedSecretary keys: ${assignedSecretary.keys.toList()}');
         _selectedSecretary = assignedSecretary['_id']?.toString();
@@ -229,21 +248,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Load program attendance data
       final attendingCourseDetails = appointment['attendingCourseDetails'];
-      if (attendingCourseDetails != null && attendingCourseDetails is Map<String, dynamic>) {
+      if (attendingCourseDetails != null &&
+          attendingCourseDetails is Map<String, dynamic>) {
         _isAttendingProgram = true;
-        
+
         // Load program date range
         final fromDate = attendingCourseDetails['fromDate'];
         final toDate = attendingCourseDetails['toDate'];
-        
+
         if (fromDate != null) {
           final from = DateTime.parse(fromDate);
-          _programFromDateController.text = '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+          _programFromDateController.text =
+              '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
         }
-        
+
         if (toDate != null) {
           final to = DateTime.parse(toDate);
-          _programToDateController.text = '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+          _programToDateController.text =
+              '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
         }
       }
 
@@ -260,12 +282,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Set the number of users based on the loaded data
       final accompanyUsers = appointment['accompanyUsers'];
-      print('DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers');
+      print(
+        'DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers',
+      );
       if (accompanyUsers != null && accompanyUsers['users'] != null) {
         final List<dynamic> users = accompanyUsers['users'];
         // Set number of users to just the accompanying users count
         _numberOfUsersController.text = users.length.toString();
-        print('DEBUG LOAD: Set numberOfUsers to ${users.length} (accompanying users only)');
+        print(
+          'DEBUG LOAD: Set numberOfUsers to ${users.length} (accompanying users only)',
+        );
       } else {
         _numberOfUsersController.text = '0';
         print('DEBUG LOAD: Set numberOfUsers to 0 (no accompanying users)');
@@ -287,15 +313,20 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   void _loadGuestData(Map<String, dynamic> appointment) {
     final guestInformation = appointment['guestInformation'];
     if (guestInformation != null && guestInformation is Map<String, dynamic>) {
-      _guestNameController.text = guestInformation['fullName']?.toString() ?? '';
-      _guestEmailController.text = guestInformation['emailId']?.toString() ?? '';
-      _guestDesignationController.text = guestInformation['designation']?.toString() ?? '';
-      _guestCompanyController.text = guestInformation['company']?.toString() ?? '';
-      _guestLocationController.text = guestInformation['location']?.toString() ?? '';
-      
+      _guestNameController.text =
+          guestInformation['fullName']?.toString() ?? '';
+      _guestEmailController.text =
+          guestInformation['emailId']?.toString() ?? '';
+      _guestDesignationController.text =
+          guestInformation['designation']?.toString() ?? '';
+      _guestCompanyController.text =
+          guestInformation['company']?.toString() ?? '';
+      _guestLocationController.text =
+          guestInformation['location']?.toString() ?? '';
+
       // Load guest photo
       _mainGuestPhotoUrl = guestInformation['profilePhotoUrl']?.toString();
-      
+
       // Load phone number
       final phoneNumber = guestInformation['phoneNumber'];
       print('📞 Loading main guest phone number: $phoneNumber');
@@ -304,13 +335,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           // Phone number is stored as an object with countryCode and number
           final countryCode = phoneNumber['countryCode']?.toString() ?? '';
           final number = phoneNumber['number']?.toString() ?? '';
-          
+
           if (number.isNotEmpty) {
             // Set combined format: +countryCode + number
-            final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+            final cleanCountryCode = countryCode.startsWith('+')
+                ? countryCode.substring(1)
+                : countryCode;
             _guestPhoneController.text = '+$cleanCountryCode$number';
             print('📞 Parsed main guest phone: +$cleanCountryCode$number');
-            
+
             // Set country
             _selectedCountry = Country(
               phoneCode: cleanCountryCode,
@@ -334,7 +367,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               final number = parts.sublist(1).join('');
               _guestPhoneController.text = '+$countryCode$number';
               print('📞 Parsed main guest phone: +$countryCode$number');
-              
+
               // Set country
               _selectedCountry = Country(
                 phoneCode: countryCode,
@@ -364,10 +397,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
     // Load reference information
     final referenceInformation = appointment['referenceInformation'];
-    if (referenceInformation != null && referenceInformation is Map<String, dynamic>) {
-      _referenceNameController.text = referenceInformation['fullName']?.toString() ?? '';
-      _referenceEmailController.text = referenceInformation['email']?.toString() ?? '';
-      _referencePhoneController.text = referenceInformation['phoneNumber']?.toString() ?? '';
+    if (referenceInformation != null &&
+        referenceInformation is Map<String, dynamic>) {
+      _referenceNameController.text =
+          referenceInformation['fullName']?.toString() ?? '';
+      _referenceEmailController.text =
+          referenceInformation['email']?.toString() ?? '';
+      _referencePhoneController.text =
+          referenceInformation['phoneNumber']?.toString() ?? '';
     }
   }
 
@@ -389,14 +426,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (accompanyUsers != null && accompanyUsers['users'] != null) {
       final List<dynamic> users = accompanyUsers['users'];
       print('DEBUG LOAD: Found ${users.length} accompanying users');
-      
+
       // If users array is empty, treat it as no accompanying users
       if (users.isEmpty) {
         print('DEBUG LOAD: Empty users array, clearing guest controllers');
         _clearGuestControllers();
         return;
       }
-      
+
       // Clear existing controllers
       _clearGuestControllers();
 
@@ -404,27 +441,37 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final user = users[i];
         if (user is Map<String, dynamic>) {
           final guestNumber = i + 1;
-          
+
           // Create controllers for this guest
-          final nameController = TextEditingController(text: user['fullName']?.toString() ?? '');
+          final nameController = TextEditingController(
+            text: user['fullName']?.toString() ?? '',
+          );
           final phoneController = TextEditingController();
-          final ageController = TextEditingController(text: user['age']?.toString() ?? '');
+          final ageController = TextEditingController(
+            text: user['age']?.toString() ?? '',
+          );
 
           // Parse phone number
           final phoneNumber = user['phoneNumber'];
-          print('📞 Loading accompanying user $guestNumber phone number: $phoneNumber');
+          print(
+            '📞 Loading accompanying user $guestNumber phone number: $phoneNumber',
+          );
           if (phoneNumber != null) {
             if (phoneNumber is Map<String, dynamic>) {
               // Phone number is stored as an object with countryCode and number
               final countryCode = phoneNumber['countryCode']?.toString() ?? '';
               final number = phoneNumber['number']?.toString() ?? '';
-              
+
               if (number.isNotEmpty) {
                 // Set combined format: +countryCode + number
-                final cleanCountryCode = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                final cleanCountryCode = countryCode.startsWith('+')
+                    ? countryCode.substring(1)
+                    : countryCode;
                 phoneController.text = '+$cleanCountryCode$number';
-                print('📞 Accompanying user $guestNumber phone: +$cleanCountryCode$number');
-                
+                print(
+                  '📞 Accompanying user $guestNumber phone: +$cleanCountryCode$number',
+                );
+
                 _guestCountries[guestNumber] = Country(
                   phoneCode: cleanCountryCode,
                   countryCode: 'IN',
@@ -446,8 +493,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   final countryCode = parts[0];
                   final number = parts.sublist(1).join('');
                   phoneController.text = '+$countryCode$number';
-                  print('📞 Accompanying user $guestNumber phone: +$countryCode$number');
-                  
+                  print(
+                    '📞 Accompanying user $guestNumber phone: +$countryCode$number',
+                  );
+
                   _guestCountries[guestNumber] = Country(
                     phoneCode: countryCode,
                     countryCode: 'IN',
@@ -462,15 +511,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   );
                 } else {
                   phoneController.text = phoneNumber;
-                  print('📞 Accompanying user $guestNumber phone (no country code): $phoneNumber');
+                  print(
+                    '📞 Accompanying user $guestNumber phone (no country code): $phoneNumber',
+                  );
                 }
               } else {
                 phoneController.text = phoneNumber;
-                print('📞 Accompanying user $guestNumber phone (no + prefix): $phoneNumber');
+                print(
+                  '📞 Accompanying user $guestNumber phone (no + prefix): $phoneNumber',
+                );
               }
             }
           } else {
-            print('📞 No phone number found for accompanying user $guestNumber');
+            print(
+              '📞 No phone number found for accompanying user $guestNumber',
+            );
           }
 
           _guestControllers.add({
@@ -515,22 +570,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     });
 
     try {
-      final result = await ActionService.getAshramLocationByLocationId(locationId: _selectedLocationId!);
+      final result = await ActionService.getAshramLocationByLocationId(
+        locationId: _selectedLocationId!,
+      );
       if (result['success'] == true) {
         final locationData = result['data'];
         final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
-        
+
         print('✅ Loaded ${assignedSecretaries.length} secretaries from API');
-        
+
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = [];
-        
+
         for (var secretary in assignedSecretaries) {
           try {
             final secretaryData = secretary['secretaryId'] ?? secretary;
             secretaries.add({
               'id': secretaryData['_id']?.toString() ?? '',
-              'name': secretaryData['fullName']?.toString() ?? 'Unknown Secretary',
+              'name':
+                  secretaryData['fullName']?.toString() ?? 'Unknown Secretary',
               'email': secretaryData['email']?.toString() ?? '',
               'role': secretaryData['role']?.toString() ?? '',
             });
@@ -544,7 +602,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           _secretaries = secretaries;
           _isLoadingSecretaries = false;
         });
-        
+
         // Log secretary details for debugging
         for (var secretary in secretaries) {
           print('👤 Secretary: ${secretary['name']} (ID: ${secretary['id']})');
@@ -553,7 +611,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         print('❌ Failed to load secretaries: ${result['message']}');
         setState(() {
           _isLoadingSecretaries = false;
-          _secretaryErrorMessage = result['message'] ?? 'Failed to load secretaries';
+          _secretaryErrorMessage =
+              result['message'] ?? 'Failed to load secretaries';
           _secretaries = [];
         });
       }
@@ -603,9 +662,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             setState(() {
               _isMainGuestPhotoUploading = false;
             });
-            
+
             // Show backend error message in dialog
-            final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
+            final errorMessage =
+                result['error'] ??
+                result['message'] ??
+                'Photo validation failed';
             _showPhotoValidationErrorDialog(errorMessage, () {
               // Clear any previous state and allow user to pick again
               setState(() {
@@ -619,22 +681,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
-          
+
           // Show error message in dialog
-          _showPhotoValidationErrorDialog('Error uploading photo: ${e.toString()}', () {
-            // Clear any previous state and allow user to pick again
-            setState(() {
-              _mainGuestPhotoFile = null;
-              _mainGuestPhotoUrl = null;
-              _isMainGuestPhotoUploading = false;
-            });
-          });
+          _showPhotoValidationErrorDialog(
+            'Error uploading photo: ${e.toString()}',
+            () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _mainGuestPhotoFile = null;
+                _mainGuestPhotoUrl = null;
+                _isMainGuestPhotoUploading = false;
+              });
+            },
+          );
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
     }
   }
 
@@ -657,7 +722,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        
+
         // Check file size (5MB limit)
         if (file.size > 5 * 1024 * 1024) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -697,7 +762,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     setState(() {
       _selectedAttachment = null;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Attachment removed'),
@@ -750,39 +815,48 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   void _updateGuestControllers() {
     int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-    
-    print('DEBUG UPDATE: _updateGuestControllers - accompanyUsersCount: $accompanyUsersCount, current controllers: ${_guestControllers.length}');
-    
+
+    print(
+      'DEBUG UPDATE: _updateGuestControllers - accompanyUsersCount: $accompanyUsersCount, current controllers: ${_guestControllers.length}',
+    );
+
     // If we're reducing the number of guests, dispose extra controllers from the end
     if (_guestControllers.length > accompanyUsersCount) {
-      print('DEBUG UPDATE: Removing ${_guestControllers.length - accompanyUsersCount} guest controllers');
+      print(
+        'DEBUG UPDATE: Removing ${_guestControllers.length - accompanyUsersCount} guest controllers',
+      );
       for (int i = accompanyUsersCount; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        
+
         // Also remove associated data
         int guestNumber = i + 1;
         _guestImages.remove(guestNumber);
         _guestUploading.remove(guestNumber);
         _guestCountries.remove(guestNumber);
       }
-      _guestControllers.removeRange(accompanyUsersCount, _guestControllers.length);
-      print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
+      _guestControllers.removeRange(
+        accompanyUsersCount,
+        _guestControllers.length,
+      );
+      print(
+        'DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}',
+      );
     }
-    
+
     // If we need more guests, add them at the bottom
     while (_guestControllers.length < accompanyUsersCount) {
       int guestNumber = _guestControllers.length + 1;
-      
+
       Map<String, TextEditingController> controllers = {
         'name': TextEditingController(),
         'phone': TextEditingController(),
         'age': TextEditingController(),
       };
       _guestControllers.add(controllers);
-      
+
       // Initialize country for new guest (only if not already set)
       if (!_guestCountries.containsKey(guestNumber)) {
         _guestCountries[guestNumber] = Country(
@@ -799,7 +873,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         );
       }
     }
-    
+
     setState(() {});
     _validateForm();
   }
@@ -822,13 +896,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Helper method to validate date range
   bool _isValidDateRange(String fromDate, String toDate) {
-    if (fromDate.isEmpty || toDate.isEmpty) return true; // Let other validation handle empty dates
-    
+    if (fromDate.isEmpty || toDate.isEmpty)
+      return true; // Let other validation handle empty dates
+
     final fromDateTime = _parseDateString(fromDate);
     final toDateTime = _parseDateString(toDate);
-    
-    if (fromDateTime == null || toDateTime == null) return true; // Let other validation handle invalid dates
-    
+
+    if (fromDateTime == null || toDateTime == null)
+      return true; // Let other validation handle invalid dates
+
     return fromDateTime.isBefore(toDateTime);
   }
 
@@ -842,10 +918,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
       return true; // Let other validation handle empty dates
     }
-    
+
     final fromDateTime = _parseDateString(fromDate);
     final toDateTime = _parseDateString(toDate);
-    
+
     if (fromDateTime == null || toDateTime == null) {
       if (errorType == 'appointment') {
         _dateRangeError = null;
@@ -854,26 +930,33 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
       return true; // Let other validation handle invalid dates
     }
-    
+
     final isValid = fromDateTime.isBefore(toDateTime);
-    
+
     if (errorType == 'appointment') {
       _dateRangeError = isValid ? null : 'From date must be before to date';
     } else if (errorType == 'program') {
-      _programDateRangeError = isValid ? null : 'Program start date must be before program end date';
+      _programDateRangeError = isValid
+          ? null
+          : 'Program start date must be before program end date';
     }
-    
+
     return isValid;
   }
 
   void _validateForm() {
-    bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
-        _fromDateController.text.isNotEmpty &&
-        _toDateController.text.isNotEmpty;
-    
-    // Validate date ranges
-    bool dateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, 'appointment');
-    
+    bool basicFormValid =
+        _appointmentPurposeController.text.isNotEmpty &&
+        _preferredFromDateController.text.isNotEmpty &&
+        _preferredToDateController.text.isNotEmpty;
+
+    // Validate preferred date ranges
+    bool preferredDateRangeValid = _validateDateRange(
+      _preferredFromDateController.text,
+      _preferredToDateController.text,
+      'appointment',
+    );
+
     // Validate main guest photo if appointment type is guest
     bool mainGuestPhotoValid = true;
     if (_isGuestAppointment) {
@@ -881,16 +964,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         mainGuestPhotoValid = false;
       }
     }
-    
+
     // Validate main guest email if appointment type is guest
     bool mainGuestEmailValid = true;
     if (_isGuestAppointment) {
-      mainGuestEmailValid = _guestEmailError == null && _guestEmailController.text.isNotEmpty;
+      mainGuestEmailValid =
+          _guestEmailError == null && _guestEmailController.text.isNotEmpty;
     }
-    
+
     // Validate guest information if any
     bool guestFormValid = true;
-    final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    final accompanyUsersCount =
+        int.tryParse(_numberOfUsersController.text) ?? 0;
     if (accompanyUsersCount > 0 && accompanyUsersCount <= 10) {
       for (var guest in _guestControllers) {
         if (guest['name']?.text.isEmpty == true ||
@@ -899,22 +984,40 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           guestFormValid = false;
           break;
         }
+        
+        // Validate age range (1-120)
+        final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+        if (age < 1 || age > 120) {
+          guestFormValid = false;
+          break;
+        }
       }
     }
-    
+
     // Validate program dates if attending a program
     bool programDatesValid = true;
     if (_isAttendingProgram) {
-      if (_programFromDateController.text.isEmpty || _programToDateController.text.isEmpty) {
+      if (_programFromDateController.text.isEmpty ||
+          _programToDateController.text.isEmpty) {
         programDatesValid = false;
       } else {
         // Validate program date range
-        programDatesValid = _validateDateRange(_programFromDateController.text, _programToDateController.text, 'program');
+        programDatesValid = _validateDateRange(
+          _programFromDateController.text,
+          _programToDateController.text,
+          'program',
+        );
       }
     }
-    
+
     setState(() {
-      _isFormValid = basicFormValid && dateRangeValid && mainGuestPhotoValid && mainGuestEmailValid && guestFormValid && programDatesValid;
+      _isFormValid =
+          basicFormValid &&
+          preferredDateRangeValid &&
+          mainGuestPhotoValid &&
+          mainGuestEmailValid &&
+          guestFormValid &&
+          programDatesValid;
     });
   }
 
@@ -935,34 +1038,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1,
       };
 
-      // Priority-based date range logic
-      if (_isAttendingProgram) {
-        // FIRST PRIORITY: If attending program, use program dates for preferred date range
-        updateData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_programFromDateController.text),
-          'toDate': _parseDateToISO(_programToDateController.text),
-        };
-      } else {
-        // SECOND PRIORITY: If not attending program, use preferred date range
-        updateData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        };
-      }
+      // Use preferred date range for appointment scheduling
+      updateData['preferredDateRange'] = {
+        'fromDate': _parseDateToISO(_preferredFromDateController.text),
+        'toDate': _parseDateToISO(_preferredToDateController.text),
+      };
 
       // Add guest information if appointment type is guest
       if (_isGuestAppointment) {
         final phoneText = _guestPhoneController.text.trim();
         String fullPhoneNumber = phoneText;
-        
+
         // If the phone number doesn't start with +, add the country code
         if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
           final countryCode = '+${_selectedCountry.phoneCode}';
           fullPhoneNumber = '$countryCode$phoneText';
         }
-        
+
         print('📞 Saving main guest phone: $fullPhoneNumber');
-        
+
         Map<String, dynamic> guestInfo = {
           'fullName': _guestNameController.text.trim(),
           'emailId': _guestEmailController.text.trim(),
@@ -971,11 +1065,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'company': _guestCompanyController.text.trim(),
           'location': _guestLocationController.text.trim(),
         };
-        
+
         if (_mainGuestPhotoUrl != null) {
           guestInfo['profilePhotoUrl'] = _mainGuestPhotoUrl;
         }
-        
+
         updateData['guestInformation'] = guestInfo;
 
         // Add reference information
@@ -987,51 +1081,56 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Add accompanyUsers if there are additional users
-      final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+      final accompanyUsersCount =
+          int.tryParse(_numberOfUsersController.text) ?? 0;
       if (accompanyUsersCount > 0) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
-          
+
           final phoneText = guest['phone']?.text.trim() ?? '';
           String fullPhoneNumber = phoneText;
-          
+
           // If the phone number doesn't start with +, add the country code
           if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
-            final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
+            final countryCode =
+                '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
             fullPhoneNumber = '$countryCode$phoneText';
           }
-          
-          print('📞 Saving accompanying user $guestNumber phone: $fullPhoneNumber');
-          
+
+          print(
+            '📞 Saving accompanying user $guestNumber phone: $fullPhoneNumber',
+          );
+
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
             'phoneNumber': fullPhoneNumber,
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
-          
+
           if (_guestImages.containsKey(guestNumber)) {
             guestData['profilePhotoUrl'] = _guestImages[guestNumber];
           }
-          
+
           accompanyUsers.add(guestData);
         }
-        
+
         updateData['accompanyUsers'] = {
           'numberOfUsers': accompanyUsersCount,
           'users': accompanyUsersCount > 10 ? [] : accompanyUsers,
         };
-        print('DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users');
+        print(
+          'DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users',
+        );
       } else {
         // If no accompanying users, ensure numberOfUsers is set to 1 and clear accompanyUsers
         updateData['numberOfUsers'] = 1;
         // Try sending empty array instead of null to ensure backend clears the data
-        updateData['accompanyUsers'] = {
-          'numberOfUsers': 0,
-          'users': [],
-        };
-        print('DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1');
+        updateData['accompanyUsers'] = {'numberOfUsers': 0, 'users': []};
+        print(
+          'DEBUG SAVE: Setting accompanyUsers to empty array and numberOfUsers to 1',
+        );
       }
 
       // Add program attendance data if applicable
@@ -1045,9 +1144,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Call API to update appointment
-      final appointmentId = widget.appointmentData?['appointmentId'] ?? 
-                           widget.appointmentData?['_id'] ?? '';
-      
+      final appointmentId =
+          widget.appointmentData?['appointmentId'] ??
+          widget.appointmentData?['_id'] ??
+          '';
+
       final result = await ActionService.updateAppointmentEnhanced(
         appointmentId: appointmentId,
         updateData: updateData,
@@ -1064,14 +1165,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         Navigator.pop(context, true); // Return true to indicate success
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Failed to update appointment')),
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to update appointment'),
+          ),
         );
       }
     } catch (e) {
       print('Error saving appointment: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving appointment: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving appointment: $e')));
     } finally {
       setState(() {
         _isSaving = false;
@@ -1100,27 +1203,27 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     try {
       // Clean and validate the URL
       String cleanUrl = url.trim();
-      
+
       // Add protocol if missing
       if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
         cleanUrl = 'https://$cleanUrl';
       }
-      
+
       print('🔄 Attempting to open URL: $cleanUrl');
-      
+
       final Uri uri = Uri.parse(cleanUrl);
-      
+
       // Check if URL can be launched
       final canLaunch = await canLaunchUrl(uri);
       print('🔄 Can launch URL: $canLaunch');
-      
+
       if (canLaunch) {
         final launched = await launchUrl(
-          uri, 
+          uri,
           mode: LaunchMode.externalApplication,
         );
         print('🔄 URL launched successfully: $launched');
-        
+
         if (!launched && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1163,10 +1266,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     required TextEditingController controller,
     String? placeholder,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    String? Function(String?)? validator,
   }) {
     return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
           label,
           style: const TextStyle(
@@ -1179,12 +1285,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
+          validator: validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(
             hintText: placeholder,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            counterText: '', // Hide character counter
           ),
           onChanged: (_) => _validateForm(),
         ),
@@ -1217,17 +1329,32 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             hintText: placeholder,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.grey[300]!,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.grey[300]!,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.deepPurple),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.deepPurple,
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
           ),
           onChanged: (value) {
             setState(() {
@@ -1235,7 +1362,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               if (value.isEmpty) {
                 _guestEmailError = 'Email is required';
               } else {
-                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                final emailRegex = RegExp(
+                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                );
                 if (!emailRegex.hasMatch(value)) {
                   _guestEmailError = 'Please enter a valid email address';
                 } else {
@@ -1250,10 +1379,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SizedBox(height: 4),
           Text(
             _guestEmailError!,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],
       ],
@@ -1268,7 +1394,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+      children: [
         Text(
           label,
           style: const TextStyle(
@@ -1276,18 +1402,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             fontWeight: FontWeight.w500,
             color: Colors.black87,
           ),
-                      ),
-                      const SizedBox(height: 8),
+        ),
+        const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.multiline,
           maxLines: 5,
           decoration: InputDecoration(
             hintText: placeholder,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
           onChanged: onChanged,
         ),
@@ -1297,11 +1424,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   Widget _buildLocationField() {
     return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
           'Appointment Location *',
-                  style: TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: Colors.black87,
@@ -1319,27 +1446,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               color: Colors.white,
             ),
             child: Row(
-                  children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
+              children: [
+                Icon(Icons.location_on, color: Colors.grey[600], size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _selectedAppointmentLocation ?? 'Select a location',
                     style: TextStyle(
-                      color: _selectedAppointmentLocation != null ? Colors.black87 : Colors.grey[600],
+                      color: _selectedAppointmentLocation != null
+                          ? Colors.black87
+                          : Colors.grey[600],
                       fontSize: 16,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: Colors.grey[600],
-                  size: 24,
-                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
               ],
             ),
           ),
@@ -1361,9 +1482,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                children: [
+          ),
+          child: Column(
+            children: [
               // Handle
               Container(
                 margin: const EdgeInsets.only(top: 12),
@@ -1374,17 +1495,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
-                  // Header
+
+              // Header
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, color: const Color(0xFFF97316), size: 24),
+                    Icon(
+                      Icons.location_on,
+                      color: const Color(0xFFF97316),
+                      size: 24,
+                    ),
                     const SizedBox(width: 12),
-                  const Text(
+                    const Text(
                       'Select Location',
-                    style: TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
@@ -1393,9 +1518,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   ],
                 ),
               ),
-              
+
               const Divider(height: 1),
-              
+
               // Location List
               Expanded(
                 child: _isLoadingLocations
@@ -1405,36 +1530,49 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         itemCount: _locations.length,
                         itemBuilder: (context, index) {
                           final location = _locations[index];
-                          final locationName = location['name']?.toString() ?? '';
-                          final isSelected = _selectedAppointmentLocation == locationName;
-                          
+                          final locationName =
+                              location['name']?.toString() ?? '';
+                          final isSelected =
+                              _selectedAppointmentLocation == locationName;
+
                           return ListTile(
                             leading: Icon(
                               Icons.location_on,
-                              color: isSelected ? const Color(0xFFF97316) : Colors.grey[600],
+                              color: isSelected
+                                  ? const Color(0xFFF97316)
+                                  : Colors.grey[600],
                             ),
                             title: Text(
                               locationName,
                               style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                color: isSelected ? const Color(0xFFF97316) : Colors.black87,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? const Color(0xFFF97316)
+                                    : Colors.black87,
                               ),
                             ),
                             trailing: isSelected
-                                ? Icon(Icons.check, color: const Color(0xFFF97316))
+                                ? Icon(
+                                    Icons.check,
+                                    color: const Color(0xFFF97316),
+                                  )
                                 : null,
                             onTap: () {
                               setState(() {
                                 _selectedAppointmentLocation = locationName;
-                                _selectedLocationId = location['locationId']?.toString();
-                                _selectedLocationMongoId = location['_id']?.toString();
+                                _selectedLocationId = location['locationId']
+                                    ?.toString();
+                                _selectedLocationMongoId = location['_id']
+                                    ?.toString();
                               });
-                              
+
                               // Load secretaries for the selected location
                               if (_selectedLocationId != null) {
                                 _loadSecretaries();
                               }
-                              
+
                               Navigator.pop(context);
                               _validateForm();
                             },
@@ -1451,13 +1589,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   Widget _buildSecretaryField() {
     return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
           'Have you been in touch with any secretary regarding your appointment?',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
             color: Colors.black87,
           ),
         ),
@@ -1474,11 +1612,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.person,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
+                Icon(Icons.person, color: Colors.grey[600], size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _isLoadingSecretaries
@@ -1487,27 +1621,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           style: TextStyle(color: Colors.grey[600]),
                         )
                       : _selectedLocationId == null
-                          ? Text(
-                              'Please select a location first',
-                              style: TextStyle(color: Colors.grey[600]),
-                            )
-                          : Text(
-                              _getSelectedSecretaryName() ?? 'Select a secretary',
-                              style: TextStyle(
-                                color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
-                                    ? Colors.black87 
-                                    : Colors.grey[600],
-                                fontSize: 16,
-                              ),
-                            ),
-                ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: Colors.grey[600],
-                  size: 24,
-                            ),
-                          ],
+                      ? Text(
+                          'Please select a location first',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      : Text(
+                          _getSelectedSecretaryName() ?? 'Select a secretary',
+                          style: TextStyle(
+                            color:
+                                _getSelectedSecretaryName() != null &&
+                                    _getSelectedSecretaryName() !=
+                                        'None - I am not in touch with any secretary'
+                                ? Colors.black87
+                                : Colors.grey[600],
+                            fontSize: 16,
+                          ),
                         ),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
+              ],
+            ),
           ),
         ),
       ],
@@ -1519,15 +1652,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     print('🔍 _selectedSecretary: $_selectedSecretary');
     print('🔍 _selectedSecretaryName: $_selectedSecretaryName');
     print('🔍 _secretaries count: ${_secretaries.length}');
-    
-    if (_selectedSecretary == null) return 'None - I am not in touch with any secretary';
-    
+
+    if (_selectedSecretary == null)
+      return 'None - I am not in touch with any secretary';
+
     // If we have a stored name, use it
     if (_selectedSecretaryName != null && _selectedSecretaryName!.isNotEmpty) {
       print('🔍 Using stored name: $_selectedSecretaryName');
       return _selectedSecretaryName;
     }
-    
+
     // Otherwise, try to find it in the secretaries list
     final selectedSecretary = _secretaries.firstWhere(
       (secretary) => secretary['id'] == _selectedSecretary,
@@ -1548,7 +1682,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-                                  color: Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -1564,7 +1698,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            
+
             // Header
             Padding(
               padding: const EdgeInsets.all(20),
@@ -1583,9 +1717,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ],
               ),
             ),
-            
+
             const Divider(height: 1),
-            
+
             // Secretary List
             Flexible(
               child: ListView(
@@ -1595,20 +1729,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   ListTile(
                     leading: Icon(
                       Icons.person_off,
-                      color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.grey[600],
+                      color: _selectedSecretary == null
+                          ? const Color(0xFFF97316)
+                          : Colors.grey[600],
                     ),
                     title: Text(
                       'None - I am not in touch with any secretary',
                       style: TextStyle(
-                        fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
-                        color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.black87,
+                        fontWeight: _selectedSecretary == null
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        color: _selectedSecretary == null
+                            ? const Color(0xFFF97316)
+                            : Colors.black87,
                       ),
                     ),
                     trailing: _selectedSecretary == null
                         ? Icon(Icons.check, color: const Color(0xFFF97316))
                         : null,
                     onTap: () {
-                                  setState(() {
+                      setState(() {
                         _selectedSecretary = null;
                         _selectedSecretaryName = null;
                       });
@@ -1616,23 +1756,30 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       _validateForm();
                     },
                   ),
-                  
+
                   // Secretary options
                   ..._secretaries.map((secretary) {
                     final secretaryId = secretary['id']?.toString();
-                    final secretaryName = secretary['name']?.toString() ?? 'Unknown';
+                    final secretaryName =
+                        secretary['name']?.toString() ?? 'Unknown';
                     final isSelected = _selectedSecretary == secretaryId;
-                    
+
                     return ListTile(
                       leading: Icon(
                         Icons.person,
-                        color: isSelected ? const Color(0xFFF97316) : Colors.grey[600],
+                        color: isSelected
+                            ? const Color(0xFFF97316)
+                            : Colors.grey[600],
                       ),
                       title: Text(
                         secretaryName,
                         style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          color: isSelected ? const Color(0xFFF97316) : Colors.black87,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: isSelected
+                              ? const Color(0xFFF97316)
+                              : Colors.black87,
                         ),
                       ),
                       trailing: isSelected
@@ -1664,28 +1811,32 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
     if (pickedFile != null) {
       print('📸 Guest $guestNumber image selected: ${pickedFile.path}');
-      
+
       // Show uploading state
       setState(() {
         _guestUploading[guestNumber] = true;
       });
-      
+
       try {
         // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
-        
+        final result = await ActionService.uploadAndValidateProfilePhoto(
+          File(pickedFile.path),
+        );
+
         if (result['success']) {
           final s3Url = result['s3Url'];
           setState(() {
             _guestImages[guestNumber] = s3Url;
             _guestUploading[guestNumber] = false;
           });
-          
+
           print('✅ Guest $guestNumber photo uploaded to S3: $s3Url');
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Guest $guestNumber photo uploaded and validated successfully!'),
+              content: Text(
+                'Guest $guestNumber photo uploaded and validated successfully!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -1693,34 +1844,43 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           setState(() {
             _guestUploading[guestNumber] = false;
           });
-          
-          print('❌ Guest $guestNumber photo upload failed: ${result['message']}');
-          
+
+          print(
+            '❌ Guest $guestNumber photo upload failed: ${result['message']}',
+          );
+
           // Show backend error message in dialog
-          final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
-          _showPhotoValidationErrorDialog('Guest $guestNumber: $errorMessage', () {
-            // Clear any previous state and allow user to pick again
-            setState(() {
-              _guestImages.remove(guestNumber);
-              _guestUploading[guestNumber] = false;
-            });
-          });
+          final errorMessage =
+              result['error'] ?? result['message'] ?? 'Photo validation failed';
+          _showPhotoValidationErrorDialog(
+            'Guest $guestNumber: $errorMessage',
+            () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
+          );
         }
       } catch (e) {
         setState(() {
           _guestUploading[guestNumber] = false;
         });
-        
+
         print('❌ Error uploading guest $guestNumber photo: $e');
-        
+
         // Show error message in dialog
-        _showPhotoValidationErrorDialog('Guest $guestNumber: Error uploading photo: ${e.toString()}', () {
-          // Clear any previous state and allow user to pick again
-          setState(() {
-            _guestImages.remove(guestNumber);
-            _guestUploading[guestNumber] = false;
-          });
-        });
+        _showPhotoValidationErrorDialog(
+          'Guest $guestNumber: Error uploading photo: ${e.toString()}',
+          () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _guestImages.remove(guestNumber);
+              _guestUploading[guestNumber] = false;
+            });
+          },
+        );
       }
     }
   }
@@ -1729,7 +1889,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     setState(() {
       _guestImages.remove(guestNumber);
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Guest $guestNumber photo removed'),
@@ -1738,7 +1898,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  void _updatePhoneNumberWithCountryCode(int guestNumber, String newCountryCode) {
+  void _updatePhoneNumberWithCountryCode(
+    int guestNumber,
+    String newCountryCode,
+  ) {
     if (guestNumber > 0 && guestNumber <= _guestControllers.length) {
       final controller = _guestControllers[guestNumber - 1]['phone'];
       if (controller != null) {
@@ -1793,7 +1956,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -1801,7 +1967,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
-      controller.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      controller.text =
+          '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
       _validateForm();
     }
   }
@@ -1815,12 +1982,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
             fontSize: 16,
-                fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w500,
             color: Colors.black87,
           ),
         ),
@@ -1830,10 +1997,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: placeholder,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
           onChanged: onChanged,
         ),
@@ -1866,17 +2034,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             hintText: 'Select date',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: errorMessage != null ? Colors.red : Colors.deepPurple),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.deepPurple,
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
             suffixIcon: const Icon(Icons.calendar_today),
           ),
           onTap: onTap,
@@ -1885,10 +2062,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SizedBox(height: 4),
           Text(
             errorMessage,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],
       ],
@@ -1980,7 +2154,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
             onChanged: (value) {
               // Ensure the phone number starts with the country code
@@ -1988,7 +2165,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 // If user enters number without +, add the country code
                 if (!value.startsWith(_selectedCountry.phoneCode)) {
                   final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
-                  _guestPhoneController.text = '+${_selectedCountry.phoneCode}$cleanValue';
+                  _guestPhoneController.text =
+                      '+${_selectedCountry.phoneCode}$cleanValue';
                   _guestPhoneController.selection = TextSelection.fromPosition(
                     TextPosition(offset: _guestPhoneController.text.length),
                   );
@@ -2002,11 +2180,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
+  Widget _buildAccompanyingUserPhoneField(
+    int guestNumber,
+    TextEditingController controller,
+  ) {
     // Get the country for this guest
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
     final countryCode = country.phoneCode;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2091,7 +2272,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
             onChanged: (value) {
               // Ensure the phone number starts with the country code
@@ -2113,17 +2297,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  Widget _buildGuestCard(int guestNumber, Map<String, TextEditingController> guest) {
+  Widget _buildGuestCard(
+    int guestNumber,
+    Map<String, TextEditingController> guest,
+  ) {
     // Check if photo is required (age >= 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age >= 12;
-    
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -2132,7 +2317,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF97316).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -2149,7 +2337,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Name
             _buildReferenceField(
               label: 'Name',
@@ -2157,23 +2345,35 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               placeholder: 'Enter name',
             ),
             const SizedBox(height: 12),
-            
+
             // Age
             _buildReferenceField(
               label: 'Age',
               controller: guest['age']!,
-              placeholder: 'Enter age',
+              placeholder: 'Enter age (1-120)',
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 3,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Age is required';
+                }
+                final age = int.tryParse(value);
+                if (age == null || age < 1 || age > 120) {
+                  return 'Please enter 1-120';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 12),
-            
+
             // Phone
             _buildAccompanyingUserPhoneField(guestNumber, guest['phone']!),
-            
+
             // Photo Section (only show if age >= 12)
             if (isPhotoRequired) ...[
               const SizedBox(height: 16),
-              
+
               // Photo Header
               Row(
                 children: [
@@ -2196,19 +2396,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               const SizedBox(height: 4),
               Text(
                 'Photo of the Guest Required for Age 12 years and Above',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 12),
-              
+
               // Photo Upload Options
               Column(
                 children: [
                   // Upload from Device Card
                   GestureDetector(
-                    onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                    onTap: () =>
+                        _pickGuestImage(ImageSource.gallery, guestNumber),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -2253,10 +2451,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Take Photo Card
                   GestureDetector(
-                    onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                    onTap: () =>
+                        _pickGuestImage(ImageSource.camera, guestNumber),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -2300,21 +2499,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       ),
                     ),
                   ),
-                  
+
                   // Show selected image preview
-                  if (_guestImages.containsKey(guestNumber) || _guestUploading[guestNumber] == true) ...[
+                  if (_guestImages.containsKey(guestNumber) ||
+                      _guestUploading[guestNumber] == true) ...[
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: _guestUploading[guestNumber] == true 
-                            ? Colors.blue[50] 
-                            : (_guestImages.containsKey(guestNumber) ? Colors.green[50] : Colors.orange[50]),
+                        color: _guestUploading[guestNumber] == true
+                            ? Colors.blue[50]
+                            : (_guestImages.containsKey(guestNumber)
+                                  ? Colors.green[50]
+                                  : Colors.orange[50]),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _guestUploading[guestNumber] == true 
-                              ? Colors.blue[200]! 
-                              : (_guestImages.containsKey(guestNumber) ? Colors.green[200]! : Colors.orange[200]!),
+                          color: _guestUploading[guestNumber] == true
+                              ? Colors.blue[200]!
+                              : (_guestImages.containsKey(guestNumber)
+                                    ? Colors.green[200]!
+                                    : Colors.orange[200]!),
                         ),
                       ),
                       child: Column(
@@ -2334,55 +2538,74 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ? const Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.blue,
+                                              ),
                                         ),
                                       )
                                     : _guestImages.containsKey(guestNumber)
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(
-                                              _guestImages[guestNumber]!,
-                                              fit: BoxFit.cover,
-                                              loadingBuilder: (context, child, loadingProgress) {
-                                                if (loadingProgress == null) return child;
-                                                return Center(
-                                                  child: CircularProgressIndicator(
-                                                    value: loadingProgress.expectedTotalBytes != null
-                                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                        : null,
-                                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                                                  ),
-                                                );
-                                              },
-                                              errorBuilder: (context, error, stackTrace) {
-                                                print('❌ Error loading accompanying user photo for guest $guestNumber: $error');
-                                                print('❌ Photo URL: ${_guestImages[guestNumber]}');
-                                                return Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.grey[200],
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.error_outline,
-                                                    color: Colors.red,
-                                                    size: 24,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          )
-                                        : const Icon(
-                                            Icons.warning,
-                                            color: Colors.orange,
-                                            size: 24,
-                                          ),
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          _guestImages[guestNumber]!,
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null)
+                                              return child;
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                value:
+                                                    loadingProgress
+                                                            .expectedTotalBytes !=
+                                                        null
+                                                    ? loadingProgress
+                                                              .cumulativeBytesLoaded /
+                                                          loadingProgress
+                                                              .expectedTotalBytes!
+                                                    : null,
+                                                valueColor:
+                                                    const AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.blue),
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            print(
+                                              '❌ Error loading accompanying user photo for guest $guestNumber: $error',
+                                            );
+                                            print(
+                                              '❌ Photo URL: ${_guestImages[guestNumber]}',
+                                            );
+                                            return Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(
+                                                Icons.error_outline,
+                                                color: Colors.red,
+                                                size: 24,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.warning,
+                                        color: Colors.orange,
+                                        size: 24,
+                                      ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (_guestUploading[guestNumber] == true) ...[
+                                    if (_guestUploading[guestNumber] ==
+                                        true) ...[
                                       const Text(
                                         'Uploading photo...',
                                         style: TextStyle(
@@ -2390,7 +2613,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           color: Colors.blue,
                                         ),
                                       ),
-                                    ] else if (_guestImages.containsKey(guestNumber)) ...[
+                                    ] else if (_guestImages.containsKey(
+                                      guestNumber,
+                                    )) ...[
                                       const Text(
                                         'Photo uploaded successfully',
                                         style: TextStyle(
@@ -2428,23 +2653,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                               ),
                             ],
                           ),
-                          
+
                           // Action buttons (only show if photo is uploaded)
                           if (_guestImages.containsKey(guestNumber)) ...[
                             const SizedBox(height: 12),
-                            
+
                             Column(
                               children: [
                                 // Upload Different Photo
                                 GestureDetector(
-                                  onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                                  onTap: () => _pickGuestImage(
+                                    ImageSource.gallery,
+                                    guestNumber,
+                                  ),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.blue[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.blue[200]!),
+                                      border: Border.all(
+                                        color: Colors.blue[200]!,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -2466,19 +2699,27 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 6),
-                                
+
                                 // Take New Photo
                                 GestureDetector(
-                                  onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                                  onTap: () => _pickGuestImage(
+                                    ImageSource.camera,
+                                    guestNumber,
+                                  ),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.orange[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.orange[200]!),
+                                      border: Border.all(
+                                        color: Colors.orange[200]!,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -2500,19 +2741,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 6),
-                                
+
                                 // Remove Photo
                                 GestureDetector(
                                   onTap: () => _removeGuestImage(guestNumber),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.red[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.red[200]!),
+                                      border: Border.all(
+                                        color: Colors.red[200]!,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -2544,8 +2790,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ],
               ),
             ],
-            
-
           ],
         ),
       ),
@@ -2599,65 +2843,75 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: _isGuestAppointment ? Colors.green.shade50 : Colors.blue.shade50,
+                            color: _isGuestAppointment
+                                ? Colors.green.shade50
+                                : Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _isGuestAppointment ? Colors.green.shade200 : Colors.blue.shade200,
+                              color: _isGuestAppointment
+                                  ? Colors.green.shade200
+                                  : Colors.blue.shade200,
                               width: 1,
                             ),
                           ),
                           child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
                                   Icon(
-                                    _isGuestAppointment ? Icons.person : Icons.person_outline,
-                                    color: _isGuestAppointment ? Colors.green.shade700 : Colors.blue.shade700,
+                                    _isGuestAppointment
+                                        ? Icons.person
+                                        : Icons.person_outline,
+                                    color: _isGuestAppointment
+                                        ? Colors.green.shade700
+                                        : Colors.blue.shade700,
                                     size: 24,
                                   ),
                                   const SizedBox(width: 8),
-            Text(
+                                  Text(
                                     'Appointment Type: ${_isGuestAppointment ? 'Guest' : 'Myself'}',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: _isGuestAppointment ? Colors.green.shade700 : Colors.blue.shade700,
+                                      color: _isGuestAppointment
+                                          ? Colors.green.shade700
+                                          : Colors.blue.shade700,
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _isGuestAppointment 
+                                _isGuestAppointment
                                     ? 'Editing appointment for a guest'
                                     : 'Editing your personal appointment',
-                style: TextStyle(
-                  fontSize: 14,
+                                style: TextStyle(
+                                  fontSize: 14,
                                   color: Colors.grey.shade600,
-                ),
-              ),
-          ],
-        ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 24),
 
                         // Reference Information Section (for guest appointments)
                         if (_isGuestAppointment) ...[
-        Container(
+                          Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+                            decoration: BoxDecoration(
                               color: Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+                              border: Border.all(
                                 color: Colors.blue.shade200,
                                 width: 1,
-            ),
-          ),
+                              ),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                              children: [
                                 const Text(
                                   'Reference Information',
                                   style: TextStyle(
@@ -2668,7 +2922,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _isLoadingReferenceInfo 
+                                  _isLoadingReferenceInfo
                                       ? 'Loading your information...'
                                       : 'Your reference details',
                                   style: TextStyle(
@@ -2677,14 +2931,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                
+
                                 // Show loading state or reference fields
                                 if (_isLoadingReferenceInfo) ...[
                                   const Center(
                                     child: Column(
                                       children: [
                                         CircularProgressIndicator(
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.blue,
+                                              ),
                                         ),
                                         SizedBox(height: 12),
                                         Text(
@@ -2692,11 +2949,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           style: TextStyle(
                                             fontSize: 14,
                                             color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ] else ...[
                                   // Reference Name
                                   _buildReferenceField(
@@ -2705,7 +2962,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     placeholder: 'Your name',
                                   ),
                                   const SizedBox(height: 12),
-                                  
+
                                   // Reference Email
                                   _buildReferenceField(
                                     label: 'Reference Email',
@@ -2714,7 +2971,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     keyboardType: TextInputType.emailAddress,
                                   ),
                                   const SizedBox(height: 12),
-                                  
+
                                   // Reference Phone
                                   _buildReferenceField(
                                     label: 'Reference Phone',
@@ -2727,9 +2984,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          
+
                           // Guest Information Section
-        const Text(
+                          const Text(
                             'Guest Information',
                             style: TextStyle(
                               fontSize: 20,
@@ -2740,13 +2997,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Edit the details of the person you are requesting the appointment for',
-          style: TextStyle(
-            fontSize: 14,
+                            style: TextStyle(
+                              fontSize: 14,
                               color: Colors.grey.shade600,
                             ),
                           ),
                           const SizedBox(height: 20),
-                          
+
                           // Guest Full Name
                           _buildReferenceField(
                             label: 'Full Name of the Guest',
@@ -2754,7 +3011,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             placeholder: 'Enter guest\'s full name',
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Email
                           _buildEmailField(
                             label: 'Email ID of the Guest',
@@ -2762,11 +3019,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             placeholder: 'guest@email.com',
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Mobile
                           _buildGuestPhoneFieldWithCountryPicker(),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Designation
                           _buildReferenceField(
                             label: 'Designation',
@@ -2774,7 +3031,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             placeholder: 'Guest\'s professional title',
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Company/Organization
                           _buildReferenceField(
                             label: 'Company/Organization',
@@ -2782,7 +3039,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             placeholder: 'Guest\'s organization name',
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Location
                           _buildReferenceField(
                             label: 'Location',
@@ -2790,16 +3047,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             placeholder: 'Guest\'s location',
                           ),
                           const SizedBox(height: 24),
-                          
+
                           // Guest Photo Section
-        Row(
-          children: [
-                                                            Icon(
+                          Row(
+                            children: [
+                              Icon(
                                 Icons.camera_alt,
                                 color: const Color(0xFFF97316),
                                 size: 20,
                               ),
-            const SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               const Text(
                                 'Guest Photo',
                                 style: TextStyle(
@@ -2819,7 +3076,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Guest Photo Status
                           if (_isMainGuestPhotoUploading) ...[
                             Container(
@@ -2836,13 +3093,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.blue,
+                                      ),
                                     ),
                                   ),
                                   SizedBox(width: 12),
-            Expanded(
+                                  Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Uploading photo...',
@@ -2888,23 +3148,38 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         _mainGuestPhotoUrl!,
                                         fit: BoxFit.cover,
                                         loadingBuilder: (context, child, loadingProgress) {
-                                          if (loadingProgress == null) return child;
+                                          if (loadingProgress == null)
+                                            return child;
                                           return Center(
                                             child: CircularProgressIndicator(
-                                              value: loadingProgress.expectedTotalBytes != null
-                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                              value:
+                                                  loadingProgress
+                                                          .expectedTotalBytes !=
+                                                      null
+                                                  ? loadingProgress
+                                                            .cumulativeBytesLoaded /
+                                                        loadingProgress
+                                                            .expectedTotalBytes!
                                                   : null,
-                                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                                              valueColor:
+                                                  const AlwaysStoppedAnimation<
+                                                    Color
+                                                  >(Colors.blue),
                                             ),
                                           );
                                         },
                                         errorBuilder: (context, error, stackTrace) {
-                                          print('❌ Error loading main guest photo: $error');
-                                          print('❌ Photo URL: $_mainGuestPhotoUrl');
+                                          print(
+                                            '❌ Error loading main guest photo: $error',
+                                          );
+                                          print(
+                                            '❌ Photo URL: $_mainGuestPhotoUrl',
+                                          );
                                           return Container(
                                             decoration: BoxDecoration(
                                               color: Colors.grey[200],
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: const Icon(
                                               Icons.error_outline,
@@ -2919,7 +3194,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   const SizedBox(width: 12),
                                   const Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Photo uploaded successfully',
@@ -2934,29 +3210,35 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey,
-              ),
-            ),
-          ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            
+
                             // Action buttons for main guest photo
                             const SizedBox(height: 12),
                             Column(
                               children: [
-                                                                // Upload Different Photo
+                                // Upload Different Photo
                                 GestureDetector(
-                                  onTap: () => _pickMainGuestImage(ImageSource.gallery),
+                                  onTap: () =>
+                                      _pickMainGuestImage(ImageSource.gallery),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.blue[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.blue[200]!),
+                                      border: Border.all(
+                                        color: Colors.blue[200]!,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -2978,19 +3260,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 6),
-                                
+
                                 // Take New Photo
                                 GestureDetector(
-                                  onTap: () => _pickMainGuestImage(ImageSource.camera),
+                                  onTap: () =>
+                                      _pickMainGuestImage(ImageSource.camera),
                                   child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.orange[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.orange[200]!),
+                                      border: Border.all(
+                                        color: Colors.orange[200]!,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -3002,32 +3290,37 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         const SizedBox(width: 8),
                                         Text(
                                           'Take New Photo',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
                                             color: Colors.orange[700],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-                                
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
                                 const SizedBox(height: 6),
-                                
+
                                 // Remove Photo
                                 GestureDetector(
                                   onTap: _removeMainGuestImage,
-      child: Container(
+                                  child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: Colors.red[50],
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.red[200]!),
+                                      border: Border.all(
+                                        color: Colors.red[200]!,
+                                      ),
                                     ),
-          child: Row(
-            children: [
+                                    child: Row(
+                                      children: [
                                         Icon(
                                           Icons.delete_outline,
                                           color: Colors.red[700],
@@ -3049,9 +3342,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                               ],
                             ),
                           ] else ...[
-              Container(
+                            Container(
                               padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+                              decoration: BoxDecoration(
                                 color: Colors.orange[50],
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Colors.orange[200]!),
@@ -3066,7 +3359,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Photo required for guests 12+ years old',
@@ -3089,23 +3383,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 ],
                               ),
                             ),
-                            
+
                             // Upload buttons when no photo exists
                             const SizedBox(height: 12),
                             Row(
                               children: [
-              Expanded(
+                                Expanded(
                                   child: GestureDetector(
-                                    onTap: () => _pickMainGuestImage(ImageSource.gallery),
+                                    onTap: () => _pickMainGuestImage(
+                                      ImageSource.gallery,
+                                    ),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.blue[50],
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.blue[200]!),
+                                        border: Border.all(
+                                          color: Colors.blue[200]!,
+                                        ),
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             Icons.upload_file,
@@ -3129,16 +3431,23 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: GestureDetector(
-                                    onTap: () => _pickMainGuestImage(ImageSource.camera),
+                                    onTap: () =>
+                                        _pickMainGuestImage(ImageSource.camera),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.orange[50],
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.orange[200]!),
+                                        border: Border.all(
+                                          color: Colors.orange[200]!,
+                                        ),
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             Icons.camera_alt,
@@ -3177,10 +3486,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           'Edit details about your requested appointment',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black54,
-                          ),
+                          style: TextStyle(fontSize: 16, color: Colors.black54),
                         ),
                         const SizedBox(height: 32),
 
@@ -3188,7 +3494,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         _buildTextArea(
                           label: 'Appointment Purpose',
                           controller: _appointmentPurposeController,
-                          placeholder: 'Please describe the purpose of your appointment in detail',
+                          placeholder:
+                              'Please describe the purpose of your appointment in detail',
                           onChanged: (value) => _validateForm(),
                         ),
                         const SizedBox(height: 20),
@@ -3219,18 +3526,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 // Minus button
                                 GestureDetector(
                                   onTap: () {
-                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-                                    print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                                    int currentCount =
+                                        int.tryParse(
+                                          _numberOfUsersController.text,
+                                        ) ??
+                                        0;
+                                    print(
+                                      'DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}',
+                                    );
                                     if (currentCount > 0) {
-                                      print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                                      print(
+                                        'DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}',
+                                      );
                                       setState(() {
-                                        _numberOfUsersController.text = (currentCount - 1).toString();
+                                        _numberOfUsersController.text =
+                                            (currentCount - 1).toString();
                                       });
                                       _updateGuestControllers();
                                       _validateForm();
-                                      print('DEBUG MINUS: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}');
+                                      print(
+                                        'DEBUG MINUS: After removal. New count: ${_numberOfUsersController.text}, Guest controllers: ${_guestControllers.length}',
+                                      );
                                     } else {
-                                      print('DEBUG MINUS: Cannot reduce below 0 (no accompanying users)');
+                                      print(
+                                        'DEBUG MINUS: Cannot reduce below 0 (no accompanying users)',
+                                      );
                                     }
                                   },
                                   child: Container(
@@ -3239,7 +3559,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     decoration: BoxDecoration(
                                       color: Colors.grey[200],
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.grey[300]!),
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                      ),
                                     ),
                                     child: const Icon(
                                       Icons.remove,
@@ -3249,20 +3571,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                
+
                                 // Number display
                                 Expanded(
                                   child: Container(
                                     height: 48,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                       color: Colors.white,
                                     ),
                                     child: Center(
                                       child: Text(
-                                        _numberOfUsersController.text.isEmpty ? '0' : _numberOfUsersController.text,
+                                        _numberOfUsersController.text.isEmpty
+                                            ? '0'
+                                            : _numberOfUsersController.text,
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w600,
@@ -3273,13 +3601,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                
+
                                 // Plus button
                                 GestureDetector(
                                   onTap: () {
-                                    int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+                                    int currentCount =
+                                        int.tryParse(
+                                          _numberOfUsersController.text,
+                                        ) ??
+                                        0;
                                     setState(() {
-                                      _numberOfUsersController.text = (currentCount + 1).toString();
+                                      _numberOfUsersController.text =
+                                          (currentCount + 1).toString();
                                     });
                                     _updateGuestControllers();
                                     _validateForm();
@@ -3290,7 +3623,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF97316),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFFF97316)),
+                                      border: Border.all(
+                                        color: const Color(0xFFF97316),
+                                      ),
                                     ),
                                     child: const Icon(
                                       Icons.add,
@@ -3314,7 +3649,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         const SizedBox(height: 20),
 
                         // Guest Information Cards (for accompanying users)
-                        if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 0 && (int.tryParse(_numberOfUsersController.text) ?? 0) <= 10) ...[
+                        if ((int.tryParse(_numberOfUsersController.text) ?? 0) >
+                                0 &&
+                            (int.tryParse(_numberOfUsersController.text) ??
+                                    0) <=
+                                10) ...[
                           const Text(
                             'Accompany User Details',
                             style: TextStyle(
@@ -3326,19 +3665,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(height: 8),
                           const Text(
                             'Please provide details for accompany users',
-                  style: TextStyle(
-                    fontSize: 14,
+                            style: TextStyle(
+                              fontSize: 14,
                               color: Colors.black54,
                             ),
                           ),
                           const SizedBox(height: 16),
                           ..._guestControllers.asMap().entries.map((entry) {
                             int index = entry.key;
-                            Map<String, TextEditingController> guest = entry.value;
+                            Map<String, TextEditingController> guest =
+                                entry.value;
                             return _buildGuestCard(index + 1, guest);
                           }).toList(),
                           const SizedBox(height: 20),
-                        ] else if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 10) ...[
+                        ] else if ((int.tryParse(
+                                  _numberOfUsersController.text,
+                                ) ??
+                                0) >
+                            10) ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
@@ -3387,7 +3731,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           'Select your preferred date range *',
                           style: TextStyle(
                             fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black87,
                           ),
                         ),
@@ -3396,8 +3740,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         // From Date
                         _buildDateField(
                           label: 'From Date',
-                          controller: _fromDateController,
-                          onTap: () => _selectDate(context, _fromDateController),
+                          controller: _preferredFromDateController,
+                          onTap: () =>
+                              _selectDate(context, _preferredFromDateController),
                           errorMessage: _dateRangeError,
                         ),
                         const SizedBox(height: 20),
@@ -3405,8 +3750,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         // To Date
                         _buildDateField(
                           label: 'To Date',
-                          controller: _toDateController,
-                          onTap: () => _selectDate(context, _toDateController),
+                          controller: _preferredToDateController,
+                          onTap: () => _selectDate(context, _preferredToDateController),
                           errorMessage: _dateRangeError,
                         ),
                         const SizedBox(height: 32),
@@ -3457,22 +3802,27 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              
+
                               // Show existing attachment if available
-                              if (_existingAttachmentUrl != null && _existingAttachmentUrl!.isNotEmpty) ...[
+                              if (_existingAttachmentUrl != null &&
+                                  _existingAttachmentUrl!.isNotEmpty) ...[
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: Colors.blue.shade50,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.blue.shade200),
+                                    border: Border.all(
+                                      color: Colors.blue.shade200,
+                                    ),
                                   ),
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(8),
-                                      onTap: () => _openAttachmentUrl(_existingAttachmentUrl!),
+                                      onTap: () => _openAttachmentUrl(
+                                        _existingAttachmentUrl!,
+                                      ),
                                       child: Row(
                                         children: [
                                           Icon(
@@ -3483,7 +3833,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
@@ -3491,8 +3842,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                                       'Existing Attachment',
                                                       style: TextStyle(
                                                         fontSize: 14,
-                                                        color: Colors.blue.shade600,
-                                                        fontWeight: FontWeight.w500,
+                                                        color: Colors
+                                                            .blue
+                                                            .shade600,
+                                                        fontWeight:
+                                                            FontWeight.w500,
                                                       ),
                                                     ),
                                                   ],
@@ -3524,11 +3878,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                               GestureDetector(
                                 onTap: _pickAttachment,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.grey.shade300),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
                                   ),
                                   child: const Text(
                                     'Choose File',
@@ -3540,7 +3899,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                 ),
                               ),
-                              
+
                               // Show selected attachment
                               if (_selectedAttachment != null) ...[
                                 const SizedBox(height: 16),
@@ -3549,7 +3908,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.green.shade50,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.shade200),
+                                    border: Border.all(
+                                      color: Colors.green.shade200,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -3561,10 +3922,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              _selectedAttachment!.path.split('/').last,
+                                              _selectedAttachment!.path
+                                                  .split('/')
+                                                  .last,
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 14,
@@ -3587,7 +3951,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                           padding: const EdgeInsets.all(4),
                                           decoration: BoxDecoration(
                                             color: Colors.red.shade50,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: Icon(
                                             Icons.close,
@@ -3642,11 +4008,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             const Text('Yes'),
                           ],
                         ),
-                        
+
                         // Program Date Range Section (only show if user selects Yes)
                         if (_isAttendingProgram) ...[
                           const SizedBox(height: 24),
-                          
+
                           // Program Date Range Header
                           Row(
                             children: [
@@ -3670,7 +4036,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Program Start and End Date Fields
                           Column(
                             children: [
@@ -3688,11 +4054,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   GestureDetector(
-                                    onTap: () => _selectDate(context, _programFromDateController),
+                                    onTap: () => _selectDate(
+                                      context,
+                                      _programFromDateController,
+                                    ),
                                     child: Container(
                                       width: double.infinity,
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
+                                        border: Border.all(
+                                          color: _programDateRangeError != null
+                                              ? Colors.red
+                                              : const Color(0xFFF97316),
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: TextField(
@@ -3700,13 +4073,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         enabled: false,
                                         decoration: InputDecoration(
                                           hintText: 'dd-mm-yyyy',
-                                          hintStyle: TextStyle(color: Colors.grey[400]),
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey[400],
+                                          ),
                                           filled: true,
                                           fillColor: Colors.white,
                                           border: InputBorder.none,
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                          prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
-                                          suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 16,
+                                              ),
+                                          prefixIcon: Icon(
+                                            Icons.calendar_today,
+                                            color: const Color(0xFFF97316),
+                                          ),
+                                          suffixIcon: Icon(
+                                            Icons.arrow_drop_down,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -3723,9 +4108,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ],
                                 ],
                               ),
-                              
+
                               const SizedBox(height: 16),
-                              
+
                               // Program End Date
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3740,11 +4125,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   GestureDetector(
-                                    onTap: () => _selectDate(context, _programToDateController),
+                                    onTap: () => _selectDate(
+                                      context,
+                                      _programToDateController,
+                                    ),
                                     child: Container(
                                       width: double.infinity,
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
+                                        border: Border.all(
+                                          color: _programDateRangeError != null
+                                              ? Colors.red
+                                              : const Color(0xFFF97316),
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: TextField(
@@ -3752,13 +4144,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         enabled: false,
                                         decoration: InputDecoration(
                                           hintText: 'dd-mm-yyyy',
-                                          hintStyle: TextStyle(color: Colors.grey[400]),
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey[400],
+                                          ),
                                           filled: true,
                                           fillColor: Colors.white,
                                           border: InputBorder.none,
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                          prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
-                                          suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 16,
+                                              ),
+                                          prefixIcon: Icon(
+                                            Icons.calendar_today,
+                                            color: const Color(0xFFF97316),
+                                          ),
+                                          suffixIcon: Icon(
+                                            Icons.arrow_drop_down,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -3777,9 +4181,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                               ),
                             ],
                           ),
-                          
+
                           const SizedBox(height: 12),
-                          
+
                           // Instructional Text
                           Text(
                             'Please enter your program dates. Your appointment will be scheduled during this period.',
@@ -3797,7 +4201,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isFormValid && !_isSaving ? _saveAppointment : null,
+                            onPressed: _isFormValid && !_isSaving
+                                ? _saveAppointment
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFF97316),
                               foregroundColor: Colors.white,
@@ -3814,7 +4220,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       ),
                                       SizedBox(width: 12),
@@ -3833,18 +4242,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       ],
                     ),
                   ),
-          ),
-        ),
-      ),
+                ),
+              ),
+            ),
     );
   }
-
-
 
   void _performDeleteGuestCard(int guestNumber) {
     // Convert guestNumber to 0-based index
     int index = guestNumber - 1;
-    
+
     if (index >= 0 && index < _guestControllers.length) {
       setState(() {
         // Dispose the controllers for this guest
@@ -3852,22 +4259,22 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        
+
         // Remove the guest from the list
         _guestControllers.removeAt(index);
-        
+
         // Remove associated data
         _guestCountries.remove(guestNumber);
         _guestImages.remove(guestNumber);
         _guestUploading.remove(guestNumber);
-        
+
         // Update the number of users (just accompanying users)
         _numberOfUsersController.text = _guestControllers.length.toString();
-        
+
         // Update form validation
         _validateForm();
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Person $guestNumber has been deleted.'),
@@ -3877,18 +4284,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
   }
 
-  void _showPhotoValidationErrorDialog(String errorMessage, VoidCallback onTryAgain) {
+  void _showPhotoValidationErrorDialog(
+    String errorMessage,
+    VoidCallback onTryAgain,
+  ) {
     // Remove "Guest X:" prefix if present
     String cleanErrorMessage = errorMessage;
-    if (cleanErrorMessage.contains('Guest ') && cleanErrorMessage.contains(': ')) {
+    if (cleanErrorMessage.contains('Guest ') &&
+        cleanErrorMessage.contains(': ')) {
       cleanErrorMessage = cleanErrorMessage.split(': ').skip(1).join(': ');
     }
-    
+
     // Remove "Profile photo validation failed:" prefix if present
     if (cleanErrorMessage.startsWith('Profile photo validation failed:')) {
-      cleanErrorMessage = cleanErrorMessage.replaceFirst('Profile photo validation failed:', '').trim();
+      cleanErrorMessage = cleanErrorMessage
+          .replaceFirst('Profile photo validation failed:', '')
+          .trim();
     }
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -3938,14 +4351,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                                         Text(
-                       cleanErrorMessage,
-                       style: TextStyle(
-                         fontSize: 12,
-                         color: Colors.orange.shade700,
-                         fontWeight: FontWeight.w500,
-                       ),
-                     ),
+                    Text(
+                      cleanErrorMessage,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3992,10 +4405,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
               child: const Text(
                 'View Photo Guidelines',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ],

@@ -30,8 +30,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Form controllers
   final TextEditingController _appointmentPurposeController = TextEditingController();
   final TextEditingController _numberOfUsersController = TextEditingController();
-  final TextEditingController _fromDateController = TextEditingController();
-  final TextEditingController _toDateController = TextEditingController();
+  
+  // Preferred date range controllers (for appointment scheduling)
+  final TextEditingController _preferredFromDateController = TextEditingController();
+  final TextEditingController _preferredToDateController = TextEditingController();
+  
+  // Program date range controllers (for course/program dates)
+  final TextEditingController _programFromDateController = TextEditingController();
+  final TextEditingController _programToDateController = TextEditingController();
   
   // Reference Information Controllers
   final TextEditingController _referenceNameController = TextEditingController();
@@ -123,8 +129,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   void dispose() {
     _appointmentPurposeController.dispose();
     _numberOfUsersController.dispose();
-    _fromDateController.dispose();
-    _toDateController.dispose();
+    _preferredFromDateController.dispose();
+    _preferredToDateController.dispose();
+    _programFromDateController.dispose();
+    _programToDateController.dispose();
     
     // Dispose reference controllers
     _referenceNameController.dispose();
@@ -280,22 +288,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   void _validateForm() {
     bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
-        _fromDateController.text.isNotEmpty &&
-        _toDateController.text.isNotEmpty;
+        _preferredFromDateController.text.isNotEmpty &&
+        _preferredToDateController.text.isNotEmpty;
     
-    // Validate date ranges
-    bool dateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, errorType: 'appointment');
+    // Validate preferred date ranges
+    bool preferredDateRangeValid = _validateDateRange(_preferredFromDateController.text, _preferredToDateController.text, errorType: 'appointment');
     
     // Validate program date ranges if attending a program
     bool programDateRangeValid = true;
     if (_isAttendingProgram) {
-      programDateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, errorType: 'program');
+      programDateRangeValid = _validateDateRange(_programFromDateController.text, _programToDateController.text, errorType: 'program');
     }
     
     // Validate main guest phone number if appointment type is guest
     bool mainGuestPhoneValid = true;
     if (widget.personalInfo['appointmentType'] == 'guest') {
-      if (_guestPhoneController.text.isEmpty || _guestPhoneController.text.length != 10) {
+      if (_guestPhoneController.text.isEmpty) {
         mainGuestPhoneValid = false;
       }
     }
@@ -329,14 +337,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         
         if (guest['name']?.text.isEmpty == true ||
             guest['phone']?.text.isEmpty == true ||
-            guest['phone']?.text.length != 10 ||
             guest['age']?.text.isEmpty == true) {
           guestFormValid = false;
           break;
         }
         
-        // Check if photo is required and provided for guests aged 12+
+        // Validate age range (1-120)
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+        if (age < 1 || age > 120) {
+          guestFormValid = false;
+          break;
+        }
+        
+        // Check if photo is required and provided for guests aged 12+
         if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
           guestFormValid = false;
           break;
@@ -345,7 +358,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
     
     setState(() {
-      _isFormValid = basicFormValid && dateRangeValid && programDateRangeValid && mainGuestPhoneValid && mainGuestEmailValid && mainGuestPhotoValid && guestFormValid;
+      _isFormValid = basicFormValid && preferredDateRangeValid && programDateRangeValid && mainGuestPhoneValid && mainGuestEmailValid && mainGuestPhotoValid && guestFormValid;
     });
   }
 
@@ -771,20 +784,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1, // +1 for main user
       };
 
-      // Priority-based date range logic
-      if (_isAttendingProgram) {
-        // FIRST PRIORITY: If attending program, use program dates for preferred date range
-        appointmentData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        };
-      } else {
-        // SECOND PRIORITY: If not attending program, use preferred date range
-        appointmentData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        };
-      }
+      // Use preferred date range for appointment scheduling
+      appointmentData['preferredDateRange'] = {
+        'fromDate': _parseDateToISO(_preferredFromDateController.text),
+        'toDate': _parseDateToISO(_preferredToDateController.text),
+      };
       
 
 
@@ -874,23 +878,28 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointmentData['attendingCourseDetails'] = {
           'courseName': 'General Program',
           'duration': '1 day',
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
+          'fromDate': _parseDateToISO(_programFromDateController.text),
+          'toDate': _parseDateToISO(_programToDateController.text),
         };
       }
 
 
 
       // Use ActionService.createAppointment method with attachment
+      print('🎯 Calling ActionService.createAppointment...');
       final result = await ActionService.createAppointment(
         appointmentData,
         attachmentFile: _selectedAttachment,
       );
+      print('🎯 ActionService.createAppointment result: $result');
 
       // Hide loading indicator
       Navigator.pop(context);
 
       if (result['success'] == true) {
+        // Send appointment creation notification
+        await _sendAppointmentCreatedNotification(result['data']);
+        
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1811,22 +1820,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // From Date
-                  _buildDateField(
-                    label: 'From Date',
-                    controller: _fromDateController,
-                    onTap: () => _selectDate(context, _fromDateController),
-                    errorMessage: _dateRangeError,
-                  ),
-                  const SizedBox(height: 20),
+                        // From Date
+      _buildDateField(
+        label: 'From Date',
+        controller: _preferredFromDateController,
+        onTap: () => _selectDate(context, _preferredFromDateController),
+        errorMessage: _dateRangeError,
+      ),
+      const SizedBox(height: 20),
 
-                  // To Date
-                  _buildDateField(
-                    label: 'To Date',
-                    controller: _toDateController,
-                    onTap: () => _selectDate(context, _toDateController),
-                    errorMessage: _dateRangeError,
-                  ),
+      // To Date
+      _buildDateField(
+        label: 'To Date',
+        controller: _preferredToDateController,
+        onTap: () => _selectDate(context, _preferredToDateController),
+        errorMessage: _dateRangeError,
+      ),
                   const SizedBox(height: 20),
 
                   // Add Gurudev's Schedule Link
@@ -1990,7 +1999,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                             const SizedBox(height: 8),
                             GestureDetector(
-                              onTap: () => _selectDate(context, _fromDateController),
+                              onTap: () => _selectDate(context, _programFromDateController),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
@@ -1998,7 +2007,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: TextField(
-                                  controller: _fromDateController,
+                                  controller: _programFromDateController,
                                   enabled: false,
                                   decoration: InputDecoration(
                                     hintText: 'dd-mm-yyyy',
@@ -2042,7 +2051,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                             const SizedBox(height: 8),
                             GestureDetector(
-                              onTap: () => _selectDate(context, _toDateController),
+                              onTap: () => _selectDate(context, _programToDateController),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
@@ -2050,7 +2059,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: TextField(
-                                  controller: _toDateController,
+                                  controller: _programToDateController,
                                   enabled: false,
                                   decoration: InputDecoration(
                                     hintText: 'dd-mm-yyyy',
@@ -2373,11 +2382,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             _buildGuestTextField(
               label: 'Age',
               controller: guest['age']!,
-              placeholder: 'Enter age',
+              placeholder: 'Enter age (1-120)',
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 3,
               onChanged: (value) {
                 _validateForm();
                 setState(() {}); // Rebuild to show/hide photo section
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Age is required';
+                }
+                final age = int.tryParse(value);
+                if (age == null || age < 1 || age > 120) {
+                  return 'Please enter 1-120';
+                }
+                return null;
               },
             ),
             
@@ -2756,7 +2777,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required TextEditingController controller,
     required String placeholder,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
     Function(String)? onChanged,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2770,10 +2794,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
           onChanged: onChanged,
+          validator: validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
@@ -2791,7 +2819,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[300]!),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[500]!),
+            ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            counterText: '', // Hide character counter
           ),
         ),
       ],
@@ -3012,11 +3049,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Phone Number Field (without country code)
         TextField(
           controller: controller,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          maxLength: 10,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
           enabled: !isReadOnly,
           decoration: InputDecoration(
-            hintText: 'Enter phone number',
-            hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
             fillColor: isReadOnly ? Colors.grey[100] : Colors.white,
             border: OutlineInputBorder(
@@ -3036,6 +3075,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            counterText: '', // Hide the character counter
           ),
         ),
       ],
@@ -3612,6 +3652,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                    onSelect: (Country country) {
                      setState(() {
                        _selectedCountry = country;
+                       // Clear the phone number field when country changes
+                       _guestPhoneController.clear();
                      });
                    },
                  );
@@ -3650,21 +3692,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
              Expanded(
                child: TextField(
                  controller: _guestPhoneController,
-                 keyboardType: TextInputType.phone,
+                 keyboardType: TextInputType.number,
                  maxLength: 10,
                  inputFormatters: [
                    FilteringTextInputFormatter.digitsOnly,
                  ],
-                 onChanged: (value) {
-                   // Validate phone number length
-                   if (value.length == 10) {
-                     // Phone number is valid
-                     setState(() {});
-                   }
-                 },
                  decoration: InputDecoration(
-                   hintText: 'Enter 10-digit phone number',
-                   hintStyle: TextStyle(color: Colors.grey[400]),
                    filled: true,
                    fillColor: Colors.white,
                    border: OutlineInputBorder(
@@ -3688,10 +3721,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                      borderSide: BorderSide(color: Colors.red[500]!),
                    ),
                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                   counterText: '',
-                   errorText: _guestPhoneController.text.isNotEmpty && _guestPhoneController.text.length != 10
-                       ? 'Phone number must be 10 digits'
-                       : null,
+                   counterText: '', // Hide the character counter
                  ),
                ),
              ),
@@ -3748,6 +3778,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                    onSelect: (Country selectedCountry) {
                      setState(() {
                        _guestCountries[guestNumber] = selectedCountry;
+                       // Clear the phone number field when country changes
+                       controller.clear();
                      });
                    },
                  );
@@ -3786,22 +3818,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
              Expanded(
                child: TextField(
                  controller: controller,
-                 keyboardType: TextInputType.phone,
+                 keyboardType: TextInputType.number,
                  maxLength: 10,
                  inputFormatters: [
                    FilteringTextInputFormatter.digitsOnly,
                  ],
                  onChanged: (value) {
                    _validateForm();
-                   // Validate phone number length
-                   if (value.length == 10) {
-                     // Phone number is valid
-                     setState(() {});
-                   }
                  },
                  decoration: InputDecoration(
-                   hintText: 'Enter 10-digit phone number',
-                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                    filled: true,
                    fillColor: Colors.grey[50],
                    border: OutlineInputBorder(
@@ -3825,10 +3850,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                      borderSide: BorderSide(color: Colors.red[500]!),
                    ),
                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                   counterText: '',
-                   errorText: controller.text.isNotEmpty && controller.text.length != 10
-                       ? 'Phone number must be 10 digits'
-                       : null,
+                   counterText: '', // Hide the character counter
                  ),
                ),
              ),
@@ -4145,6 +4167,71 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         return Icons.directions;
       default:
         return Icons.location_on;
+    }
+  }
+
+  // Send appointment creation notification
+  Future<void> _sendAppointmentCreatedNotification(Map<String, dynamic>? appointmentData) async {
+    try {
+      // Get current user data
+      final userData = await StorageService.getUserData();
+      if (userData == null) {
+        print('⚠️ User data not found, skipping appointment notification');
+        return;
+      }
+
+      final userId = userData['_id']?.toString() ?? userData['userId']?.toString() ?? userData['id']?.toString();
+      final appointmentId = appointmentData?['_id']?.toString() ?? appointmentData?['id']?.toString();
+      
+      if (userId == null || appointmentId == null) {
+        print('⚠️ User ID or Appointment ID not found, skipping notification');
+        print('🔍 User ID: $userId, Appointment ID: $appointmentId');
+        return;
+      }
+
+      print('🎉 Sending appointment creation notification for appointment: $appointmentId');
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName': appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ?? 
+                   widget.personalInfo['fullName'] ?? 'User',
+        'date': appointmentData?['preferredDateRange']?['fromDate'] ?? 
+               _preferredFromDateController.text,
+        'time': 'Scheduled', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 'Selected Location',
+        'purpose': appointmentData?['appointmentPurpose'] ?? _appointmentPurposeController.text,
+        'numberOfUsers': appointmentData?['numberOfUsers'] ?? _numberOfUsersController.text,
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'user_appointment_request',
+        'userRole': userData['role']?.toString() ?? 'user',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentCreatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment creation notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print('⚠️ Failed to send appointment creation notification: ${result['message']}');
+        print('🔍 Error details: ${result['error']}');
+      }
+
+    } catch (e) {
+      print('❌ Error sending appointment creation notification: $e');
+      // Don't block the appointment creation flow if notification fails
     }
   }
 

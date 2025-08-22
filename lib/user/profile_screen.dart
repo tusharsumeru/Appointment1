@@ -70,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (phoneField is Map) {
           final cc = (phoneField['countryCode'] ?? '').toString();
           final num = (phoneField['number'] ?? '').toString();
-          phoneText = '$cc $num';
+          phoneText = '$cc$num'; // Combined format without space
         } else if (phoneField is String) {
           phoneText = phoneField;
         }
@@ -1123,7 +1123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (phoneField is Map) {
             final cc = (phoneField['countryCode'] ?? '').toString();
             final num = (phoneField['number'] ?? '').toString();
-            phoneText = '$cc $num';
+            phoneText = '$cc$num'; // Combined format without space
           } else if (phoneField is String) {
             phoneText = phoneField;
           }

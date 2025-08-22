@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'action.dart';
 
 class StorageService {
   static const String _tokenKey = 'auth_token';
@@ -9,16 +10,17 @@ class StorageService {
   static const String _appointmentsKey = 'cached_appointments';
   static const String _appointmentsTimestampKey = 'appointments_timestamp';
   static const String _inboxAppointmentsKey = 'cached_inbox_appointments';
-  static const String _inboxAppointmentsTimestampKey = 'inbox_appointments_timestamp';
-  static const String _assignedToMeAppointmentsKey = 'cached_assigned_to_me_appointments';
-  static const String _assignedToMeAppointmentsTimestampKey = 'assigned_to_me_appointments_timestamp';
+  static const String _inboxAppointmentsTimestampKey =
+      'inbox_appointments_timestamp';
+  static const String _assignedToMeAppointmentsKey =
+      'cached_assigned_to_me_appointments';
+  static const String _assignedToMeAppointmentsTimestampKey =
+      'assigned_to_me_appointments_timestamp';
+  static const String _fcmTokenKey = 'fcm_token';
 
-  // API base URL - same as in ActionService
-  static const String _apiBaseUrl = 'https://89628f197129.ngrok-free.app/api/v3';
-
-  // Get API URL
+  // Get API URL from ActionService
   static Future<String> getApiUrl() async {
-    return _apiBaseUrl;
+    return await ActionService.baseUrl;
   }
 
   // Save authentication token
@@ -88,11 +90,15 @@ class StorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userDataString = prefs.getString(_userDataKey);
-      print('📡 StorageService.getUserData() - Retrieved from storage: $userDataString');
-      
+      print(
+        '📡 StorageService.getUserData() - Retrieved from storage: $userDataString',
+      );
+
       if (userDataString != null) {
         final decodedData = jsonDecode(userDataString);
-        print('✅ StorageService.getUserData() - Successfully decoded: $decodedData');
+        print(
+          '✅ StorageService.getUserData() - Successfully decoded: $decodedData',
+        );
         return decodedData;
       }
       print('⚠️ StorageService.getUserData() - No data found in storage');
@@ -141,18 +147,23 @@ class StorageService {
     await clearAuthData();
   }
 
-
-
   // Appointment data caching
 
   // Save appointments data
-  static Future<void> saveAppointments(List<Map<String, dynamic>> appointments) async {
+  static Future<void> saveAppointments(
+    List<Map<String, dynamic>> appointments,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final appointmentsString = jsonEncode(appointments);
       await prefs.setString(_appointmentsKey, appointmentsString);
-      await prefs.setInt(_appointmentsTimestampKey, DateTime.now().millisecondsSinceEpoch);
-      print('Appointments data saved successfully: ${appointments.length} appointments');
+      await prefs.setInt(
+        _appointmentsTimestampKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      print(
+        'Appointments data saved successfully: ${appointments.length} appointments',
+      );
     } catch (e) {
       print('Error saving appointments data: $e');
       throw Exception('Failed to save appointments data: $e');
@@ -160,13 +171,20 @@ class StorageService {
   }
 
   // Save inbox appointments data
-  static Future<void> saveInboxAppointments(List<Map<String, dynamic>> appointments) async {
+  static Future<void> saveInboxAppointments(
+    List<Map<String, dynamic>> appointments,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final appointmentsString = jsonEncode(appointments);
       await prefs.setString(_inboxAppointmentsKey, appointmentsString);
-      await prefs.setInt(_inboxAppointmentsTimestampKey, DateTime.now().millisecondsSinceEpoch);
-      print('Inbox appointments data saved successfully: ${appointments.length} appointments');
+      await prefs.setInt(
+        _inboxAppointmentsTimestampKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      print(
+        'Inbox appointments data saved successfully: ${appointments.length} appointments',
+      );
     } catch (e) {
       print('Error saving inbox appointments data: $e');
       throw Exception('Failed to save inbox appointments data: $e');
@@ -174,13 +192,20 @@ class StorageService {
   }
 
   // Save assigned to me appointments data
-  static Future<void> saveAssignedToMeAppointments(List<Map<String, dynamic>> appointments) async {
+  static Future<void> saveAssignedToMeAppointments(
+    List<Map<String, dynamic>> appointments,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final appointmentsString = jsonEncode(appointments);
       await prefs.setString(_assignedToMeAppointmentsKey, appointmentsString);
-      await prefs.setInt(_assignedToMeAppointmentsTimestampKey, DateTime.now().millisecondsSinceEpoch);
-      print('Assigned to me appointments data saved successfully: ${appointments.length} appointments');
+      await prefs.setInt(
+        _assignedToMeAppointmentsTimestampKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      print(
+        'Assigned to me appointments data saved successfully: ${appointments.length} appointments',
+      );
     } catch (e) {
       print('Error saving assigned to me appointments data: $e');
       throw Exception('Failed to save assigned to me appointments data: $e');
@@ -220,7 +245,8 @@ class StorageService {
   }
 
   // Get cached assigned to me appointments data
-  static Future<List<Map<String, dynamic>>?> getAssignedToMeAppointments() async {
+  static Future<List<Map<String, dynamic>>?>
+  getAssignedToMeAppointments() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final appointmentsString = prefs.getString(_assignedToMeAppointmentsKey);
@@ -258,4 +284,39 @@ class StorageService {
       throw Exception('Failed to clear appointments cache: $e');
     }
   }
-} 
+
+  // Save FCM token
+  static Future<void> saveFCMToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_fcmTokenKey, token);
+      print('✅ FCM token saved successfully: $token');
+    } catch (e) {
+      print('❌ Error saving FCM token: $e');
+      throw Exception('Failed to save FCM token: $e');
+    }
+  }
+
+  // Get FCM token
+  static Future<String?> getFCMToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_fcmTokenKey);
+    } catch (e) {
+      print('❌ Error getting FCM token: $e');
+      return null;
+    }
+  }
+
+  // Check if user has enabled notifications
+  static Future<bool> hasNotificationsEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_fcmTokenKey);
+      return token != null && token.isNotEmpty;
+    } catch (e) {
+      print('❌ Error checking notification status: $e');
+      return false;
+    }
+  }
+}
