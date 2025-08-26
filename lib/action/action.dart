@@ -5483,6 +5483,7 @@ class ActionService {
   }
 
   // Update user profile with S3 URL only (no file upload)
+ // Update user profile with file upload support
   static Future<Map<String, dynamic>> updateUserProfile({
     required String fullName,
     required String email,
@@ -5491,7 +5492,8 @@ class ActionService {
     String? company,
     required String full_address,
     required List<String> userTags,
-    String? profilePhotoUrl, // S3 URL only
+    String? profilePhotoUrl, // S3 URL (for existing photos)
+    File? profilePhotoFile, // File object for new photo upload
   }) async {
     try {
       // Get authentication token
@@ -5503,7 +5505,6 @@ class ActionService {
           'message': 'No authentication token found. Please login again.',
         };
       }
-
       // Validate required fields
       if (fullName.isEmpty || email.isEmpty || phoneNumber.isEmpty) {
         return {
@@ -5513,7 +5514,6 @@ class ActionService {
               'Missing required fields: fullName, email, or phoneNumber.',
         };
       }
-
       // Validate email format
       final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
       if (!emailRegex.hasMatch(email)) {
@@ -5523,16 +5523,13 @@ class ActionService {
           'message': 'Please enter a valid email address.',
         };
       }
-
       // Create multipart request
       final request = http.MultipartRequest(
         'PUT',
         Uri.parse('$baseUrl/auth/profile'),
       );
-
       // Add authorization header
       request.headers['Authorization'] = 'Bearer $token';
-
       // Add text fields
       request.fields['fullName'] = fullName.trim();
       request.fields['email'] = email.toLowerCase().trim();
@@ -5543,17 +5540,14 @@ class ActionService {
       if (company != null && company.isNotEmpty) {
         request.fields['company'] = company.trim();
       }
-
       // Handle full_address as JSON string
       request.fields['full_address'] = jsonEncode({
         'display_name': full_address.trim(),
       });
-
       // Handle userTags as array - send as both userTags and additionalRoles
       // Always send userTags field, even when empty, to clear existing roles if needed
-      print('📤 userTags received: $userTags (length: ${userTags.length})');
-      print('📤 userTags is empty: ${userTags.isEmpty}');
-
+      print(':outbox_tray: userTags received: $userTags (length: ${userTags.length})');
+      print(':outbox_tray: userTags is empty: ${userTags.isEmpty}');
       if (userTags.isNotEmpty) {
         // Send userTags using indexed keys to ensure all values are sent
         for (int i = 0; i < userTags.length; i++) {
@@ -5563,73 +5557,82 @@ class ActionService {
         for (int i = 0; i < userTags.length; i++) {
           request.fields['additionalRoles[$i]'] = userTags[i];
         }
-        print('📤 Sending userTags as indexed array: $userTags');
-        print('📤 Also sending as additionalRoles: $userTags');
+        print(':outbox_tray: Sending userTags as indexed array: $userTags');
+        print(':outbox_tray: Also sending as additionalRoles: $userTags');
       } else {
         // Send 'none' to indicate no roles selected (clear existing roles)
         request.fields['userTags'] = 'No Roles selected';
         request.fields['additionalRoles'] = 'No Roles selected';
-        print('📤 Sending "none" for userTags to indicate no roles selected');
+        print(':outbox_tray: Sending "none" for userTags to indicate no roles selected');
         print(
-          '📤 Also sending "none" for additionalRoles to indicate no roles selected',
+          ':outbox_tray: Also sending "none" for additionalRoles to indicate no roles selected',
         );
-        print('📤 This should tell the backend to remove all existing roles');
+        print(':outbox_tray: This should tell the backend to remove all existing roles');
       }
-
-      // Add S3 URL if present (no file upload needed)
-      if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
-        request.fields['profilePhoto'] =
-            profilePhotoUrl; // Database field name is 'profilePhoto'
-        print('📤 Sending profile photo URL: $profilePhotoUrl');
-        print('📤 Field name: profilePhoto (matches database)');
+      // Handle profile photo - either file upload or S3 URL
+      if (profilePhotoFile != null) {
+        // Upload file directly to backend for validation and S3 upload
+        print(':outbox_tray: Uploading profile photo file: ${profilePhotoFile.path}');
+        // Get file extension and mime type
+        final fileName = profilePhotoFile.path.split('/').last;
+        final fileExtension = fileName.split('.').last.toLowerCase();
+        final mimeType = _getMimeType(fileExtension);
+        // Add file to multipart request
+        final fileStream = http.ByteStream(profilePhotoFile.openRead());
+        final fileLength = await profilePhotoFile.length();
+        final multipartFile = http.MultipartFile(
+          'file', // Backend expects 'file' field
+          fileStream,
+          fileLength,
+          filename: fileName,
+          contentType: MediaType.parse(mimeType),
+        );
+        request.files.add(multipartFile);
+        print(':outbox_tray: Added file to request: $fileName (${fileLength} bytes, $mimeType)');
+      } else if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
+        // Use existing S3 URL
+        request.fields['profilePhoto'] = profilePhotoUrl;
+        print(':outbox_tray: Sending profile photo URL: $profilePhotoUrl');
       } else {
-        print('📤 No profile photo URL provided');
+        print(':outbox_tray: No profile photo provided');
       }
-
       // Send request
-      print('📤 Sending profile update request with fields: ${request.fields}');
+      print(':outbox_tray: Sending profile update request with fields: ${request.fields}');
       print(
-        '📤 Sending profile update request with files: ${request.files.length}',
+        ':outbox_tray: Sending profile update request with files: ${request.files.length}',
       );
-
       // Debug: Print each field individually
-      print('📤 Individual fields being sent:');
+      print(':outbox_tray: Individual fields being sent:');
       request.fields.forEach((key, value) {
-        print('📤 Field: $key = $value');
+        print(':outbox_tray: Field: $key = $value');
       });
-
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
-
       // Parse response
-      print('📥 Raw response status: ${response.statusCode}');
-      print('📥 Raw response body: ${response.body}');
-
+      print(':inbox_tray: Raw response status: ${response.statusCode}');
+      print(':inbox_tray: Raw response body: ${response.body}');
       final Map<String, dynamic> responseData = jsonDecode(response.body);
-      print('📥 Parsed response data: $responseData');
+      print(':inbox_tray: Parsed response data: $responseData');
       print(
-        '📥 Profile photo in response: ${responseData['data']?['profilePhoto']}',
+        ':inbox_tray: Profile photo in response: ${responseData['data']?['profilePhoto']}',
       );
-
       if (response.statusCode == 200) {
-        print('📥 Response status is 200, checking for data...');
-        print('📥 responseData[\'data\']: ${responseData['data']}');
-
+        print(':inbox_tray: Response status is 200, checking for data...');
+        print(':inbox_tray: responseData[\'data\']: ${responseData['data']}');
         // Update cached user data with the response data
         if (responseData['data'] != null) {
-          print('📥 Saving user data to storage: ${responseData['data']}');
+          print(':inbox_tray: Saving user data to storage: ${responseData['data']}');
           await StorageService.saveUserData(responseData['data']);
-          print('✅ User data saved successfully to storage');
+          print(':white_check_mark: User data saved successfully to storage');
         } else {
-          print('⚠️ No data in response, not updating storage');
+          print(':warning: No data in response, not updating storage');
           print(
-            '⚠️ This might indicate that the backend is not returning updated user data',
+            ':warning: This might indicate that the backend is not returning updated user data',
           );
           print(
-            '⚠️ The profile update was successful but no user data was returned',
+            ':warning: The profile update was successful but no user data was returned',
           );
         }
-
         return {
           'success': true,
           'statusCode': 200,
@@ -5651,6 +5654,13 @@ class ActionService {
       };
     }
   }
+
+
+
+
+
+
+
 
   ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
   // Create appointment method using enhanced API with file attachment support

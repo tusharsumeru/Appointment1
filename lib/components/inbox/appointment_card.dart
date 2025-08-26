@@ -8,6 +8,7 @@ import 'reminder_form.dart';
 import 'call_form.dart';
 import 'assign_form.dart';
 import 'star_form.dart';
+import '../common/profile_photo_dialog.dart';
 
 import '../../action/action.dart';
 
@@ -138,50 +139,63 @@ class _AppointmentCardState extends State<AppointmentCard> {
               Row(
                 children: [
                   // Created by Avatar (Square Box) or Guest Avatar
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!, width: 1),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(7),
-                      child: displayImage.isNotEmpty
-                          ? Image.network(
-                              displayImage,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
+                  GestureDetector(
+                    onTap: () {
+                      ProfilePhotoDialog.showWithErrorHandling(
+                        context,
+                        imageUrl: displayImage,
+                        userName: displayName,
+                        description: "${displayName}'s profile photo",
+                      );
+                    },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!, width: 1),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: displayImage.isNotEmpty
+                              ? Image.network(
+                                  displayImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 25,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
                                   color: Colors.grey[300],
                                   child: const Icon(
                                     Icons.person,
                                     size: 25,
                                     color: Colors.grey,
                                   ),
-                                );
-                              },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  color: Colors.grey[300],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                );
-                              },
-                            )
-                          : Container(
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.person,
-                                size: 25,
-                                color: Colors.grey,
-                              ),
-                            ),
-                    ),
+                                ),
+                        ),
+                      ),
+                                         ),
                   ),
                   const SizedBox(width: 12),
 
@@ -499,8 +513,14 @@ class _AppointmentCardState extends State<AppointmentCard> {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
       final users = accompanyUsers['users'] ?? [];
+      final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
       
-      // Total attendees = 1 (main user) + number of accompanying users
+      // If users array is empty but numberOfUsers is provided, add 1 for main user
+      if (users is List && users.isEmpty && numberOfUsers > 0) {
+        return numberOfUsers + 1; // Add 1 for main user
+      }
+      
+      // Otherwise, calculate: 1 (main user) + number of accompanying users
       if (users is List) {
         return 1 + users.length;
       }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../action/action.dart';
 import '../inbox/appointment_detail_page.dart';
+import '../common/profile_photo_dialog.dart';
 
 class UpcomingCardComponent extends StatefulWidget {
   final DateTime selectedDate;
@@ -733,25 +734,57 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                   child: Row(
                     children: [
                       // Patient image
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.grey.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        child: ClipOval(
-                          child: _getProfilePhotoUrl(appointment).isNotEmpty
-                              ? Image.network(
-                                  _getProfilePhotoUrl(appointment),
-                                  width: 44,
-                                  height: 44,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
+                      GestureDetector(
+                        onTap: () {
+                          final photoUrl = _getProfilePhotoUrl(appointment);
+                          ProfilePhotoDialog.showWithErrorHandling(
+                            context,
+                            imageUrl: photoUrl,
+                            userName: _getAppointmentName(appointment),
+                            description: "${_getAppointmentName(appointment)}'s profile photo",
+                          );
+                        },
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.grey.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: _getProfilePhotoUrl(appointment).isNotEmpty
+                                  ? Image.network(
+                                      _getProfilePhotoUrl(appointment),
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              _getUserInitials(appointment),
+                                              style: TextStyle(
+                                                color: category['color'],
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Container(
                                       width: 44,
                                       height: 44,
                                       decoration: BoxDecoration(
@@ -768,28 +801,10 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                                           ),
                                         ),
                                       ),
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _getUserInitials(appointment),
-                                      style: TextStyle(
-                                        color: category['color'],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
                                     ),
-                                  ),
-                                ),
-                        ),
+                            ),
+                          ),
+                                                 ),
                       ),
                       const SizedBox(width: 12),
                       // Patient details

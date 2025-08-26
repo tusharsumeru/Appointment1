@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:country_picker/country_picker.dart';
 import 'dart:io';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
 import '../../action/jwt_utils.dart';
+import '../../components/user/photo_validation_bottom_sheet.dart';
 
 class EditAppointmentScreen extends StatefulWidget {
   final Map<String, dynamic> appointment;
@@ -38,7 +40,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String? _selectedLocation;
   String? _selectedSecretary;
   String _teacherStatus = 'no';
-  String _attendingProgram = 'no';
   
   // Secretary data (same as assign_form.dart)
   List<Map<String, dynamic>> _availableAssignees = [];
@@ -58,6 +59,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   
   // Guest information data
   List<Map<String, dynamic>> _guests = [];
+  
+  // Guest controllers for editable fields (similar to user edit screen)
+  List<Map<String, TextEditingController>> _guestControllers = [];
+  Map<int, String> _guestImages = {};
+  Map<int, bool> _guestUploading = {};
+  Map<int, String> _guestCountries = {};
   
   // Photo picker for guests
   final ImagePicker _imagePicker = ImagePicker();
@@ -80,27 +87,40 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _companyController.text = _getCreatedByCompany();
     _designationController.text = _getCreatedByDesignation();
     
-    // Initialize guest information
-    _initializeGuestData();
-    
     // Get number of people from accompanyUsers object
-    String numberOfPeople = '1';
+    String numberOfPeople = '0'; // Default to 0 accompanying people
     final accompanyUsers = widget.appointment['accompanyUsers'];
-    print('DEBUG: accompanyUsers = $accompanyUsers');
+    print('🔍 API DEBUG: accompanyUsers = $accompanyUsers');
     
     if (accompanyUsers is Map<String, dynamic>) {
       final numberOfUsers = accompanyUsers['numberOfUsers'];
-      print('DEBUG: numberOfUsers = $numberOfUsers');
+      print('🔍 API DEBUG: numberOfUsers = $numberOfUsers');
       if (numberOfUsers != null) {
         numberOfPeople = numberOfUsers.toString();
-        print('DEBUG: Setting numberOfPeople = $numberOfPeople');
+        print('🔍 API DEBUG: Setting numberOfPeople = $numberOfPeople');
+      }
+      
+      // Log the users array
+      final users = accompanyUsers['users'];
+      print('🔍 API DEBUG: users array = $users');
+      if (users is List) {
+        print('🔍 API DEBUG: users count = ${users.length}');
+        for (int i = 0; i < users.length; i++) {
+          print('🔍 API DEBUG: user $i = ${users[i]}');
+        }
       }
     }
     
-    print('DEBUG: Final numberOfPeople = $numberOfPeople');
+    print('🔍 API DEBUG: Final numberOfPeople = $numberOfPeople');
     _numberOfPeopleController = TextEditingController(
       text: numberOfPeople,
     );
+    
+    // Initialize guest information from existing data
+    _initializeGuestData();
+    
+    // Add listener to update guest controllers when number of people changes
+    _numberOfPeopleController.addListener(_updateGuestControllers);
     
     // Initialize date controllers
     final preferredDateRange = widget.appointment['preferredDateRange'];
@@ -159,11 +179,20 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   @override
   void dispose() {
     _purposeController.dispose();
+    _numberOfPeopleController.removeListener(_updateGuestControllers);
     _numberOfPeopleController.dispose();
     _fromDateController.dispose();
     _toDateController.dispose();
     _companyController.dispose();
     _designationController.dispose();
+    
+    // Dispose guest controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    
     super.dispose();
   }
 
@@ -265,6 +294,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
     
     return false;
+  }
+
+  int _calculateDateRange() {
+    try {
+      final fromDateText = _fromDateController.text;
+      final toDateText = _toDateController.text;
+      
+      if (fromDateText.isEmpty || toDateText.isEmpty) {
+        return 0;
+      }
+      
+      final fromDate = DateTime.parse(fromDateText);
+      final toDate = DateTime.parse(toDateText);
+      
+      final difference = toDate.difference(fromDate).inDays;
+      return difference + 1; // Include both start and end dates
+    } catch (e) {
+      return 0;
+    }
   }
 
   String _getCreatedByName() {
@@ -486,10 +534,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _initializeGuestData() {
+    print('🔍 GUEST DEBUG: Starting _initializeGuestData');
     final accompanyUsers = widget.appointment['accompanyUsers'];
+    print('🔍 GUEST DEBUG: accompanyUsers = $accompanyUsers');
+    
     if (accompanyUsers is Map<String, dynamic>) {
       final users = accompanyUsers['users'];
+      print('🔍 GUEST DEBUG: users = $users');
+      
       if (users is List) {
+        print('🔍 GUEST DEBUG: Processing ${users.length} users');
         _guests = users.map((user) {
           final phoneNumber = user['phoneNumber'];
           String fullPhone = '';
@@ -532,10 +586,227 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             'admittedBy': user['admittedBy'],
             'relationshipToApplicant': user['relationshipToApplicant'],
             'admittedAt': user['admittedAt'],
+            'isUploading': false,
           };
         }).toList();
       }
     }
+    
+    print('🔍 GUEST DEBUG: Final _guests count: ${_guests.length}');
+    print('🔍 GUEST DEBUG: _guests data: $_guests');
+    
+    // Initialize guest controllers for editable fields
+    _initializeGuestControllers();
+  }
+
+  // Initialize guest controllers for editable fields
+  void _initializeGuestControllers() {
+    print('🔍 CONTROLLER DEBUG: Initializing guest controllers. Guests count: ${_guests.length}');
+    
+    // Clear existing controllers
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    _guestControllers.clear();
+    _guestImages.clear();
+    _guestUploading.clear();
+    _guestCountries.clear();
+    
+    // Initialize controllers for each guest
+    for (int i = 0; i < _guests.length; i++) {
+      final guest = _guests[i];
+      final phoneNumber = guest['phoneNumber'] ?? '';
+      
+      // Parse phone number to extract country code and number
+      String countryCode = '+91'; // Default
+      String number = phoneNumber;
+      
+      if (phoneNumber.contains(' ')) {
+        final parts = phoneNumber.split(' ');
+        if (parts.isNotEmpty) {
+          countryCode = parts[0];
+          number = parts.skip(1).join(' ').replaceAll('-', '');
+        }
+      }
+      
+      final ageController = TextEditingController(text: guest['age'] ?? '');
+      
+      // Add listener to age controller to trigger rebuild when age changes
+      ageController.addListener(() {
+        print('🔍 AGE DEBUG: Age changed for guest $i to: ${ageController.text}');
+        setState(() {
+          // This will trigger a rebuild and update the photo requirement visibility
+        });
+      });
+      
+      _guestControllers.add({
+        'name': TextEditingController(text: guest['fullName'] ?? ''),
+        'age': ageController,
+        'phone': TextEditingController(text: number),
+      });
+      
+      // Initialize associated data
+      _guestImages[i + 1] = guest['profilePhotoUrl'] ?? '';
+      _guestUploading[i + 1] = false;
+      _guestCountries[i + 1] = countryCode;
+    }
+    
+    print('🔍 CONTROLLER DEBUG: After initialization - controllers count: ${_guestControllers.length}');
+    print('🔍 CONTROLLER DEBUG: _guestImages keys: ${_guestImages.keys.toList()}');
+    print('🔍 CONTROLLER DEBUG: _guestCountries keys: ${_guestCountries.keys.toList()}');
+  }
+
+
+
+  // Update guest controllers based on number of accompanying people
+  void _updateGuestControllers() {
+    final numberOfAccompanyingPeople = int.tryParse(_numberOfPeopleController.text) ?? 0;
+    final currentControllersCount = _guestControllers.length;
+    
+    print('DEBUG UPDATE: _updateGuestControllers - numberOfAccompanyingPeople: $numberOfAccompanyingPeople, current controllers: $currentControllersCount');
+    
+    // Skip if this is the initial setup (guests are being initialized from existing data)
+    if (_guests.isNotEmpty && currentControllersCount == 0) {
+      print('DEBUG UPDATE: Skipping - guests are being initialized from existing data');
+      return;
+    }
+    
+    // Initialize guests if empty and we need guests
+    if (_guests.isEmpty && numberOfAccompanyingPeople > 0) {
+      print('DEBUG UPDATE: Creating new empty guests');
+      _createEmptyGuests(numberOfAccompanyingPeople);
+    }
+    
+    if (numberOfAccompanyingPeople > currentControllersCount) {
+      // Add more controllers
+      print('DEBUG UPDATE: Adding ${numberOfAccompanyingPeople - currentControllersCount} guest controllers');
+      
+              while (_guestControllers.length < numberOfAccompanyingPeople) {
+          int guestNumber = _guestControllers.length + 1;
+          
+          // Add to guests list
+          _guests.add({
+            'fullName': '',
+            'age': '',
+            'phoneNumber': '',
+            'profilePhotoUrl': '',
+            'userId': null,
+            'admissionStatus': 'pending',
+            'admittedBy': null,
+            'relationshipToApplicant': null,
+            'admittedAt': null,
+            'isUploading': false,
+          });
+          
+          // Add controllers for new guest
+          final ageController = TextEditingController();
+          
+          // Add listener to age controller to trigger rebuild when age changes
+          ageController.addListener(() {
+            print('🔍 AGE DEBUG: Age changed for new guest ${_guestControllers.length} to: ${ageController.text}');
+            setState(() {
+              // This will trigger a rebuild and update the photo requirement visibility
+            });
+          });
+          
+          _guestControllers.add({
+            'name': TextEditingController(),
+            'age': ageController,
+            'phone': TextEditingController(),
+          });
+          
+          // Initialize associated data
+          _guestImages[guestNumber] = '';
+          _guestUploading[guestNumber] = false;
+          _guestCountries[guestNumber] = '+91';
+        }
+      } else if (numberOfAccompanyingPeople < currentControllersCount) {
+        // Remove controllers (remove from the end)
+        print('DEBUG UPDATE: Removing ${currentControllersCount - numberOfAccompanyingPeople} guest controllers');
+        
+        // Dispose controllers that will be removed
+        for (int i = numberOfAccompanyingPeople; i < currentControllersCount; i++) {
+          var guest = _guestControllers[i];
+          guest['name']?.dispose();
+          guest['phone']?.dispose();
+          guest['age']?.dispose();
+        }
+        
+        // Remove from lists (remove from the end)
+        _guests.removeRange(numberOfAccompanyingPeople, currentControllersCount);
+        _guestControllers.removeRange(numberOfAccompanyingPeople, currentControllersCount);
+        
+        // Remove associated data (remove from the end)
+        for (int i = numberOfAccompanyingPeople + 1; i <= currentControllersCount; i++) {
+          _guestImages.remove(i);
+          _guestUploading.remove(i);
+          _guestCountries.remove(i);
+        }
+        
+        print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
+      }
+  }
+
+  // Create empty guests for new appointments
+  void _createEmptyGuests(int numberOfGuests) {
+    print('DEBUG CREATE: Creating $numberOfGuests empty guests');
+    
+    // Clear existing data
+    for (var guest in _guestControllers) {
+      guest['name']?.dispose();
+      guest['phone']?.dispose();
+      guest['age']?.dispose();
+    }
+    _guestControllers.clear();
+    _guestImages.clear();
+    _guestUploading.clear();
+    _guestCountries.clear();
+    _guests.clear();
+    
+    // Create empty guests
+    for (int i = 0; i < numberOfGuests; i++) {
+      int guestNumber = i + 1;
+      
+      // Add to guests list
+      _guests.add({
+        'fullName': '',
+        'age': '',
+        'phoneNumber': '',
+        'profilePhotoUrl': '',
+        'userId': null,
+        'admissionStatus': 'pending',
+        'admittedBy': null,
+        'relationshipToApplicant': null,
+        'admittedAt': null,
+        'isUploading': false,
+      });
+      
+      // Add controllers for new guest
+      final ageController = TextEditingController();
+      
+      // Add listener to age controller to trigger rebuild when age changes
+      ageController.addListener(() {
+        print('🔍 AGE DEBUG: Age changed for empty guest $i to: ${ageController.text}');
+        setState(() {
+          // This will trigger a rebuild and update the photo requirement visibility
+        });
+      });
+      
+      _guestControllers.add({
+        'name': TextEditingController(),
+        'age': ageController,
+        'phone': TextEditingController(),
+      });
+      
+      // Initialize associated data
+      _guestImages[guestNumber] = '';
+      _guestUploading[guestNumber] = false;
+      _guestCountries[guestNumber] = '+91';
+    }
+    
+    print('DEBUG CREATE: Created ${_guests.length} empty guests with ${_guestControllers.length} controllers');
   }
 
   // Photo picker methods for guests
@@ -549,22 +820,76 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
       
       if (pickedFile != null) {
+        print('📸 Guest $guestIndex image selected: ${pickedFile.path}');
+
+        // Show uploading state
         setState(() {
-          _guests[guestIndex]['profilePhotoUrl'] = pickedFile.path;
-          _guests[guestIndex]['localPhotoFile'] = File(pickedFile.path);
+          _guestUploading[guestIndex + 1] = true;
         });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                source == ImageSource.camera 
-                    ? 'Photo captured successfully!' 
-                    : 'Photo uploaded successfully!'
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
+
+        try {
+          // Upload photo immediately and get S3 URL
+          final result = await ActionService.uploadAndValidateProfilePhoto(
+            File(pickedFile.path),
+          );
+
+          if (result['success']) {
+            final s3Url = result['s3Url'];
+            setState(() {
+              _guestImages[guestIndex + 1] = s3Url;
+              _guestUploading[guestIndex + 1] = false;
+            });
+
+            print('✅ Guest $guestIndex photo uploaded to S3: $s3Url');
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Guest ${guestIndex + 1} photo uploaded and validated successfully!',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } else {
+            setState(() {
+              _guestUploading[guestIndex + 1] = false;
+            });
+
+            print('❌ Guest $guestIndex photo upload failed: ${result['message']}');
+
+            // Show backend error message in dialog
+            final errorMessage =
+                result['error'] ?? result['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(
+              'Guest ${guestIndex + 1}: $errorMessage',
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _guestImages[guestIndex + 1] = '';
+                  _guestUploading[guestIndex + 1] = false;
+                });
+              },
+            );
+          }
+        } catch (e) {
+          setState(() {
+            _guestUploading[guestIndex + 1] = false;
+          });
+
+          print('❌ Error uploading guest $guestIndex photo: $e');
+
+          // Show error message in dialog
+          _showPhotoValidationErrorDialog(
+            'Guest ${guestIndex + 1}: Error uploading photo: ${e.toString()}',
+            () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages[guestIndex + 1] = '';
+                _guestUploading[guestIndex + 1] = false;
+              });
+            },
           );
         }
       }
@@ -583,8 +908,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   void _removeGuestPhoto(int guestIndex) {
     setState(() {
-      _guests[guestIndex]['profilePhotoUrl'] = '';
-      _guests[guestIndex]['localPhotoFile'] = null;
+      _guestImages[guestIndex + 1] = '';
+      _guestUploading[guestIndex + 1] = false;
     });
     
     ScaffoldMessenger.of(context).showSnackBar(
@@ -597,9 +922,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   int _getGuestIndexFromPhotoUrl(String photoUrl) {
-    for (int i = 0; i < _guests.length; i++) {
-      if (_guests[i]['profilePhotoUrl'] == photoUrl) {
-        return i;
+    for (int i = 1; i <= _guests.length; i++) {
+      if (_guestImages[i] == photoUrl) {
+        return i - 1;
       }
     }
     return 0; // Fallback to first guest
@@ -871,7 +1196,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (accompanyUsers is Map<String, dynamic>) {
       print('AccompanyUsers keys: ${accompanyUsers.keys.toList()}');
       print('AccompanyUsers numberOfUsers: ${accompanyUsers['numberOfUsers']}');
+      print('AccompanyUsers users: ${accompanyUsers['users']}');
     }
+    
+    // Debug all appointment data
+    print('Full appointment data: ${widget.appointment}');
     
     print('=== END DEBUG INFO ===');
   }
@@ -892,6 +1221,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         throw Exception('Appointment ID not found');
       }
 
+      // Get original appointment type for debugging
+      final originalAppointmentType = widget.appointment['appointmentType']?.toString() ?? 'myself';
+      print('🔍 DEBUG: Original appointment type: $originalAppointmentType');
+      print('🔍 DEBUG: Original appointment data: ${widget.appointment}');
+      
       // Prepare the update data
       final updateData = {
         'userCurrentCompany': _companyController.text.trim(),
@@ -904,21 +1238,36 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         },
         'appointmentLocation': _selectedLocation,
         'assignedSecretary': _selectedSecretary,
-        'numberOfUsers': int.tryParse(_numberOfPeopleController.text) ?? 1,
-        'attendingProgram': _attendingProgram,
+        'numberOfUsers': _guestControllers.length,
         'isTeacher': _teacherStatus,
-        // Add required fields that the API expects
-        'appointmentFor': {
-          'type': 'myself', // Default to myself since we're editing existing appointment
+        // Add required fields that the API expects - preserve original appointment type
+        'appointmentFor': widget.appointment['appointmentFor'] ?? {
+          'type': widget.appointment['appointmentType']?.toString() ?? 'myself', // Preserve original type
         },
-        'appointmentType': 'myself', // Default to myself
+        'appointmentType': widget.appointment['appointmentType']?.toString() ?? 'myself', // Preserve original type
         'accompanyUsers': _getAccompanyUsersData(),
         'attendingCourseDetails': {
-          'isAttending': _attendingProgram == 'yes',
+          'isAttending': false,
           'fromDate': _fromDateController.text,
           'toDate': _toDateController.text,
         },
       };
+
+      // Add guestInformation if appointment type is 'guest'
+      if (originalAppointmentType == 'guest') {
+        print('🔍 DEBUG: Adding guestInformation for guest appointment');
+        updateData['guestInformation'] = widget.appointment['guestInformation'] ?? {
+          'fullName': widget.appointment['appointmentFor']?['otherPersonDetails']?['fullName'] ?? '',
+          'email': widget.appointment['appointmentFor']?['otherPersonDetails']?['email'] ?? '',
+          'phoneNumber': widget.appointment['appointmentFor']?['otherPersonDetails']?['phoneNumber'] ?? {
+            'countryCode': '+91',
+            'number': '',
+          },
+          'age': widget.appointment['appointmentFor']?['otherPersonDetails']?['age'] ?? '',
+          'relationship': widget.appointment['appointmentFor']?['otherPersonDetails']?['relationship'] ?? '',
+        };
+        print('🔍 DEBUG: guestInformation added: ${updateData['guestInformation']}');
+      }
 
       // Show debug info in SnackBar
       if (_selectedFile != null) {
@@ -999,21 +1348,50 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Map<String, dynamic>? _getAccompanyUsersData() {
-    final accompanyUsers = widget.appointment['accompanyUsers'];
-    if (accompanyUsers is Map<String, dynamic>) {
-      final numberOfUsers = accompanyUsers['numberOfUsers'];
-      final users = accompanyUsers['users'];
-      
-      if (numberOfUsers != null && users is List) {
-        return {
-          'numberOfUsers': numberOfUsers,
-          'users': users,
-        };
-      }
+    if (_guestControllers.isEmpty) {
+      return null;
     }
     
-    // If no existing accompanyUsers data, return null to skip this field
-    return null;
+    // Build users data from controllers
+    final List<Map<String, dynamic>> users = [];
+    
+    for (int i = 0; i < _guestControllers.length; i++) {
+      final controllers = _guestControllers[i];
+      final guestNumber = i + 1;
+      
+      // Get phone number with country code
+      final phoneNumber = controllers['phone']?.text ?? '';
+      final countryCode = _guestCountries[guestNumber] ?? '+91';
+      
+      // Format phone number
+      String formattedPhone = '';
+      if (phoneNumber.isNotEmpty) {
+        formattedPhone = '$countryCode $phoneNumber';
+      }
+      
+      // Get photo URL from guest images
+      final photoUrl = _guestImages[guestNumber] ?? '';
+      
+      users.add({
+        'fullName': controllers['name']?.text ?? '',
+        'age': controllers['age']?.text ?? '',
+        'phoneNumber': {
+          'countryCode': countryCode,
+          'number': phoneNumber,
+        },
+        'profilePhotoUrl': photoUrl,
+        'userId': null, // Will be assigned by backend
+        'admissionStatus': 'pending',
+        'admittedBy': null,
+        'relationshipToApplicant': null,
+        'admittedAt': null,
+      });
+    }
+    
+    return {
+      'numberOfUsers': _guestControllers.length,
+      'users': users,
+    };
   }
 
   @override
@@ -1147,18 +1525,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     
                     const SizedBox(height: 16),
                     
-                                          // Number of People
+                                          // Number of Accompanying People
                       _buildNumberField(
-                        'Number of People',
+                        'Number of Accompanying People',
                         _numberOfPeopleController,
-                        'Number of people for the appointment',
+                        'Number of people accompanying you',
                         isRequired: true,
                       ),
                       
                       const SizedBox(height: 16),
                       
                       // Guest Information Section
-                      if (_guests.isNotEmpty) ...[
+                      if ((int.tryParse(_numberOfPeopleController.text) ?? 0) > 0) ...[
                         _buildGuestInformationSection(),
                         const SizedBox(height: 16),
                       ],
@@ -1170,11 +1548,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     
                     // Date Range
                     _buildDateRangeSection(),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Attending Program Radio
-                    _buildProgramRadioGroup(),
                     
                     const SizedBox(height: 32),
                     
@@ -1568,6 +1941,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildNumberField(String label, TextEditingController controller, String placeholder, {bool isRequired = false}) {
+    // Check if number of people is greater than 10
+    final numberOfPeople = int.tryParse(controller.text) ?? 0;
+    final shouldShowInfoCard = numberOfPeople <= 10;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1580,61 +1957,128 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: placeholder,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+        
+        // Number of People with + and - buttons
+        Row(
+          children: [
+            // Minus button
+            GestureDetector(
+              onTap: () {
+                int currentCount = int.tryParse(controller.text) ?? 0;
+                print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                if (currentCount > 0) { // Minimum 0 accompanying people
+                  print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
+                  setState(() {
+                    controller.text = (currentCount - 1).toString();
+                  });
+                  _updateGuestControllers();
+                  print('DEBUG MINUS: After removal. New count: ${controller.text}, Guest controllers: ${_guestControllers.length}');
+                } else {
+                  print('DEBUG MINUS: Cannot reduce below 0 (no accompanying people)');
+                }
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey[300]!,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.remove,
+                  color: Colors.black87,
+                  size: 24,
+                ),
+              ),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+            const SizedBox(width: 12),
+
+            // Number display
+            Expanded(
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.grey[300]!,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Center(
+                  child: Text(
+                    controller.text.isEmpty ? '0' : controller.text,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
+            const SizedBox(width: 12),
+
+            // Plus button
+            GestureDetector(
+              onTap: () {
+                int currentCount = int.tryParse(controller.text) ?? 0;
+                setState(() {
+                  controller.text = (currentCount + 1).toString();
+                });
+                _updateGuestControllers();
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF97316),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFF97316),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
             ),
-            filled: true,
-            fillColor: Colors.grey[50],
-          ),
-          validator: isRequired ? (value) {
-            if (value == null || value.isEmpty) {
-              return 'This field is required';
-            }
-            final number = int.tryParse(value);
-            if (number == null || number < 1) {
-              return 'Please enter a valid number (minimum 1)';
-            }
-            return null;
-          } : null,
+          ],
         ),
+        
         const SizedBox(height: 4),
         Text(
-          'Enter the number of people for the appointment',
+          'Number of people accompanying you',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
-          ),
-          child: Text(
-            'ℹ️ For appointments with more than 10 people, individual details for additional accompanying people are not required. The appointment will be processed with the main contact information and guest details.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.blue[800],
+        // Only show the blue info card if number of people is 10 or less
+        if (shouldShowInfoCard)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Text(
+              'ℹ️ For appointments with more than 10 people, individual details for additional accompanying people are not required. The appointment will be processed with the main contact information and guest details.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue[800],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -1662,30 +2106,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               child: _buildDateField('To Date', _toDateController),
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.calendar_today, color: Colors.blue, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '📅 Selected Range: 9 days\nFrom 02/08/2025 to 10/08/2025',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue[800],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -1746,29 +2166,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  Widget _buildProgramRadioGroup() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Are you attending any program at the Bangalore Ashram during these dates? *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildSimpleRadioOption('Yes', 'yes', _attendingProgram, (value) => setState(() => _attendingProgram = value)),
-            const SizedBox(width: 16),
-            _buildSimpleRadioOption('No', 'no', _attendingProgram, (value) => setState(() => _attendingProgram = value)),
-          ],
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildLoadingField(String label) {
     return Column(
@@ -3067,6 +3465,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildGuestInformationSection() {
+    // Safety check - ensure controllers are initialized
+    if (_guests.isNotEmpty && _guestControllers.isEmpty) {
+      print('WARNING: Guests exist but controllers not initialized. Initializing now...');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initializeGuestControllers();
+      });
+      return const Center(child: CircularProgressIndicator());
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3080,6 +3487,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
         const SizedBox(height: 16),
         ...List.generate(_guests.length, (index) {
+          // Only generate cards if we have corresponding controllers
+          if (index >= _guestControllers.length) {
+            print('WARNING: Skipping guest card $index - no controller available');
+            return const SizedBox.shrink();
+          }
           return Column(
             children: [
               _buildGuestCard(index),
@@ -3092,8 +3504,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildGuestCard(int index) {
+    // Safety check to prevent index out of bounds
+    if (index >= _guests.length || index >= _guestControllers.length) {
+      print('ERROR: Index $index is out of bounds. _guests.length: ${_guests.length}, _guestControllers.length: ${_guestControllers.length}');
+      return const SizedBox.shrink();
+    }
+    
     final guest = _guests[index];
     final guestNumber = index + 1;
+    final controllers = _guestControllers[index];
+    
+    // Check if photo is required (age >= 12)
+    final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
+    final isPhotoRequired = age >= 12;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -3113,75 +3536,470 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Guest header
-          Row(
-            children: [
-              Text(
-                'Guest $guestNumber',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF97316).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Accompanying Guest - $guestNumber - Details',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFF97316),
               ),
-              const Spacer(),
-              if (guest['profilePhotoUrl']?.isNotEmpty == true)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green[600], size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Photo uploaded',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.green[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           
-          // Guest details grid
+          // Guest details - editable fields
           Column(
             children: [
-              // Full Name
-              _buildGuestField(
-                'Full Name',
-                guest['fullName'] ?? '',
-                isRequired: true,
+              // Name
+              _buildEditableGuestField(
+                label: 'Name',
+                controller: controllers['name']!,
+                placeholder: 'Enter name',
               ),
-              const SizedBox(height: 16),
-              
-              // Contact Number
-              _buildGuestField(
-                'Contact Number',
-                guest['phoneNumber'] ?? '',
-                isRequired: true,
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               
               // Age
-              _buildGuestField(
-                'Age',
-                guest['age'] ?? '',
-                isRequired: true,
-                isNumber: true,
+              _buildEditableGuestField(
+                label: 'Age',
+                controller: controllers['age']!,
+                placeholder: 'Enter age (1-120)',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 3,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Age is required';
+                  }
+                  final age = int.tryParse(value);
+                  if (age == null || age < 1 || age > 120) {
+                    return 'Please enter 1-120';
+                  }
+                  return null;
+                },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               
-              // Photo section
-              _buildGuestPhotoSection(index),
+              // Phone
+              _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!),
+              
+              // Photo Section (only show if age >= 12)
+              if (isPhotoRequired) ...[
+                const SizedBox(height: 16),
+                
+                // Photo Header
+                Row(
+                  children: [
+                    Icon(
+                      Icons.camera_alt,
+                      color: const Color(0xFFF97316),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Photo *',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Photo of the Guest Required for Age 12 years and Above',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
+                
+                // Photo Upload Options
+                Column(
+                  children: [
+                    // Upload from Device Card
+                    GestureDetector(
+                      onTap: () => _pickGuestImage(index, ImageSource.gallery),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.upload_file,
+                              color: const Color(0xFFF97316),
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Upload from Device',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Choose an existing photo',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Take Photo Card
+                    GestureDetector(
+                      onTap: () => _pickGuestImage(index, ImageSource.camera),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.camera_alt,
+                              color: const Color(0xFFF97316),
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Take Photo',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Use your device camera',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Show selected image preview
+                    if ((_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty) ||
+                        _guestUploading[guestNumber] == true) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _guestUploading[guestNumber] == true
+                              ? Colors.blue[50]
+                              : (_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty
+                                    ? Colors.green[50]
+                                    : Colors.orange[50]),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _guestUploading[guestNumber] == true
+                                ? Colors.blue[200]!
+                                : (_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty
+                                      ? Colors.green[200]!
+                                      : Colors.orange[200]!),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Photo preview and status message
+                            Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[200],
+                                  ),
+                                  child: _guestUploading[guestNumber] == true
+                                      ? const Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.blue,
+                                                ),
+                                          ),
+                                        )
+                                      : (_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty)
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            _guestImages[guestNumber]!,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value:
+                                                      loadingProgress
+                                                              .expectedTotalBytes !=
+                                                          null
+                                                      ? loadingProgress
+                                                                .cumulativeBytesLoaded /
+                                                            loadingProgress
+                                                                .expectedTotalBytes!
+                                                      : null,
+                                                  valueColor:
+                                                      const AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.blue),
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[200],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.error_outline,
+                                                  color: Colors.red,
+                                                  size: 24,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.warning,
+                                          color: Colors.orange,
+                                          size: 24,
+                                        ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (_guestUploading[guestNumber] == true) ...[
+                                        const Text(
+                                          'Uploading photo...',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue,
+                                          ),
+                                        ),
+                                      ] else if (_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty) ...[
+                                        const Text(
+                                          'Photo uploaded successfully',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'Guest photo is ready',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ] else ...[
+                                        const Text(
+                                          'Photo required',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'Please upload a photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            
+                            // Action buttons (only show if photo is uploaded)
+                            if (_guestImages.containsKey(guestNumber) && _guestImages[guestNumber]!.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              
+                              Column(
+                                children: [
+                                  // Upload Different Photo
+                                  GestureDetector(
+                                    onTap: () => _pickGuestImage(
+                                      index,
+                                      ImageSource.gallery,
+                                    ),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue[50],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.blue[200]!,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.upload_file,
+                                            color: const Color(0xFFF97316),
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Upload Different Photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.blue[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  const SizedBox(height: 6),
+                                  
+                                  // Take New Photo
+                                  GestureDetector(
+                                    onTap: () => _pickGuestImage(
+                                      index,
+                                      ImageSource.camera,
+                                    ),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange[50],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.orange[200]!,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.camera_alt,
+                                            color: Colors.orange[700],
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Take New Photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.orange[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  const SizedBox(height: 6),
+                                  
+                                  // Remove Photo
+                                  GestureDetector(
+                                    onTap: () => _removeGuestPhoto(index),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red[50],
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.red[200]!,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red[700],
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Remove Photo',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.red[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ],
           ),
         ],
@@ -3227,9 +4045,199 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  // Editable guest field for form inputs
+  Widget _buildEditableGuestField({
+    required String label,
+    required TextEditingController controller,
+    required String placeholder,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[400],
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: const Color(0xFFF97316)),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[300]!),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Phone field for accompanying users with country code
+  Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Phone *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            // Country code picker
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: TextStyle(fontSize: 16, color: Colors.black),
+                    bottomSheetHeight: 500,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color.fromARGB(255, 8, 191, 214),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country country) {
+                    setState(() {
+                      _guestCountries[guestNumber] = country.phoneCode;
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _guestCountries[guestNumber] ?? '+91',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'Enter phone number',
+                  hintStyle: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[400],
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: const Color(0xFFF97316)),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[300]!),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildGuestPhotoSection(int index) {
     final guest = _guests[index];
     final hasPhoto = guest['profilePhotoUrl']?.isNotEmpty == true;
+    
+    // Check if guest age is above 11
+    final ageString = guest['age']?.toString() ?? '';
+    int? age;
+    try {
+      age = int.tryParse(ageString);
+    } catch (e) {
+      age = null;
+    }
+    
+    // Only show photo section if age is above 11
+    if (age == null || age <= 11) {
+      return const SizedBox.shrink(); // Return empty widget if age is 11 or below
+    }
     
     return Container(
       decoration: BoxDecoration(
@@ -3268,7 +4276,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 Icon(Icons.camera_alt, color: Colors.grey[600], size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'Guest ${index + 1} Photo',
+                  'Photo',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -3292,9 +4300,95 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           // Content
           Padding(
             padding: const EdgeInsets.all(16),
-            child: hasPhoto
-                ? _buildPhotoUploadedState(guest['profilePhotoUrl']!, index)
-                : _buildPhotoNotUploadedState(index),
+            child: _buildPhotoContent(index),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoContent(int guestIndex) {
+    final guest = _guests[guestIndex];
+    final isUploading = guest['isUploading'] == true;
+    final hasPhoto = guest['profilePhotoUrl']?.isNotEmpty == true;
+    
+    if (isUploading) {
+      return _buildPhotoUploadingState(guestIndex);
+    } else if (hasPhoto) {
+      return _buildPhotoUploadedState(guest['profilePhotoUrl']!, guestIndex);
+    } else {
+      return _buildPhotoNotUploadedState(guestIndex);
+    }
+  }
+
+  Widget _buildPhotoUploadingState(int guestIndex) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue[300]!),
+      ),
+      child: Column(
+        children: [
+          // Loading spinner
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Status text
+          Text(
+            'Uploading photo...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.blue[800],
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue[100],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.upload, color: Colors.blue[800], size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  'Processing...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue[800],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -3601,6 +4695,136 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showPhotoValidationErrorDialog(
+    String errorMessage,
+    VoidCallback onTryAgain,
+  ) {
+    // Remove "Guest X:" prefix if present
+    String cleanErrorMessage = errorMessage;
+    if (cleanErrorMessage.contains('Guest ') &&
+        cleanErrorMessage.contains(': ')) {
+      cleanErrorMessage = cleanErrorMessage.split(': ').skip(1).join(': ');
+    }
+
+    // Remove "Profile photo validation failed:" prefix if present
+    if (cleanErrorMessage.startsWith('Profile photo validation failed:')) {
+      cleanErrorMessage = cleanErrorMessage
+          .replaceFirst('Profile photo validation failed:', '')
+          .trim();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Photo Validation Failed',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cleanErrorMessage,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange.shade600,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Please ensure your photo meets our validation requirements',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade700,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Show photo validation guidance bottom sheet
+                PhotoValidationBottomSheet.show(
+                  context,
+                  onTryAgain: onTryAgain,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'View Photo Guidelines',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

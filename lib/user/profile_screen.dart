@@ -23,8 +23,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
-
-
   @override
   void initState() {
     super.initState();
@@ -185,7 +183,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: _isLoading
             ? const Center(
                 child: CircularProgressIndicator(
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFFF97316),
+                  ),
                 ),
               )
             : _userData == null
@@ -271,7 +271,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: const Color(0xFFF97316).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFFF97316,
+                                  ).withOpacity(0.3),
                                   width: 3,
                                 ),
                                 boxShadow: [
@@ -290,20 +292,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         errorBuilder:
                                             (context, error, stackTrace) {
                                               return Container(
-                                                color: const Color(0xFFF97316)
-                                                    .withOpacity(0.1),
+                                                color: const Color(
+                                                  0xFFF97316,
+                                                ).withOpacity(0.1),
                                                 child: const Icon(
                                                   Icons.person,
                                                   size: 40,
-                                                  color: const Color(0xFFF97316),
+                                                  color: const Color(
+                                                    0xFFF97316,
+                                                  ),
                                                 ),
                                               );
                                             },
                                       )
                                     : Container(
-                                        color: const Color(0xFFF97316).withOpacity(
-                                          0.1,
-                                        ),
+                                        color: const Color(
+                                          0xFFF97316,
+                                        ).withOpacity(0.1),
                                         child: const Icon(
                                           Icons.person,
                                           size: 40,
@@ -874,17 +879,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
+        Text(
+          '$label:',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w500,
           ),
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
@@ -903,10 +906,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Check if user is an AOL teacher
     final aolTeacherData = _userData?['aol_teacher'];
     final atolValidationData = aolTeacherData?['atolValidationData'];
-    
+
     // Check if teacher verification is successful
     final bool isTeacherVerified = atolValidationData?['verified'] == true;
-    
+
     if (!isTeacherVerified) {
       // Show "Not an AOL Teacher" message
       return Container(
@@ -915,10 +918,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: BoxDecoration(
           color: Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(
-            color: Colors.grey.shade300,
-            width: 1,
-          ),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
         ),
         child: Row(
           children: [
@@ -929,45 +929,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Colors.grey.shade400,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 16,
-              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                                                Text(
-                                  'No',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
+                Text(
+                  'No',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
               ],
             ),
           ],
         ),
       );
     }
-    
+
     // Get teacher details from API response
     final teacherDetails = atolValidationData?['data']?['teacherdetails'];
     final teacherCode = aolTeacherData?['aolTeacher']?['teacherCode'] ?? 'N/A';
-    
+    final teacherEmail =
+        aolTeacherData?['aolTeacher']?['teacherEmail'] ?? 'N/A';
+    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.lightGreen.shade50,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-          color: Colors.lightGreen.shade200,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.lightGreen.shade200, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -982,11 +978,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.green,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: const Icon(Icons.check, color: Colors.white, size: 16),
               ),
               const SizedBox(width: 12),
               Column(
@@ -1016,12 +1008,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // Teacher Details
           _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
           const SizedBox(height: 8),
+          _buildTeacherDetail('Type', teacherType),
+          const SizedBox(height: 8),
           _buildTeacherDetail('Teacher Code', teacherCode),
           const SizedBox(height: 8),
-          _buildTeacherDetail(
-            'Type',
-            teacherDetails?['teacher_type'] ?? 'N/A',
-          ),
+          _buildTeacherDetail('Teacher Email', teacherEmail),
           const SizedBox(height: 8),
           _buildTeacherDetail(
             'Programs',
@@ -1095,15 +1086,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Refresh user data from API to get the most up-to-date information
       try {
         final apiResult = await ActionService.getCurrentUser();
-        
+
         if (apiResult['success'] == true) {
           // Check if API returned the updated photo
           final apiPhoto = apiResult['data']?['profilePhoto'];
           final expectedPhoto = result['profilePhoto'];
-          
+
           // If API returned old photo but we have updated photo, preserve the updated one
-          if (apiResult['data']?['profilePhoto'] != result['profilePhoto'] && result['profilePhoto'] != null) {
-            final preservedData = <String, dynamic>{...apiResult['data'] as Map<String, dynamic>, 'profilePhoto': result['profilePhoto']};
+          if (apiResult['data']?['profilePhoto'] != result['profilePhoto'] &&
+              result['profilePhoto'] != null) {
+            final preservedData = <String, dynamic>{
+              ...apiResult['data'] as Map<String, dynamic>,
+              'profilePhoto': result['profilePhoto'],
+            };
             setState(() {
               _userData = preservedData;
             });
@@ -1112,13 +1107,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _userData = apiResult['data'] as Map<String, dynamic>?;
             });
           }
-          
+
           // Update form controllers with fresh data
-          _fullNameController.text = _userData?['fullName'] ?? _userData?['name'] ?? '';
+          _fullNameController.text =
+              _userData?['fullName'] ?? _userData?['name'] ?? '';
           _emailController.text = _userData?['email'] ?? '';
-          
+
           // Handle phone number mapping
-          final dynamic phoneField = _userData?['phoneNumber'] ?? _userData?['phone'];
+          final dynamic phoneField =
+              _userData?['phoneNumber'] ?? _userData?['phone'];
           String phoneText = '';
           if (phoneField is Map) {
             final cc = (phoneField['countryCode'] ?? '').toString();
@@ -1128,10 +1125,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             phoneText = phoneField;
           }
           _phoneController.text = phoneText;
-          
+
           _designationController.text = _userData?['designation'] ?? '';
           _companyController.text = _userData?['company'] ?? '';
-          
+
           // Handle location mapping
           final dynamic fullAddress = _userData?['full_address'];
           String locationText = '';
@@ -1148,15 +1145,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (error) {
         // Fallback to using returned data if API refresh fails
         setState(() {
-          _userData = <String, dynamic>{...?_userData, ...result as Map<String, dynamic>};
+          _userData = <String, dynamic>{
+            ...?_userData,
+            ...result as Map<String, dynamic>,
+          };
         });
-        
-        _fullNameController.text = result['fullName'] ?? _fullNameController.text;
+
+        _fullNameController.text =
+            result['fullName'] ?? _fullNameController.text;
         _emailController.text = result['email'] ?? _emailController.text;
         _phoneController.text = result['phoneNumber'] ?? _phoneController.text;
-        _designationController.text = result['designation'] ?? _designationController.text;
+        _designationController.text =
+            result['designation'] ?? _designationController.text;
         _companyController.text = result['company'] ?? _companyController.text;
-        _locationController.text = result['location'] ?? _locationController.text;
+        _locationController.text =
+            result['location'] ?? _locationController.text;
       }
     } else {
       // Edit form returned null (no changes made)

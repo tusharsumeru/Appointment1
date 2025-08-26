@@ -17,45 +17,61 @@ import '../components/user/photo_validation_bottom_sheet.dart';
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
 
-  const AppointmentDetailsScreen({
-    super.key,
-    required this.personalInfo,
-  });
+  const AppointmentDetailsScreen({super.key, required this.personalInfo});
 
   @override
-  State<AppointmentDetailsScreen> createState() => _AppointmentDetailsScreenState();
+  State<AppointmentDetailsScreen> createState() =>
+      _AppointmentDetailsScreenState();
 }
 
 class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Form controllers
-  final TextEditingController _appointmentPurposeController = TextEditingController();
-  final TextEditingController _numberOfUsersController = TextEditingController();
-  final TextEditingController _fromDateController = TextEditingController();
-  final TextEditingController _toDateController = TextEditingController();
-  
+  final TextEditingController _appointmentPurposeController =
+      TextEditingController();
+  final TextEditingController _numberOfUsersController =
+      TextEditingController();
+
+  // Preferred date range controllers (for appointment scheduling)
+  final TextEditingController _preferredFromDateController =
+      TextEditingController();
+  final TextEditingController _preferredToDateController =
+      TextEditingController();
+
+  // Program date range controllers (for course/program dates)
+  final TextEditingController _programFromDateController =
+      TextEditingController();
+  final TextEditingController _programToDateController =
+      TextEditingController();
+
   // Reference Information Controllers
-  final TextEditingController _referenceNameController = TextEditingController();
-  final TextEditingController _referenceEmailController = TextEditingController();
-  final TextEditingController _referencePhoneController = TextEditingController();
-  
+  final TextEditingController _referenceNameController =
+      TextEditingController();
+  final TextEditingController _referenceEmailController =
+      TextEditingController();
+  final TextEditingController _referencePhoneController =
+      TextEditingController();
+
   // Guest Information Controllers
   final TextEditingController _guestNameController = TextEditingController();
   final TextEditingController _guestEmailController = TextEditingController();
   final TextEditingController _guestPhoneController = TextEditingController();
-  final TextEditingController _guestDesignationController = TextEditingController();
+  final TextEditingController _guestDesignationController =
+      TextEditingController();
   final TextEditingController _guestCompanyController = TextEditingController();
-  final TextEditingController _guestLocationController = TextEditingController();
-  
+  final TextEditingController _guestLocationController =
+      TextEditingController();
+
   // Form state
   bool _isFormValid = false;
   String? _selectedSecretary;
   String? _selectedAppointmentLocation;
-  String? _selectedLocationId; // Store the selected location ID (locationId for API calls)
+  String?
+  _selectedLocationId; // Store the selected location ID (locationId for API calls)
   String? _selectedLocationMongoId; // Store the MongoDB _id for form submission
   File? _selectedImage;
   File? _selectedAttachment; // For file attachments
   bool _isAttendingProgram = false;
-  
+
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
 
@@ -63,12 +79,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Map<int, String> _guestImages = {};
   // Guest upload states - Map to track upload status for each guest
   Map<int, bool> _guestUploading = {};
-  
+
   // Location search state
   List<Map<String, dynamic>> _locationSuggestions = [];
   bool _isSearchingLocations = false;
   String _lastSearchQuery = '';
-  
+
   // Main guest photo state
   String? _mainGuestPhotoUrl;
   bool _isMainGuestPhotoUploading = false;
@@ -76,7 +92,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Location data
   List<Map<String, dynamic>> _locations = [];
   bool _isLoadingLocations = true;
-  
+
   // Reference information loading state
   bool _isLoadingReferenceInfo = true;
 
@@ -87,7 +103,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   // Email validation error
   String? _guestEmailError;
-  
+
   // Date validation errors
   String? _dateRangeError;
   String? _programDateRangeError;
@@ -123,14 +139,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   void dispose() {
     _appointmentPurposeController.dispose();
     _numberOfUsersController.dispose();
-    _fromDateController.dispose();
-    _toDateController.dispose();
-    
+    _preferredFromDateController.dispose();
+    _preferredToDateController.dispose();
+    _programFromDateController.dispose();
+    _programToDateController.dispose();
+
     // Dispose reference controllers
     _referenceNameController.dispose();
     _referenceEmailController.dispose();
     _referencePhoneController.dispose();
-    
+
     // Dispose guest controllers
     _guestNameController.dispose();
     _guestEmailController.dispose();
@@ -138,7 +156,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     _guestDesignationController.dispose();
     _guestCompanyController.dispose();
     _guestLocationController.dispose();
-    
+
     // Dispose guest controllers
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
@@ -150,7 +168,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   void _updateGuestControllers() {
     int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-    
+
     // If more than 10 accompany users, don't create dynamic cards
     if (accompanyUsersCount > 10) {
       // Clear all existing controllers and data
@@ -163,12 +181,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _guestImages.clear();
       _guestUploading.clear();
       _guestCountries.clear();
-      
+
       setState(() {});
       _validateForm();
       return;
     }
-    
+
     // If we're reducing the number of accompany users, dispose extra controllers from the end
     if (_guestControllers.length > accompanyUsersCount) {
       for (int i = accompanyUsersCount; i < _guestControllers.length; i++) {
@@ -176,27 +194,30 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        
+
         // Also remove associated data
         int guestNumber = i + 1;
         _guestImages.remove(guestNumber);
         _guestUploading.remove(guestNumber);
         _guestCountries.remove(guestNumber);
       }
-      _guestControllers.removeRange(accompanyUsersCount, _guestControllers.length);
+      _guestControllers.removeRange(
+        accompanyUsersCount,
+        _guestControllers.length,
+      );
     }
-    
+
     // If we need more accompany users, add them at the bottom (only if <= 10 accompany users total)
     while (_guestControllers.length < accompanyUsersCount) {
       int guestNumber = _guestControllers.length + 1;
-      
+
       Map<String, TextEditingController> controllers = {
         'name': TextEditingController(),
         'phone': TextEditingController(),
         'age': TextEditingController(),
       };
       _guestControllers.add(controllers);
-      
+
       // Initialize country for new guest
       _guestCountries[guestNumber] = Country(
         phoneCode: '91',
@@ -211,7 +232,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         e164Key: '91-IN-0',
       );
     }
-    
+
     setState(() {});
     _validateForm();
   }
@@ -234,18 +255,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   // Helper method to validate date range
   bool _isValidDateRange(String fromDate, String toDate) {
-    if (fromDate.isEmpty || toDate.isEmpty) return true; // Let other validation handle empty dates
-    
+    if (fromDate.isEmpty || toDate.isEmpty)
+      return true; // Let other validation handle empty dates
+
     final fromDateTime = _parseDateString(fromDate);
     final toDateTime = _parseDateString(toDate);
-    
-    if (fromDateTime == null || toDateTime == null) return true; // Let other validation handle invalid dates
-    
+
+    if (fromDateTime == null || toDateTime == null)
+      return true; // Let other validation handle invalid dates
+
     return fromDateTime.isBefore(toDateTime);
   }
 
   // Helper method to validate date range and set error message
-  bool _validateDateRange(String fromDate, String toDate, {String errorType = 'appointment'}) {
+  bool _validateDateRange(
+    String fromDate,
+    String toDate, {
+    String errorType = 'appointment',
+  }) {
     if (fromDate.isEmpty || toDate.isEmpty) {
       if (errorType == 'appointment') {
         _dateRangeError = null;
@@ -254,10 +281,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
       return true; // Let other validation handle empty dates
     }
-    
+
     final fromDateTime = _parseDateString(fromDate);
     final toDateTime = _parseDateString(toDate);
-    
+
     if (fromDateTime == null || toDateTime == null) {
       if (errorType == 'appointment') {
         _dateRangeError = null;
@@ -266,46 +293,58 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
       return true; // Let other validation handle invalid dates
     }
-    
+
     final isValid = fromDateTime.isBefore(toDateTime);
-    
+
     if (errorType == 'appointment') {
       _dateRangeError = isValid ? null : 'From date must be before to date';
     } else if (errorType == 'program') {
-      _programDateRangeError = isValid ? null : 'Program start date must be before program end date';
+      _programDateRangeError = isValid
+          ? null
+          : 'Program start date must be before program end date';
     }
-    
+
     return isValid;
   }
 
   void _validateForm() {
-    bool basicFormValid = _appointmentPurposeController.text.isNotEmpty &&
-        _fromDateController.text.isNotEmpty &&
-        _toDateController.text.isNotEmpty;
-    
-    // Validate date ranges
-    bool dateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, errorType: 'appointment');
-    
+    bool basicFormValid =
+        _appointmentPurposeController.text.isNotEmpty &&
+        _preferredFromDateController.text.isNotEmpty &&
+        _preferredToDateController.text.isNotEmpty;
+
+    // Validate preferred date ranges
+    bool preferredDateRangeValid = _validateDateRange(
+      _preferredFromDateController.text,
+      _preferredToDateController.text,
+      errorType: 'appointment',
+    );
+
     // Validate program date ranges if attending a program
     bool programDateRangeValid = true;
     if (_isAttendingProgram) {
-      programDateRangeValid = _validateDateRange(_fromDateController.text, _toDateController.text, errorType: 'program');
+      programDateRangeValid = _validateDateRange(
+        _programFromDateController.text,
+        _programToDateController.text,
+        errorType: 'program',
+      );
     }
-    
+
     // Validate main guest phone number if appointment type is guest
     bool mainGuestPhoneValid = true;
     if (widget.personalInfo['appointmentType'] == 'guest') {
-      if (_guestPhoneController.text.isEmpty || _guestPhoneController.text.length != 10) {
+      if (_guestPhoneController.text.isEmpty) {
         mainGuestPhoneValid = false;
       }
     }
-    
+
     // Validate main guest email if appointment type is guest
     bool mainGuestEmailValid = true;
     if (widget.personalInfo['appointmentType'] == 'guest') {
-      mainGuestEmailValid = _guestEmailError == null && _guestEmailController.text.isNotEmpty;
+      mainGuestEmailValid =
+          _guestEmailError == null && _guestEmailController.text.isNotEmpty;
     }
-    
+
     // Validate main guest photo if appointment type is guest
     bool mainGuestPhotoValid = true;
     if (widget.personalInfo['appointmentType'] == 'guest') {
@@ -313,11 +352,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         mainGuestPhotoValid = false;
       }
     }
-    
+
     // Validate guest information if any (only for <= 10 accompany users)
     bool guestFormValid = true;
-    final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
-    
+    final accompanyUsersCount =
+        int.tryParse(_numberOfUsersController.text) ?? 0;
+
     if (accompanyUsersCount > 10) {
       // For more than 10 accompany users, no guest validation needed
       guestFormValid = true;
@@ -326,30 +366,45 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       for (int i = 0; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
-        
+
         if (guest['name']?.text.isEmpty == true ||
             guest['phone']?.text.isEmpty == true ||
-            guest['phone']?.text.length != 10 ||
             guest['age']?.text.isEmpty == true) {
           guestFormValid = false;
           break;
         }
-        
-        // Check if photo is required and provided for guests aged 12+
+
+        // Validate age range (1-120)
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+        if (age < 1 || age > 120) {
+          guestFormValid = false;
+          break;
+        }
+
+        // Check if photo is required and provided for guests aged 12+
         if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
           guestFormValid = false;
           break;
         }
       }
     }
-    
+
     setState(() {
-      _isFormValid = basicFormValid && dateRangeValid && programDateRangeValid && mainGuestPhoneValid && mainGuestEmailValid && mainGuestPhotoValid && guestFormValid;
+      _isFormValid =
+          basicFormValid &&
+          preferredDateRangeValid &&
+          programDateRangeValid &&
+          mainGuestPhoneValid &&
+          mainGuestEmailValid &&
+          mainGuestPhotoValid &&
+          guestFormValid;
     });
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -357,7 +412,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
-      controller.text = "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
+      controller.text =
+          "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
       _validateForm();
     }
   }
@@ -375,7 +431,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
       try {
         // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
+        final result = await ActionService.uploadAndValidateProfilePhoto(
+          File(pickedFile.path),
+        );
 
         if (result['success']) {
           final s3Url = result['s3Url'];
@@ -384,13 +442,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             _mainGuestPhotoUrl = s3Url;
             _isMainGuestPhotoUploading = false;
           });
-          
+
           // Update form validation
           _validateForm();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Main guest photo uploaded and validated successfully!'),
+              content: Text(
+                'Main guest photo uploaded and validated successfully!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -398,12 +458,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
-          
+
           // Update form validation
           _validateForm();
 
           // Show backend error message in dialog
-          final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
+          final errorMessage =
+              result['error'] ?? result['message'] ?? 'Photo validation failed';
           _showPhotoValidationErrorDialog(errorMessage, () {
             // Clear any previous state and allow user to pick again
             setState(() {
@@ -417,19 +478,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         setState(() {
           _isMainGuestPhotoUploading = false;
         });
-        
+
         // Update form validation
         _validateForm();
 
         // Show error message in dialog
-        _showPhotoValidationErrorDialog('Error uploading photo: ${e.toString()}', () {
-          // Clear any previous state and allow user to pick again
-          setState(() {
-            _selectedImage = null;
-            _mainGuestPhotoUrl = null;
-            _isMainGuestPhotoUploading = false;
-          });
-        });
+        _showPhotoValidationErrorDialog(
+          'Error uploading photo: ${e.toString()}',
+          () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _selectedImage = null;
+              _mainGuestPhotoUrl = null;
+              _isMainGuestPhotoUploading = false;
+            });
+          },
+        );
       }
     }
   }
@@ -439,10 +503,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _selectedImage = null;
       _mainGuestPhotoUrl = null;
     });
-    
+
     // Update form validation
     _validateForm();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Photo removed'),
@@ -463,7 +527,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        
+
         // Check file size (5MB limit)
         if (file.size > 5 * 1024 * 1024) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -503,7 +567,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     setState(() {
       _selectedAttachment = null;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Attachment removed'),
@@ -522,21 +586,25 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       setState(() {
         _guestUploading[guestNumber] = true;
       });
-      
+
       try {
         // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(File(pickedFile.path));
-        
+        final result = await ActionService.uploadAndValidateProfilePhoto(
+          File(pickedFile.path),
+        );
+
         if (result['success']) {
           final s3Url = result['s3Url'];
           setState(() {
             _guestImages[guestNumber] = s3Url;
             _guestUploading[guestNumber] = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Guest $guestNumber photo uploaded and validated successfully!'),
+              content: Text(
+                'Guest $guestNumber photo uploaded and validated successfully!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -544,30 +612,37 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             _guestUploading[guestNumber] = false;
           });
-          
+
           // Show backend error message in dialog
-          final errorMessage = result['error'] ?? result['message'] ?? 'Photo validation failed';
-          _showPhotoValidationErrorDialog('Guest $guestNumber: $errorMessage', () {
-            // Clear any previous state and allow user to pick again
-            setState(() {
-              _guestImages.remove(guestNumber);
-              _guestUploading[guestNumber] = false;
-            });
-          });
+          final errorMessage =
+              result['error'] ?? result['message'] ?? 'Photo validation failed';
+          _showPhotoValidationErrorDialog(
+            'Guest $guestNumber: $errorMessage',
+            () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
+          );
         }
       } catch (e) {
         setState(() {
           _guestUploading[guestNumber] = false;
         });
-        
+
         // Show error message in dialog
-        _showPhotoValidationErrorDialog('Guest $guestNumber: Error uploading photo: ${e.toString()}', () {
-          // Clear any previous state and allow user to pick again
-          setState(() {
-            _guestImages.remove(guestNumber);
-            _guestUploading[guestNumber] = false;
-          });
-        });
+        _showPhotoValidationErrorDialog(
+          'Guest $guestNumber: Error uploading photo: ${e.toString()}',
+          () {
+            // Clear any previous state and allow user to pick again
+            setState(() {
+              _guestImages.remove(guestNumber);
+              _guestUploading[guestNumber] = false;
+            });
+          },
+        );
       }
     }
   }
@@ -577,7 +652,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _guestImages.remove(guestNumber);
       _guestUploading.remove(guestNumber);
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Guest $guestNumber photo removed'),
@@ -590,10 +665,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Future<void> _loadLocations() async {
     try {
       final result = await ActionService.getAshramLocations();
-      
+
       if (result['success']) {
         final locations = List<Map<String, dynamic>>.from(result['data'] ?? []);
-        
+
         setState(() {
           _locations = locations;
           _isLoadingLocations = false;
@@ -625,10 +700,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         final locationData = result['data'];
         final assignedSecretaries = locationData['assignedSecretaries'] ?? [];
-        
+
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = [];
-        
+
         for (var secretary in assignedSecretaries) {
           try {
             final secretaryData = secretary['secretaryId'] ?? secretary;
@@ -650,7 +725,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       } else {
         setState(() {
           _isLoadingSecretaries = false;
-          _secretaryErrorMessage = result['message'] ?? 'Failed to load secretaries';
+          _secretaryErrorMessage =
+              result['message'] ?? 'Failed to load secretaries';
           _secretaries = [];
         });
       }
@@ -668,20 +744,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     try {
       // First try to get fresh data from API
       final apiResult = await ActionService.getCurrentUser();
-      
+
       Map<String, dynamic>? userData;
-      
+
       if (apiResult['success'] == true) {
         userData = apiResult['data'];
       } else {
         userData = await StorageService.getUserData();
       }
-      
+
       if (userData != null) {
         // Set initial values for reference fields
         final fullName = userData['fullName'] ?? userData['name'] ?? '';
         final email = userData['email'] ?? '';
-        
+
         // Handle phone number object structure
         String phone = '';
         if (userData['phoneNumber'] != null) {
@@ -698,7 +774,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         } else {
           phone = ''; // Explicitly set to empty string
         }
-        
+
         setState(() {
           _referenceNameController.text = fullName;
           _referenceEmailController.text = email;
@@ -706,7 +782,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           _isLoadingReferenceInfo = false;
         });
       }
-      
     } catch (error) {
       // Set default values if data loading fails
       setState(() {
@@ -720,23 +795,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   void _submitForm() async {
     if (!_isFormValid) return;
-    
+
     try {
       // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         },
       );
 
-
-
       // Prepare personalInfo and ensure a structured phoneNumber object is available
-      Map<String, dynamic> cleanedPersonalInfo = Map<String, dynamic>.from(widget.personalInfo);
+      Map<String, dynamic> cleanedPersonalInfo = Map<String, dynamic>.from(
+        widget.personalInfo,
+      );
       try {
         final phoneValue = cleanedPersonalInfo['phone'];
         if (phoneValue != null) {
@@ -754,7 +827,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       } catch (e) {
         // Could not normalize personalInfo phone
       }
-      
+
       // Collect all form data
       Map<String, dynamic> appointmentData = {
         'meetingType': 'in_person', // Default value
@@ -762,59 +835,59 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'type': widget.personalInfo['appointmentType'] ?? 'myself',
           'personalInfo': cleanedPersonalInfo, // Use cleaned version
         },
-        'userCurrentCompany': widget.personalInfo['company'] ?? '', // Changed from 'Sumeru Digital'
-        'userCurrentDesignation': widget.personalInfo['designation'] ?? '', // Changed from 'Office Operations Specialist'
+        'userCurrentCompany':
+            widget.personalInfo['company'] ??
+            '', // Changed from 'Sumeru Digital'
+        'userCurrentDesignation':
+            widget.personalInfo['designation'] ??
+            '', // Changed from 'Office Operations Specialist'
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
-        'appointmentLocation': _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
-        'assignedSecretary': _selectedSecretary, // Send null when no secretary is selected
-        'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1, // +1 for main user
+        'appointmentLocation':
+            _selectedLocationMongoId ?? '6889dbd15b943e342f660060',
+        'assignedSecretary':
+            _selectedSecretary, // Send null when no secretary is selected
+        'numberOfUsers':
+            (int.tryParse(_numberOfUsersController.text) ?? 0) +
+            1, // +1 for main user
       };
 
-      // Priority-based date range logic
-      if (_isAttendingProgram) {
-        // FIRST PRIORITY: If attending program, use program dates for preferred date range
-        appointmentData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        };
-      } else {
-        // SECOND PRIORITY: If not attending program, use preferred date range
-        appointmentData['preferredDateRange'] = {
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
-        };
-      }
-      
-
+      // Use preferred date range for appointment scheduling
+      appointmentData['preferredDateRange'] = {
+        'fromDate': _parseDateToISO(_preferredFromDateController.text),
+        'toDate': _parseDateToISO(_preferredToDateController.text),
+      };
 
       // Add accompanyUsers if there are additional users (only for <= 10 accompany users)
-      final accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+      final accompanyUsersCount =
+          int.tryParse(_numberOfUsersController.text) ?? 0;
       if (_guestControllers.isNotEmpty && accompanyUsersCount <= 10) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
-          
+
           // Backend expects phoneNumber as string, not object
-          final countryCode = '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
+          final countryCode =
+              '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
           final phoneNumber = guest['phone']?.text.trim() ?? '';
           final fullPhoneNumber = '$countryCode$phoneNumber';
-          
+
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
-            'phoneNumber': fullPhoneNumber, // Send as string for backend compatibility
+            'phoneNumber':
+                fullPhoneNumber, // Send as string for backend compatibility
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
-          
+
           // Add photo if available for this guest
           if (_guestImages.containsKey(guestNumber)) {
             guestData['profilePhotoUrl'] = _guestImages[guestNumber];
           }
-          
+
           accompanyUsers.add(guestData);
         }
-        
+
         // Structure accompanyUsers as expected by backend
         appointmentData['accompanyUsers'] = {
           'numberOfUsers': accompanyUsers.length,
@@ -823,7 +896,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       } else if (accompanyUsersCount > 10) {
         // For more than 10 accompany users, just send the total count without individual details
         appointmentData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsersCount, // Use the accompany users count as entered by user
+          'numberOfUsers':
+              accompanyUsersCount, // Use the accompany users count as entered by user
           'users': [], // Empty array since individual details not required
         };
       }
@@ -834,21 +908,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         final countryCode = '+${_selectedCountry.phoneCode}';
         final phoneNumber = _guestPhoneController.text.trim();
         final fullPhoneNumber = '$countryCode$phoneNumber';
-        
+
         Map<String, dynamic> guestInfo = {
           'fullName': _guestNameController.text.trim(),
           'emailId': _guestEmailController.text.trim(),
-          'phoneNumber': fullPhoneNumber, // Send as string for backend compatibility
+          'phoneNumber':
+              fullPhoneNumber, // Send as string for backend compatibility
           'designation': _guestDesignationController.text.trim(),
           'company': _guestCompanyController.text.trim(),
           'location': _guestLocationController.text.trim(),
         };
-        
+
         // Add main guest photo URL if available
         if (_mainGuestPhotoUrl != null) {
           guestInfo['profilePhotoUrl'] = _mainGuestPhotoUrl;
         }
-        
+
         appointmentData['guestInformation'] = guestInfo;
       }
 
@@ -857,7 +932,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointmentData['referenceInformation'] = {
           'fullName': _referenceNameController.text.trim(),
           'email': _referenceEmailController.text.trim(),
-          'phoneNumber': _referencePhoneController.text.trim(), // Send as string
+          'phoneNumber': _referencePhoneController.text
+              .trim(), // Send as string
         };
       }
 
@@ -874,32 +950,37 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointmentData['attendingCourseDetails'] = {
           'courseName': 'General Program',
           'duration': '1 day',
-          'fromDate': _parseDateToISO(_fromDateController.text),
-          'toDate': _parseDateToISO(_toDateController.text),
+          'fromDate': _parseDateToISO(_programFromDateController.text),
+          'toDate': _parseDateToISO(_programToDateController.text),
         };
       }
 
-
-
       // Use ActionService.createAppointment method with attachment
+      print('🎯 Calling ActionService.createAppointment...');
       final result = await ActionService.createAppointment(
         appointmentData,
         attachmentFile: _selectedAttachment,
       );
+      print('🎯 ActionService.createAppointment result: $result');
 
       // Hide loading indicator
       Navigator.pop(context);
 
       if (result['success'] == true) {
+        // Send appointment creation notification
+        await _sendAppointmentCreatedNotification(result['data']);
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Appointment created successfully!'),
+            content: Text(
+              result['message'] ?? 'Appointment created successfully!',
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
         );
-        
+
         // Navigate back to the main screen
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
@@ -915,7 +996,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     } catch (e) {
       // Hide loading indicator
       Navigator.pop(context);
-      
+
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -995,7 +1076,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _isLoadingReferenceInfo 
+                            _isLoadingReferenceInfo
                                 ? 'Loading your information...'
                                 : 'Your reference details',
                             style: TextStyle(
@@ -1004,14 +1085,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Show loading state or reference fields
                           if (_isLoadingReferenceInfo) ...[
                             const Center(
                               child: Column(
                                 children: [
                                   CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.blue,
+                                    ),
                                   ),
                                   SizedBox(height: 12),
                                   Text(
@@ -1033,7 +1116,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               isReadOnly: true,
                             ),
                             const SizedBox(height: 12),
-                            
+
                             // Reference Email
                             _buildReferenceField(
                               label: 'Reference Email',
@@ -1043,7 +1126,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               isReadOnly: true,
                             ),
                             const SizedBox(height: 12),
-                            
+
                             // Reference Phone
                             _buildReferencePhoneField(
                               label: 'Reference Phone',
@@ -1055,7 +1138,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Guest Information Section
                     const Text(
                       'Guest Information',
@@ -1074,7 +1157,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Guest Full Name
                     _buildReferenceField(
                       label: 'Full Name of the Guest *',
@@ -1082,7 +1165,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       placeholder: 'Enter guest\'s full name',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Guest Email
                     _buildEmailField(
                       label: 'Email ID of the Guest *',
@@ -1090,11 +1173,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       placeholder: 'guest@email.com',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Guest Mobile
                     _buildGuestPhoneFieldWithCountryPicker(),
                     const SizedBox(height: 16),
-                    
+
                     // Guest Designation
                     _buildReferenceField(
                       label: 'Designation *',
@@ -1102,7 +1185,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       placeholder: 'Guest\'s professional title',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Guest Company/Organization
                     _buildReferenceField(
                       label: 'Company/Organization *',
@@ -1110,11 +1193,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       placeholder: 'Guest\'s organization name',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Guest Location with Search
                     _buildLocationSearchField(),
                     const SizedBox(height: 24),
-                    
+
                     // Guest Photo Section
                     Row(
                       children: [
@@ -1143,7 +1226,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Photo Upload Options
                     Column(
                       children: [
@@ -1168,7 +1251,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Upload from Device',
@@ -1215,7 +1299,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Take Photo',
@@ -1246,14 +1331,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: _isMainGuestPhotoUploading 
-                                  ? Colors.blue[50] 
-                                  : (_mainGuestPhotoUrl != null ? Colors.green[50] : Colors.orange[50]),
+                              color: _isMainGuestPhotoUploading
+                                  ? Colors.blue[50]
+                                  : (_mainGuestPhotoUrl != null
+                                        ? Colors.green[50]
+                                        : Colors.orange[50]),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: _isMainGuestPhotoUploading 
-                                    ? Colors.blue[200]! 
-                                    : (_mainGuestPhotoUrl != null ? Colors.green[200]! : Colors.orange[200]!),
+                                color: _isMainGuestPhotoUploading
+                                    ? Colors.blue[200]!
+                                    : (_mainGuestPhotoUrl != null
+                                          ? Colors.green[200]!
+                                          : Colors.orange[200]!),
                               ),
                             ),
                             child: Column(
@@ -1276,7 +1365,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           if (_isMainGuestPhotoUploading) ...[
                                             const Text(
@@ -1292,10 +1382,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                               height: 20,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2,
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.blue),
                                               ),
                                             ),
-                                          ] else if (_mainGuestPhotoUrl != null) ...[
+                                          ] else if (_mainGuestPhotoUrl !=
+                                              null) ...[
                                             const Text(
                                               'Photo uploaded and validated successfully',
                                               style: TextStyle(
@@ -1333,24 +1427,32 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                     ),
                                   ],
                                 ),
-                                
+
                                 // Show action buttons after successful upload
                                 if (_mainGuestPhotoUrl != null) ...[
                                   const SizedBox(height: 12),
-                                  
+
                                   // Action buttons - one below the other
                                   Column(
                                     children: [
                                       // Upload Different Photo
                                       GestureDetector(
-                                        onTap: () => _pickImage(ImageSource.gallery),
+                                        onTap: () =>
+                                            _pickImage(ImageSource.gallery),
                                         child: Container(
                                           width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.blue[50],
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.blue[200]!),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.blue[200]!,
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
@@ -1372,19 +1474,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                           ),
                                         ),
                                       ),
-                                      
+
                                       const SizedBox(height: 6),
-                                      
+
                                       // Take New Photo
                                       GestureDetector(
-                                        onTap: () => _pickImage(ImageSource.camera),
+                                        onTap: () =>
+                                            _pickImage(ImageSource.camera),
                                         child: Container(
                                           width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.orange[50],
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.orange[200]!),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.orange[200]!,
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
@@ -1406,19 +1516,26 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                           ),
                                         ),
                                       ),
-                                      
+
                                       const SizedBox(height: 6),
-                                      
+
                                       // Remove Photo
                                       GestureDetector(
                                         onTap: _removeImage,
                                         child: Container(
                                           width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.red[50],
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.red[200]!),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.red[200]!,
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
@@ -1464,154 +1581,158 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'Provide details about your requested appointment',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Appointment Purpose
+                  _buildTextArea(
+                    label: 'Appointment Purpose',
+                    controller: _appointmentPurposeController,
+                    placeholder:
+                        'Please describe the purpose of your appointment in detail',
+                    onChanged: (value) => _validateForm(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Attachment Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.attach_file,
+                                color: Colors.grey.shade600,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Upload Document',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Tap to select PDF, DOC, PPT files (up to 5MB)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: _pickAttachment,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: const Text(
+                              'Choose File',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Show selected attachment
+                        if (_selectedAttachment != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green.shade600,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _selectedAttachment!.path
+                                            .split('/')
+                                            .last,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'File selected successfully',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _removeAttachment,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Icon(
+                                      Icons.close,
+                                      color: Colors.red.shade600,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                                     const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
-                   // Appointment Purpose
-                   _buildTextArea(
-                     label: 'Appointment Purpose',
-                     controller: _appointmentPurposeController,
-                     placeholder: 'Please describe the purpose of your appointment in detail',
-                     onChanged: (value) => _validateForm(),
-                   ),
-                   const SizedBox(height: 20),
-
-                   // Attachment Section
-                   Container(
-                     width: double.infinity,
-                     padding: const EdgeInsets.all(16),
-                     decoration: BoxDecoration(
-                       color: Colors.grey.shade50,
-                       borderRadius: BorderRadius.circular(12),
-                       border: Border.all(color: Colors.grey.shade300),
-                     ),
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         Row(
-                           children: [
-                             Container(
-                               padding: const EdgeInsets.all(8),
-                               decoration: BoxDecoration(
-                                 color: Colors.grey.shade200,
-                                 borderRadius: BorderRadius.circular(8),
-                               ),
-                               child: Icon(
-                                 Icons.attach_file,
-                                 color: Colors.grey.shade600,
-                                 size: 20,
-                               ),
-                             ),
-                             const SizedBox(width: 12),
-                             const Text(
-                               'Upload Document',
-                               style: TextStyle(
-                                 fontSize: 16,
-                                 fontWeight: FontWeight.w600,
-                                 color: Colors.black87,
-                               ),
-                             ),
-                           ],
-                         ),
-                         const SizedBox(height: 8),
-                         Text(
-                           'Tap to select PDF, DOC, PPT files (up to 5MB)',
-                           style: TextStyle(
-                             fontSize: 14,
-                             color: Colors.grey.shade600,
-                           ),
-                         ),
-                         const SizedBox(height: 12),
-                         GestureDetector(
-                           onTap: _pickAttachment,
-                           child: Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                             decoration: BoxDecoration(
-                               color: Colors.white,
-                               borderRadius: BorderRadius.circular(8),
-                               border: Border.all(color: Colors.grey.shade300),
-                             ),
-                             child: const Text(
-                               'Choose File',
-                               style: TextStyle(
-                                 fontSize: 14,
-                                 fontWeight: FontWeight.w500,
-                                 color: Colors.black87,
-                               ),
-                             ),
-                           ),
-                         ),
-                         
-                         // Show selected attachment
-                         if (_selectedAttachment != null) ...[
-                           const SizedBox(height: 16),
-                           Container(
-                             padding: const EdgeInsets.all(12),
-                             decoration: BoxDecoration(
-                               color: Colors.green.shade50,
-                               borderRadius: BorderRadius.circular(8),
-                               border: Border.all(color: Colors.green.shade200),
-                             ),
-                             child: Row(
-                               children: [
-                                 Icon(
-                                   Icons.check_circle,
-                                   color: Colors.green.shade600,
-                                   size: 20,
-                                 ),
-                                 const SizedBox(width: 8),
-                                 Expanded(
-                                   child: Column(
-                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                     children: [
-                                       Text(
-                                         _selectedAttachment!.path.split('/').last,
-                                         style: const TextStyle(
-                                           fontWeight: FontWeight.w600,
-                                           fontSize: 14,
-                                         ),
-                                       ),
-                                       const SizedBox(height: 2),
-                                       Text(
-                                         'File selected successfully',
-                                         style: TextStyle(
-                                           fontSize: 12,
-                                           color: Colors.grey.shade600,
-                                         ),
-                                       ),
-                                     ],
-                                   ),
-                                 ),
-                                 GestureDetector(
-                                   onTap: _removeAttachment,
-                                   child: Container(
-                                     padding: const EdgeInsets.all(4),
-                                     decoration: BoxDecoration(
-                                       color: Colors.red.shade50,
-                                       borderRadius: BorderRadius.circular(4),
-                                     ),
-                                     child: Icon(
-                                       Icons.close,
-                                       color: Colors.red.shade600,
-                                       size: 16,
-                                     ),
-                                   ),
-                                 ),
-                               ],
-                             ),
-                           ),
-                         ],
-                       ],
-                     ),
-                   ),
-                   const SizedBox(height: 20),
-
-                                     // Appointment Location
-                   _buildLocationButton(),
+                  // Appointment Location
+                  _buildLocationButton(),
                   const SizedBox(height: 20),
 
                   // Secretary Contact
@@ -1636,10 +1757,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           // Minus button
                           GestureDetector(
                             onTap: () {
-                              int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+                              int currentCount =
+                                  int.tryParse(_numberOfUsersController.text) ??
+                                  0;
                               if (currentCount > 0) {
                                 setState(() {
-                                  _numberOfUsersController.text = (currentCount - 1).toString();
+                                  _numberOfUsersController.text =
+                                      (currentCount - 1).toString();
                                 });
                                 _updateGuestControllers();
                                 _validateForm();
@@ -1661,12 +1785,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          
+
                           // Number display
                           Expanded(
                             child: Container(
                               height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border.all(color: Colors.grey[300]!),
                                 borderRadius: BorderRadius.circular(8),
@@ -1674,7 +1800,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  _numberOfUsersController.text.isEmpty ? '0' : _numberOfUsersController.text,
+                                  _numberOfUsersController.text.isEmpty
+                                      ? '0'
+                                      : _numberOfUsersController.text,
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
@@ -1685,13 +1813,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          
+
                           // Plus button
                           GestureDetector(
                             onTap: () {
-                              int currentCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+                              int currentCount =
+                                  int.tryParse(_numberOfUsersController.text) ??
+                                  0;
                               setState(() {
-                                _numberOfUsersController.text = (currentCount + 1).toString();
+                                _numberOfUsersController.text =
+                                    (currentCount + 1).toString();
                               });
                               _updateGuestControllers();
                               _validateForm();
@@ -1702,7 +1833,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF97316),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFF97316)),
+                                border: Border.all(
+                                  color: const Color(0xFFF97316),
+                                ),
                               ),
                               child: const Icon(
                                 Icons.add,
@@ -1716,10 +1849,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Number of people accompanying you',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -1738,10 +1868,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Please provide details for accompany users',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 16),
                     ..._guestControllers.asMap().entries.map((entry) {
@@ -1750,7 +1877,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       return _buildGuestCard(index + 1, guest);
                     }).toList(),
                     const SizedBox(height: 20),
-                  ] else if ((int.tryParse(_numberOfUsersController.text) ?? 0) > 10) ...[
+                  ] else if ((int.tryParse(_numberOfUsersController.text) ??
+                          0) >
+                      10) ...[
                     // Show message for more than 10 accompany users
                     Container(
                       width: double.infinity,
@@ -1798,8 +1927,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     const SizedBox(height: 20),
                   ],
 
-
-
                   // Date Range Section
                   const Text(
                     'Select your preferred date range *',
@@ -1814,8 +1941,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   // From Date
                   _buildDateField(
                     label: 'From Date',
-                    controller: _fromDateController,
-                    onTap: () => _selectDate(context, _fromDateController),
+                    controller: _preferredFromDateController,
+                    onTap: () =>
+                        _selectDate(context, _preferredFromDateController),
                     errorMessage: _dateRangeError,
                   ),
                   const SizedBox(height: 20),
@@ -1823,8 +1951,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   // To Date
                   _buildDateField(
                     label: 'To Date',
-                    controller: _toDateController,
-                    onTap: () => _selectDate(context, _toDateController),
+                    controller: _preferredToDateController,
+                    onTap: () =>
+                        _selectDate(context, _preferredToDateController),
                     errorMessage: _dateRangeError,
                   ),
                   const SizedBox(height: 20),
@@ -1836,10 +1965,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.blue.shade200,
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.blue.shade200, width: 1),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1877,7 +2003,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           },
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade100,
                               borderRadius: BorderRadius.circular(8),
@@ -1944,11 +2073,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       const Text('Yes'),
                     ],
                   ),
-                  
+
                   // Program Date Range Section (only show if user selects Yes)
                   if (_isAttendingProgram) ...[
                     const SizedBox(height: 24),
-                    
+
                     // Program Date Range Header
                     Row(
                       children: [
@@ -1972,7 +2101,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Program Start and End Date Fields
                     Column(
                       children: [
@@ -1990,25 +2119,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                             const SizedBox(height: 8),
                             GestureDetector(
-                              onTap: () => _selectDate(context, _fromDateController),
+                              onTap: () => _selectDate(
+                                context,
+                                _programFromDateController,
+                              ),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
+                                  border: Border.all(
+                                    color: _programDateRangeError != null
+                                        ? Colors.red
+                                        : const Color(0xFFF97316),
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: TextField(
-                                  controller: _fromDateController,
+                                  controller: _programFromDateController,
                                   enabled: false,
                                   decoration: InputDecoration(
                                     hintText: 'dd-mm-yyyy',
-                                    hintStyle: TextStyle(color: Colors.grey[400]),
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                    ),
                                     filled: true,
                                     fillColor: Colors.white,
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                    prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
-                                    suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.calendar_today,
+                                      color: const Color(0xFFF97316),
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.arrow_drop_down,
+                                      color: Colors.grey[600],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2025,9 +2172,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ],
                           ],
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         // Program End Date
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2042,25 +2189,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                             const SizedBox(height: 8),
                             GestureDetector(
-                              onTap: () => _selectDate(context, _toDateController),
+                              onTap: () => _selectDate(
+                                context,
+                                _programToDateController,
+                              ),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: _programDateRangeError != null ? Colors.red : const Color(0xFFF97316)),
+                                  border: Border.all(
+                                    color: _programDateRangeError != null
+                                        ? Colors.red
+                                        : const Color(0xFFF97316),
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: TextField(
-                                  controller: _toDateController,
+                                  controller: _programToDateController,
                                   enabled: false,
                                   decoration: InputDecoration(
                                     hintText: 'dd-mm-yyyy',
-                                    hintStyle: TextStyle(color: Colors.grey[400]),
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                    ),
                                     filled: true,
                                     fillColor: Colors.white,
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                    prefixIcon: Icon(Icons.calendar_today, color: const Color(0xFFF97316)),
-                                    suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.calendar_today,
+                                      color: const Color(0xFFF97316),
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.arrow_drop_down,
+                                      color: Colors.grey[600],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2079,9 +2244,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Instructional Text
                     Text(
                       'Please enter your program dates. Your appointment will be scheduled during this period.',
@@ -2202,7 +2367,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             value: value,
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 16,
+              ),
             ),
             items: items.map((String item) {
               return DropdownMenuItem<String>(
@@ -2263,8 +2431,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-
-
   Widget _buildDateField({
     required String label,
     required TextEditingController controller,
@@ -2287,7 +2453,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           onTap: onTap,
           child: Container(
             decoration: BoxDecoration(
-              border: Border.all(color: errorMessage != null ? Colors.red : Colors.grey[300]!),
+              border: Border.all(
+                color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: TextField(
@@ -2299,7 +2467,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 filled: true,
                 fillColor: Colors.grey[50],
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
                 suffixIcon: Icon(Icons.calendar_today, color: Colors.grey[600]),
               ),
             ),
@@ -2309,27 +2480,25 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           const SizedBox(height: 4),
           Text(
             errorMessage,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildGuestCard(int guestNumber, Map<String, TextEditingController> guest) {
+  Widget _buildGuestCard(
+    int guestNumber,
+    Map<String, TextEditingController> guest,
+  ) {
     // Check if photo is required (age >= 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age >= 12;
-    
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -2338,7 +2507,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.deepPurple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -2355,7 +2527,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Full Name
             _buildGuestTextField(
               label: 'Full Name',
@@ -2364,27 +2536,39 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               onChanged: (value) => _validateForm(),
             ),
             const SizedBox(height: 16),
-            
+
             // Contact Number
             _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
             const SizedBox(height: 16),
-            
+
             // Age
             _buildGuestTextField(
               label: 'Age',
               controller: guest['age']!,
-              placeholder: 'Enter age',
+              placeholder: 'Enter age (1-120)',
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 3,
               onChanged: (value) {
                 _validateForm();
                 setState(() {}); // Rebuild to show/hide photo section
               },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Age is required';
+                }
+                final age = int.tryParse(value);
+                if (age == null || age < 1 || age > 120) {
+                  return 'Please enter 1-120';
+                }
+                return null;
+              },
             ),
-            
+
             // Photo Section (only show if age >= 12)
             if (isPhotoRequired) ...[
               const SizedBox(height: 16),
-              
+
               // Photo Header
               Row(
                 children: [
@@ -2407,19 +2591,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               const SizedBox(height: 4),
               Text(
                 'Photo of the Guest Required for Age 12 years and Above',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 12),
-              
+
               // Photo Upload Options
               Column(
                 children: [
                   // Upload from Device Card
                   GestureDetector(
-                    onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                    onTap: () =>
+                        _pickGuestImage(ImageSource.gallery, guestNumber),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -2464,10 +2646,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Take Photo Card
                   GestureDetector(
-                    onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                    onTap: () =>
+                        _pickGuestImage(ImageSource.camera, guestNumber),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -2511,7 +2694,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                     ),
                   ),
-                  
+
                   // Show upload status
                   if (_guestUploading[guestNumber] == true) ...[
                     const SizedBox(height: 12),
@@ -2529,7 +2712,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blue[600]!,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -2560,7 +2745,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                     ),
                   ],
-                  
+
                   // Show selected image preview for this guest
                   if (_guestImages.containsKey(guestNumber)) ...[
                     const SizedBox(height: 12),
@@ -2590,13 +2775,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                       ? Image.network(
                                           _guestImages[guestNumber]!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return const Icon(
-                                              Icons.check_circle,
-                                              color: Colors.green,
-                                              size: 24,
-                                            );
-                                          },
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return const Icon(
+                                                  Icons.check_circle,
+                                                  color: Colors.green,
+                                                  size: 24,
+                                                );
+                                              },
                                         )
                                       : const Icon(
                                           Icons.check_circle,
@@ -2631,22 +2817,30 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               ),
                             ],
                           ),
-                          
+
                           const SizedBox(height: 12),
-                          
+
                           // Action buttons - one below the other
                           Column(
                             children: [
                               // Upload Different Photo
                               GestureDetector(
-                                onTap: () => _pickGuestImage(ImageSource.gallery, guestNumber),
+                                onTap: () => _pickGuestImage(
+                                  ImageSource.gallery,
+                                  guestNumber,
+                                ),
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.blue[50],
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.blue[200]!),
+                                    border: Border.all(
+                                      color: Colors.blue[200]!,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -2668,19 +2862,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   ),
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 6),
-                              
+
                               // Take New Photo
                               GestureDetector(
-                                onTap: () => _pickGuestImage(ImageSource.camera, guestNumber),
+                                onTap: () => _pickGuestImage(
+                                  ImageSource.camera,
+                                  guestNumber,
+                                ),
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.orange[50],
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.orange[200]!),
+                                    border: Border.all(
+                                      color: Colors.orange[200]!,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -2702,15 +2904,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   ),
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 6),
-                              
+
                               // Remove Photo
                               GestureDetector(
                                 onTap: () => _removeGuestImage(guestNumber),
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.red[50],
                                     borderRadius: BorderRadius.circular(6),
@@ -2756,7 +2961,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required TextEditingController controller,
     required String placeholder,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
     Function(String)? onChanged,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2770,10 +2978,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
           onChanged: onChanged,
+          validator: validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
@@ -2791,7 +3003,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[300]!),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[500]!),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+            counterText: '', // Hide character counter
           ),
         ),
       ],
@@ -2829,9 +3053,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 children: [
                   const Text('🇮🇳', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 4),
-                  const Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  const Text(
+                    '+91',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(width: 4),
-                  Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
+                  Icon(
+                    Icons.arrow_drop_down,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -2859,7 +3090,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Colors.deepPurple),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
@@ -2914,7 +3148,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
           ),
         ),
       ],
@@ -2949,17 +3186,32 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.grey[300]!,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.grey[300]!,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: _guestEmailError != null ? Colors.red : Colors.deepPurple),
+              borderSide: BorderSide(
+                color: _guestEmailError != null
+                    ? Colors.red
+                    : Colors.deepPurple,
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
           ),
           onChanged: (value) {
             setState(() {
@@ -2967,7 +3219,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               if (value.isEmpty) {
                 _guestEmailError = 'Email is required';
               } else {
-                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                final emailRegex = RegExp(
+                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                );
                 if (!emailRegex.hasMatch(value)) {
                   _guestEmailError = 'Please enter a valid email address';
                 } else {
@@ -2982,10 +3236,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           const SizedBox(height: 4),
           Text(
             _guestEmailError!,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],
       ],
@@ -3012,11 +3263,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Phone Number Field (without country code)
         TextField(
           controller: controller,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          maxLength: 10,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           enabled: !isReadOnly,
           decoration: InputDecoration(
-            hintText: 'Enter phone number',
-            hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
             fillColor: isReadOnly ? Colors.grey[100] : Colors.white,
             border: OutlineInputBorder(
@@ -3035,386 +3286,396 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
+            counterText: '', // Hide the character counter
           ),
         ),
       ],
     );
   }
 
-   // Build location button that opens bottom sheet
-   Widget _buildLocationButton() {
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         const Text(
-           'Appointment Location *',
-           style: TextStyle(
-             fontSize: 16,
-             fontWeight: FontWeight.w500,
-             color: Colors.black87,
-           ),
-         ),
-         const SizedBox(height: 8),
-         GestureDetector(
-           onTap: _showLocationBottomSheet,
-           child: Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.grey[300]!),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.white,
-             ),
-             child: Row(
-               children: [
-                 Icon(
-                   Icons.location_on,
-                   color: const Color(0xFFF97316),
-                   size: 20,
-                 ),
-                 const SizedBox(width: 12),
-                 Expanded(
-                   child: _isLoadingLocations
-                       ? Row(
-                           children: [
-                             const SizedBox(
-                               width: 16,
-                               height: 16,
-                               child: CircularProgressIndicator(strokeWidth: 2),
-                             ),
-                             const SizedBox(width: 12),
-                             Text(
-                               'Loading locations...',
-                               style: TextStyle(color: Colors.grey[600]),
-                             ),
-                           ],
-                         )
-                       : Text(
-                           _selectedAppointmentLocation ?? 'Select a location',
-                           style: TextStyle(
-                             color: _selectedAppointmentLocation != null 
-                                 ? Colors.black87 
-                                 : Colors.grey[600],
-                             fontSize: 16,
-                           ),
-                         ),
-                 ),
-                 Icon(
-                   Icons.arrow_drop_down,
-                   color: Colors.grey[600],
-                   size: 24,
-                 ),
-               ],
-             ),
-           ),
-         ),
-       ],
-     );
-   }
+  // Build location button that opens bottom sheet
+  Widget _buildLocationButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Appointment Location *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showLocationBottomSheet,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: const Color(0xFFF97316),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _isLoadingLocations
+                      ? Row(
+                          children: [
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Loading locations...',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          _selectedAppointmentLocation ?? 'Select a location',
+                          style: TextStyle(
+                            color: _selectedAppointmentLocation != null
+                                ? Colors.black87
+                                : Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-   // Show location bottom sheet
-   void _showLocationBottomSheet() {
-     showModalBottomSheet(
-       context: context,
-       isScrollControlled: true,
-       backgroundColor: Colors.transparent,
-       builder: (context) => DraggableScrollableSheet(
-         initialChildSize: 0.6,
-         minChildSize: 0.4,
-         maxChildSize: 0.9,
-         builder: (context, scrollController) => LocationBottomSheet(
-           locations: _locations,
-           selectedLocation: _selectedAppointmentLocation,
-           isLoading: _isLoadingLocations,
-           onLocationSelected: (locationName) {
-             setState(() {
-               _selectedAppointmentLocation = locationName;
-               // Find and store the corresponding location ID
-               if (locationName != null) {
-                 final selectedLocation = _locations.firstWhere(
-                   (location) => location['name'] == locationName,
-                   orElse: () => {},
-                 );
-                 _selectedLocationId = selectedLocation['locationId'];
-                 _selectedLocationMongoId = selectedLocation['_id'];
-                 
-                 // Load secretaries for the selected location
-                 if (_selectedLocationId != null) {
-                   _loadSecretariesForLocation(_selectedLocationId!);
-                 }
-               } else {
-                 _selectedLocationId = null;
-                 _selectedLocationMongoId = null;
-                 // Clear secretaries when no location is selected
-                 setState(() {
-                   _secretaries = [];
-                   _selectedSecretary = null;
-                 });
-               }
-             });
-             _validateForm();
-           },
-         ),
-       ),
-     );
-   }
+  // Show location bottom sheet
+  void _showLocationBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => LocationBottomSheet(
+          locations: _locations,
+          selectedLocation: _selectedAppointmentLocation,
+          isLoading: _isLoadingLocations,
+          onLocationSelected: (locationName) {
+            setState(() {
+              _selectedAppointmentLocation = locationName;
+              // Find and store the corresponding location ID
+              if (locationName != null) {
+                final selectedLocation = _locations.firstWhere(
+                  (location) => location['name'] == locationName,
+                  orElse: () => {},
+                );
+                _selectedLocationId = selectedLocation['locationId'];
+                _selectedLocationMongoId = selectedLocation['_id'];
 
-   // Build secretary dropdown with dynamic data
-   Widget _buildSecretaryDropdown() {
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         const Text(
-           'Have you been in touch with any secretary regarding your appointment?',
-           style: TextStyle(
-             fontSize: 16,
-             fontWeight: FontWeight.w500,
-             color: Colors.black87,
-           ),
-         ),
-         const SizedBox(height: 8),
-         
-         // Show loading state
-         if (_isLoadingSecretaries) ...[
-           Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.grey[300]!),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.grey[50],
-             ),
-             child: Row(
-               children: [
-                 const SizedBox(
-                   width: 16,
-                   height: 16,
-                   child: CircularProgressIndicator(strokeWidth: 2),
-                 ),
-                 const SizedBox(width: 12),
-                 Text(
-                   'Loading secretaries...',
-                   style: TextStyle(color: Colors.grey[600]),
-                 ),
-               ],
-             ),
-           ),
-         ] else if (_secretaryErrorMessage != null) ...[
-           // Show error state
-           Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.red[300]!),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.red[50],
-             ),
-             child: Row(
-               children: [
-                 Icon(Icons.error_outline, color: Colors.red[600], size: 20),
-                 const SizedBox(width: 8),
-                 Expanded(
-                   child: Text(
-                     _secretaryErrorMessage!,
-                     style: TextStyle(color: Colors.red[600], fontSize: 14),
-                   ),
-                 ),
-               ],
-             ),
-           ),
-         ] else if (_selectedLocationId == null) ...[
-           // Show placeholder when no location is selected
-           Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.grey[300]!),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.grey[50],
-             ),
-             child: Text(
-               'Please select a location first',
-               style: TextStyle(color: Colors.grey[600]),
-             ),
-           ),
-         ] else if (_secretaries.isEmpty) ...[
-           // Show no secretaries available
-           Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.orange[300]!),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.orange[50],
-             ),
-             child: Row(
-               children: [
-                 Icon(Icons.info_outline, color: Colors.orange[600], size: 20),
-                 const SizedBox(width: 8),
-                 Expanded(
-                   child: Text(
-                     'No secretaries available for this location',
-                     style: TextStyle(color: Colors.orange[600], fontSize: 14),
-                   ),
-                 ),
-               ],
-             ),
-           ),
-         ] else ...[
-           // Show secretary dropdown
-           Container(
-             decoration: BoxDecoration(
-               border: Border.all(color: Colors.grey[300]!),
-               borderRadius: BorderRadius.circular(8),
-             ),
-             child: DropdownButtonFormField<String>(
-               value: _selectedSecretary,
-               decoration: const InputDecoration(
-                 border: InputBorder.none,
-                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-               ),
-               items: [
-                 // Add "Select a secretary" option
-                 const DropdownMenuItem<String>(
-                   value: null,
-                   child: Text('Select a secretary'),
-                 ),
-                 // Add secretary options
-                 ..._secretaries.map((secretary) {
-                   return DropdownMenuItem<String>(
-                     value: secretary['id'],
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       mainAxisSize: MainAxisSize.min,
-                       children: [
-                         Text(
-                           secretary['name'],
-                           style: const TextStyle(fontWeight: FontWeight.w500),
-                         ),
-                         if (secretary['email'] != null && secretary['email'].isNotEmpty)
-                           Text(
-                             secretary['email'],
-                             style: TextStyle(
-                               fontSize: 12,
-                               color: Colors.grey[600],
-                             ),
-                           ),
-                       ],
-                     ),
-                   );
-                 }).toList(),
-               ],
-               onChanged: (value) {
-                 setState(() {
-                   _selectedSecretary = value;
-                 });
-                 _validateForm();
-               },
-               icon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
-             ),
-           ),
-         ],
-       ],
-     );
-   }
+                // Load secretaries for the selected location
+                if (_selectedLocationId != null) {
+                  _loadSecretariesForLocation(_selectedLocationId!);
+                }
+              } else {
+                _selectedLocationId = null;
+                _selectedLocationMongoId = null;
+                // Clear secretaries when no location is selected
+                setState(() {
+                  _secretaries = [];
+                  _selectedSecretary = null;
+                });
+              }
+            });
+            _validateForm();
+          },
+        ),
+      ),
+    );
+  }
 
-   // Build secretary button that opens bottom sheet
-   Widget _buildSecretaryButton() {
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         const Text(
-           'Have you been in touch with any secretary regarding your appointment?',
-           style: TextStyle(
-             fontSize: 16,
-             fontWeight: FontWeight.w500,
-             color: Colors.black87,
-           ),
-         ),
-         const SizedBox(height: 8),
-         GestureDetector(
-           onTap: _showSecretaryBottomSheet,
-           child: Container(
-             width: double.infinity,
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-             decoration: BoxDecoration(
-               border: Border.all(
-                 color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
-                     ? const Color(0xFFF97316)
-                     : Colors.grey[300]!,
-               ),
-               borderRadius: BorderRadius.circular(8),
-               color: Colors.white,
-             ),
-             child: Row(
-               children: [
-                 Icon(
-                   Icons.person,
-                   color: const Color(0xFFF97316),
-                   size: 20,
-                 ),
-                 const SizedBox(width: 12),
-                 Expanded(
-                   child: _isLoadingSecretaries
-                       ? Row(
-                           children: [
-                             const SizedBox(
-                               width: 16,
-                               height: 16,
-                               child: CircularProgressIndicator(strokeWidth: 2),
-                             ),
-                             const SizedBox(width: 12),
-                             Text(
-                               'Loading secretaries...',
-                               style: TextStyle(color: Colors.grey[600]),
-                             ),
-                           ],
-                         )
-                       : _secretaryErrorMessage != null
-                           ? Row(
-                               children: [
-                                 Icon(Icons.error_outline, color: Colors.red[600], size: 20),
-                                 const SizedBox(width: 8),
-                                 Expanded(
-                                   child: Text(
-                                     _secretaryErrorMessage!,
-                                     style: TextStyle(color: Colors.red[600], fontSize: 14),
-                                   ),
-                                 ),
-                               ],
-                             )
-                           : _selectedLocationId == null
-                               ? Text(
-                                   'Please select a location first',
-                                   style: TextStyle(color: Colors.grey[600]),
-                                 )
-                               : Text(
-                                   _getSelectedSecretaryName() ?? 'Select a secretary',
-                                   style: TextStyle(
-                                     color: _getSelectedSecretaryName() != null && _getSelectedSecretaryName() != 'None - I am not in touch with any secretary'
-                                         ? Colors.black87 
-                                         : Colors.grey[600],
-                                     fontSize: 16,
-                                   ),
-                                 ),
-                 ),
-                 Icon(
-                   Icons.arrow_drop_down,
-                   color: Colors.grey[600],
-                   size: 24,
-                 ),
-               ],
-             ),
-           ),
-         ),
-       ],
-     );
-   }
+  // Build secretary dropdown with dynamic data
+  Widget _buildSecretaryDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Have you been in touch with any secretary regarding your appointment?',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
 
-     // Get selected secretary name
+        // Show loading state
+        if (_isLoadingSecretaries) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.grey[50],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Loading secretaries...',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ] else if (_secretaryErrorMessage != null) ...[
+          // Show error state
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.red[50],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[600], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _secretaryErrorMessage!,
+                    style: TextStyle(color: Colors.red[600], fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else if (_selectedLocationId == null) ...[
+          // Show placeholder when no location is selected
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.grey[50],
+            ),
+            child: Text(
+              'Please select a location first',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+        ] else if (_secretaries.isEmpty) ...[
+          // Show no secretaries available
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.orange[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.orange[50],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange[600], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No secretaries available for this location',
+                    style: TextStyle(color: Colors.orange[600], fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          // Show secretary dropdown
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonFormField<String>(
+              value: _selectedSecretary,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+              ),
+              items: [
+                // Add "Select a secretary" option
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('Select a secretary'),
+                ),
+                // Add secretary options
+                ..._secretaries.map((secretary) {
+                  return DropdownMenuItem<String>(
+                    value: secretary['id'],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          secretary['name'],
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        if (secretary['email'] != null &&
+                            secretary['email'].isNotEmpty)
+                          Text(
+                            secretary['email'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedSecretary = value;
+                });
+                _validateForm();
+              },
+              icon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Build secretary button that opens bottom sheet
+  Widget _buildSecretaryButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Have you been in touch with any secretary regarding your appointment?',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showSecretaryBottomSheet,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color:
+                    _getSelectedSecretaryName() != null &&
+                        _getSelectedSecretaryName() !=
+                            'None - I am not in touch with any secretary'
+                    ? const Color(0xFFF97316)
+                    : Colors.grey[300]!,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.person, color: const Color(0xFFF97316), size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _isLoadingSecretaries
+                      ? Row(
+                          children: [
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Loading secretaries...',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        )
+                      : _secretaryErrorMessage != null
+                      ? Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.red[600],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _secretaryErrorMessage!,
+                                style: TextStyle(
+                                  color: Colors.red[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : _selectedLocationId == null
+                      ? Text(
+                          'Please select a location first',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      : Text(
+                          _getSelectedSecretaryName() ?? 'Select a secretary',
+                          style: TextStyle(
+                            color:
+                                _getSelectedSecretaryName() != null &&
+                                    _getSelectedSecretaryName() !=
+                                        'None - I am not in touch with any secretary'
+                                ? Colors.black87
+                                : Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Get selected secretary name
   String? _getSelectedSecretaryName() {
-    if (_selectedSecretary == null) return 'None - I am not in touch with any secretary';
+    if (_selectedSecretary == null)
+      return 'None - I am not in touch with any secretary';
     final selectedSecretary = _secretaries.firstWhere(
       (secretary) => secretary['id'] == _selectedSecretary,
       orElse: () => {},
@@ -3422,448 +3683,489 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return selectedSecretary['name'] ?? '';
   }
 
-   // Show secretary bottom sheet
-   void _showSecretaryBottomSheet() {
-     if (_selectedLocationId == null || _isLoadingSecretaries || _secretaryErrorMessage != null) {
-       return; // Don't show bottom sheet if conditions aren't met
-     }
+  // Show secretary bottom sheet
+  void _showSecretaryBottomSheet() {
+    if (_selectedLocationId == null ||
+        _isLoadingSecretaries ||
+        _secretaryErrorMessage != null) {
+      return; // Don't show bottom sheet if conditions aren't met
+    }
 
-     showModalBottomSheet(
-       context: context,
-       isDismissible: true, // Close when tapping outside
-       backgroundColor: Colors.transparent,
-       builder: (context) => Container(
-         decoration: const BoxDecoration(
-           color: Colors.white,
-           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-         ),
-         child: Column(
-           mainAxisSize: MainAxisSize.min,
-           children: [
-             // Handle
-             Container(
-               margin: const EdgeInsets.only(top: 12),
-               width: 40,
-               height: 4,
-               decoration: BoxDecoration(
-                 color: Colors.grey[300],
-                 borderRadius: BorderRadius.circular(2),
-               ),
-             ),
-             
-             // Header
-             Padding(
-               padding: const EdgeInsets.all(20),
-               child: Row(
-                 children: [
-                   Icon(Icons.person, color: const Color(0xFFF97316), size: 24),
-                   const SizedBox(width: 12),
-                   const Text(
-                     'Select Secretary',
-                     style: TextStyle(
-                       fontSize: 20,
-                       fontWeight: FontWeight.bold,
-                       color: Colors.black87,
-                     ),
-                   ),
-                 ],
-               ),
-             ),
-             
-             const Divider(height: 1),
-             
-             // Secretary List
-             Flexible(
-               child: ListView(
-                 shrinkWrap: true,
-                 children: [
-                   // None option at the top
-                   ListTile(
-                     leading: CircleAvatar(
-                       backgroundColor: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.grey[300],
-                       child: Icon(
-                         Icons.person_off,
-                         color: _selectedSecretary == null ? Colors.white : Colors.grey[600],
-                         size: 20,
-                       ),
-                     ),
-                                            title: Text(
-                         'None - I am not in touch with any secretary',
-                         style: TextStyle(
-                           fontWeight: _selectedSecretary == null ? FontWeight.w600 : FontWeight.normal,
-                           color: _selectedSecretary == null ? const Color(0xFFF97316) : Colors.black87,
-                         ),
-                       ),
-                       trailing: _selectedSecretary == null ? const Icon(Icons.check_circle, color: Color(0xFFF97316)) : null,
-                     onTap: () {
-                       setState(() {
-                         _selectedSecretary = null;
-                       });
-                       _validateForm();
-                       Navigator.pop(context);
-                     },
-                   ),
-                   
-                   // Divider between None and secretary options
-                   const Divider(height: 1),
-                   
-                   // Show message if no secretaries available
-                   if (_secretaries.isEmpty) ...[
-                     Padding(
-                       padding: const EdgeInsets.all(16),
-                       child: Text(
-                         'No secretaries available for this location',
-                         style: TextStyle(
-                           color: Colors.grey[600],
-                           fontSize: 14,
-                           fontStyle: FontStyle.italic,
-                         ),
-                         textAlign: TextAlign.center,
-                       ),
-                     ),
-                   ] else ...[
-                     // Secretary options
-                     ..._secretaries.map((secretary) {
-                     final secretaryName = secretary['name'] ?? 'Unknown Secretary';
-                     final isSelected = _selectedSecretary == secretary['id'];
-                     
-                     return ListTile(
-                       leading: CircleAvatar(
-                         backgroundColor: isSelected ? const Color(0xFFF97316) : Colors.grey[300],
-                         child: Text(
-                           secretaryName.isNotEmpty ? secretaryName[0].toUpperCase() : '?',
-                           style: TextStyle(
-                             color: isSelected ? Colors.white : Colors.grey[600],
-                             fontWeight: FontWeight.bold,
-                           ),
-                         ),
-                       ),
-                       title: Text(
-                         secretaryName,
-                         style: TextStyle(
-                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                           color: isSelected ? const Color(0xFFF97316) : Colors.black87,
-                         ),
-                       ),
-                       trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFFF97316)) : null,
-                       onTap: () {
-                         setState(() {
-                           _selectedSecretary = secretary['id'];
-                         });
-                         _validateForm();
-                         Navigator.pop(context);
-                       },
-                     );
-                   }).toList(),
-                   ],
-                 ],
-               ),
-             ),
-             
-             SizedBox(height: MediaQuery.of(context).padding.bottom),
-           ],
-         ),
-       ),
-     );
-   }
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true, // Close when tapping outside
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
 
-   // Build guest phone field with country picker
-   Widget _buildGuestPhoneFieldWithCountryPicker() {
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         const Text(
-           'Mobile No. of the Guest *',
-           style: TextStyle(
-             fontSize: 16,
-             fontWeight: FontWeight.w500,
-             color: Colors.black87,
-           ),
-         ),
-         const SizedBox(height: 8),
-         Row(
-           children: [
-             // Country Code Button
-             GestureDetector(
-               onTap: () {
-                 showCountryPicker(
-                   context: context,
-                   showPhoneCode: true,
-                   countryListTheme: CountryListThemeData(
-                     flagSize: 25,
-                     backgroundColor: Colors.white,
-                     textStyle: const TextStyle(fontSize: 16, color: Colors.black87),
-                     bottomSheetHeight: 500,
-                     borderRadius: const BorderRadius.only(
-                       topLeft: Radius.circular(20.0),
-                       topRight: Radius.circular(20.0),
-                     ),
-                     inputDecoration: InputDecoration(
-                       labelText: 'Search',
-                       hintText: 'Start typing to search',
-                       prefixIcon: const Icon(Icons.search),
-                       border: OutlineInputBorder(
-                         borderSide: BorderSide(
-                           color: const Color(0xFF8C98A8).withOpacity(0.2),
-                         ),
-                       ),
-                     ),
-                   ),
-                   onSelect: (Country country) {
-                     setState(() {
-                       _selectedCountry = country;
-                     });
-                   },
-                 );
-               },
-               child: Container(
-                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                 decoration: BoxDecoration(
-                   border: Border.all(color: Colors.grey[300]!),
-                   borderRadius: BorderRadius.circular(8),
-                   color: Colors.white,
-                 ),
-                 child: Row(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     Text(
-                       _selectedCountry.flagEmoji,
-                       style: const TextStyle(fontSize: 18),
-                     ),
-                     const SizedBox(width: 8),
-                     Text(
-                       '+${_selectedCountry.phoneCode}',
-                       style: const TextStyle(
-                         fontSize: 16,
-                         fontWeight: FontWeight.w500,
-                         color: Colors.black87,
-                       ),
-                     ),
-                     const SizedBox(width: 4),
-                     Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
-                   ],
-                 ),
-               ),
-             ),
-             const SizedBox(width: 8),
-             // Phone Number Field
-             Expanded(
-               child: TextField(
-                 controller: _guestPhoneController,
-                 keyboardType: TextInputType.phone,
-                 maxLength: 10,
-                 inputFormatters: [
-                   FilteringTextInputFormatter.digitsOnly,
-                 ],
-                 onChanged: (value) {
-                   // Validate phone number length
-                   if (value.length == 10) {
-                     // Phone number is valid
-                     setState(() {});
-                   }
-                 },
-                 decoration: InputDecoration(
-                   hintText: 'Enter 10-digit phone number',
-                   hintStyle: TextStyle(color: Colors.grey[400]),
-                   filled: true,
-                   fillColor: Colors.white,
-                   border: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.grey[300]!),
-                   ),
-                   enabledBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.grey[300]!),
-                   ),
-                   focusedBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: const BorderSide(color: Colors.deepPurple),
-                   ),
-                   errorBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.red[300]!),
-                   ),
-                   focusedErrorBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.red[500]!),
-                   ),
-                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                   counterText: '',
-                   errorText: _guestPhoneController.text.isNotEmpty && _guestPhoneController.text.length != 10
-                       ? 'Phone number must be 10 digits'
-                       : null,
-                 ),
-               ),
-             ),
-           ],
-         ),
-       ],
-     );
-   }
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.person, color: const Color(0xFFF97316), size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Select Secretary',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-   // Build additional guest phone field with country picker
-   Widget _buildAdditionalGuestPhoneField(int guestNumber, TextEditingController controller) {
-     final country = _guestCountries[guestNumber] ?? _selectedCountry;
-     
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         const Text(
-           'Contact Number *',
-           style: TextStyle(
-             fontSize: 14,
-             fontWeight: FontWeight.w500,
-             color: Colors.black87,
-           ),
-         ),
-         const SizedBox(height: 6),
-         Row(
-           children: [
-             // Country Code Button
-             GestureDetector(
-               onTap: () {
-                 showCountryPicker(
-                   context: context,
-                   showPhoneCode: true,
-                   countryListTheme: CountryListThemeData(
-                     flagSize: 25,
-                     backgroundColor: Colors.white,
-                     textStyle: const TextStyle(fontSize: 16, color: Colors.black87),
-                     bottomSheetHeight: 500,
-                     borderRadius: const BorderRadius.only(
-                       topLeft: Radius.circular(20.0),
-                       topRight: Radius.circular(20.0),
-                     ),
-                     inputDecoration: InputDecoration(
-                       labelText: 'Search',
-                       hintText: 'Start typing to search',
-                       prefixIcon: const Icon(Icons.search),
-                       border: OutlineInputBorder(
-                         borderSide: BorderSide(
-                           color: const Color(0xFF8C98A8).withOpacity(0.2),
-                         ),
-                       ),
-                     ),
-                   ),
-                   onSelect: (Country selectedCountry) {
-                     setState(() {
-                       _guestCountries[guestNumber] = selectedCountry;
-                     });
-                   },
-                 );
-               },
-               child: Container(
-                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                 decoration: BoxDecoration(
-                   border: Border.all(color: Colors.grey[300]!),
-                   borderRadius: BorderRadius.circular(8),
-                   color: Colors.grey[50],
-                 ),
-                 child: Row(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     Text(
-                       country.flagEmoji,
-                       style: const TextStyle(fontSize: 16),
-                     ),
-                     const SizedBox(width: 6),
-                     Text(
-                       '+${country.phoneCode}',
-                       style: const TextStyle(
-                         fontSize: 14,
-                         fontWeight: FontWeight.w500,
-                         color: Colors.black87,
-                       ),
-                     ),
-                     const SizedBox(width: 2),
-                     Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 18),
-                   ],
-                 ),
-               ),
-             ),
-             const SizedBox(width: 8),
-             // Phone Number Field
-             Expanded(
-               child: TextField(
-                 controller: controller,
-                 keyboardType: TextInputType.phone,
-                 maxLength: 10,
-                 inputFormatters: [
-                   FilteringTextInputFormatter.digitsOnly,
-                 ],
-                 onChanged: (value) {
-                   _validateForm();
-                   // Validate phone number length
-                   if (value.length == 10) {
-                     // Phone number is valid
-                     setState(() {});
-                   }
-                 },
-                 decoration: InputDecoration(
-                   hintText: 'Enter 10-digit phone number',
-                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-                   filled: true,
-                   fillColor: Colors.grey[50],
-                   border: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.grey[300]!),
-                   ),
-                   enabledBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.grey[300]!),
-                   ),
-                   focusedBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: const BorderSide(color: Colors.deepPurple),
-                   ),
-                   errorBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.red[300]!),
-                   ),
-                   focusedErrorBorder: OutlineInputBorder(
-                     borderRadius: BorderRadius.circular(8),
-                     borderSide: BorderSide(color: Colors.red[500]!),
-                   ),
-                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                   counterText: '',
-                   errorText: controller.text.isNotEmpty && controller.text.length != 10
-                       ? 'Phone number must be 10 digits'
-                       : null,
-                 ),
-               ),
-             ),
-           ],
-         ),
-       ],
-     );
-   }
+            const Divider(height: 1),
 
-   // Helper method to parse dd-mm-yyyy format to ISO 8601 format
-   String _parseDateToISO(String dateString) {
-     try {
-       // Parse dd-mm-yyyy format
-       final parts = dateString.split('-');
-       if (parts.length == 3) {
-         final day = int.parse(parts[0]);
-         final month = int.parse(parts[1]);
-         final year = int.parse(parts[2]);
-         
-         // Create DateTime object
-         final date = DateTime(year, month, day);
-         
-         // Convert to ISO 8601 format with timezone
-         return date.toUtc().toIso8601String();
-       }
-     } catch (e) {
-       // Error parsing date
-     }
-     
-     // Return current date as fallback
-     return DateTime.now().toUtc().toIso8601String();
-   }
-  
+            // Secretary List
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  // None option at the top
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: _selectedSecretary == null
+                          ? const Color(0xFFF97316)
+                          : Colors.grey[300],
+                      child: Icon(
+                        Icons.person_off,
+                        color: _selectedSecretary == null
+                            ? Colors.white
+                            : Colors.grey[600],
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      'None - I am not in touch with any secretary',
+                      style: TextStyle(
+                        fontWeight: _selectedSecretary == null
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        color: _selectedSecretary == null
+                            ? const Color(0xFFF97316)
+                            : Colors.black87,
+                      ),
+                    ),
+                    trailing: _selectedSecretary == null
+                        ? const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFFF97316),
+                          )
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedSecretary = null;
+                      });
+                      _validateForm();
+                      Navigator.pop(context);
+                    },
+                  ),
+
+                  // Divider between None and secretary options
+                  const Divider(height: 1),
+
+                  // Show message if no secretaries available
+                  if (_secretaries.isEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'No secretaries available for this location',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ] else ...[
+                    // Secretary options
+                    ..._secretaries.map((secretary) {
+                      final secretaryName =
+                          secretary['name'] ?? 'Unknown Secretary';
+                      final isSelected = _selectedSecretary == secretary['id'];
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected
+                              ? const Color(0xFFF97316)
+                              : Colors.grey[300],
+                          child: Text(
+                            secretaryName.isNotEmpty
+                                ? secretaryName[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          secretaryName,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? const Color(0xFFF97316)
+                                : Colors.black87,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_circle,
+                                color: Color(0xFFF97316),
+                              )
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedSecretary = secretary['id'];
+                          });
+                          _validateForm();
+                          Navigator.pop(context);
+                        },
+                      );
+                    }).toList(),
+                  ],
+                ],
+              ),
+            ),
+
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Build guest phone field with country picker
+  Widget _buildGuestPhoneFieldWithCountryPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Mobile No. of the Guest *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            // Country Code Button
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country country) {
+                    setState(() {
+                      _selectedCountry = country;
+                      // Clear the phone number field when country changes
+                      _guestPhoneController.clear();
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _selectedCountry.flagEmoji,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+${_selectedCountry.phoneCode}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Phone Number Field
+            Expanded(
+              child: TextField(
+                controller: _guestPhoneController,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.deepPurple),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[300]!),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[500]!),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  counterText: '', // Hide the character counter
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Build additional guest phone field with country picker
+  Widget _buildAdditionalGuestPhoneField(
+    int guestNumber,
+    TextEditingController controller,
+  ) {
+    final country = _guestCountries[guestNumber] ?? _selectedCountry;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Contact Number *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Country Code Button
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country selectedCountry) {
+                    setState(() {
+                      _guestCountries[guestNumber] = selectedCountry;
+                      // Clear the phone number field when country changes
+                      controller.clear();
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[50],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      country.flagEmoji,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+${country.phoneCode}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey[600],
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Phone Number Field
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) {
+                  _validateForm();
+                },
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.deepPurple),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[300]!),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[500]!),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  counterText: '', // Hide the character counter
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Helper method to parse dd-mm-yyyy format to ISO 8601 format
+  String _parseDateToISO(String dateString) {
+    try {
+      // Parse dd-mm-yyyy format
+      final parts = dateString.split('-');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+
+        // Create DateTime object
+        final date = DateTime(year, month, day);
+
+        // Convert to ISO 8601 format with timezone
+        return date.toUtc().toIso8601String();
+      }
+    } catch (e) {
+      // Error parsing date
+    }
+
+    // Return current date as fallback
+    return DateTime.now().toUtc().toIso8601String();
+  }
+
   // Helper to parse a string like "+919876543210" or "9876543210" into { countryCode, number }
-  Map<String, String> _parsePhoneStringToObject(String value, {String defaultCode = '+91'}) {
+  Map<String, String> _parsePhoneStringToObject(
+    String value, {
+    String defaultCode = '+91',
+  }) {
     try {
       final trimmed = value.trim();
       if (trimmed.isEmpty) {
@@ -3874,7 +4176,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         final codeMatch = RegExp(r'^\+(\d{1,4})').firstMatch(trimmed);
         if (codeMatch != null) {
           final code = '+${codeMatch.group(1)!}';
-          final rest = trimmed.substring(codeMatch.end).replaceAll(RegExp(r'\D'), '');
+          final rest = trimmed
+              .substring(codeMatch.end)
+              .replaceAll(RegExp(r'\D'), '');
           return {'countryCode': code, 'number': rest};
         }
       }
@@ -3917,7 +4221,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1'),
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
+        ),
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'AppointmentApp/1.0', // Required by Nominatim
@@ -3926,18 +4232,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        
+
         final List<Map<String, dynamic>> suggestions = data.map((item) {
           final address = item['address'] as Map<String, dynamic>? ?? {};
           final displayName = item['display_name'] as String? ?? '';
-          
+
           // Create a formatted display name
           String formattedName = displayName;
           if (address.isNotEmpty) {
-            final city = address['city'] ?? address['town'] ?? address['village'] ?? '';
+            final city =
+                address['city'] ?? address['town'] ?? address['village'] ?? '';
             final state = address['state'] ?? '';
             final country = address['country'] ?? '';
-            
+
             if (city.isNotEmpty && state.isNotEmpty) {
               formattedName = '$city, $state';
               if (country.isNotEmpty) {
@@ -3945,7 +4252,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               }
             }
           }
-          
+
           return {
             'display_name': formattedName,
             'full_display_name': displayName,
@@ -3960,7 +4267,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           _locationSuggestions = suggestions;
           _isSearchingLocations = false;
         });
-        
+
         // Found location suggestions
       } else {
         setState(() {
@@ -3979,7 +4286,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   void _selectLocation(Map<String, dynamic> location) {
     final displayName = location['display_name'] as String? ?? '';
     _guestLocationController.text = displayName;
-    
+
     setState(() {
       _locationSuggestions = [];
       _isSearchingLocations = false;
@@ -3996,18 +4303,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Build location search field with dropdown
   Widget _buildLocationSearchField() {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Location *',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Location *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
           ),
-          const SizedBox(height: 8),
-        
+        ),
+        const SizedBox(height: 8),
+
         // Search input field
         TextField(
           controller: _guestLocationController,
@@ -4042,7 +4349,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.deepPurple),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
             suffixIcon: _isSearchingLocations
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -4053,17 +4363,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ),
                   )
                 : _guestLocationController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _guestLocationController.clear();
-                          _clearLocationSuggestions();
-                        },
-                      )
-                    : const Icon(Icons.search, color: Colors.grey),
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _guestLocationController.clear();
+                      _clearLocationSuggestions();
+                    },
+                  )
+                : const Icon(Icons.search, color: Colors.grey),
           ),
         ),
-        
+
         // Location suggestions dropdown
         if (_locationSuggestions.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -4088,7 +4398,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 final location = _locationSuggestions[index];
                 final displayName = location['display_name'] as String? ?? '';
                 final type = location['type'] as String? ?? '';
-                
+
                 return ListTile(
                   dense: true,
                   leading: Icon(
@@ -4148,14 +4458,92 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  // Send appointment creation notification
+  Future<void> _sendAppointmentCreatedNotification(
+    Map<String, dynamic>? appointmentData,
+  ) async {
+    try {
+      // Get current user data
+      final userData = await StorageService.getUserData();
+      if (userData == null) {
+        print('⚠️ User data not found, skipping appointment notification');
+        return;
+      }
+
+      final userId =
+          userData['_id']?.toString() ??
+          userData['userId']?.toString() ??
+          userData['id']?.toString();
+      final appointmentId =
+          appointmentData?['_id']?.toString() ??
+          appointmentData?['id']?.toString();
+
+      if (userId == null || appointmentId == null) {
+        print('⚠️ User ID or Appointment ID not found, skipping notification');
+        print('🔍 User ID: $userId, Appointment ID: $appointmentId');
+        return;
+      }
+
+      print(
+        '🎉 Sending appointment creation notification for appointment: $appointmentId',
+      );
+
+      // Prepare appointment data for notification
+      final notificationAppointmentData = {
+        'fullName':
+            appointmentData?['appointmentFor']?['personalInfo']?['fullName'] ??
+            widget.personalInfo['fullName'] ??
+            'User',
+        'date':
+            appointmentData?['preferredDateRange']?['fromDate'] ??
+            _preferredFromDateController.text,
+        'time': 'Scheduled', // Time is part of the date range
+        'venue': appointmentData?['appointmentLocation'] ?? 'Selected Location',
+        'purpose':
+            appointmentData?['appointmentPurpose'] ??
+            _appointmentPurposeController.text,
+        'numberOfUsers':
+            appointmentData?['numberOfUsers'] ?? _numberOfUsersController.text,
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Prepare additional notification data
+      final notificationData = {
+        'source': 'mobile_app',
+        'formType': 'user_appointment_request',
+        'userRole': userData['role']?.toString() ?? 'user',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appointmentType': widget.personalInfo['appointmentType'] ?? 'myself',
+      };
+
+      // Send the notification
+      final result = await ActionService.sendAppointmentCreatedNotification(
+        userId: userId,
+        appointmentId: appointmentId,
+        appointmentData: notificationAppointmentData,
+        notificationData: notificationData,
+      );
+
+      if (result['success']) {
+        print('✅ Appointment creation notification sent successfully');
+        print('📱 Notification ID: ${result['data']?['notificationId']}');
+      } else {
+        print(
+          '⚠️ Failed to send appointment creation notification: ${result['message']}',
+        );
+        print('🔍 Error details: ${result['error']}');
+      }
+    } catch (e) {
+      print('❌ Error sending appointment creation notification: $e');
+      // Don't block the appointment creation flow if notification fails
+    }
+  }
+
   void _launchGurudevSchedule() async {
     const url = 'https://gurudev.artofliving.org/tour-schedule/';
-    
+
     try {
-      await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       // Show URL in a dialog instead
       showDialog(
@@ -4167,7 +4555,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Please visit the following URL to check Gurudev\'s schedule:'),
+                const Text(
+                  'Please visit the following URL to check Gurudev\'s schedule:',
+                ),
                 const SizedBox(height: 12),
                 SelectableText(
                   url,
@@ -4203,18 +4593,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
-  void _showPhotoValidationErrorDialog(String errorMessage, VoidCallback onTryAgain) {
+  void _showPhotoValidationErrorDialog(
+    String errorMessage,
+    VoidCallback onTryAgain,
+  ) {
     // Remove "Guest X:" prefix if present
     String cleanErrorMessage = errorMessage;
-    if (cleanErrorMessage.contains('Guest ') && cleanErrorMessage.contains(': ')) {
+    if (cleanErrorMessage.contains('Guest ') &&
+        cleanErrorMessage.contains(': ')) {
       cleanErrorMessage = cleanErrorMessage.split(': ').skip(1).join(': ');
     }
-    
+
     // Remove "Profile photo validation failed:" prefix if present
     if (cleanErrorMessage.startsWith('Profile photo validation failed:')) {
-      cleanErrorMessage = cleanErrorMessage.replaceFirst('Profile photo validation failed:', '').trim();
+      cleanErrorMessage = cleanErrorMessage
+          .replaceFirst('Profile photo validation failed:', '')
+          .trim();
     }
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -4318,10 +4714,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               ),
               child: const Text(
                 'View Photo Guidelines',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -4329,4 +4722,4 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       },
     );
   }
-} 
+}

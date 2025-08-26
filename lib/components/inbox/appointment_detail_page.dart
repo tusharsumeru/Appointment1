@@ -1413,6 +1413,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final accompanyUsers = widget.appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
       final users = accompanyUsers['users'] ?? [];
+      final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+      
+      // If users array is empty but numberOfUsers is provided, add 1 for main user
+      if (users is List && users.isEmpty && numberOfUsers > 0) {
+        return numberOfUsers + 1; // Add 1 for main user
+      }
       
       // Total attendees = 1 (main user) + number of accompanying users
       if (users is List) {
@@ -2358,6 +2364,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           // Request Details - Different for schedule screens
           if (widget.isFromScheduleScreens) ...[
+            // Show Appointment ID for all screens (including schedule screens)
+            _buildMainCardDetailRowWithCopy('Appointment ID', _getAppointmentId(), Icons.tag),
             // Show Purpose, Teacher status, Meeting type, and Assigned Secretary for schedule screens
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
             _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
@@ -2369,7 +2377,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             ],
           ] else ...[
             // Show original details for other screens
-            _buildMainCardDetailRowWithCopy('Appoitnment ID', _getAppointmentId(), Icons.tag),
+            _buildMainCardDetailRowWithCopy('Appointment ID', _getAppointmentId(), Icons.tag),
             _buildMainCardDetailRow('Req. Dates', _getDateRange(), Icons.calendar_today),
             _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
             _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
