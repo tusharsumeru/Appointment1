@@ -128,8 +128,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize numberOfUsers to 0 by default
-    _numberOfUsersController.text = '0';
+    // Initialize numberOfUsers to 1 by default (including the main user)
+    _numberOfUsersController.text = '1';
     _validateForm();
     _loadLocations();
     _loadReferenceInfo();
@@ -167,7 +167,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _updateGuestControllers() {
-    int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    int totalPeopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+    int accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
 
     // If more than 10 accompany users, don't create dynamic cards
     if (accompanyUsersCount > 10) {
@@ -245,7 +246,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         final day = int.parse(parts[0]);
         final month = int.parse(parts[1]);
         final year = int.parse(parts[2]);
-        return DateTime(year, month, day);
+        return DateTime.utc(year, month, day); // Use UTC to avoid timezone issues
       }
     } catch (e) {
       print('Error parsing date: $e');
@@ -355,8 +356,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     // Validate guest information if any (only for <= 10 accompany users)
     bool guestFormValid = true;
-    final accompanyUsersCount =
-        int.tryParse(_numberOfUsersController.text) ?? 0;
+    final totalPeopleCount =
+        int.tryParse(_numberOfUsersController.text) ?? 1;
+    final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
 
     if (accompanyUsersCount > 10) {
       // For more than 10 accompany users, no guest validation needed
@@ -848,8 +850,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'assignedSecretary':
             _selectedSecretary, // Send null when no secretary is selected
         'numberOfUsers':
-            (int.tryParse(_numberOfUsersController.text) ?? 0) +
-            1, // +1 for main user
+            int.tryParse(_numberOfUsersController.text) ?? 1, // Total number of people
       };
 
       // Use preferred date range for appointment scheduling
@@ -859,24 +860,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       };
 
       // Add accompanyUsers if there are additional users (only for <= 10 accompany users)
-      final accompanyUsersCount =
-          int.tryParse(_numberOfUsersController.text) ?? 0;
+      final totalPeopleCount =
+          int.tryParse(_numberOfUsersController.text) ?? 1;
+      final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
       if (_guestControllers.isNotEmpty && accompanyUsersCount <= 10) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
 
-          // Backend expects phoneNumber as string, not object
+          // Store phoneNumber as object with countryCode and number (number includes country code)
           final countryCode =
               '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
           final phoneNumber = guest['phone']?.text.trim() ?? '';
-          final fullPhoneNumber = '$countryCode$phoneNumber';
+          final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
-            'phoneNumber':
-                fullPhoneNumber, // Send as string for backend compatibility
+            'phoneNumber': {
+              'countryCode': countryCode,
+              'number': fullPhoneNumber, // number now includes country code
+            },
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
@@ -897,7 +901,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // For more than 10 accompany users, just send the total count without individual details
         appointmentData['accompanyUsers'] = {
           'numberOfUsers':
-              accompanyUsersCount, // Use the accompany users count as entered by user
+              accompanyUsersCount, // Use the accompany users count
           'users': [], // Empty array since individual details not required
         };
       }
@@ -970,19 +974,95 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Send appointment creation notification
         await _sendAppointmentCreatedNotification(result['data']);
 
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result['message'] ?? 'Appointment created successfully!',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
+        // Show beautiful success dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Success Icon with green background
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.green.shade200,
+                          width: 3,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        color: Colors.green,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Success Text
+                    const Text(
+                      'Appointment request',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'submitted successfully.',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Continue Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          // Navigate back to the main screen
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF97316),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
-
-        // Navigate back to the main screen
-        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1739,12 +1819,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   _buildSecretaryButton(),
                   const SizedBox(height: 20),
 
-                  // Number of Accompany Users with + and - buttons
+                  // Total Number of People with + and - buttons
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Accompany Users',
+                        'Total Number of People',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -1759,8 +1839,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             onTap: () {
                               int currentCount =
                                   int.tryParse(_numberOfUsersController.text) ??
-                                  0;
-                              if (currentCount > 0) {
+                                  1;
+                              if (currentCount > 1) {
                                 setState(() {
                                   _numberOfUsersController.text =
                                       (currentCount - 1).toString();
@@ -1801,7 +1881,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               child: Center(
                                 child: Text(
                                   _numberOfUsersController.text.isEmpty
-                                      ? '0'
+                                      ? '1'
                                       : _numberOfUsersController.text,
                                   style: const TextStyle(
                                     fontSize: 18,
@@ -1819,7 +1899,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             onTap: () {
                               int currentCount =
                                   int.tryParse(_numberOfUsersController.text) ??
-                                  0;
+                                  1;
                               setState(() {
                                 _numberOfUsersController.text =
                                     (currentCount + 1).toString();
@@ -1848,7 +1928,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Number of people accompanying you',
+                        'Total number of people including you',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
@@ -1878,8 +1958,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     }).toList(),
                     const SizedBox(height: 20),
                   ] else if ((int.tryParse(_numberOfUsersController.text) ??
-                          0) >
-                      10) ...[
+                          1) >
+                      11) ...[
                     // Show message for more than 10 accompany users
                     Container(
                       width: double.infinity,
@@ -2248,14 +2328,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     const SizedBox(height: 12),
 
                     // Instructional Text
-                    Text(
-                      'Please enter your program dates. Your appointment will be scheduled during this period.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: const Color(0xFFF97316),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                    // Text(
+                    //   'Please enter your program dates. Your appointment will be scheduled during this period.',
+                    //   style: TextStyle(
+                    //     fontSize: 14,
+                    //     color: const Color(0xFFF97316),
+                    //     fontStyle: FontStyle.italic,
+                    //   ),
+                    // ),
                   ],
                   const SizedBox(height: 32),
 
@@ -4147,11 +4227,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         final month = int.parse(parts[1]);
         final year = int.parse(parts[2]);
 
-        // Create DateTime object
-        final date = DateTime(year, month, day);
+        // Create DateTime object in UTC directly to avoid timezone conversion issues
+        final date = DateTime.utc(year, month, day);
 
-        // Convert to ISO 8601 format with timezone
-        return date.toUtc().toIso8601String();
+        // Convert to ISO 8601 format
+        return date.toIso8601String();
       }
     } catch (e) {
       // Error parsing date

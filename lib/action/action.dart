@@ -4779,7 +4779,7 @@ class ActionService {
   ///
   /// Returns:
   /// - Map containing success status, message, and user data
-  static Future<Map<String, dynamic>> registerUser({
+static Future<Map<String, dynamic>> registerUser({
     required String fullName,
     required String email,
     required String password,
@@ -4796,7 +4796,7 @@ class ActionService {
     required File profilePhotoFile,
   }) async {
     try {
-      // ✅ 1. Validate required fields
+      // :white_check_mark: 1. Validate required fields
       if (fullName.isEmpty ||
           email.isEmpty ||
           password.isEmpty ||
@@ -4807,7 +4807,6 @@ class ActionService {
           'message': 'Missing fullName, email, password, or phone number.',
         };
       }
-
       if (profilePhotoFile == null) {
         return {
           'success': false,
@@ -4815,8 +4814,7 @@ class ActionService {
           'message': 'Profile photo is required.',
         };
       }
-
-      // ✅ 2. Validate email format
+      // :white_check_mark: 2. Validate email format
       final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
       if (!emailRegex.hasMatch(email)) {
         return {
@@ -4825,8 +4823,7 @@ class ActionService {
           'message': 'Please enter a valid email address.',
         };
       }
-
-      // ✅ 3. Validate phone number format (basic validation)
+      // :white_check_mark: 3. Validate phone number format (basic validation)
       if (!phoneNumber.startsWith('+')) {
         return {
           'success': false,
@@ -4834,12 +4831,10 @@ class ActionService {
           'message': 'Phone number must be in "+CC NNNNNNNNNN" format.',
         };
       }
-
-      // ✅ 4. Validate file type and size
+      // :white_check_mark: 4. Validate file type and size
       final fileName = profilePhotoFile.path.split('/').last;
       final fileExtension = fileName.split('.').last.toLowerCase();
       final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
-
       if (!allowedExtensions.contains(fileExtension)) {
         return {
           'success': false,
@@ -4848,7 +4843,6 @@ class ActionService {
               'Profile photo must be a valid image file (JPG, PNG, GIF).',
         };
       }
-
       // Check file size (max 5MB)
       final fileSize = await profilePhotoFile.length();
       if (fileSize > 5 * 1024 * 1024) {
@@ -4858,8 +4852,7 @@ class ActionService {
           'message': 'Profile photo size must be less than 5MB.',
         };
       }
-
-      // ✅ 5. Prepare request body
+      // :white_check_mark: 5. Prepare request body
       final Map<String, dynamic> requestBody = {
         'fullName': fullName.trim(),
         'email': email.toLowerCase().trim(),
@@ -4875,34 +4868,42 @@ class ActionService {
         'teacheremail': teacheremail,
         'mobilenumber': mobilenumber,
       };
-
-      // ✅ 6. Create multipart request for file upload
+      // :white_check_mark: 6. Create multipart request for file upload
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/auth/signup'),
       );
-
       // Add headers
       request.headers['Content-Type'] = 'multipart/form-data';
-
       // Add text fields
       requestBody.forEach((key, value) {
         if (value != null) {
           if (value is List) {
             // Handle array fields like userTags
-            for (String item in value) {
-              request.fields['$key[]'] = item;
+            print(':outbox_tray: Processing array field: $key = $value');
+            if (key == 'userTags') {
+              // Send userTags using indexed keys to ensure all values are sent
+              for (int i = 0; i < value.length; i++) {
+                request.fields['userTags[$i]'] = value[i];
+                request.fields['additionalRoles[$i]'] = value[i];
+              }
+              print(':outbox_tray: Sending userTags as indexed array: $value');
+              print(':outbox_tray: Also sending as additionalRoles: $value');
+            } else {
+              // Handle other array fields
+              for (String item in value) {
+                request.fields['$key[]'] = item;
+              }
             }
           } else {
+            print(':outbox_tray: Processing non-array field: $key = $value');
             request.fields[key] = value.toString();
           }
         }
       });
-
-      // ✅ 7. Add file to request
+      // :white_check_mark: 7. Add file to request
       final fileStream = http.ByteStream(profilePhotoFile.openRead());
       final fileLength = await profilePhotoFile.length();
-
       final multipartFile = http.MultipartFile(
         'file', // Field name expected by server
         fileStream,
@@ -4910,18 +4911,14 @@ class ActionService {
         filename: fileName,
         contentType: MediaType('image', fileExtension),
       );
-
       request.files.add(multipartFile);
-
-      // ✅ 8. Send request
+      // :white_check_mark: 8. Send request
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
-
-      // ✅ 9. Parse response
+      // :white_check_mark: 9. Parse response
       final Map<String, dynamic> responseData = jsonDecode(response.body);
-
       if (response.statusCode == 201) {
-        // ✅ 10. Registration successful
+        // :white_check_mark: 10. Registration successful
         return {
           'success': true,
           'statusCode': 201,
@@ -4931,14 +4928,14 @@ class ActionService {
               'Registration successful. Please verify your email.',
         };
       } else if (response.statusCode == 409) {
-        // ✅ 11. User already exists
+        // :white_check_mark: 11. User already exists
         return {
           'success': false,
           'statusCode': 409,
           'message': responseData['message'] ?? 'Email already exists.',
         };
       } else if (response.statusCode == 400) {
-        // ✅ 12. Validation error
+        // :white_check_mark: 12. Validation error
         return {
           'success': false,
           'statusCode': 400,
@@ -4947,7 +4944,7 @@ class ActionService {
               'Validation failed. Please check your input.',
         };
       } else {
-        // ✅ 13. Other errors
+        // :white_check_mark: 13. Other errors
         return {
           'success': false,
           'statusCode': response.statusCode,
@@ -4957,9 +4954,8 @@ class ActionService {
         };
       }
     } catch (error) {
-      // ✅ 14. Handle exceptions
-      print('❌ Registration Error: $error');
-
+      // :white_check_mark: 14. Handle exceptions
+      print(':x: Registration Error: $error');
       if (error.toString().contains('SocketException')) {
         return {
           'success': false,
@@ -4968,7 +4964,6 @@ class ActionService {
               'Network error. Please check your connection and try again.',
         };
       }
-
       return {
         'success': false,
         'statusCode': 500,
@@ -4976,6 +4971,13 @@ class ActionService {
       };
     }
   }
+
+
+
+
+
+
+
 
   /// Validate AOL teacher credentials
   /// This function validates teacher code, email, and phone number with the ATOL API

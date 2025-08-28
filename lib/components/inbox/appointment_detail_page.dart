@@ -12,6 +12,7 @@ import 'reminder_form.dart';
 import '../../action/action.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+
 class AppointmentDetailPage extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final bool isFromDeletedAppointments;
@@ -231,7 +232,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     } else if (appointmentType?.toLowerCase() == 'myself') {
       if (index == 0) {
-        return '(Main User)';
+        return '(Main Appointee #1)'; // Show main appointee label
       } else {
         // Get age from API data for accompanying users
         final accompanyUsers = widget.appointment['accompanyUsers'];
@@ -254,7 +255,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     } else {
       // Regular appointment logic
       if (index == 0) {
-        return '(Main User)';
+        return '(Main Appointee #1)'; // Show main appointee label
       } else {
         // Get age from API data
         final accompanyUsers = widget.appointment['accompanyUsers'];
@@ -288,18 +289,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        // Get matches from the selected time period only
+        final matches = apiResult[_selectedFilter]?['matches'] as List<dynamic>? ?? [];
         
-        // Return total count of all matches
-        final totalMatches = matches30.length + matches60.length + matches90.length;
+        // Debug: Print match count for this user with selected filter
+        print('User $index (${result['fullName']}): ${_selectedFilter} matches = ${matches.length}');
         
-        // Debug: Print match count for this user
-        print('User $index (${result['fullName']}): Total matches = $totalMatches (30d: ${matches30.length}, 60d: ${matches60.length}, 90d: ${matches90.length})');
-        
-        return totalMatches;
+        return matches.length;
       } else {
         // apiResult is null - no face match data for this user
         print('User $index (${result['fullName']}): apiResult is null - no face match data');
@@ -310,6 +306,426 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // If no face match data available, return 0 (no matches found)
     print('User $index: No face match results found');
     return 0;
+  }
+
+  // Get album information for a user (only albums with valid dates)
+  Map<String, int> _getUserAlbums(int index) {
+    // Use meeting history to get only albums with valid dates
+    final meetingHistory = _getMeetingHistory(index);
+    Map<String, int> albumMap = {};
+    
+    for (final meeting in meetingHistory) {
+      final albumId = meeting['albumId']?.toString() ?? '';
+      if (albumId.isNotEmpty) {
+        // Count images in this album (we already filtered out invalid dates in _getMeetingHistory)
+        albumMap[albumId] = (albumMap[albumId] ?? 0) + 1;
+      }
+    }
+    
+    return albumMap;
+  }
+
+  // Get total album count for a user
+  int _getUserAlbumCount(int index) {
+    final albums = _getUserAlbums(index);
+    return albums.values.fold(0, (sum, count) => sum + count);
+  }
+
+  // Get unique album count for a user
+  int _getUserUniqueAlbumCount(int index) {
+    final albums = _getUserAlbums(index);
+    return albums.length;
+  }
+
+  // Get meeting history for a user (grouped by album)
+  List<Map<String, dynamic>> _getMeetingHistory(int index) {
+    final faceMatchResults = _faceMatchData[index] ?? [];
+    
+    if (faceMatchResults.isNotEmpty) {
+      final result = faceMatchResults[0];
+      
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        
+        // Get matches from the selected time period
+        final matches = apiResult[_selectedFilter]?['matches'] as List<dynamic>? ?? [];
+        
+        // Group matches by album
+        Map<String, List<Map<String, dynamic>>> albumGroups = {};
+        
+        for (final match in matches) {
+          if (match is Map<String, dynamic>) {
+            final albumId = match['album_id']?.toString() ?? '';
+            final date = match['date']?.toString() ?? '';
+            final daysAgo = match['days_ago']?.toString() ?? '';
+            final imageUrl = match['image_name']?.toString() ?? '';
+            
+            // Only include matches with valid album ID and date
+            if (albumId.isNotEmpty && 
+                date.isNotEmpty && 
+                date.toLowerCase() != 'unknown' && 
+                date != 'null') {
+              if (!albumGroups.containsKey(albumId)) {
+                albumGroups[albumId] = [];
+              }
+              albumGroups[albumId]!.add({
+                'imageUrl': imageUrl,
+                'date': date,
+                'daysAgo': daysAgo,
+                'albumId': albumId,
+              });
+            }
+          }
+        }
+        
+        // Convert to list of album meetings (one per album)
+        List<Map<String, dynamic>> albumMeetings = [];
+        albumGroups.forEach((albumId, matches) {
+          if (matches.isNotEmpty) {
+            // Sort matches by date to get the most recent
+            matches.sort((a, b) {
+              final dateA = a['date']?.toString() ?? '';
+              final dateB = b['date']?.toString() ?? '';
+              return dateB.compareTo(dateA);
+            });
+            
+            // Take the first (most recent) match from this album
+            final firstMatch = matches.first;
+            albumMeetings.add({
+              'imageUrl': firstMatch['imageUrl'],
+              'date': firstMatch['date'],
+              'daysAgo': firstMatch['daysAgo'],
+              'albumId': albumId,
+              'totalImages': matches.length, // Number of images in this album
+            });
+          }
+        });
+        
+        // Sort albums by date (most recent first)
+        albumMeetings.sort((a, b) {
+          final dateA = a['date']?.toString() ?? '';
+          final dateB = b['date']?.toString() ?? '';
+          return dateB.compareTo(dateA);
+        });
+        
+        return albumMeetings;
+      }
+    }
+    
+    return [];
+  }
+
+  // Get last meeting date
+  String _getLastMeetingDate(int index) {
+    final meetings = _getMeetingHistory(index);
+    if (meetings.isNotEmpty) {
+      final date = meetings.first['date']?.toString() ?? '';
+      if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
+        // Convert "2025-JUN-09" to "Jun 9, 2025"
+        try {
+          final parts = date.split('-');
+          if (parts.length == 3) {
+            final year = parts[0];
+            final month = parts[1];
+            final day = parts[2];
+            
+            // Validate that all parts are valid
+            if (year.isNotEmpty && month.isNotEmpty && day.isNotEmpty && 
+                year != 'null' && month != 'null' && day != 'null') {
+              
+              final monthNames = {
+                'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr',
+                'MAY': 'May', 'JUN': 'Jun', 'JUL': 'Jul', 'AUG': 'Aug',
+                'SEP': 'Sep', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
+              };
+              
+              final monthName = monthNames[month] ?? month;
+              final dayNum = int.tryParse(day) ?? 0;
+              
+              if (dayNum > 0) {
+                return '$monthName $dayNum, $year';
+              }
+            }
+          }
+        } catch (e) {
+          print('Error parsing date: $e');
+        }
+      }
+    }
+    return 'No meetings in ${_selectedFilter.replaceAll('_', ' ')}';
+  }
+
+  // Get last meeting days ago
+  String _getLastMeetingDaysAgo(int index) {
+    final meetings = _getMeetingHistory(index);
+    if (meetings.isNotEmpty) {
+      return meetings.first['daysAgo']?.toString() ?? '0';
+    }
+    return '0';
+  }
+
+  // Get total meetings count
+  int _getTotalMeetings(int index) {
+    final meetings = _getMeetingHistory(index);
+    return meetings.length;
+  }
+
+  // Build meeting history item widget
+  Widget _buildMeetingHistoryItem(Map<String, dynamic> meeting, int userIndex) {
+    final imageUrl = meeting['imageUrl']?.toString() ?? '';
+    final date = meeting['date']?.toString() ?? '';
+    final daysAgo = meeting['daysAgo']?.toString() ?? '';
+    final albumId = meeting['albumId']?.toString() ?? '';
+    final totalImages = meeting['totalImages']?.toString() ?? '0';
+    
+    // Convert date format
+    String formattedDate = date;
+    try {
+      final parts = date.split('-');
+      if (parts.length == 3) {
+        final year = parts[0];
+        final month = parts[1];
+        final day = parts[2];
+        
+        final monthNames = {
+          'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr',
+          'MAY': 'May', 'JUN': 'Jun', 'JUL': 'Jul', 'AUG': 'Aug',
+          'SEP': 'Sep', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
+        };
+        
+        final monthName = monthNames[month] ?? month;
+        final dayNum = int.tryParse(day) ?? 0;
+        
+        formattedDate = '$monthName $dayNum, $year';
+      }
+    } catch (e) {
+      // Keep original format if conversion fails
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[100]!),
+      ),
+      child: Row(
+        children: [
+          // Album image (first image from the album)
+          GestureDetector(
+            onTap: () => _showImageInDialog(imageUrl),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: _buildNetworkImage(imageUrl, 20),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          // Album details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  formattedDate,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[900],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$daysAgo days ago',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '$totalImages images',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // View button
+          ElevatedButton(
+            onPressed: () => _navigateToAlbumImages(userIndex, albumId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey[700],
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+                side: BorderSide(color: Colors.grey[300]!),
+              ),
+            ),
+            child: const Text(
+              'View',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Navigate to album images
+  void _navigateToAlbumImages(int userIndex, String albumId) {
+    final userName = _getUserName(userIndex);
+    final userImageUrl = _getUserImageUrl(userIndex);
+    final faceMatchResults = _faceMatchData[userIndex] ?? [];
+    
+    // Filter face match data to only include images from the specific album
+    List<Map<String, dynamic>> filteredFaceMatchData = [];
+    
+    if (faceMatchResults.isNotEmpty) {
+      final result = faceMatchResults[0];
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        
+        // Get matches from all time periods and filter by album
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        
+        // Filter matches by album ID
+        List<Map<String, dynamic>> filteredMatches = [];
+        
+        for (final match in [...matches30, ...matches60, ...matches90]) {
+          if (match is Map<String, dynamic> && 
+              match['album_id']?.toString() == albumId) {
+            filteredMatches.add(match);
+          }
+        }
+        
+        // Create filtered result
+        if (filteredMatches.isNotEmpty) {
+          filteredFaceMatchData = [{
+            ...result,
+            'apiResult': {
+              ...apiResult,
+              '30_days': {'matches': filteredMatches.where((m) => 
+                apiResult['30_days']?['matches']?.contains(m) ?? false).toList()},
+              '60_days': {'matches': filteredMatches.where((m) => 
+                apiResult['60_days']?['matches']?.contains(m) ?? false).toList()},
+              '90_days': {'matches': filteredMatches.where((m) => 
+                apiResult['90_days']?['matches']?.contains(m) ?? false).toList()},
+            }
+          }];
+        }
+      }
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserImagesScreen(
+          userName: '$userName (Album $albumId)',
+          imageCount: filteredFaceMatchData.isNotEmpty ? 
+            _getAlbumImageCount(userIndex, albumId) : 0,
+          userImageUrl: userImageUrl,
+          faceMatchData: filteredFaceMatchData,
+          userIndex: userIndex,
+          isAlbumView: true,
+          albumId: albumId,
+        ),
+      ),
+    );
+  }
+  
+  // Get image count for specific album
+  int _getAlbumImageCount(int userIndex, String albumId) {
+    final faceMatchResults = _faceMatchData[userIndex] ?? [];
+    
+    if (faceMatchResults.isNotEmpty) {
+      final result = faceMatchResults[0];
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        
+        int count = 0;
+        for (final match in [...matches30, ...matches60, ...matches90]) {
+          if (match is Map<String, dynamic> && 
+              match['album_id']?.toString() == albumId) {
+            count++;
+          }
+        }
+        return count;
+      }
+    }
+    return 0;
+  }
+
+  // Show image in dialog
+  void _showImageInDialog(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(Icons.image, size: 80, color: Colors.grey),
+                ),
+              );
+            },
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   String _extractAge(String label) {
@@ -445,6 +861,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     // Pass the actual match count (no +1 for profile image)
     int finalImageCount = imageCount;
     
+    // Get album information for this user
+    final albums = _getUserAlbums(userIndex);
+    final totalAlbumImages = _getUserAlbumCount(userIndex);
+    final uniqueAlbumCount = _getUserUniqueAlbumCount(userIndex);
+    
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -456,6 +877,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           isLoading: _isLoadingFaceMatch[userIndex] ?? false,
           error: _faceMatchErrors[userIndex],
           userIndex: userIndex,
+          albums: albums,
+          totalAlbumImages: totalAlbumImages,
+          uniqueAlbumCount: uniqueAlbumCount,
         ),
       ),
     );
@@ -857,6 +1281,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     return '';
   }
 
+  // Get reference person name for guest appointments
+  String _getReferencePersonName() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final name = referencePerson['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+      }
+    }
+    return '';
+  }
+
   // Get quick appointment purpose
   String _getQuickAppointmentPurpose() {
     final apptType = widget.appointment['appt_type']?.toString();
@@ -940,6 +1379,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         // Dropdown (reduced size)
         Expanded(
           child: Container(
+            height: 36, // Match refresh button height
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1002,6 +1442,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         const SizedBox(width: 8),
         // Refresh button inline with dropdown
         Container(
+          height: 36, // Match dropdown height
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -1012,7 +1453,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             onTap: _isRefreshing ? null : () => _refreshAccompanyingUsers(),
             borderRadius: BorderRadius.circular(6),
             child: Container(
-              height: 32, // Match dropdown height
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -2185,6 +2625,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAppointeeMobile() {
+    // Check if this is a guest appointment first
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestPhone = guestInformation['phoneNumber']?.toString();
+      if (guestPhone != null && guestPhone.isNotEmpty) {
+        return guestPhone;
+      }
+    }
+    
     // Check if this is a quick appointment first (same logic as message form)
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
@@ -2381,6 +2832,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Req. Dates', _getDateRange(), Icons.calendar_today),
             _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
             _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
+            // Show reference person information for guest appointments
+            if (_isGuestAppointment()) ...[
+              _buildMainCardDetailRow('Reference Person', _getReferencePersonName(), Icons.person_add),
+              _buildMainCardDetailRow('Reference Person Email', _getReferencePersonEmail(), Icons.email),
+              _buildMainCardDetailRow('Reference Person Phone', _getReferencePersonPhone(), Icons.phone),
+            ],
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[
               _buildMainCardDetailRowWithAttachment('Attachment', _getAttachmentFilename(), Icons.attach_file),
@@ -2479,7 +2936,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Users accompanying this appointment. Click refresh to load face match data.',
+                'Users with 90-day meeting history and album information. Click refresh to load face match data.',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -2498,7 +2955,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Column(
             children: [
               SizedBox(
-                height: 120,
+                height: 400, // Increased height to accommodate the new card design
                 child: PageView.builder(
                   controller: _pageController,
                   onPageChanged: (index) {
@@ -2579,134 +3036,280 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildUserCard(String name, String label, int matches, bool isMainUser, int userIndex) {
-    // Make cards clickable if there is face match data available and apiResult is not null
-    bool isClickable = _faceMatchData[userIndex]?.isNotEmpty == true && 
-                      _faceMatchData[userIndex]![0]['apiResult'] != null;
+    // Get album information
+    final albums = _getUserAlbums(userIndex);
+    final totalAlbumImages = _getUserAlbumCount(userIndex);
+    final uniqueAlbumCount = _getUserUniqueAlbumCount(userIndex);
     
-    return GestureDetector(
-      onTap: isClickable ? () => _navigateToUserImages(name, matches, userIndex) : null,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey[300]!, // Keep normal border for all cards
-            width: 1,
+    // Get meeting history data
+    final meetingHistory = _getMeetingHistory(userIndex);
+    final lastMeetingDate = _getLastMeetingDate(userIndex);
+    final lastMeetingDaysAgo = _getLastMeetingDaysAgo(userIndex);
+    final totalMeetings = _getTotalMeetings(userIndex);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1), // Keep normal shadow for all cards
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with profile image and user info
+            Row(
+              children: [
+                // Profile Image with badge
+                Container(
+                  width: 80, // Increased width to accommodate badge
+                  height: 80, // Increased height to accommodate badge
+                  child: Stack(
+                    clipBehavior: Clip.none, // Allow badge to extend outside
+                    children: [
+                      Positioned(
+                        left: 8, // Center the image within the larger container
+                        top: 8,
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isMainUser ? Colors.orange[400]! : Colors.blue[400]!, 
+                              width: 4
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _buildNetworkImage(_getUserImageUrl(userIndex), 32),
+                          ),
+                        ),
+                      ),
+                      // Badge showing user number
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: isMainUser ? Colors.orange[500] : Colors.blue[500],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${userIndex + 1}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                
+                // User Information
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[900],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isMainUser ? '(Main Appointee #1)' : '(Accompanying #${userIndex + 1})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isMainUser ? Colors.orange[600] : Colors.blue[600],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Opacity(
-          opacity: 1.0, // Keep full opacity for all cards
-          child: Row(
-            children: [
-              // Profile Image (Square)
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: _buildNetworkImage(_getUserImageUrl(userIndex), 30),
-                ),
-              ),
-              const SizedBox(width: 12),
-              
-              // User Information
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Name and Label
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                          overflow: TextOverflow.visible,
-                          softWrap: true,
+            
+            const SizedBox(height: 24),
+            
+            // Meeting Statistics Grid
+            Column(
+              children: [
+                // Last Meeting Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
                         ),
-                        Text(
-                          label,
+                        child: Text(
+                          'LAST MEETING',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue[600],
-                          ),
-                          overflow: TextOverflow.visible,
-                          softWrap: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Total Matches with Image Icon
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _isLoadingFaceMatch[userIndex] == true
-                              ? 'Loading matches...'
-                              : _faceMatchData[userIndex]?.isNotEmpty == true
-                                ? _faceMatchData[userIndex]![0]['apiResult'] != null
-                                  ? 'Total Matches Found : $matches'
-                                  : 'No face match data available'
-                                : 'No face match data available',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _isLoadingFaceMatch[userIndex] == true
-                                ? Colors.blue[600]
-                                : _faceMatchData[userIndex]?.isNotEmpty == true
-                                  ? _faceMatchData[userIndex]![0]['apiResult'] != null
-                                    ? Colors.grey[600]
-                                    : Colors.grey[500]
-                                  : Colors.grey[500],
-                            ),
-                            overflow: TextOverflow.visible,
-                            softWrap: true,
-                          ),
-                        ),
-                        if (_isLoadingFaceMatch[userIndex] == true) ...[
-                          const SizedBox(width: 4),
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
-                            ),
-                          ),
-                        ] else if (_faceMatchData[userIndex]?.isNotEmpty == true && 
-                                   _faceMatchData[userIndex]![0]['apiResult'] != null) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.photo_library,
-                            size: 14,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
                             color: Colors.grey[600],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                                              Row(
+                          children: [
+                            Text(
+                              lastMeetingDate,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[900],
+                              ),
+                            ),
+                            if (lastMeetingDaysAgo != '0') ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '$lastMeetingDaysAgo days ago',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Total Albums Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                        ),
+                        child: Text(
+                          'TOTAL ALBUMS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            '$uniqueAlbumCount',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[900],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'albums in last ${_selectedFilter.replaceAll('_', ' ')}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                            ),
                           ),
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Meeting History Section
+            if (meetingHistory.isNotEmpty) ...[
+              Text(
+                'Meeting History',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[900],
                 ),
               ),
+              const SizedBox(height: 12),
+              
+                             // Meeting History List
+               Column(
+                 children: [
+                   ...meetingHistory.take(3).map((meeting) => _buildMeetingHistoryItem(meeting, userIndex)),
+                   if (meetingHistory.length > 3) ...[
+                     const SizedBox(height: 8),
+                     Center(
+                       child: Text(
+                         '+${meetingHistory.length - 3} more meetings',
+                         style: TextStyle(
+                           fontSize: 12,
+                           color: Colors.grey[500],
+                         ),
+                       ),
+                     ),
+                   ],
+                 ],
+               ),
             ],
-          ),
+          ],
         ),
       ),
     );

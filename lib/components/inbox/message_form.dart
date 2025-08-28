@@ -162,7 +162,18 @@ class _MessageFormState extends State<MessageForm> {
   }
 
   String _extractAppointeeMobile() {
-    // Check if this is a quick appointment first
+    // Check if this is a guest appointment first
+    final appointmentType = _appointmentData['appointmentType']?.toString();
+    final guestInformation = _appointmentData['guestInformation'];
+    
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestPhone = guestInformation['phoneNumber']?.toString();
+      if (guestPhone != null && guestPhone.isNotEmpty) {
+        return guestPhone;
+      }
+    }
+    
+    // Check if this is a quick appointment
     final apptType = _appointmentData['appt_type']?.toString();
     final quickApt = _appointmentData['quick_apt'];
     

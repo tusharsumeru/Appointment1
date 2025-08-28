@@ -4,6 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:country_picker/country_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -33,7 +36,20 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   TextEditingController _companyController = TextEditingController();
   TextEditingController _designationController = TextEditingController();
   
-  // Loading state
+  // Controllers for guest information fields
+  late TextEditingController _guestFullNameController;
+  late TextEditingController _guestEmailController;
+  late TextEditingController _guestPhoneController;
+  late TextEditingController _guestDesignationController;
+      late TextEditingController _guestCompanyController;
+    late TextEditingController _guestLocationController;
+    
+    // Location autocomplete state
+    List<String> _locationSuggestions = [];
+    bool _isLoadingGuestLocations = false;
+    Timer? _locationDebounceTimer;
+    
+    // Loading state
   bool _isSubmitting = false;
   
   // Form state
@@ -119,6 +135,20 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Initialize guest information from existing data
     _initializeGuestData();
     
+    // Initialize guest information controllers
+    _guestFullNameController = TextEditingController(text: _getGuestFullName());
+    _guestEmailController = TextEditingController(text: _getGuestEmail());
+    _guestPhoneController = TextEditingController(text: _getGuestPhone());
+    _guestDesignationController = TextEditingController(text: _getGuestDesignation());
+    _guestCompanyController = TextEditingController(text: _getGuestCompany());
+    _guestLocationController = TextEditingController(text: _getGuestLocation());
+    
+    // Initialize guest photo state
+    final existingGuestPhotoUrl = _getGuestPhotoUrl();
+    if (existingGuestPhotoUrl.isNotEmpty) {
+      _guestImages[0] = existingGuestPhotoUrl;
+    }
+    
     // Add listener to update guest controllers when number of people changes
     _numberOfPeopleController.addListener(_updateGuestControllers);
     
@@ -185,6 +215,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _toDateController.dispose();
     _companyController.dispose();
     _designationController.dispose();
+    
+    // Dispose guest information controllers
+    _guestFullNameController.dispose();
+    _guestEmailController.dispose();
+    _guestPhoneController.dispose();
+    _guestDesignationController.dispose();
+    _guestCompanyController.dispose();
+    _guestLocationController.dispose();
+    _locationDebounceTimer?.cancel();
     
     // Dispose guest controllers
     for (var guest in _guestControllers) {
@@ -921,17 +960,788 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  // Guest photo display methods for guest appointments
+  Future<void> _pickGuestImageForDisplay(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      
+      if (pickedFile != null) {
+        print('📸 Guest display image selected: ${pickedFile.path}');
+
+        // Show uploading state
+        setState(() {
+          // For guest display, we'll use a special key
+          _guestUploading[0] = true; // Use 0 for guest display
+        });
+
+        try {
+          // Upload photo immediately and get S3 URL
+          final result = await ActionService.uploadAndValidateProfilePhoto(
+            File(pickedFile.path),
+          );
+
+          if (result['success']) {
+            final s3Url = result['s3Url'];
+            setState(() {
+              // Store the guest photo URL in a special field
+              _guestImages[0] = s3Url; // Use 0 for guest display
+              _guestUploading[0] = false;
+            });
+
+            print('✅ Guest display photo uploaded to S3: $s3Url');
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Guest photo uploaded and validated successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } else {
+            setState(() {
+              _guestUploading[0] = false;
+            });
+
+            print('❌ Guest display photo upload failed: ${result['message']}');
+
+            // Show backend error message in dialog
+            final errorMessage =
+                result['error'] ?? result['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(
+              'Guest: $errorMessage',
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _guestImages[0] = '';
+                  _guestUploading[0] = false;
+                });
+              },
+            );
+          }
+        } catch (e) {
+          setState(() {
+            _guestUploading[0] = false;
+          });
+
+          print('❌ Error uploading guest display photo: $e');
+
+          // Show error message in dialog
+          _showPhotoValidationErrorDialog(
+            'Guest: Error uploading photo: ${e.toString()}',
+            () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _guestImages[0] = '';
+                _guestUploading[0] = false;
+              });
+            },
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeGuestPhotoForDisplay() {
+    setState(() {
+      _guestImages[0] = ''; // Use 0 for guest display
+      _guestUploading[0] = false;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Guest photo removed successfully!'),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   int _getGuestIndexFromPhotoUrl(String photoUrl) {
     for (int i = 1; i <= _guests.length; i++) {
       if (_guestImages[i] == photoUrl) {
         return i - 1;
       }
     }
-    return 0; // Fallback to first guest
+        return 0; // Fallback to first guest
   }
 
+  // Fetch location suggestions
+  Future<void> _fetchLocations(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _locationSuggestions = [];
+        _isLoadingGuestLocations = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingGuestLocations = true;
+    });
+
+    try {
+      // Using OpenStreetMap Nominatim API
+      final response = await http.get(
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'AppointmentApp/1.0', // Required by Nominatim
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        final List<String> suggestions = [];
+
+        for (var place in data) {
+          final displayName = place['display_name'] as String?;
+          if (displayName != null) {
+            suggestions.add(displayName);
+          }
+        }
+
+        setState(() {
+          _locationSuggestions = suggestions;
+          _isLoadingGuestLocations = false;
+        });
+      } else {
+        // Fallback to mock data if API fails
+        final suggestions = [
+          '$query, New York, USA',
+          '$query, London, UK',
+          '$query, Mumbai, India',
+          '$query, Sydney, Australia',
+          '$query, Toronto, Canada',
+        ];
+
+        setState(() {
+          _locationSuggestions = suggestions;
+          _isLoadingGuestLocations = false;
+        });
+      }
+    } catch (e) {
+      // Fallback to mock data on error
+      final suggestions = [
+        '$query, New York, USA',
+        '$query, London, UK',
+        '$query, Mumbai, India',
+        '$query, Sydney, Australia',
+        '$query, Toronto, Canada',
+      ];
+
+      setState(() {
+        _locationSuggestions = suggestions;
+        _isLoadingGuestLocations = false;
+      });
+    }
+  }
+
+  void _onLocationChanged(String value) {
+    // Cancel previous timer
+    _locationDebounceTimer?.cancel();
+
+    // Set new timer for debouncing
+    _locationDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _fetchLocations(value);
+    });
+  }
+  
   String _getAppointmentId() {
     return widget.appointment['appointmentId']?.toString() ?? '';
+  }
+
+  // Check if this is a guest appointment
+  bool _isGuestAppointment() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    // Check if this is a guest appointment (either by appointmentType or by having guest data)
+    return appointmentType?.toLowerCase() == 'guest' || 
+        (guestInformation is Map<String, dynamic> && 
+         guestInformation['fullName']?.toString().isNotEmpty == true);
+  }
+
+  // Get reference person name for guest appointments
+  String _getReferencePersonName() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final name = referencePerson['name']?.toString();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+      }
+    }
+    return '';
+  }
+
+  // Get reference person email for guest appointments
+  String _getReferencePersonEmail() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final email = referencePerson['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+    return '';
+  }
+
+  // Get reference person phone number for guest appointments
+  String _getReferencePersonPhone() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final referencePerson = widget.appointment['referencePerson'];
+      if (referencePerson is Map<String, dynamic>) {
+        final phoneNumber = referencePerson['phoneNumber'];
+        if (phoneNumber is Map<String, dynamic>) {
+          final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+          final number = phoneNumber['number']?.toString() ?? '';
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            return '$countryCode $number';
+          }
+        }
+      }
+    }
+    return '';
+  }
+
+  // Get guest information helper methods
+  String _getGuestFullName() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final fullName = guestInformation['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestEmail() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final email = guestInformation['emailId']?.toString();
+        if (email != null && email.isNotEmpty) {
+          return email;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestPhone() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final phoneNumber = guestInformation['phoneNumber']?.toString();
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          return phoneNumber;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestDesignation() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final designation = guestInformation['designation']?.toString();
+        if (designation != null && designation.isNotEmpty) {
+          return designation;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestCompany() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final company = guestInformation['company']?.toString();
+        if (company != null && company.isNotEmpty) {
+          return company;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestLocation() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final location = guestInformation['location']?.toString();
+        if (location != null && location.isNotEmpty) {
+          return location;
+        }
+      }
+    }
+    return '';
+  }
+
+  String _getGuestPhotoUrl() {
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType?.toLowerCase() == 'guest') {
+      final guestInformation = widget.appointment['guestInformation'];
+      if (guestInformation is Map<String, dynamic>) {
+        final photoUrl = guestInformation['profilePhotoUrl']?.toString();
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          return photoUrl;
+        }
+      }
+    }
+    return '';
+  }
+
+  Widget _buildGuestInformationDisplaySection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          // Guest Information Fields - One per row
+          Column(
+            children: [
+              // Full Name
+              _buildEditableGuestField('Full Name of the Guest', _guestFullNameController),
+              const SizedBox(height: 16),
+              
+              // Email
+              _buildEditableGuestField('Email ID of the Guest', _guestEmailController),
+              const SizedBox(height: 16),
+              
+              // Phone
+              _buildEditableGuestField('Mobile No. of the Guest', _guestPhoneController),
+              const SizedBox(height: 16),
+              
+              // Designation
+              _buildEditableGuestField('Designation', _guestDesignationController),
+              const SizedBox(height: 16),
+              
+              // Company
+              _buildEditableGuestField('Company/Organization', _guestCompanyController),
+              const SizedBox(height: 16),
+              
+                              // Location
+                _buildLocationField(),
+              const SizedBox(height: 24),
+              
+              // Guest Photo Section
+              _buildGuestPhotoDisplaySection(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestPhotoDisplaySection() {
+    // Use the guest photo URL from state if available, otherwise from appointment data
+    final photoUrl = _guestImages[0]?.isNotEmpty == true 
+        ? _guestImages[0]! 
+        : _getGuestPhotoUrl();
+    final hasPhoto = photoUrl.isNotEmpty;
+    final isUploading = _guestUploading[0] == true;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.grey[50]!,
+                  Colors.white,
+                  Colors.grey[50]!,
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.camera_alt, color: Colors.grey[400], size: 24),
+                const SizedBox(width: 12),
+                const Text(
+                  'Guest Photo',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Text(
+                  ' *',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: isUploading 
+                ? _buildGuestPhotoDisplayUploading() 
+                : (hasPhoto ? _buildGuestPhotoDisplayUploaded(photoUrl) : _buildGuestPhotoDisplayNotUploaded()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestPhotoDisplayUploaded(String photoUrl) {
+    return Column(
+      children: [
+        // Photo preview
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.green[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.green[300]!),
+          ),
+          child: Column(
+            children: [
+              // Photo preview
+              Container(
+                width: 112,
+                height: 112,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    photoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[200],
+                        child: Icon(
+                          Icons.person,
+                          color: Colors.grey[400],
+                          size: 48,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Status text
+              const Text(
+                'Photo uploaded',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[800], size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Verified & Uploaded',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Action buttons
+        Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Implement photo upload functionality for guest photo
+                  _pickGuestImageForDisplay(ImageSource.gallery);
+                },
+                icon: const Icon(Icons.upload, size: 16),
+                label: const Text('Upload Different Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Implement camera functionality for guest photo
+                  _pickGuestImageForDisplay(ImageSource.camera);
+                },
+                icon: const Icon(Icons.camera_alt, size: 16),
+                label: const Text('Take New Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Implement photo removal functionality for guest photo
+                  _removeGuestPhotoForDisplay();
+                },
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text('Remove'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  foregroundColor: Colors.red[600],
+                  side: BorderSide(color: Colors.red[300]!),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestPhotoDisplayUploading() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue[300]!),
+      ),
+      child: Column(
+        children: [
+          // Loading spinner
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Status text
+          Text(
+            'Uploading photo...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.blue[800],
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue[100],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.upload, color: Colors.blue[800], size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  'Processing...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue[800],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestPhotoDisplayNotUploaded() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.camera_alt_outlined,
+            color: Colors.grey[400],
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No photo uploaded',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Required for guests 12+ years old - Divine pic validation',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Implement photo upload functionality for guest photo
+                    _pickGuestImageForDisplay(ImageSource.gallery);
+                  },
+                  icon: const Icon(Icons.upload, size: 16),
+                  label: const Text('Upload Photo'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Implement camera functionality for guest photo
+                    _pickGuestImageForDisplay(ImageSource.camera);
+                  },
+                  icon: const Icon(Icons.camera_alt, size: 16),
+                  label: const Text('Take Photo'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   // Load current user (same as assign_form.dart)
@@ -966,9 +1776,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _secretaryErrorMessage = null;
       });
 
-      // Extract location ID from appointment data
-      final locationId = _extractLocationId();
-      print('DEBUG: Extracted locationId = $locationId');
+      // Use selected location if available, otherwise extract from appointment data
+      String? locationId;
+      if (_selectedLocation != null) {
+        locationId = _selectedLocation;
+        print('DEBUG: Using selected locationId = $locationId');
+      } else {
+        locationId = _extractLocationId();
+        print('DEBUG: Extracted locationId from appointment data = $locationId');
+      }
       
       if (locationId == null) {
         setState(() {
@@ -980,12 +1796,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Call the API to get secretaries for this location
+      print('DEBUG: Calling API with locationId: $locationId');
       final result = await ActionService.getAssignedSecretariesByAshramLocation(
         locationId: locationId,
       );
+      print('DEBUG: API result: $result');
 
       if (result['success']) {
         final List<dynamic> secretariesData = result['data'] ?? [];
+        print('DEBUG: Secretaries data received: $secretariesData');
         
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = secretariesData.map((secretary) {
@@ -994,6 +1813,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           final isCurrentUser = secretaryId == _currentUserId;
           final isAssigned = secretaryName == _assignedSecretaryId;
           
+          print('DEBUG: Processing secretary: $secretaryId - $secretaryName');
+          
           return {
             'id': secretaryId,
             'name': secretaryName,
@@ -1001,11 +1822,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             'isAssigned': isAssigned,
           };
         }).toList();
+        
+        print('DEBUG: Transformed secretaries: $secretaries');
 
         setState(() {
           _availableAssignees = secretaries;
           _isLoadingSecretaries = false;
         });
+        print('DEBUG: Updated _availableAssignees with ${secretaries.length} secretaries');
         
         // Ensure the assigned secretary is selected if not already set
         if (_selectedSecretary == null && _assignedSecretaryId != null) {
@@ -1210,6 +2034,75 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       return;
     }
 
+    // Validate guest information fields if this is a guest appointment
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    if (appointmentType == 'guest') {
+      if (_guestFullNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest full name is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_guestEmailController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest email is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      // Validate email format
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_guestEmailController.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid guest email address'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_guestPhoneController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest phone number is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_guestDesignationController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest designation is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_guestCompanyController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest company is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_guestLocationController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guest location is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -1256,17 +2149,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Add guestInformation if appointment type is 'guest'
       if (originalAppointmentType == 'guest') {
         print('🔍 DEBUG: Adding guestInformation for guest appointment');
-        updateData['guestInformation'] = widget.appointment['guestInformation'] ?? {
-          'fullName': widget.appointment['appointmentFor']?['otherPersonDetails']?['fullName'] ?? '',
-          'email': widget.appointment['appointmentFor']?['otherPersonDetails']?['email'] ?? '',
-          'phoneNumber': widget.appointment['appointmentFor']?['otherPersonDetails']?['phoneNumber'] ?? {
-            'countryCode': '+91',
-            'number': '',
-          },
-          'age': widget.appointment['appointmentFor']?['otherPersonDetails']?['age'] ?? '',
-          'relationship': widget.appointment['appointmentFor']?['otherPersonDetails']?['relationship'] ?? '',
+        updateData['guestInformation'] = {
+          'fullName': _guestFullNameController.text.trim(),
+          'emailId': _guestEmailController.text.trim(),
+          'phoneNumber': _guestPhoneController.text.trim(),
+          'designation': _guestDesignationController.text.trim(),
+          'company': _guestCompanyController.text.trim(),
+          'location': _guestLocationController.text.trim(),
+          // Use new photo URL if uploaded, otherwise preserve existing
+          'profilePhotoUrl': _guestImages[0]?.isNotEmpty == true 
+              ? _guestImages[0]! 
+              : (widget.appointment['guestInformation']?['profilePhotoUrl'] ?? ''),
         };
-        print('🔍 DEBUG: guestInformation added: ${updateData['guestInformation']}');
+        print('🔍 DEBUG: Updated guestInformation: ${updateData['guestInformation']}');
       }
 
       // Show debug info in SnackBar
@@ -1471,31 +2366,48 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Personal Information Section
-                    _buildSectionHeader('Personal Information', 'Your contact details (auto-filled from your profile)'),
-                    const SizedBox(height: 20),
+                    // Personal Information Section - Only show for non-guest appointments
+                    if (!_isGuestAppointment()) ...[
+                      _buildSectionHeader('Personal Information', 'Your contact details (auto-filled from your profile)'),
+                      const SizedBox(height: 20),
+                      
+                      // Personal Info Grid
+                      Column(
+                        children: [
+                          // Full Name and Email Address on separate lines
+                          _buildDisabledField('Full Name', _getCreatedByName()),
+                          const SizedBox(height: 16),
+                          _buildDisabledField('Email Address', _getCreatedByEmail()),
+                          const SizedBox(height: 16),
+                          
+                          // Phone Number and Designation on separate lines
+                          _buildDisabledField('Phone Number', _getCreatedByPhone()),
+                          const SizedBox(height: 16),
+                          _buildDisabledField('Designation', _getCreatedByDesignation()),
+                          const SizedBox(height: 16),
+                          
+                          // Company/Organization and Teacher Status on separate lines
+                          _buildDisabledField('Company/Organization', _getCreatedByCompany()),
+                          const SizedBox(height: 16),
+                          _buildTeacherRadioGroup(),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                     
-                    // Personal Info Grid
-                    Column(
-                      children: [
-                        // Full Name and Email Address on separate lines
-                        _buildDisabledField('Full Name', _getCreatedByName()),
-                        const SizedBox(height: 16),
-                        _buildDisabledField('Email Address', _getCreatedByEmail()),
-                        const SizedBox(height: 16),
-                        
-                        // Phone Number and Designation on separate lines
-                        _buildDisabledField('Phone Number', _getCreatedByPhone()),
-                        const SizedBox(height: 16),
-                        _buildDisabledField('Designation', _getCreatedByDesignation()),
-                        const SizedBox(height: 16),
-                        
-                        // Company/Organization and Teacher Status on separate lines
-                        _buildDisabledField('Company/Organization', _getCreatedByCompany()),
-                        const SizedBox(height: 16),
-                        _buildTeacherRadioGroup(),
-                      ],
-                    ),
+                    // Reference Information Section for Guest Appointments
+                    if (_isGuestAppointment()) ...[
+                      _buildSectionHeader('Reference Information', 'Reference details of the person requesting the appointment'),
+                      const SizedBox(height: 20),
+                      _buildReferenceInformationSection(),
+                      const SizedBox(height: 32),
+                      
+                      // Guest Information Section
+                      _buildSectionHeader('Guest Information', 'Enter the details of the person you are requesting the appointment for'),
+                      const SizedBox(height: 20),
+                      _buildGuestInformationDisplaySection(),
+                      const SizedBox(height: 32),
+                    ],
                     
                     const SizedBox(height: 32),
                     
@@ -1630,6 +2542,38 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  Widget _buildReferenceInformationSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          // Reference Information Grid
+          Column(
+            children: [
+              // Reference Name
+              _buildDisabledField('Reference Name', _getReferencePersonName()),
+              const SizedBox(height: 16),
+              
+              // Reference Email
+              _buildDisabledField('Reference Email', _getReferencePersonEmail()),
+              const SizedBox(height: 16),
+              
+              // Reference Phone
+              _buildDisabledField('Reference Phone', _getReferencePersonPhone()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
   Widget _buildDisabledField(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1662,6 +2606,186 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditableGuestField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: label.contains('Email') ? TextInputType.emailAddress : TextInputType.text,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.orange[400]!),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Enter $label',
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+            ),
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[800],
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return '$label is required';
+            }
+            // Email validation for email fields
+            if (label.contains('Email') && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+              return 'Please enter a valid email address';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(width: 4),
+            Text(
+              '*',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Column(
+          children: [
+            TextFormField(
+              controller: _guestLocationController,
+              decoration: InputDecoration(
+                hintText: 'Start typing your location...',
+                suffixIcon: _isLoadingGuestLocations
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : _guestLocationController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                _guestLocationController.clear();
+                                _locationSuggestions = [];
+                              });
+                            },
+                          )
+                        : null,
+                filled: true,
+                fillColor: Colors.grey.shade50.withOpacity(0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              onChanged: (value) {
+                _onLocationChanged(value);
+                setState(() {
+                  // Trigger rebuild to show/hide clear button
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Location is required';
+                }
+                return null;
+              },
+            ),
+            if (_locationSuggestions.isNotEmpty)
+              Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: _locationSuggestions.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            _locationSuggestions[index],
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _guestLocationController.text =
+                                  _locationSuggestions[index];
+                              _locationSuggestions = [];
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     );
@@ -2072,7 +3196,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               border: Border.all(color: Colors.blue[200]!),
             ),
             child: Text(
-              'ℹ️ For appointments with more than 10 people, individual details for additional accompanying people are not required. The appointment will be processed with the main contact information and guest details.',
+              ' ',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.blue[800],
@@ -2219,92 +3343,41 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Appointment Location *',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
+            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: _isLoadingLocations ? null : () => _showLocationSelectionBottomSheet(),
+        GestureDetector(
+          onTap: _isLoadingLocations ? null : _showLocationSelectionBottomSheet,
           child: Container(
             width: double.infinity,
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
             ),
             child: Row(
               children: [
-                if (_isLoadingLocations) ...[
-                  // Show loading state
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Loading locations...',
+                Icon(Icons.location_on, color: Colors.grey[600], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedLocation != null ? _getSelectedLocationName() : 'Select a location',
                     style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
+                      color: _selectedLocation != null
+                          ? Colors.black87
+                          : Colors.grey[600],
+                      fontSize: 16,
                     ),
                   ),
-                ] else if (_locationErrorMessage != null) ...[
-                  // Show error state
-                  Icon(Icons.error_outline, color: Colors.red[600], size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Error loading locations',
-                      style: TextStyle(
-                        color: Colors.red[600],
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ] else if (_selectedLocation != null) ...[
-                  // Show selected location
-                  Icon(
-                    Icons.location_on,
-                    color: Colors.blue[600],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _getSelectedLocationName(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ] else ...[
-                  // Show placeholder
-                  Text(
-                    'Select location',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                if (!_isLoadingLocations && _locationErrorMessage == null)
-                  Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
               ],
             ),
           ),
@@ -2326,7 +3399,197 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildLocationSelectionContent(),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: const Color(0xFFF97316),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Select Location',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Location list
+              Expanded(
+                child: _isLoadingLocations
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : _locationErrorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _locationErrorMessage!,
+                                  style: TextStyle(color: Colors.red),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : _availableLocations.isEmpty
+                            ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.location_off, size: 48, color: Colors.grey),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'No locations available',
+                                      style: TextStyle(color: Colors.grey),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                itemCount: _availableLocations.length,
+                                itemBuilder: (context, index) {
+                                  final location = _availableLocations[index];
+                                  final isSelected = location['id']?.toString() == _selectedLocation;
+                                  
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? const Color(0xFFF97316).withOpacity(0.1)
+                                          : Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? const Color(0xFFF97316)
+                                            : Colors.grey[300]!,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      onTap: () {
+                                        print('DEBUG: Location selected: ${location['id']} - ${location['name']}');
+                                        setState(() {
+                                          _selectedLocation = location['id']?.toString();
+                                          // Clear secretary selection when location changes
+                                          _selectedSecretary = null;
+                                        });
+                                        Navigator.pop(context);
+                                        // Reload secretaries for the new location
+                                        print('DEBUG: Reloading secretaries for location: $_selectedLocation');
+                                        _loadSecretaries();
+                                      },
+                                      leading: CircleAvatar(
+                                        backgroundColor: isSelected
+                                            ? const Color(0xFFF97316)
+                                            : Colors.grey[300],
+                                        child: Icon(
+                                          Icons.location_on,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.grey[600],
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        location['name']?.toString() ?? 'Unknown',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          color: isSelected
+                                              ? const Color(0xFFF97316)
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                      subtitle: location['description']?.toString().isNotEmpty == true
+                                          ? Text(
+                                              location['description']?.toString() ?? '',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey[600],
+                                              ),
+                                            )
+                                          : null,
+                                      trailing: isSelected
+                                          ? const Icon(
+                                              Icons.check_circle,
+                                              color: Color(0xFFF97316),
+                                              size: 24,
+                                            )
+                                          : null,
+                                    ),
+                                  );
+                                },
+                              ),
+              ),
+
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -2508,49 +3771,87 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Have you been in touch with any secretary regarding your appointment?',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
+            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _showSecretarySelectionBottomSheet(),
+        GestureDetector(
+          onTap: _selectedLocation == null || _isLoadingSecretaries ? null : _showSecretarySelectionBottomSheet,
           child: Container(
             width: double.infinity,
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
             ),
             child: Row(
               children: [
-                if (_selectedSecretary != null) ...[
-                  // Show selected secretary with avatar and check icon
-                  ..._buildSelectedSecretaryDisplay(),
-                ] else ...[
-                  // Show placeholder
-                  Text(
-                    'Select secretary',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+                Icon(Icons.person, color: Colors.grey[600], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _isLoadingSecretaries
+                      ? Text(
+                          'Loading secretaries...',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      : _selectedLocation == null
+                      ? Text(
+                          'Please select a location first',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      : Builder(
+                          builder: (context) {
+                            final secretaryName = _getSelectedSecretaryName();
+                            print('DEBUG: Secretary field - selectedLocation: $_selectedLocation, availableAssignees: ${_availableAssignees.length}, secretaryName: $secretaryName');
+                            return Text(
+                              secretaryName ?? 'Select a secretary',
+                              style: TextStyle(
+                                color:
+                                    secretaryName != null &&
+                                        secretaryName !=
+                                            'None - I am not in touch with any secretary'
+                                    ? Colors.black87
+                                    : Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 24),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  String? _getSelectedSecretaryName() {
+    print('🔍 _getSelectedSecretaryName() called');
+    print('🔍 _selectedSecretary: $_selectedSecretary');
+    print('🔍 _availableAssignees count: ${_availableAssignees.length}');
+
+    if (_selectedSecretary == null)
+      return 'None - I am not in touch with any secretary';
+
+    // Try to find it in the available assignees list
+    try {
+      final selectedSecretary = _availableAssignees.firstWhere(
+        (secretary) => secretary['id']?.toString() == _selectedSecretary,
+      );
+      print('🔍 Found secretary in list: $selectedSecretary');
+      return selectedSecretary['name']?.toString();
+    } catch (e) {
+      print('🔍 Secretary not found in list');
+      return null;
+    }
   }
 
   List<Widget> _buildSelectedSecretaryDisplay() {
@@ -2603,11 +3904,252 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _showSecretarySelectionBottomSheet() {
+    if (_selectedLocation == null || _isLoadingSecretaries) {
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildSecretarySelectionContent(),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person,
+                      color: const Color(0xFFF97316),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Select Secretary',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Secretary list
+              Expanded(
+                child: _isLoadingSecretaries
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : _availableAssignees.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No secretaries available for this location',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _availableAssignees.length + 1, // +1 for "None" option
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                // "None" option
+                                final isSelected = _selectedSecretary == null;
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFFF97316).withOpacity(0.1)
+                                        : Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? const Color(0xFFF97316)
+                                          : Colors.grey[300]!,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedSecretary = null;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                    leading: CircleAvatar(
+                                      backgroundColor: isSelected
+                                          ? const Color(0xFFF97316)
+                                          : Colors.grey[300],
+                                      child: Icon(
+                                        Icons.person_off,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.grey[600],
+                                        size: 20,
+                                      ),
+                                    ),
+                                    title: const Text(
+                                      'None - I am not in touch with any secretary',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(
+                                            Icons.check_circle,
+                                            color: Color(0xFFF97316),
+                                            size: 24,
+                                          )
+                                        : null,
+                                  ),
+                                );
+                              }
+
+                              // Secretary options
+                              final secretaryIndex = index - 1;
+                              final secretary = _availableAssignees[secretaryIndex];
+                              final isSelected = secretary['id']?.toString() == _selectedSecretary;
+                              final isAssigned = secretary['isAssigned'] == true;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFFF97316).withOpacity(0.1)
+                                      : isAssigned
+                                          ? Colors.green.withOpacity(0.1)
+                                          : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFFF97316)
+                                        : isAssigned
+                                            ? Colors.green
+                                            : Colors.grey[300]!,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: ListTile(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedSecretary = secretary['id']?.toString();
+                                    });
+                                    Navigator.pop(context);
+                                  },
+                                  leading: CircleAvatar(
+                                    backgroundColor: isSelected
+                                        ? const Color(0xFFF97316)
+                                        : isAssigned
+                                            ? Colors.green
+                                            : Colors.indigo[100],
+                                    child: Text(
+                                      _getInitials(secretary['name']?.toString() ?? ''),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : isAssigned
+                                                ? Colors.white
+                                                : Colors.indigo,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    secretary['name']?.toString() ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: isSelected
+                                          ? const Color(0xFFF97316)
+                                          : isAssigned
+                                              ? Colors.green[700]
+                                              : Colors.black87,
+                                    ),
+                                  ),
+                                  subtitle: isAssigned
+                                      ? const Text(
+                                          'Currently assigned',
+                                          style: TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 12,
+                                          ),
+                                        )
+                                      : null,
+                                  trailing: isSelected
+                                      ? const Icon(
+                                          Icons.check_circle,
+                                          color: Color(0xFFF97316),
+                                          size: 24,
+                                        )
+                                      : isAssigned
+                                          ? const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                              size: 20,
+                                            )
+                                          : null,
+                                ),
+                              );
+                            },
+                          ),
+              ),
+
+              // Done button
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -3560,32 +5102,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           Column(
             children: [
               // Name
-              _buildEditableGuestField(
-                label: 'Name',
-                controller: controllers['name']!,
-                placeholder: 'Enter name',
-              ),
+              _buildEditableGuestField('Name', controllers['name']!),
               const SizedBox(height: 12),
               
               // Age
-              _buildEditableGuestField(
-                label: 'Age',
-                controller: controllers['age']!,
-                placeholder: 'Enter age (1-120)',
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Age is required';
-                  }
-                  final age = int.tryParse(value);
-                  if (age == null || age < 1 || age > 120) {
-                    return 'Please enter 1-120';
-                  }
-                  return null;
-                },
-              ),
+              _buildEditableGuestField('Age', controllers['age']!),
               const SizedBox(height: 12),
               
               // Phone
@@ -4045,64 +5566,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
-  // Editable guest field for form inputs
-  Widget _buildEditableGuestField({
-    required String label,
-    required TextEditingController controller,
-    required String placeholder,
-    TextInputType? keyboardType,
-    List<TextInputFormatter>? inputFormatters,
-    int? maxLength,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          maxLength: maxLength,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: placeholder,
-            hintStyle: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[400],
-            ),
-            filled: true,
-            fillColor: Colors.grey[50],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: const Color(0xFFF97316)),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.red[300]!),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-        ),
-      ],
-    );
-  }
+
 
   // Phone field for accompanying users with country code
   Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {

@@ -155,7 +155,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       final designation = userData?['designation'] ?? '';
       final company = userData?['company'] ?? '';
 
-      // Handle teacher status - check atolValidationData.success field inside aol_teacher
+      // Handle teacher status - check atolValidationData.verified field inside aol_teacher (same as profile screen)
       bool isTeacher = false;
       String? teacherType;
 
@@ -164,18 +164,18 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       if (userData?['aol_teacher'] != null &&
           userData!['aol_teacher'] is Map<String, dynamic> &&
           userData!['aol_teacher']['atolValidationData'] != null &&
-          userData!['aol_teacher']['atolValidationData']['success'] == true) {
+          userData!['aol_teacher']['atolValidationData']['verified'] == true) {
         isTeacher = true;
         // Extract teacher type
         teacherType = userData!['aol_teacher']['teacher_type'] ?? 'N/A';
         print(
-          '👨‍🏫 Teacher status: YES (aol_teacher.atolValidationData.success = true)',
+          '👨‍🏫 Teacher status: YES (aol_teacher.atolValidationData.verified = true)',
         );
         print('👨‍🏫 Teacher type: $teacherType');
       } else {
         isTeacher = false;
         print(
-          '👨‍🏫 Teacher status: NO (aol_teacher.atolValidationData.success != true or field not found)',
+          '👨‍🏫 Teacher status: NO (aol_teacher.atolValidationData.verified != true or field not found)',
         );
       }
 

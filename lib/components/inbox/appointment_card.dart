@@ -582,6 +582,18 @@ class _AppointmentCardState extends State<AppointmentCard> {
   }
 
   String _getAppointeeMobile() {
+    // Check if this is a guest appointment first
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestPhone = guestInformation['phoneNumber']?.toString();
+      if (guestPhone != null && guestPhone.isNotEmpty) {
+        return guestPhone;
+      }
+    }
+    
+    // Fallback to regular phone fields
     final phoneNumber = widget.appointment['phoneNumber'];
     if (phoneNumber is Map<String, dynamic>) {
       final countryCode = phoneNumber['countryCode']?.toString() ?? '';

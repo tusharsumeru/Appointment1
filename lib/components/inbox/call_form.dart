@@ -23,7 +23,18 @@ class _CallFormState extends State<CallForm> {
   }
 
   String _getPhoneNumber() {
-    // Check if this is a quick appointment first
+    // Check if this is a guest appointment first
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestPhone = guestInformation['phoneNumber']?.toString();
+      if (guestPhone != null && guestPhone.isNotEmpty) {
+        return guestPhone;
+      }
+    }
+    
+    // Check if this is a quick appointment
     final apptType = widget.appointment['appt_type']?.toString();
     final quickApt = widget.appointment['quick_apt'];
     

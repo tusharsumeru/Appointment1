@@ -38,12 +38,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         
         // Load detailed appointment data for scheduled date, time, and venue
         final detailedResult = await ActionService.getAppointmentByIdDetailed(widget.appointmentId);
+        print('DEBUG: Detailed result success: ${detailedResult['success']}');
         if (detailedResult['success']) {
+          print('DEBUG: Detailed data received: ${detailedResult['data']}');
           setState(() {
             detailedAppointmentData = detailedResult['data'];
             isLoading = false;
           });
         } else {
+          print('DEBUG: Detailed result failed: ${detailedResult['message']}');
           setState(() {
             isLoading = false;
           });
@@ -205,6 +208,40 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       return venueLabel ?? 'N/A';
     } catch (e) {
       return 'N/A';
+    }
+  }
+
+  int _getTotalNumberOfUsers() {
+    if (detailedAppointmentData == null) return 0;
+    
+    try {
+      // First try to get numberOfUsers from accompanyUsers
+      final accompanyUsers = detailedAppointmentData!['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'];
+        if (numberOfUsers != null) {
+          final result = int.tryParse(numberOfUsers.toString()) ?? 0;
+          // Add 1 for the main user (total = main user + accompanying users)
+          return result + 1;
+        }
+      }
+      
+      // Fallback: try direct numberOfUsers field
+      final directNumberOfUsers = detailedAppointmentData!['numberOfUsers'];
+      if (directNumberOfUsers != null) {
+        final result = int.tryParse(directNumberOfUsers.toString()) ?? 0;
+        return result;
+      }
+      
+      // Final fallback: count users from the appointmentData (check-in status data)
+      if (appointmentData != null && appointmentData!['users'] != null) {
+        final usersList = appointmentData!['users'] as List<dynamic>;
+        return usersList.length;
+      }
+      
+      return 0;
+    } catch (e) {
+      return 0;
     }
   }
 
@@ -991,6 +1028,69 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   ),
                                 ),
                               ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Total Number of Users Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFF97316).withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF97316).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.people,
+                                color: Color(0xFFF97316),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Total Users',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _getTotalNumberOfUsers().toString(),
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFF97316),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),

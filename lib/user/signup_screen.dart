@@ -689,9 +689,7 @@ class _SignupScreenState extends State<SignupScreen> {
         print('🔍 Teacher verification data: ${result['data']}');
 
         setState(() {
-          _selectedTeacherType = _selectedTeacherType == 'part-time'
-              ? 'part-time'
-              : 'full-time';
+          _selectedTeacherType = 'yes';
           _isTeacherVerified = true;
           _teacherVerificationData = result['data'];
         });
@@ -763,12 +761,14 @@ class _SignupScreenState extends State<SignupScreen> {
         String? teacherEmail;
         String? teacherMobile;
 
-        if (_selectedTeacherType != 'no') {
+        if (_selectedTeacherType == 'yes') {
           teacherCode = _teacherCodeController.text.trim();
           teacherEmail = _teacherEmailController.text.trim();
           teacherMobile =
               '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
         }
+
+
 
         // Call registration API
         final result = await ActionService.registerUser(
@@ -780,10 +780,8 @@ class _SignupScreenState extends State<SignupScreen> {
           company: _companyController.text.trim(),
           full_address: _locationController.text.trim(),
           userTags: _selectedRoles.toList(),
-          aol_teacher: _selectedTeacherType != 'no',
-          teacher_type: _selectedTeacherType == 'no'
-              ? null
-              : _selectedTeacherType,
+          aol_teacher: _selectedTeacherType == 'yes',
+          teacher_type: _selectedTeacherType == 'yes' ? 'Teacher' : null,
           teachercode: teacherCode,
           teacheremail: teacherEmail,
           mobilenumber: teacherMobile,
@@ -1546,19 +1544,11 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 12),
               _buildRadioOption(
-                value: 'part-time',
-                label: 'Yes - Part-time',
-                isSelected: _selectedTeacherType == 'part-time',
+                value: 'yes',
+                label: 'Yes',
+                isSelected: _selectedTeacherType == 'yes',
                 onTap: () =>
-                    setState(() => _selectedTeacherType = 'part-time'),
-              ),
-              const SizedBox(height: 12),
-              _buildRadioOption(
-                value: 'full-time',
-                label: 'Yes - Full-time',
-                isSelected: _selectedTeacherType == 'full-time',
-                onTap: () =>
-                    setState(() => _selectedTeacherType = 'full-time'),
+                    setState(() => _selectedTeacherType = 'yes'),
               ),
             ],
           ),
@@ -1571,9 +1561,7 @@ class _SignupScreenState extends State<SignupScreen> {
         _teacherVerificationData?['validationResult']?['apiResponse']?['teacherdetails'] ??
         {};
     final teacherCode = _teacherVerificationData?['teacherCode'] ?? '';
-    final teacherType = _selectedTeacherType == 'part-time'
-        ? 'Part-time Teacher'
-        : 'Full-time Teacher';
+    final teacherType = 'Teacher';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1705,8 +1693,8 @@ class _SignupScreenState extends State<SignupScreen> {
     return GestureDetector(
       onTap: () {
         onTap();
-        // Show teacher verification bottom sheet for part-time and full-time
-        if ((value == 'part-time' || value == 'full-time') && !isSelected) {
+        // Show teacher verification bottom sheet for yes
+        if (value == 'yes' && !isSelected) {
           _showTeacherVerificationBottomSheet();
         }
       },
@@ -1967,11 +1955,11 @@ class _SignupScreenState extends State<SignupScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          if (isSelected) {
-            _selectedRoles.remove(role);
-          } else {
-            _selectedRoles.add(role);
-          }
+                      if (isSelected) {
+              _selectedRoles.remove(role);
+            } else {
+              _selectedRoles.add(role);
+            }
         });
       },
       child: Container(

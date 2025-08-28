@@ -40,7 +40,7 @@ class _ReminderFormState extends State<ReminderForm> {
   String _selectedVenueName = 'Select a venue';
   
   // Checkbox states
-  bool _tbsReq = false;
+  bool _tbsReq = true;
   bool _dontSendEmailSms = false;
   bool _sendArrivalTime = false;
   bool _scheduleEmailSms = false;
@@ -116,11 +116,23 @@ class _ReminderFormState extends State<ReminderForm> {
               final venueExists = _venueOptions.any((venue) => venue['_id']?.toString() == _selectedVenueId);
               
               if (_selectedVenueId.isEmpty || !venueExists) {
-                // Set to first venue if none selected or current selection doesn't exist
-              final firstVenue = _venueOptions.first;
-              _selectedVenueId = firstVenue['_id']?.toString() ?? '';
-              _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
-                print('🎯 [VENUE] Auto-selected first venue: ${_selectedVenueName} (ID: ${_selectedVenueId})');
+                // Try to find Kaveri venue first, otherwise use first venue
+                final kaveriVenue = _venueOptions.firstWhere(
+                  (venue) => venue['name']?.toString().toLowerCase().contains('kaveri') == true,
+                  orElse: () => <String, dynamic>{},
+                );
+                
+                if (kaveriVenue.isNotEmpty) {
+                  _selectedVenueId = kaveriVenue['_id']?.toString() ?? '';
+                  _selectedVenueName = kaveriVenue['name']?.toString() ?? 'Select a venue';
+                  print('🎯 [VENUE] Auto-selected Kaveri venue: ${_selectedVenueName} (ID: ${_selectedVenueId})');
+                } else {
+                  // Fallback to first venue if Kaveri not found
+                  final firstVenue = _venueOptions.first;
+                  _selectedVenueId = firstVenue['_id']?.toString() ?? '';
+                  _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
+                  print('🎯 [VENUE] Auto-selected first venue (Kaveri not found): ${_selectedVenueName} (ID: ${_selectedVenueId})');
+                }
               } else {
                 // Update venue name for existing selection
                 final selectedVenue = _venueOptions.firstWhere(
@@ -187,6 +199,12 @@ class _ReminderFormState extends State<ReminderForm> {
   void initState() {
     super.initState();
     print('🚀 [INIT] ReminderForm initialized');
+    
+    // Set time to 16:30 when TBS is checked by default
+    if (_tbsReq) {
+      _selectedTime = '16:30';
+    }
+    
     print('   📅 Default time: $_selectedTime');
     print('   ⏰ Default arrival time: $_selectedArrivalTime');
     print('   🏢 Default meeting type: $_selectedMeetingType');

@@ -9,6 +9,11 @@ class UserImagesScreen extends StatefulWidget {
   final bool isLoading;
   final String? error;
   final int userIndex;
+  final Map<String, int>? albums;
+  final int? totalAlbumImages;
+  final int? uniqueAlbumCount;
+  final bool isAlbumView;
+  final String? albumId;
 
   const UserImagesScreen({
     super.key,
@@ -19,6 +24,11 @@ class UserImagesScreen extends StatefulWidget {
     this.isLoading = false,
     this.error,
     this.userIndex = 0,
+    this.albums,
+    this.totalAlbumImages,
+    this.uniqueAlbumCount,
+    this.isAlbumView = false,
+    this.albumId,
   });
 
   @override
@@ -56,10 +66,7 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
   }
 
-  String _getImageDate(int index) {
-    // For all users, show "Match X" format (no profile image)
-    return 'Match ${index + 1}';
-  }
+
 
   double _getMatchConfidence(int index) {
     // For all users, calculate confidence from API matches
@@ -108,6 +115,61 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     }
     
     return 0; // No matches found
+  }
+
+  // Get album ID for a specific image
+  String _getImageAlbumId(int index) {
+    if (widget.faceMatchData.isNotEmpty) {
+      final result = widget.faceMatchData[0];
+      
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        
+        // Get matches from all time periods
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        
+        // Combine all matches
+        final allMatches = [...matches30, ...matches60, ...matches90];
+        
+        if (index < allMatches.length) {
+          final match = allMatches[index];
+          return match['album_id']?.toString() ?? '';
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get image date for a specific image
+  String _getImageDate(int index) {
+    if (widget.faceMatchData.isNotEmpty) {
+      final result = widget.faceMatchData[0];
+      
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        
+        // Get matches from all time periods
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        
+        // Combine all matches
+        final allMatches = [...matches30, ...matches60, ...matches90];
+        
+        if (index < allMatches.length) {
+          final match = allMatches[index];
+          final date = match['date']?.toString() ?? '';
+          if (date.isNotEmpty) {
+            return date;
+          }
+        }
+      }
+    }
+    
+    return 'Match ${index + 1}';
   }
 
   @override
@@ -279,7 +341,9 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
                     Icon(Icons.photo_library, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
-                      '${_getActualImageCount()} images found',
+                      widget.isAlbumView 
+                        ? '${_getActualImageCount()} images in album'
+                        : '${_getActualImageCount()} images found',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],
@@ -287,6 +351,42 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
                     ),
                   ],
                 ),
+                // Show album information if available
+                if (widget.albums != null && widget.albums!.isNotEmpty && !widget.isAlbumView) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.album, size: 16, color: Colors.green[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.uniqueAlbumCount} albums • ${widget.totalAlbumImages} total images',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Show album ID when viewing specific album
+                if (widget.isAlbumView && widget.albumId != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.album, size: 16, color: Colors.orange[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Album ID: ${widget.albumId}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (widget.userIndex > 0) ...[
                   const SizedBox(height: 4),
                   Row(
@@ -387,8 +487,72 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
                 ),
               ),
             ),
-            
-
+            // Image Info
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Match number and confidence
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _getImageDate(index),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${_getMatchConfidence(index).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Album information
+                  if (widget.albums != null && widget.albums!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.album,
+                          size: 10,
+                          color: Colors.green[600],
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            _getImageAlbumId(index),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.green[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),

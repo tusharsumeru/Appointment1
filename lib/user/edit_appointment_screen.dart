@@ -142,6 +142,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize numberOfUsers to 1 by default (including the main user)
+    _numberOfUsersController.text = '1';
     _loadAppointmentData();
     _loadLocations();
     if (_isGuestAppointment) {
@@ -252,23 +254,36 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final attendingCourseDetails = appointment['attendingCourseDetails'];
       if (attendingCourseDetails != null &&
           attendingCourseDetails is Map<String, dynamic>) {
-        _isAttendingProgram = true;
+        
+        // Check the isAttending field from the database
+        final isAttending = attendingCourseDetails['isAttending'];
+        if (isAttending == true) {
+          _isAttendingProgram = true;
+          print('📅 Program attendance data found: isAttending = true');
+          
+          // Load program date range
+          final fromDate = attendingCourseDetails['fromDate'];
+          final toDate = attendingCourseDetails['toDate'];
 
-        // Load program date range
-        final fromDate = attendingCourseDetails['fromDate'];
-        final toDate = attendingCourseDetails['toDate'];
+          if (fromDate != null) {
+            final from = DateTime.parse(fromDate);
+            _programFromDateController.text =
+                '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+          }
 
-        if (fromDate != null) {
-          final from = DateTime.parse(fromDate);
-          _programFromDateController.text =
-              '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+          if (toDate != null) {
+            final to = DateTime.parse(toDate);
+            _programToDateController.text =
+                '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+          }
+        } else {
+          _isAttendingProgram = false;
+          print('📅 Program attendance data found: isAttending = false');
         }
-
-        if (toDate != null) {
-          final to = DateTime.parse(toDate);
-          _programToDateController.text =
-              '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
-        }
+      } else {
+        // Explicitly set to false if no program details exist
+        _isAttendingProgram = false;
+        print('📅 No program attendance data found, setting _isAttendingProgram to false');
       }
 
       // Load existing attachment URL
@@ -289,14 +304,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
       if (accompanyUsers != null && accompanyUsers['users'] != null) {
         final List<dynamic> users = accompanyUsers['users'];
-        // Set number of users to just the accompanying users count
-        _numberOfUsersController.text = users.length.toString();
+        // Set number of users to total count (accompanying users + 1 for main user)
+        _numberOfUsersController.text = (users.length + 1).toString();
         print(
-          'DEBUG LOAD: Set numberOfUsers to ${users.length} (accompanying users only)',
+          'DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (total people including main user)',
         );
       } else {
-        _numberOfUsersController.text = '0';
-        print('DEBUG LOAD: Set numberOfUsers to 0 (no accompanying users)');
+        _numberOfUsersController.text = '1';
+        print('DEBUG LOAD: Set numberOfUsers to 1 (just main user)');
       }
 
       _validateForm();
@@ -338,55 +353,79 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           final countryCode = phoneNumber['countryCode']?.toString() ?? '';
           final number = phoneNumber['number']?.toString() ?? '';
 
-          if (number.isNotEmpty) {
-            // Set combined format: +countryCode + number
-            final cleanCountryCode = countryCode.startsWith('+')
-                ? countryCode.substring(1)
-                : countryCode;
-            _guestPhoneController.text = '+$cleanCountryCode$number';
-            print('📞 Parsed main guest phone: +$cleanCountryCode$number');
+                      if (number.isNotEmpty) {
+              // Extract just the number part (remove country code if present)
+              String numberOnly = number;
+              
+              // Get the country code without the + prefix
+              final countryCodeWithoutPlus = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+              
+              // Check if the number starts with the country code (without +)
+              if (number.startsWith(countryCodeWithoutPlus)) {
+                // Remove the country code from the beginning of the number
+                numberOnly = number.substring(countryCodeWithoutPlus.length);
+              } else if (number.startsWith('+')) {
+                // Fallback: if number starts with +, try to extract country code
+                final countryCodeWithoutPlus = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                if (number.startsWith('+$countryCodeWithoutPlus')) {
+                  numberOnly = number.substring(countryCodeWithoutPlus.length + 1); // +1 for the +
+                } else {
+                  // If the number doesn't match the expected country code format,
+                  // try to extract any country code from the beginning
+                  numberOnly = _extractNumberFromFullPhone(number);
+                }
+              }
+              
+              _guestPhoneController.text = numberOnly;
+              print('📞 Parsed main guest phone number only: $numberOnly');
 
             // Set country
             _selectedCountry = Country(
-              phoneCode: cleanCountryCode,
+              phoneCode: countryCode.startsWith('+') ? countryCode.substring(1) : countryCode,
               countryCode: 'IN', // Default to India
               e164Sc: 0,
               geographic: true,
               level: 1,
               name: 'India',
               example: '9876543210',
-              displayName: 'India (IN) [+$cleanCountryCode]',
+              displayName: 'India (IN) [$countryCode]',
               displayNameNoCountryCode: 'India (IN)',
-              e164Key: '$cleanCountryCode-IN-0',
+              e164Key: '${countryCode.startsWith('+') ? countryCode.substring(1) : countryCode}-IN-0',
             );
           }
         } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
-          // Fallback: phone number is stored as a string
-          if (phoneNumber.startsWith('+')) {
-            final parts = phoneNumber.substring(1).split(' ');
-            if (parts.length >= 2) {
-              final countryCode = parts[0];
-              final number = parts.sublist(1).join('');
-              _guestPhoneController.text = '+$countryCode$number';
-              print('📞 Parsed main guest phone: +$countryCode$number');
+                      // Fallback: phone number is stored as a string
+            if (phoneNumber.startsWith('+')) {
+              // Extract just the number part
+              String numberOnly = _extractNumberFromFullPhone(phoneNumber);
+              String countryCode = '+91'; // Default
+              
+              // Try to find the country code that was removed
+              final knownCountryCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+39', '+34', '+7', '+61', '+55', '+52', '+46', '+31', '+32', '+41', '+47', '+45', '+358', '+46', '+47', '+48', '+351', '+420', '+380', '+213', '+355'];
+              
+              for (String code in knownCountryCodes) {
+                if (phoneNumber.startsWith(code)) {
+                  countryCode = code;
+                  break;
+                }
+              }
+              
+              _guestPhoneController.text = numberOnly;
+              print('📞 Parsed main guest phone number only: $numberOnly');
 
-              // Set country
-              _selectedCountry = Country(
-                phoneCode: countryCode,
-                countryCode: 'IN', // Default to India
-                e164Sc: 0,
-                geographic: true,
-                level: 1,
-                name: 'India',
-                example: '9876543210',
-                displayName: 'India (IN) [+$countryCode]',
-                displayNameNoCountryCode: 'India (IN)',
-                e164Key: '$countryCode-IN-0',
-              );
-            } else {
-              _guestPhoneController.text = phoneNumber;
-              print('📞 Main guest phone (no country code): $phoneNumber');
-            }
+            // Set country
+            _selectedCountry = Country(
+              phoneCode: countryCode.startsWith('+') ? countryCode.substring(1) : countryCode,
+              countryCode: 'IN', // Default to India
+              e164Sc: 0,
+              geographic: true,
+              level: 1,
+              name: 'India',
+              example: '9876543210',
+              displayName: 'India (IN) [$countryCode]',
+              displayNameNoCountryCode: 'India (IN)',
+              e164Key: '${countryCode.startsWith('+') ? countryCode.substring(1) : countryCode}-IN-0',
+            );
           } else {
             _guestPhoneController.text = phoneNumber;
             print('📞 Main guest phone (no + prefix): $phoneNumber');
@@ -465,58 +504,80 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               final number = phoneNumber['number']?.toString() ?? '';
 
               if (number.isNotEmpty) {
-                // Set combined format: +countryCode + number
-                final cleanCountryCode = countryCode.startsWith('+')
-                    ? countryCode.substring(1)
-                    : countryCode;
-                phoneController.text = '+$cleanCountryCode$number';
+                // Extract just the number part (remove country code if present)
+                String numberOnly = number;
+                
+                // Get the country code without the + prefix
+                final countryCodeWithoutPlus = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                
+                // Check if the number starts with the country code (without +)
+                if (number.startsWith(countryCodeWithoutPlus)) {
+                  // Remove the country code from the beginning of the number
+                  numberOnly = number.substring(countryCodeWithoutPlus.length);
+                } else if (number.startsWith('+')) {
+                  // Fallback: if number starts with +, try to extract country code
+                  final countryCodeWithoutPlus = countryCode.startsWith('+') ? countryCode.substring(1) : countryCode;
+                  if (number.startsWith('+$countryCodeWithoutPlus')) {
+                    numberOnly = number.substring(countryCodeWithoutPlus.length + 1); // +1 for the +
+                  } else {
+                    // If the number doesn't match the expected country code format,
+                    // try to extract any country code from the beginning
+                    numberOnly = _extractNumberFromFullPhone(number);
+                  }
+                }
+                
+                phoneController.text = numberOnly;
                 print(
-                  '📞 Accompanying user $guestNumber phone: +$cleanCountryCode$number',
+                  '📞 Accompanying user $guestNumber phone number only: $numberOnly',
                 );
 
                 _guestCountries[guestNumber] = Country(
-                  phoneCode: cleanCountryCode,
+                  phoneCode: countryCode.startsWith('+') ? countryCode.substring(1) : countryCode,
                   countryCode: 'IN',
                   e164Sc: 0,
                   geographic: true,
                   level: 1,
                   name: 'India',
                   example: '9876543210',
-                  displayName: 'India (IN) [+$cleanCountryCode]',
+                  displayName: 'India (IN) [$countryCode]',
                   displayNameNoCountryCode: 'India (IN)',
-                  e164Key: '$cleanCountryCode-IN-0',
+                  e164Key: '${countryCode.startsWith('+') ? countryCode.substring(1) : countryCode}-IN-0',
                 );
               }
             } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
               // Fallback: phone number is stored as a string
               if (phoneNumber.startsWith('+')) {
-                final parts = phoneNumber.substring(1).split(' ');
-                if (parts.length >= 2) {
-                  final countryCode = parts[0];
-                  final number = parts.sublist(1).join('');
-                  phoneController.text = '+$countryCode$number';
-                  print(
-                    '📞 Accompanying user $guestNumber phone: +$countryCode$number',
-                  );
-
-                  _guestCountries[guestNumber] = Country(
-                    phoneCode: countryCode,
-                    countryCode: 'IN',
-                    e164Sc: 0,
-                    geographic: true,
-                    level: 1,
-                    name: 'India',
-                    example: '9876543210',
-                    displayName: 'India (IN) [+$countryCode]',
-                    displayNameNoCountryCode: 'India (IN)',
-                    e164Key: '$countryCode-IN-0',
-                  );
-                } else {
-                  phoneController.text = phoneNumber;
-                  print(
-                    '📞 Accompanying user $guestNumber phone (no country code): $phoneNumber',
-                  );
+                // Extract just the number part
+                String numberOnly = _extractNumberFromFullPhone(phoneNumber);
+                String countryCode = '+91'; // Default
+                
+                // Try to find the country code that was removed
+                final knownCountryCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+39', '+34', '+7', '+61', '+55', '+52', '+46', '+31', '+32', '+41', '+47', '+45', '+358', '+46', '+47', '+48', '+351', '+420', '+380', '+213', '+355'];
+                
+                for (String code in knownCountryCodes) {
+                  if (phoneNumber.startsWith(code)) {
+                    countryCode = code;
+                    break;
+                  }
                 }
+                
+                phoneController.text = numberOnly;
+                print(
+                  '📞 Accompanying user $guestNumber phone number only: $numberOnly',
+                );
+
+                _guestCountries[guestNumber] = Country(
+                  phoneCode: countryCode.startsWith('+') ? countryCode.substring(1) : countryCode,
+                  countryCode: 'IN',
+                  e164Sc: 0,
+                  geographic: true,
+                  level: 1,
+                  name: 'India',
+                  example: '9876543210',
+                  displayName: 'India (IN) [$countryCode]',
+                  displayNameNoCountryCode: 'India (IN)',
+                  e164Key: '${countryCode.startsWith('+') ? countryCode.substring(1) : countryCode}-IN-0',
+                );
               } else {
                 phoneController.text = phoneNumber;
                 print(
@@ -816,10 +877,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _updateGuestControllers() {
-    int accompanyUsersCount = int.tryParse(_numberOfUsersController.text) ?? 0;
+    int totalPeopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+    int accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
 
     print(
-      'DEBUG UPDATE: _updateGuestControllers - accompanyUsersCount: $accompanyUsersCount, current controllers: ${_guestControllers.length}',
+      'DEBUG UPDATE: _updateGuestControllers - totalPeopleCount: $totalPeopleCount, accompanyUsersCount: $accompanyUsersCount, current controllers: ${_guestControllers.length}',
     );
 
     // If we're reducing the number of guests, dispose extra controllers from the end
@@ -888,7 +950,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final day = int.parse(parts[0]);
         final month = int.parse(parts[1]);
         final year = int.parse(parts[2]);
-        return DateTime(year, month, day);
+        return DateTime.utc(year, month, day); // Use UTC to avoid timezone issues
       }
     } catch (e) {
       print('Error parsing date: $e');
@@ -976,8 +1038,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
     // Validate guest information if any
     bool guestFormValid = true;
-    final accompanyUsersCount =
-        int.tryParse(_numberOfUsersController.text) ?? 0;
+    final totalPeopleCount =
+        int.tryParse(_numberOfUsersController.text) ?? 1;
+    final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
     if (accompanyUsersCount > 0 && accompanyUsersCount <= 10) {
       for (var guest in _guestControllers) {
         if (guest['name']?.text.isEmpty == true ||
@@ -1037,7 +1100,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'appointmentLocation': _selectedLocationMongoId,
         'assignedSecretary': _selectedSecretary,
-        'numberOfUsers': (int.tryParse(_numberOfUsersController.text) ?? 0) + 1,
+        'numberOfUsers': int.tryParse(_numberOfUsersController.text) ?? 1, // Total number of people
       };
 
       // Use preferred date range for appointment scheduling
@@ -1051,8 +1114,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final phoneText = _guestPhoneController.text.trim();
         String fullPhoneNumber = phoneText;
 
-        // If the phone number doesn't start with +, add the country code
-        if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
+        // Always add the country code to the phone number
+        if (phoneText.isNotEmpty) {
           final countryCode = '+${_selectedCountry.phoneCode}';
           fullPhoneNumber = '$countryCode$phoneText';
         }
@@ -1083,8 +1146,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Add accompanyUsers if there are additional users
-      final accompanyUsersCount =
-          int.tryParse(_numberOfUsersController.text) ?? 0;
+      final totalPeopleCount =
+          int.tryParse(_numberOfUsersController.text) ?? 1;
+      final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
       if (accompanyUsersCount > 0) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
@@ -1092,22 +1156,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           int guestNumber = i + 1;
 
           final phoneText = guest['phone']?.text.trim() ?? '';
-          String fullPhoneNumber = phoneText;
-
-          // If the phone number doesn't start with +, add the country code
-          if (phoneText.isNotEmpty && !phoneText.startsWith('+')) {
-            final countryCode =
-                '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
-            fullPhoneNumber = '$countryCode$phoneText';
-          }
+          final countryCode = _guestCountries[guestNumber]?.phoneCode ?? '91';
+          
+          // Format phone number as object with countryCode and number
+          Map<String, dynamic> phoneNumberObj = {
+            'countryCode': '+$countryCode',
+            'number': '$countryCode$phoneText',
+          };
 
           print(
-            '📞 Saving accompanying user $guestNumber phone: $fullPhoneNumber',
+            '📞 Saving accompanying user $guestNumber phone: ${phoneNumberObj['countryCode']}${phoneText}',
           );
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
-            'phoneNumber': fullPhoneNumber,
+            'phoneNumber': phoneNumberObj,
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
@@ -1191,13 +1254,53 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final day = int.parse(parts[0]);
         final month = int.parse(parts[1]);
         final year = int.parse(parts[2]);
-        final date = DateTime(year, month, day);
+        final date = DateTime.utc(year, month, day); // Use UTC to avoid timezone issues
         return date.toIso8601String().split('T')[0];
       }
     } catch (e) {
       print('Error parsing date: $e');
     }
     return dateString;
+  }
+
+  // Helper method to extract number from full phone number (removes country code)
+  String _extractNumberFromFullPhone(String fullPhone) {
+    if (!fullPhone.startsWith('+')) {
+      return fullPhone; // No country code to remove
+    }
+
+    // List of common country codes to try
+    final countryCodes = [
+      '+1', '+44', '+91', '+86', '+81', '+49', '+33', '+39', '+34', '+7', 
+      '+61', '+55', '+52', '+46', '+31', '+32', '+41', '+47', '+45', '+358', 
+      '+46', '+47', '+48', '+351', '+420', '+380', '+213', '+355', '+33', '+39'
+    ];
+
+    // Try to find and remove the country code
+    for (String code in countryCodes) {
+      if (fullPhone.startsWith(code)) {
+        return fullPhone.substring(code.length);
+      }
+    }
+
+    // If no known country code found, try to remove the first 1-4 digits after +
+    // This handles cases like +21312345667 where 213 is the country code
+    if (fullPhone.length > 4) {
+      // Try removing 1-4 digits after the +
+      for (int i = 1; i <= 4; i++) {
+        if (fullPhone.length > i + 1) {
+          String possibleCode = fullPhone.substring(1, i + 1);
+          // Check if the remaining part looks like a phone number (at least 7 digits)
+          String remaining = fullPhone.substring(i + 1);
+          if (remaining.length >= 7 && RegExp(r'^\d+$').hasMatch(remaining)) {
+            return remaining;
+          }
+        }
+      }
+    }
+
+    // If all else fails, return the original number without the +
+    return fullPhone.substring(1);
   }
 
   // Open attachment URL
@@ -2084,99 +2187,96 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        // Row(
-        //   children: [
-        //     // Country picker button - UI COMMENTED OUT
-        // GestureDetector(
-        //   onTap: () {
-        //         showCountryPicker(
-        //           context: context,
-        //           showPhoneCode: true,
-        //           countryListTheme: CountryListThemeData(
-        //             flagSize: 25,
-        //             backgroundColor: Colors.white,
-        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-        //             bottomSheetHeight: 500,
-        //             borderRadius: const BorderRadius.only(
-        //               topLeft: Radius.circular(20.0),
-        //               topRight: Radius.circular(20.0),
-        //             ),
-        //             inputDecoration: InputDecoration(
-        //               labelText: 'Search',
-        //               hintText: 'Start typing to search',
-        //               prefixIcon: const Icon(Icons.search),
-        //               border: OutlineInputBorder(
-        //                 borderSide: BorderSide(
-        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
-        //                 ),
-        //               ),
-        //             ),
-        //           ),
-        //           onSelect: (Country country) {
-        //             setState(() {
-        //               _selectedCountry = country;
-        //               // Update the phone number with new country code
-        //               _updateMainGuestPhoneNumberWithCountryCode(country.phoneCode);
-        //             });
-        //           },
-        //         );
-        //   },
-        //   child: Container(
-        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        //     decoration: BoxDecoration(
-        //           border: Border.all(color: Colors.grey.shade300),
-        //           borderRadius: const BorderRadius.only(
-        //             topLeft: Radius.circular(8),
-        //             bottomLeft: Radius.circular(8),
-        //           ),
-        //     ),
-        //     child: Row(
-        //           mainAxisSize: MainAxisSize.min,
-        //       children: [
-        //             Text(
-        //               '+${_selectedCountry.phoneCode}',
-        //               style: const TextStyle(fontSize: 16),
-        //             ),
-        //             const SizedBox(width: 4),
-        //             const Icon(Icons.arrow_drop_down, size: 20),
-        //           ],
-        //         ),
-        //       ),
-        //     ),
-        //   ],
-        // ),
-        // Phone number field with combined format - FULL WIDTH (country picker commented out)
-        SizedBox(
-          width: double.infinity,
-          child: TextFormField(
-            controller: _guestPhoneController,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              hintText: '+${_selectedCountry.phoneCode} Enter mobile number',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+        Row(
+          children: [
+            // Country picker button
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country country) {
+                    setState(() {
+                      _selectedCountry = country;
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '+${_selectedCountry.phoneCode}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 20),
+                  ],
+                ),
               ),
             ),
-            onChanged: (value) {
-              // Ensure the phone number starts with the country code
-              if (value.isNotEmpty && !value.startsWith('+')) {
-                // If user enters number without +, add the country code
-                if (!value.startsWith(_selectedCountry.phoneCode)) {
-                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
-                  _guestPhoneController.text =
-                      '+${_selectedCountry.phoneCode}$cleanValue';
-                  _guestPhoneController.selection = TextSelection.fromPosition(
-                    TextPosition(offset: _guestPhoneController.text.length),
-                  );
-                }
-              }
-              _validateForm();
-            },
-          ),
+            // Phone number field
+            Expanded(
+              child: TextFormField(
+                controller: _guestPhoneController,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'Enter mobile number',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.deepPurple),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  counterText: '', // Hide character counter
+                ),
+                onChanged: (value) {
+                  _validateForm();
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -2202,98 +2302,96 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        // Row(
-        //   children: [
-        //     // Country picker button - UI COMMENTED OUT
-        //     GestureDetector(
-        //       onTap: () {
-        //         showCountryPicker(
-        //           context: context,
-        //           showPhoneCode: true,
-        //           countryListTheme: CountryListThemeData(
-        //             flagSize: 25,
-        //             backgroundColor: Colors.white,
-        //             textStyle: const TextStyle(fontSize: 16, color: Colors.black),
-        //             bottomSheetHeight: 500,
-        //             borderRadius: const BorderRadius.only(
-        //               topLeft: Radius.circular(20.0),
-        //               topRight: Radius.circular(20.0),
-        //             ),
-        //             inputDecoration: InputDecoration(
-        //               labelText: 'Search',
-        //               hintText: 'Start typing to search',
-        //               prefixIcon: const Icon(Icons.search),
-        //               border: OutlineInputBorder(
-        //                 borderSide: BorderSide(
-        //                   color: const Color(0xFF8C98A8).withOpacity(0.2),
-        //                 ),
-        //               ),
-        //             ),
-        //           ),
-        //           onSelect: (Country selectedCountry) {
-        //             setState(() {
-        //               _guestCountries[guestNumber] = selectedCountry;
-        //               // Update the phone number with new country code
-        //               _updatePhoneNumberWithCountryCode(guestNumber, selectedCountry.phoneCode);
-        //             });
-        //           },
-        //         );
-        //       },
-        //       child: Container(
-        //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        //         decoration: BoxDecoration(
-        //           border: Border.all(color: Colors.grey.shade300),
-        //           borderRadius: const BorderRadius.only(
-        //             topLeft: Radius.circular(8),
-        //             bottomLeft: Radius.circular(8),
-        //           ),
-        //         ),
-        //         child: Row(
-        //           mainAxisSize: MainAxisSize.min,
-        //           children: [
-        //             Text(
-        //               '+$countryCode',
-        //               style: const TextStyle(fontSize: 16),
-        //             ),
-        //             const SizedBox(width: 4),
-        //             const Icon(Icons.arrow_drop_down, size: 20),
-        //           ],
-        //         ),
-        //       ),
-        //     ),
-        //   ],
-        // ),
-        // Phone number field with combined format - FULL WIDTH (country picker commented out)
-        SizedBox(
-          width: double.infinity,
-          child: TextFormField(
-            controller: controller,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              hintText: '+$countryCode Enter phone number',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+        Row(
+          children: [
+            // Country picker button
+            GestureDetector(
+              onTap: () {
+                showCountryPicker(
+                  context: context,
+                  showPhoneCode: true,
+                  countryListTheme: CountryListThemeData(
+                    flagSize: 25,
+                    backgroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16, color: Colors.black),
+                    bottomSheetHeight: 500,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20.0),
+                      topRight: Radius.circular(20.0),
+                    ),
+                    inputDecoration: InputDecoration(
+                      labelText: 'Search',
+                      hintText: 'Start typing to search',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color(0xFF8C98A8).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  onSelect: (Country selectedCountry) {
+                    setState(() {
+                      _guestCountries[guestNumber] = selectedCountry;
+                    });
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '+$countryCode',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 20),
+                  ],
+                ),
               ),
             ),
-            onChanged: (value) {
-              // Ensure the phone number starts with the country code
-              if (value.isNotEmpty && !value.startsWith('+')) {
-                // If user enters number without +, add the country code
-                if (!value.startsWith(countryCode)) {
-                  final cleanValue = value.replaceAll(RegExp(r'[^\d]'), '');
-                  controller.text = '+$countryCode$cleanValue';
-                  controller.selection = TextSelection.fromPosition(
-                    TextPosition(offset: controller.text.length),
-                  );
-                }
-              }
-              _validateForm();
-            },
-          ),
+            // Phone number field
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'Enter phone number',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(0),
+                    borderSide: BorderSide(color: Colors.deepPurple),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  counterText: '', // Hide character counter
+                ),
+                onChanged: (value) {
+                  _validateForm();
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -3510,12 +3608,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         _buildSecretaryField(),
                         const SizedBox(height: 20),
 
-                        // Number of People with + and - buttons
+                        // Total Number of People with + and - buttons
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Accompany Users',
+                              'Total Number of People',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -3532,11 +3630,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         int.tryParse(
                                           _numberOfUsersController.text,
                                         ) ??
-                                        0;
+                                        1;
                                     print(
                                       'DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}',
                                     );
-                                    if (currentCount > 0) {
+                                    if (currentCount > 1) {
                                       print(
                                         'DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}',
                                       );
@@ -3551,7 +3649,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       );
                                     } else {
                                       print(
-                                        'DEBUG MINUS: Cannot reduce below 0 (no accompanying users)',
+                                        'DEBUG MINUS: Cannot reduce below 1 (minimum is main user)',
                                       );
                                     }
                                   },
@@ -3591,7 +3689,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     child: Center(
                                       child: Text(
                                         _numberOfUsersController.text.isEmpty
-                                            ? '0'
+                                            ? '1'
                                             : _numberOfUsersController.text,
                                         style: const TextStyle(
                                           fontSize: 18,
@@ -3611,7 +3709,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         int.tryParse(
                                           _numberOfUsersController.text,
                                         ) ??
-                                        0;
+                                        1;
                                     setState(() {
                                       _numberOfUsersController.text =
                                           (currentCount + 1).toString();
@@ -3640,7 +3738,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Number of people accompanying you',
+                              'Total number of people including you',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -3651,11 +3749,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         const SizedBox(height: 20),
 
                         // Guest Information Cards (for accompanying users)
-                        if ((int.tryParse(_numberOfUsersController.text) ?? 0) >
-                                0 &&
+                        if ((int.tryParse(_numberOfUsersController.text) ?? 1) >
+                                1 &&
                             (int.tryParse(_numberOfUsersController.text) ??
-                                    0) <=
-                                10) ...[
+                                    1) <=
+                                11) ...[
                           const Text(
                             'Accompany User Details',
                             style: TextStyle(
@@ -3683,8 +3781,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         ] else if ((int.tryParse(
                                   _numberOfUsersController.text,
                                 ) ??
-                                0) >
-                            10) ...[
+                                1) >
+                            11) ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
@@ -4190,14 +4288,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           const SizedBox(height: 12),
 
                           // Instructional Text
-                          Text(
-                            'Please enter your program dates. Your appointment will be scheduled during this period.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: const Color(0xFFF97316),
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
+                          // Text(
+                          //   'Please enter your program dates. Your appointment will be scheduled during this period.',
+                          //   style: TextStyle(
+                          //     fontSize: 14,
+                          //     color: const Color(0xFFF97316),
+                          //     fontStyle: FontStyle.italic,
+                          //   ),
+                          // ),
                         ],
                         const SizedBox(height: 32),
 
