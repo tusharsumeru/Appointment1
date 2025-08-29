@@ -266,7 +266,12 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
 
           // Today card component
-          Expanded(child: TodayCardComponent(key: ValueKey(_refreshCounter))),
+          Expanded(
+            child: Container(
+              color: Colors.white,
+              child: TodayCardComponent(key: ValueKey(_refreshCounter)),
+            ),
+          ),
         ],
       ),
     );

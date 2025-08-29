@@ -6,6 +6,7 @@ class ReminderForm extends StatefulWidget {
   final VoidCallback? onSave;
   final VoidCallback? onClose;
   final VoidCallback? onRefresh; // Add refresh callback
+  final bool isFromScheduleScreens; // Add parameter to indicate if from schedule screens
 
   const ReminderForm({
     Key? key,
@@ -13,6 +14,7 @@ class ReminderForm extends StatefulWidget {
     this.onSave,
     this.onClose,
     this.onRefresh, // Add refresh callback parameter
+    this.isFromScheduleScreens = false, // Default to false
   }) : super(key: key);
 
   @override
@@ -54,6 +56,11 @@ class _ReminderFormState extends State<ReminderForm> {
   // Loading state
   bool _isLoading = false;
 
+  // Validation message state
+  String? _validationMessage;
+  bool _showValidationMessage = false;
+  bool _isSuccessMessage = false;
+
   // Venue data from API
   List<Map<String, dynamic>> _venueOptions = [];
   bool _isLoadingVenues = false;
@@ -68,19 +75,13 @@ class _ReminderFormState extends State<ReminderForm> {
     final appointmentId = widget.appointment['appointmentId']?.toString();
     final id = widget.appointment['_id']?.toString();
     
-    print('🔍 [ID] Available IDs:');
-    print('   📋 appointmentId: $appointmentId');
-    print('   🆔 _id: $id');
-    
-    // FIXED: Use MongoDB _id instead of appointmentId for backend compatibility
+    // Use MongoDB _id instead of appointmentId for backend compatibility
     final result = id ?? appointmentId ?? '';
-    print('   ✅ Using ID: $result (${id != null ? 'MongoDB _id' : 'appointmentId'})');
     
     return result;
   }
 
   void _loadVenues() async {
-    print('🔄 [VENUE] Starting to load venues...');
     setState(() {
       _isLoadingVenues = true;
       _venueError = null;
@@ -91,8 +92,6 @@ class _ReminderFormState extends State<ReminderForm> {
         limit: 100, // Get more venues
       );
 
-      print('📡 [VENUE] API Response received: ${result['success'] ? 'SUCCESS' : 'FAILED'}');
-
       if (result['success']) {
         final data = result['data'];
         if (data != null && data['venues'] != null) {
@@ -100,15 +99,6 @@ class _ReminderFormState extends State<ReminderForm> {
           setState(() {
             _venueOptions = venuesData.cast<Map<String, dynamic>>();
             _isLoadingVenues = false;
-            
-            print('✅ [VENUE] Successfully loaded ${_venueOptions.length} venues');
-            
-            // Debug: Check for duplicate IDs
-            final venueIds = _venueOptions.map((v) => v['_id']?.toString()).where((id) => id != null).toList();
-            final uniqueIds = venueIds.toSet();
-            if (venueIds.length != uniqueIds.length) {
-              print('⚠️  [VENUE] WARNING: Duplicate venue IDs found! Total: ${venueIds.length}, Unique: ${uniqueIds.length}');
-            }
             
             // Set default venue if venues are available and no venue is selected
             if (_venueOptions.isNotEmpty) {
@@ -125,13 +115,11 @@ class _ReminderFormState extends State<ReminderForm> {
                 if (kaveriVenue.isNotEmpty) {
                   _selectedVenueId = kaveriVenue['_id']?.toString() ?? '';
                   _selectedVenueName = kaveriVenue['name']?.toString() ?? 'Select a venue';
-                  print('🎯 [VENUE] Auto-selected Kaveri venue: ${_selectedVenueName} (ID: ${_selectedVenueId})');
                 } else {
                   // Fallback to first venue if Kaveri not found
                   final firstVenue = _venueOptions.first;
                   _selectedVenueId = firstVenue['_id']?.toString() ?? '';
                   _selectedVenueName = firstVenue['name']?.toString() ?? 'Select a venue';
-                  print('🎯 [VENUE] Auto-selected first venue (Kaveri not found): ${_selectedVenueName} (ID: ${_selectedVenueId})');
                 }
               } else {
                 // Update venue name for existing selection
@@ -140,14 +128,10 @@ class _ReminderFormState extends State<ReminderForm> {
                   orElse: () => <String, dynamic>{},
                 );
                 _selectedVenueName = selectedVenue['name']?.toString() ?? 'Select a venue';
-                print('🎯 [VENUE] Updated venue name for existing selection: ${_selectedVenueName}');
               }
-            } else {
-              print('⚠️  [VENUE] No venues available to select');
             }
           });
         } else {
-          print('❌ [VENUE] Invalid venue data structure received');
           setState(() {
             _venueError = 'Invalid venue data structure';
             _isLoadingVenues = false;
@@ -155,7 +139,6 @@ class _ReminderFormState extends State<ReminderForm> {
           });
         }
       } else {
-        print('❌ [VENUE] API failed: ${result['message']}');
         setState(() {
           _venueError = result['message'] ?? 'Failed to load venues';
           _isLoadingVenues = false;
@@ -163,7 +146,6 @@ class _ReminderFormState extends State<ReminderForm> {
         });
       }
     } catch (error) {
-      print('💥 [VENUE] Network error: $error');
       setState(() {
         _venueError = 'Network error: ${error.toString()}';
         _isLoadingVenues = false;
@@ -198,20 +180,254 @@ class _ReminderFormState extends State<ReminderForm> {
   @override
   void initState() {
     super.initState();
-    print('🚀 [INIT] ReminderForm initialized');
     
-    // Set time to 16:30 when TBS is checked by default
-    if (_tbsReq) {
+    // Load existing schedule data if available
+    _loadExistingScheduleData();
+    
+    // Set time to 16:30 when TBS is checked by default (only if no existing time and not from schedule screens)
+    if (_tbsReq && _selectedTime.isEmpty && !widget.isFromScheduleScreens) {
       _selectedTime = '16:30';
     }
-    
-    print('   📅 Default time: $_selectedTime');
-    print('   ⏰ Default arrival time: $_selectedArrivalTime');
-    print('   🏢 Default meeting type: $_selectedMeetingType');
     
     _timeController.text = _selectedTime;
     _arrivalTimeController.text = _selectedArrivalTime;
     _loadVenues(); // Load venues from API
+  }
+
+  // Method to load existing schedule data from appointment
+  void _loadExistingScheduleData() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      // Load date
+      final existingDate = scheduledDateTime['date']?.toString();
+      if (existingDate != null && existingDate.isNotEmpty) {
+        // Format the date properly - handle ISO format
+        String formattedDate = existingDate;
+        try {
+          // If it's an ISO date string, parse and format it
+          if (existingDate.contains('T') || existingDate.contains('Z')) {
+            final dateTime = DateTime.parse(existingDate);
+            formattedDate = '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+          }
+        } catch (e) {
+          // Keep original if parsing fails
+          formattedDate = existingDate;
+        }
+        
+        _selectedDate = formattedDate;
+        _dateController.text = formattedDate;
+      }
+      
+      // Load time
+      final existingTime = scheduledDateTime['time']?.toString();
+      if (existingTime != null && existingTime.isNotEmpty) {
+        // Format the time properly - handle various time formats
+        String formattedTime = existingTime;
+        try {
+          // If it's an ISO time string, parse and format it
+          if (existingTime.contains('T') || existingTime.contains('Z')) {
+            final dateTime = DateTime.parse(existingTime);
+            formattedTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+          } else if (existingTime.contains(':')) {
+            // If it's already in HH:MM format, keep it as is
+            formattedTime = existingTime;
+          } else {
+            // Try to parse as a different format
+            final dateTime = DateTime.parse(existingTime);
+            formattedTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+          }
+        } catch (e) {
+          // Keep original if parsing fails
+          formattedTime = existingTime;
+        }
+        
+        _selectedTime = formattedTime;
+        _timeController.text = formattedTime;
+      }
+      
+      // Load venue information
+      final existingVenue = scheduledDateTime['venue'];
+      if (existingVenue != null) {
+        if (existingVenue is Map<String, dynamic>) {
+          _selectedVenueId = existingVenue['_id']?.toString() ?? '';
+          _selectedVenueName = existingVenue['name']?.toString() ?? 'Select a venue';
+        } else if (existingVenue is String) {
+          _selectedVenueId = existingVenue;
+          _selectedVenueName = 'Select a venue'; // Will be updated when venues load
+        }
+      }
+      
+      // Load venue label
+      final existingVenueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (existingVenueLabel != null && existingVenueLabel.isNotEmpty) {
+        _selectedVenueName = existingVenueLabel;
+      }
+      
+      // Load meeting type
+      final existingMeetingType = scheduledDateTime['meetingType']?.toString();
+      if (existingMeetingType != null && existingMeetingType.isNotEmpty) {
+        _selectedMeetingType = existingMeetingType;
+      }
+      
+      // Load arrival time if available
+      final existingArrivalTime = scheduledDateTime['arrivalTime']?.toString();
+      if (existingArrivalTime != null && existingArrivalTime.isNotEmpty) {
+        // Format the arrival time properly
+        String formattedArrivalTime = existingArrivalTime;
+        try {
+          // If it's an ISO time string, parse and format it
+          if (existingArrivalTime.contains('T') || existingArrivalTime.contains('Z')) {
+            final dateTime = DateTime.parse(existingArrivalTime);
+            formattedArrivalTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+          } else if (existingArrivalTime.contains(':')) {
+            // If it's already in HH:MM format, keep it as is
+            formattedArrivalTime = existingArrivalTime;
+          } else {
+            // Try to parse as a different format
+            final dateTime = DateTime.parse(existingArrivalTime);
+            formattedArrivalTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+          }
+        } catch (e) {
+          // Keep original if parsing fails
+          formattedArrivalTime = existingArrivalTime;
+        }
+        
+        _selectedArrivalTime = formattedArrivalTime;
+        _arrivalTimeController.text = formattedArrivalTime;
+        _sendArrivalTime = true;
+        _showArrivalTime = true;
+      }
+      
+      // Load TBS requirement
+      final existingTbsRequired = scheduledDateTime['tbsRequired'];
+      if (existingTbsRequired != null) {
+        _tbsReq = existingTbsRequired == true;
+      }
+      
+      // Load other options
+      final existingDontSendNotifications = scheduledDateTime['dontSendNotifications'];
+      if (existingDontSendNotifications != null) {
+        _dontSendEmailSms = existingDontSendNotifications == true;
+      }
+      
+      final existingScheduleEmailSms = scheduledDateTime['scheduleEmailSmsConfirmation'];
+      if (existingScheduleEmailSms != null) {
+        _scheduleEmailSms = existingScheduleEmailSms == true;
+      }
+      
+      // Load schedule confirmation data if available
+      final existingScheduleConfirmation = scheduledDateTime['scheduleConfirmation'];
+      if (existingScheduleConfirmation is Map<String, dynamic>) {
+        final scheduleDate = existingScheduleConfirmation['date']?.toString();
+        final scheduleTime = existingScheduleConfirmation['time']?.toString();
+        
+        if (scheduleDate != null && scheduleDate.isNotEmpty) {
+          // Format the schedule confirmation date
+          String formattedScheduleDate = scheduleDate;
+          try {
+            if (scheduleDate.contains('T') || scheduleDate.contains('Z')) {
+              final dateTime = DateTime.parse(scheduleDate);
+              formattedScheduleDate = '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+            }
+          } catch (e) {
+            formattedScheduleDate = scheduleDate;
+          }
+          
+          _selectedScheduleDate = formattedScheduleDate;
+          _scheduleDateController.text = formattedScheduleDate;
+        }
+        
+        if (scheduleTime != null && scheduleTime.isNotEmpty) {
+          // Format the schedule confirmation time
+          String formattedScheduleTime = scheduleTime;
+          try {
+            if (scheduleTime.contains('T') || scheduleTime.contains('Z')) {
+              final dateTime = DateTime.parse(scheduleTime);
+              formattedScheduleTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+            } else if (scheduleTime.contains(':')) {
+              formattedScheduleTime = scheduleTime;
+            } else {
+              final dateTime = DateTime.parse(scheduleTime);
+              formattedScheduleTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+            }
+          } catch (e) {
+            formattedScheduleTime = scheduleTime;
+          }
+          
+          _selectedScheduleTime = formattedScheduleTime;
+          _scheduleTimeController.text = formattedScheduleTime;
+        }
+        
+        if (scheduleDate != null && scheduleTime != null) {
+          _showScheduleTime = true;
+        }
+      }
+      
+      // Update meeting type visibility
+      _updateMeetingTypeVisibility();
+    }
+  }
+
+  // Method to update meeting type visibility based on selected type
+  void _updateMeetingTypeVisibility() {
+    if (_selectedMeetingType == 'online') {
+      _showOfflineVenue = false;
+      _showOnlineVenue = true;
+    } else {
+      _showOfflineVenue = true;
+      _showOnlineVenue = false;
+    }
+  }
+
+  // Method to check if appointment has existing schedule data
+  bool _hasExistingSchedule() {
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    return scheduledDateTime is Map<String, dynamic> && 
+           scheduledDateTime['date'] != null && 
+           scheduledDateTime['time'] != null;
+  }
+
+  // Method to get appropriate save button text
+  String _getSaveButtonText() {
+    return _hasExistingSchedule() ? 'Update Schedule' : 'Schedule Appointment';
+  }
+
+  // Method to show validation message at top of form
+  void _displayValidationMessage(String message) {
+    setState(() {
+      _validationMessage = message;
+      _showValidationMessage = true;
+      _isSuccessMessage = message.startsWith('✅');
+    });
+    
+    // Auto-hide the message after 4 seconds
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _showValidationMessage = false;
+          _validationMessage = null;
+        });
+      }
+    });
+  }
+
+  // Method to validate date and time
+  bool _validateDateTime(String date, String time) {
+    if (date.isEmpty || time.isEmpty) return true; // Let form validation handle empty fields
+    
+    try {
+      final dateTime = DateTime.parse('$date $time');
+      final now = DateTime.now();
+      
+      if (dateTime.isBefore(now)) {
+        _displayValidationMessage('⚠️ Cannot select past date and time. Please choose a future date and time.');
+        return false;
+      }
+      
+      return true;
+    } catch (e) {
+      return true; // Let form validation handle parsing errors
+    }
   }
 
   @override
@@ -225,9 +441,7 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   void _saveReminder() async {
-    print('💾 [SAVE] Starting to save reminder...');
     if (_formKey.currentState!.validate()) {
-      print('✅ [SAVE] Form validation passed');
       setState(() {
         _isLoading = true;
       });
@@ -241,13 +455,6 @@ class _ReminderFormState extends State<ReminderForm> {
           'scheduleEmailSmsConfirmation': _scheduleEmailSms,
         };
 
-        print('📋 [SAVE] Form data prepared:');
-        print('   📅 Date: $_selectedDate');
-        print('   🕐 Time: $_selectedTime');
-        print('   🏢 Meeting Type: $_selectedMeetingType');
-        print('   🏛️  Venue: $_selectedVenueName (ID: $_selectedVenueId)');
-        print('   ⚙️  Options: $options');
-
         // Prepare schedule confirmation if enabled
         Map<String, dynamic>? scheduleConfirmation;
         if (_scheduleEmailSms && _selectedScheduleDate.isNotEmpty && _selectedScheduleTime.isNotEmpty) {
@@ -255,11 +462,7 @@ class _ReminderFormState extends State<ReminderForm> {
             'date': _selectedScheduleDate,
             'time': _selectedScheduleTime,
           };
-          print('   📧 Schedule Confirmation: $scheduleConfirmation');
         }
-
-        print('📡 [SAVE] Calling API to schedule appointment...');
-        print('   🔑 Appointment ID: ${_getAppointmentId()}');
 
         // Call the ActionService method
         final result = await ActionService.scheduleAppointment(
@@ -274,57 +477,39 @@ class _ReminderFormState extends State<ReminderForm> {
           scheduleConfirmation: scheduleConfirmation,
         );
         
-        print('📡 [SAVE] API Response received: ${result['success'] ? 'SUCCESS' : 'FAILED'}');
-        
         if (result['success']) {
-          print('✅ [SAVE] Appointment scheduled successfully!');
-          print('   📝 Message: ${result['message']}');
+          final actionText = _hasExistingSchedule() ? 'updated' : 'scheduled';
           
-          // Show success message
+          // Show success message internally
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message']),
-                backgroundColor: Colors.green,
-              ),
-            );
+            _displayValidationMessage('✅ ${result['message'] ?? 'Appointment $actionText successfully!'}');
           }
           
           // Call onSave callback
           widget.onSave?.call();
           widget.onRefresh?.call(); // Call onRefresh callback
           
-          // Close the form
+          // Close the form after a short delay to show the success message
           if (mounted) {
-            Navigator.of(context).pop();
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+            });
           }
         } else {
-          print('❌ [SAVE] Failed to schedule appointment');
-          print('   📝 Error: ${result['message']}');
-          print('   🔢 Status Code: ${result['statusCode']}');
+          final actionText = _hasExistingSchedule() ? 'update' : 'schedule';
           
-          // Show error message
+          // Show error message internally
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message']),
-                backgroundColor: Colors.red,
-              ),
-            );
+            _displayValidationMessage('❌ ${result['message'] ?? 'Failed to $actionText appointment'}');
           }
         }
       } catch (error) {
-        print('💥 [SAVE] Unexpected error occurred: $error');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('An unexpected error occurred. Please try again.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _displayValidationMessage('❌ An unexpected error occurred. Please try again.');
         }
       } finally {
-        print('🏁 [SAVE] Save operation completed');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -349,14 +534,11 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   void _onMeetingTypeChanged(String value) {
-    print('🔄 [MEETING] Meeting type changed to: $value');
     setState(() {
       _selectedMeetingType = value;
       _showOfflineVenue = _selectedMeetingType == 'in_person';
       _showOnlineVenue = _selectedMeetingType == 'zoom';
     });
-    print('   🏢 Show offline venue: $_showOfflineVenue');
-    print('   💻 Show online venue: $_showOnlineVenue');
   }
 
   @override
@@ -386,6 +568,40 @@ class _ReminderFormState extends State<ReminderForm> {
                   children: [
                     const SizedBox(height: 16),
                     
+                    // Validation Message Display at Top
+                    if (_showValidationMessage && _validationMessage != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _isSuccessMessage ? Colors.green[50] : Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _isSuccessMessage ? Colors.green[200]! : Colors.red[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _isSuccessMessage ? Icons.check_circle : Icons.warning_amber_rounded,
+                              color: _isSuccessMessage ? Colors.green[600] : Colors.red[600],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _validationMessage!,
+                                style: TextStyle(
+                                  color: _isSuccessMessage ? Colors.green[700] : Colors.red[700],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    
                     // Date Field
                     TextFormField(
                       controller: _dateController,
@@ -403,10 +619,16 @@ class _ReminderFormState extends State<ReminderForm> {
                           lastDate: DateTime.now().add(const Duration(days: 365)),
                         );
                         if (date != null) {
-                          _dateController.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                          final selectedDate = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                          _dateController.text = selectedDate;
                           setState(() {
-                            _selectedDate = _dateController.text;
+                            _selectedDate = selectedDate;
                           });
+                          
+                          // Validate date and time combination
+                          if (_selectedTime.isNotEmpty) {
+                            _validateDateTime(_selectedDate, _selectedTime);
+                          }
                         }
                       },
                       validator: (value) {
@@ -434,10 +656,16 @@ class _ReminderFormState extends State<ReminderForm> {
                           initialTime: TimeOfDay(hour: 16, minute: 30),
                         );
                         if (time != null) {
-                          _timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          final selectedTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          _timeController.text = selectedTime;
                           setState(() {
-                            _selectedTime = _timeController.text;
+                            _selectedTime = selectedTime;
                           });
+                          
+                          // Validate date and time combination
+                          if (_selectedDate.isNotEmpty) {
+                            _validateDateTime(_selectedDate, _selectedTime);
+                          }
                         }
                       },
                       validator: (value) {
@@ -648,7 +876,6 @@ class _ReminderFormState extends State<ReminderForm> {
                                    }).toList(),
                                    onChanged: _isLoading ? null : (value) {
                                      if (value != null) {
-                                       print('🎯 [VENUE] User selected venue ID: $value');
                                        setState(() {
                                          _selectedVenueId = value;
                                          final selectedVenue = _venueOptions.firstWhere(
@@ -661,14 +888,11 @@ class _ReminderFormState extends State<ReminderForm> {
                                          if (_selectedVenueName.toLowerCase().contains('satsang backstage')) {
                                            _selectedTime = '18:15';
                                            _timeController.text = _selectedTime;
-                                           print('   ⏰ Auto-set time to 18:15 for Satsang backstage');
                                          } else if (_selectedVenueName.toLowerCase().contains('gurukul')) {
                                            _selectedTime = '09:00';
                                            _timeController.text = _selectedTime;
-                                           print('   ⏰ Auto-set time to 09:00 for Gurukul');
                                          }
                                        });
-                                       print('   🏛️  Selected venue name: $_selectedVenueName');
                                      }
                         },
                         validator: (value) {
@@ -732,7 +956,7 @@ class _ReminderFormState extends State<ReminderForm> {
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Text('Save'),
+                        : Text(_getSaveButtonText()),
                   ),
                 ),
               ],

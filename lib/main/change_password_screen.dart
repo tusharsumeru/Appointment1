@@ -174,6 +174,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 constraints: const BoxConstraints(maxWidth: 800),
                 child: Card(
                   elevation: 2,
+                  color: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

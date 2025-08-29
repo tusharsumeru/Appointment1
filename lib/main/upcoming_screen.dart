@@ -221,14 +221,17 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
 
           // Upcoming card component
           Expanded(
-            child: UpcomingCardComponent(
-              key: ValueKey(_refreshCounter),
-              selectedDate: _selectedDate,
-              onRefresh: () {
-                setState(() {
-                  // Trigger refresh if needed
-                });
-              },
+            child: Container(
+              color: Colors.white,
+              child: UpcomingCardComponent(
+                key: ValueKey(_refreshCounter),
+                selectedDate: _selectedDate,
+                onRefresh: () {
+                  setState(() {
+                    // Trigger refresh if needed
+                  });
+                },
+              ),
             ),
           ),
         ],

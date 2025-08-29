@@ -103,31 +103,23 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _companyController.text = _getCreatedByCompany();
     _designationController.text = _getCreatedByDesignation();
     
-    // Get number of people from accompanyUsers object
-    String numberOfPeople = '0'; // Default to 0 accompanying people
+    // Get total number of users from accompanyUsers object
+    String numberOfPeople = '1'; // Default to 1 (main user)
     final accompanyUsers = widget.appointment['accompanyUsers'];
-    print('🔍 API DEBUG: accompanyUsers = $accompanyUsers');
     
     if (accompanyUsers is Map<String, dynamic>) {
       final numberOfUsers = accompanyUsers['numberOfUsers'];
-      print('🔍 API DEBUG: numberOfUsers = $numberOfUsers');
       if (numberOfUsers != null) {
-        numberOfPeople = numberOfUsers.toString();
-        print('🔍 API DEBUG: Setting numberOfPeople = $numberOfPeople');
+        // numberOfUsers represents accompanying users, so total = numberOfUsers + 1 (main user)
+        numberOfPeople = (numberOfUsers + 1).toString();
       }
       
       // Log the users array
       final users = accompanyUsers['users'];
-      print('🔍 API DEBUG: users array = $users');
       if (users is List) {
-        print('🔍 API DEBUG: users count = ${users.length}');
-        for (int i = 0; i < users.length; i++) {
-          print('🔍 API DEBUG: user $i = ${users[i]}');
-        }
+        // Process users if needed
       }
     }
-    
-    print('🔍 API DEBUG: Final numberOfPeople = $numberOfPeople');
     _numberOfPeopleController = TextEditingController(
       text: numberOfPeople,
     );
@@ -397,13 +389,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String _getCreatedByPhone() {
     try {
       final createdBy = widget.appointment['createdBy'];
+      
       if (createdBy is Map<String, dynamic>) {
         final phoneObj = createdBy['phoneNumber'];
+        
         if (phoneObj is Map<String, dynamic>) {
           final countryCode = phoneObj['countryCode']?.toString() ?? '';
           final number = phoneObj['number']?.toString() ?? '';
+          
           if (countryCode.isNotEmpty && number.isNotEmpty) {
-            return '$countryCode $number';
+            final fullPhone = '$countryCode $number';
+            return fullPhone;
           }
         }
         
@@ -414,11 +410,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
       
       final phoneObj = widget.appointment['phoneNumber'];
+      
       if (phoneObj is Map<String, dynamic>) {
         final countryCode = phoneObj['countryCode']?.toString() ?? '';
         final number = phoneObj['number']?.toString() ?? '';
+        
         if (countryCode.isNotEmpty && number.isNotEmpty) {
-          return '$countryCode $number';
+          final fullPhone = '$countryCode $number';
+          return fullPhone;
         }
       }
       
@@ -429,7 +428,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       
       return 'Not specified';
     } catch (e) {
-      print('Error in _getCreatedByPhone: $e');
       return 'Not specified';
     }
   }
@@ -573,19 +571,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _initializeGuestData() {
-    print('🔍 GUEST DEBUG: Starting _initializeGuestData');
     final accompanyUsers = widget.appointment['accompanyUsers'];
-    print('🔍 GUEST DEBUG: accompanyUsers = $accompanyUsers');
     
     if (accompanyUsers is Map<String, dynamic>) {
       final users = accompanyUsers['users'];
-      print('🔍 GUEST DEBUG: users = $users');
       
       if (users is List) {
-        print('🔍 GUEST DEBUG: Processing ${users.length} users');
         _guests = users.map((user) {
           final phoneNumber = user['phoneNumber'];
+          
           String fullPhone = '';
+          
           if (phoneNumber is Map<String, dynamic>) {
             final countryCode = phoneNumber['countryCode']?.toString() ?? '';
             final number = phoneNumber['number']?.toString() ?? '';
@@ -613,6 +609,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             } else if (number.isNotEmpty) {
               fullPhone = number;
             }
+          } else if (phoneNumber is String) {
+            fullPhone = phoneNumber;
           }
           
           return {
@@ -631,17 +629,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
     }
     
-    print('🔍 GUEST DEBUG: Final _guests count: ${_guests.length}');
-    print('🔍 GUEST DEBUG: _guests data: $_guests');
-    
     // Initialize guest controllers for editable fields
     _initializeGuestControllers();
   }
 
   // Initialize guest controllers for editable fields
   void _initializeGuestControllers() {
-    print('🔍 CONTROLLER DEBUG: Initializing guest controllers. Guests count: ${_guests.length}');
-    
     // Clear existing controllers
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
@@ -668,13 +661,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           countryCode = parts[0];
           number = parts.skip(1).join(' ').replaceAll('-', '');
         }
+      } else {
+        number = phoneNumber;
       }
       
       final ageController = TextEditingController(text: guest['age'] ?? '');
       
       // Add listener to age controller to trigger rebuild when age changes
       ageController.addListener(() {
-        print('🔍 AGE DEBUG: Age changed for guest $i to: ${ageController.text}');
         setState(() {
           // This will trigger a rebuild and update the photo requirement visibility
         });
@@ -691,107 +685,92 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _guestUploading[i + 1] = false;
       _guestCountries[i + 1] = countryCode;
     }
-    
-    print('🔍 CONTROLLER DEBUG: After initialization - controllers count: ${_guestControllers.length}');
-    print('🔍 CONTROLLER DEBUG: _guestImages keys: ${_guestImages.keys.toList()}');
-    print('🔍 CONTROLLER DEBUG: _guestCountries keys: ${_guestCountries.keys.toList()}');
   }
 
 
 
-  // Update guest controllers based on number of accompanying people
+  // Update guest controllers based on total number of users
   void _updateGuestControllers() {
-    final numberOfAccompanyingPeople = int.tryParse(_numberOfPeopleController.text) ?? 0;
+    final totalUsers = int.tryParse(_numberOfPeopleController.text) ?? 1;
+    final accompanyingUsers = totalUsers - 1; // Subtract 1 for main user
     final currentControllersCount = _guestControllers.length;
-    
-    print('DEBUG UPDATE: _updateGuestControllers - numberOfAccompanyingPeople: $numberOfAccompanyingPeople, current controllers: $currentControllersCount');
     
     // Skip if this is the initial setup (guests are being initialized from existing data)
     if (_guests.isNotEmpty && currentControllersCount == 0) {
-      print('DEBUG UPDATE: Skipping - guests are being initialized from existing data');
       return;
     }
     
     // Initialize guests if empty and we need guests
-    if (_guests.isEmpty && numberOfAccompanyingPeople > 0) {
-      print('DEBUG UPDATE: Creating new empty guests');
-      _createEmptyGuests(numberOfAccompanyingPeople);
+    if (_guests.isEmpty && accompanyingUsers > 0) {
+      _createEmptyGuests(accompanyingUsers);
     }
     
-    if (numberOfAccompanyingPeople > currentControllersCount) {
+    if (accompanyingUsers > currentControllersCount) {
       // Add more controllers
-      print('DEBUG UPDATE: Adding ${numberOfAccompanyingPeople - currentControllersCount} guest controllers');
-      
-              while (_guestControllers.length < numberOfAccompanyingPeople) {
-          int guestNumber = _guestControllers.length + 1;
-          
-          // Add to guests list
-          _guests.add({
-            'fullName': '',
-            'age': '',
-            'phoneNumber': '',
-            'profilePhotoUrl': '',
-            'userId': null,
-            'admissionStatus': 'pending',
-            'admittedBy': null,
-            'relationshipToApplicant': null,
-            'admittedAt': null,
-            'isUploading': false,
+      while (_guestControllers.length < accompanyingUsers) {
+        int guestNumber = _guestControllers.length + 1;
+        
+        // Add to guests list
+        _guests.add({
+          'fullName': '',
+          'age': '',
+          'phoneNumber': '',
+          'profilePhotoUrl': '',
+          'userId': null,
+          'admissionStatus': 'pending',
+          'admittedBy': null,
+          'relationshipToApplicant': null,
+          'admittedAt': null,
+          'isUploading': false,
+        });
+        
+        // Add controllers for new guest
+        final ageController = TextEditingController();
+        
+        // Add listener to age controller to trigger rebuild when age changes
+        ageController.addListener(() {
+          setState(() {
+            // This will trigger a rebuild and update the photo requirement visibility
           });
-          
-          // Add controllers for new guest
-          final ageController = TextEditingController();
-          
-          // Add listener to age controller to trigger rebuild when age changes
-          ageController.addListener(() {
-            print('🔍 AGE DEBUG: Age changed for new guest ${_guestControllers.length} to: ${ageController.text}');
-            setState(() {
-              // This will trigger a rebuild and update the photo requirement visibility
-            });
-          });
-          
-          _guestControllers.add({
-            'name': TextEditingController(),
-            'age': ageController,
-            'phone': TextEditingController(),
-          });
-          
-          // Initialize associated data
-          _guestImages[guestNumber] = '';
-          _guestUploading[guestNumber] = false;
-          _guestCountries[guestNumber] = '+91';
-        }
-      } else if (numberOfAccompanyingPeople < currentControllersCount) {
-        // Remove controllers (remove from the end)
-        print('DEBUG UPDATE: Removing ${currentControllersCount - numberOfAccompanyingPeople} guest controllers');
+        });
         
-        // Dispose controllers that will be removed
-        for (int i = numberOfAccompanyingPeople; i < currentControllersCount; i++) {
-          var guest = _guestControllers[i];
-          guest['name']?.dispose();
-          guest['phone']?.dispose();
-          guest['age']?.dispose();
-        }
+        _guestControllers.add({
+          'name': TextEditingController(),
+          'age': ageController,
+          'phone': TextEditingController(),
+        });
         
-        // Remove from lists (remove from the end)
-        _guests.removeRange(numberOfAccompanyingPeople, currentControllersCount);
-        _guestControllers.removeRange(numberOfAccompanyingPeople, currentControllersCount);
-        
-        // Remove associated data (remove from the end)
-        for (int i = numberOfAccompanyingPeople + 1; i <= currentControllersCount; i++) {
-          _guestImages.remove(i);
-          _guestUploading.remove(i);
-          _guestCountries.remove(i);
-        }
-        
-        print('DEBUG UPDATE: After removal, controllers count: ${_guestControllers.length}');
+        // Initialize associated data
+        _guestImages[guestNumber] = '';
+        _guestUploading[guestNumber] = false;
+        _guestCountries[guestNumber] = '+91';
       }
+    } else if (accompanyingUsers < currentControllersCount) {
+      // Remove controllers (remove from the end)
+      
+      // Dispose controllers that will be removed
+      for (int i = accompanyingUsers; i < currentControllersCount; i++) {
+        var guest = _guestControllers[i];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+      }
+      
+      // Remove from lists (remove from the end)
+      _guests.removeRange(accompanyingUsers, currentControllersCount);
+      _guestControllers.removeRange(accompanyingUsers, currentControllersCount);
+      
+      // Remove associated data (remove from the end)
+      for (int i = accompanyingUsers + 1; i <= currentControllersCount; i++) {
+        _guestImages.remove(i);
+        _guestUploading.remove(i);
+        _guestCountries.remove(i);
+      }
+    }
   }
 
   // Create empty guests for new appointments
   void _createEmptyGuests(int numberOfGuests) {
-    print('DEBUG CREATE: Creating $numberOfGuests empty guests');
-    
     // Clear existing data
     for (var guest in _guestControllers) {
       guest['name']?.dispose();
@@ -827,7 +806,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       
       // Add listener to age controller to trigger rebuild when age changes
       ageController.addListener(() {
-        print('🔍 AGE DEBUG: Age changed for empty guest $i to: ${ageController.text}');
         setState(() {
           // This will trigger a rebuild and update the photo requirement visibility
         });
@@ -844,8 +822,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _guestUploading[guestNumber] = false;
       _guestCountries[guestNumber] = '+91';
     }
-    
-    print('DEBUG CREATE: Created ${_guests.length} empty guests with ${_guestControllers.length} controllers');
   }
 
   // Photo picker methods for guests
@@ -1212,19 +1188,27 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   // Get reference person phone number for guest appointments
   String _getReferencePersonPhone() {
     final appointmentType = widget.appointment['appointmentType']?.toString();
+    
     if (appointmentType?.toLowerCase() == 'guest') {
       final referencePerson = widget.appointment['referencePerson'];
+      
       if (referencePerson is Map<String, dynamic>) {
         final phoneNumber = referencePerson['phoneNumber'];
+        
         if (phoneNumber is Map<String, dynamic>) {
           final countryCode = phoneNumber['countryCode']?.toString() ?? '';
           final number = phoneNumber['number']?.toString() ?? '';
+          
           if (countryCode.isNotEmpty && number.isNotEmpty) {
-            return '$countryCode $number';
+            final fullPhone = '$countryCode $number';
+            return fullPhone;
           }
+        } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
+          return phoneNumber;
         }
       }
     }
+    
     return '';
   }
 
@@ -1259,15 +1243,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   String _getGuestPhone() {
     final appointmentType = widget.appointment['appointmentType']?.toString();
+    
     if (appointmentType?.toLowerCase() == 'guest') {
       final guestInformation = widget.appointment['guestInformation'];
+      
       if (guestInformation is Map<String, dynamic>) {
-        final phoneNumber = guestInformation['phoneNumber']?.toString();
-        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        final phoneNumber = guestInformation['phoneNumber'];
+        
+        if (phoneNumber is Map<String, dynamic>) {
+          final countryCode = phoneNumber['countryCode']?.toString() ?? '';
+          final number = phoneNumber['number']?.toString() ?? '';
+          
+          if (countryCode.isNotEmpty && number.isNotEmpty) {
+            final fullPhone = '$countryCode$number';
+            return fullPhone;
+          } else if (number.isNotEmpty) {
+            return number;
+          }
+        } else if (phoneNumber is String && phoneNumber.isNotEmpty) {
           return phoneNumber;
         }
       }
     }
+    
     return '';
   }
 
@@ -1445,148 +1443,168 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       children: [
         // Photo preview
         Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.green[50],
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.green[300]!),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green[200]!),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Photo preview
-              Container(
-                width: 112,
-                height: 112,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+              // Photo preview and status message
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey[200],
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    photoUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[200],
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.grey[400],
-                          size: 48,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Status text
-              const Text(
-                'Photo uploaded',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green,
-                ),
-              ),
-              const SizedBox(height: 8),
-              
-              // Status badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.green[100],
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green[300]!),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green[800], size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Verified & Uploaded',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green[800],
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.error_outline,
+                              color: Colors.red,
+                              size: 24,
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Photo uploaded successfully',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Guest photo is ready',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Action buttons
+              const SizedBox(height: 12),
+              
+              Column(
+                children: [
+                  // Upload Different Photo
+                  GestureDetector(
+                    onTap: () => _pickGuestImageForDisplay(ImageSource.gallery),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.blue[200]!,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.upload_file,
+                            color: const Color(0xFFF97316),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Upload Different Photo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 6),
+                  
+                  // Take New Photo
+                  GestureDetector(
+                    onTap: () => _pickGuestImageForDisplay(ImageSource.camera),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: const Color(0xFFF97316),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Take New Photo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Action buttons
-        Column(
-          children: [
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // Implement photo upload functionality for guest photo
-                  _pickGuestImageForDisplay(ImageSource.gallery);
-                },
-                icon: const Icon(Icons.upload, size: 16),
-                label: const Text('Upload Different Photo'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // Implement camera functionality for guest photo
-                  _pickGuestImageForDisplay(ImageSource.camera);
-                },
-                icon: const Icon(Icons.camera_alt, size: 16),
-                label: const Text('Take New Photo'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // Implement photo removal functionality for guest photo
-                  _removeGuestPhotoForDisplay();
-                },
-                icon: const Icon(Icons.close, size: 16),
-                label: const Text('Remove'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  foregroundColor: Colors.red[600],
-                  side: BorderSide(color: Colors.red[300]!),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -1594,72 +1612,48 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   Widget _buildGuestPhotoDisplayUploading() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.blue[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue[300]!),
+        border: Border.all(color: Colors.blue[200]!),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Loading spinner
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white, width: 4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+          // Photo preview and status message
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[200],
                 ),
-              ],
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Status text
-          Text(
-            'Uploading photo...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.blue[800],
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Status badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue[100],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue[300]!),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.upload, color: Colors.blue[800], size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  'Processing...',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue[800],
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Uploading photo...',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1667,80 +1661,134 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildGuestPhotoDisplayNotUploaded() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.camera_alt_outlined,
-            color: Colors.grey[400],
-            size: 48,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'No photo uploaded',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
+    return Column(
+      children: [
+        // Photo Header
+        Row(
+          children: [
+            Icon(
+              Icons.camera_alt,
+              color: const Color(0xFFF97316),
+              size: 20,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Required for guests 12+ years old - Divine pic validation',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
+            const SizedBox(width: 8),
+            const Text(
+              'Photo *',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          
-          // Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Implement photo upload functionality for guest photo
-                    _pickGuestImageForDisplay(ImageSource.gallery);
-                  },
-                  icon: const Icon(Icons.upload, size: 16),
-                  label: const Text('Upload Photo'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Photo of the Guest Required for Age 12 years and Above',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 12),
+        
+        // Photo Upload Options
+        Column(
+          children: [
+            // Upload from Device Card
+            GestureDetector(
+              onTap: () => _pickGuestImageForDisplay(ImageSource.gallery),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.upload_file,
+                      color: const Color(0xFFF97316),
+                      size: 24,
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Upload from Device',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Choose an existing photo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Implement camera functionality for guest photo
-                    _pickGuestImageForDisplay(ImageSource.camera);
-                  },
-                  icon: const Icon(Icons.camera_alt, size: 16),
-                  label: const Text('Take Photo'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(height: 8),
+            
+            // Take Photo Card
+            GestureDetector(
+              onTap: () => _pickGuestImageForDisplay(ImageSource.camera),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFF97316)),
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFFF97316),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 24,
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Take Photo',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Use your device camera',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -2116,8 +2164,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Get original appointment type for debugging
       final originalAppointmentType = widget.appointment['appointmentType']?.toString() ?? 'myself';
-      print('🔍 DEBUG: Original appointment type: $originalAppointmentType');
-      print('🔍 DEBUG: Original appointment data: ${widget.appointment}');
       
       // Prepare the update data
       final updateData = {
@@ -2131,7 +2177,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         },
         'appointmentLocation': _selectedLocation,
         'assignedSecretary': _selectedSecretary,
-        'numberOfUsers': _guestControllers.length,
+        'numberOfUsers': int.tryParse(_numberOfPeopleController.text) ?? 1,
         'isTeacher': _teacherStatus,
         // Add required fields that the API expects - preserve original appointment type
         'appointmentFor': widget.appointment['appointmentFor'] ?? {
@@ -2148,11 +2194,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       // Add guestInformation if appointment type is 'guest'
       if (originalAppointmentType == 'guest') {
-        print('🔍 DEBUG: Adding guestInformation for guest appointment');
+        final guestPhoneNumber = _guestPhoneController.text.trim();
+        
         updateData['guestInformation'] = {
           'fullName': _guestFullNameController.text.trim(),
           'emailId': _guestEmailController.text.trim(),
-          'phoneNumber': _guestPhoneController.text.trim(),
+          'phoneNumber': guestPhoneNumber,
           'designation': _guestDesignationController.text.trim(),
           'company': _guestCompanyController.text.trim(),
           'location': _guestLocationController.text.trim(),
@@ -2161,7 +2208,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ? _guestImages[0]! 
               : (widget.appointment['guestInformation']?['profilePhotoUrl'] ?? ''),
         };
-        print('🔍 DEBUG: Updated guestInformation: ${updateData['guestInformation']}');
       }
 
       // Show debug info in SnackBar
@@ -2267,7 +2313,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Get photo URL from guest images
       final photoUrl = _guestImages[guestNumber] ?? '';
       
-      users.add({
+      final userData = {
         'fullName': controllers['name']?.text ?? '',
         'age': controllers['age']?.text ?? '',
         'phoneNumber': {
@@ -2280,13 +2326,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'admittedBy': null,
         'relationshipToApplicant': null,
         'admittedAt': null,
-      });
+      };
+      
+      users.add(userData);
     }
     
-    return {
+    final result = {
       'numberOfUsers': _guestControllers.length,
       'users': users,
     };
+    
+    return result;
   }
 
   @override
@@ -2437,18 +2487,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     
                     const SizedBox(height: 16),
                     
-                                          // Number of Accompanying People
+                                          // Total Number of Users
                       _buildNumberField(
-                        'Number of Accompanying People',
+                        'Total Number of Users',
                         _numberOfPeopleController,
-                        'Number of people accompanying you',
+                        'Total number of people including you',
                         isRequired: true,
                       ),
                       
                       const SizedBox(height: 16),
                       
                       // Guest Information Section
-                      if ((int.tryParse(_numberOfPeopleController.text) ?? 0) > 0) ...[
+                      if ((int.tryParse(_numberOfPeopleController.text) ?? 1) > 1) ...[
                         _buildGuestInformationSection(),
                         const SizedBox(height: 16),
                       ],
@@ -2807,30 +2857,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         Row(
           children: [
             Expanded(
-              child:                          _buildRadioOption(
-                           'No',
-                           'no',
-                           _teacherStatus,
-                           (value) => setState(() => _teacherStatus = value),
-                         ),
-                       ),
-                       const SizedBox(width: 8),
-                       Expanded(
-                         child: _buildRadioOption(
-                           'Part-time',
-                           'part-time',
-                           _teacherStatus,
-                           (value) => setState(() => _teacherStatus = value),
-                         ),
-                       ),
-                       const SizedBox(width: 8),
-                       Expanded(
-                         child: _buildRadioOption(
-                           'Full-time',
-                           'full-time',
-                           _teacherStatus,
-                           (value) => setState(() => _teacherStatus = value),
-                         ),
+              child: _buildReadOnlyRadioOption(
+                'No',
+                'no',
+                _teacherStatus,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildReadOnlyRadioOption(
+                'Yes',
+                'yes',
+                _teacherStatus,
+              ),
             ),
           ],
         ),
@@ -2886,6 +2925,55 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyRadioOption(String label, String value, String selectedValue) {
+    final isSelected = selectedValue == value;
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.green[50] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSelected ? Colors.green[200]! : Colors.grey[300]!,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isSelected ? Colors.green[500] : Colors.grey[400],
+              border: Border.all(
+                color: isSelected ? Colors.green[500]! : Colors.grey[400]!,
+                width: 2,
+              ),
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, size: 10, color: Colors.white)
+                : null,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.green[900] : Colors.grey[500],
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3088,9 +3176,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             // Minus button
             GestureDetector(
               onTap: () {
-                int currentCount = int.tryParse(controller.text) ?? 0;
+                int currentCount = int.tryParse(controller.text) ?? 1;
                 print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
-                if (currentCount > 0) { // Minimum 0 accompanying people
+                if (currentCount > 1) { // Minimum 1 total user (main user)
                   print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                   setState(() {
                     controller.text = (currentCount - 1).toString();
@@ -3098,7 +3186,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   _updateGuestControllers();
                   print('DEBUG MINUS: After removal. New count: ${controller.text}, Guest controllers: ${_guestControllers.length}');
                 } else {
-                  print('DEBUG MINUS: Cannot reduce below 0 (no accompanying people)');
+                  print('DEBUG MINUS: Cannot reduce below 1 (minimum total users)');
                 }
               },
               child: Container(
@@ -3136,7 +3224,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    controller.text.isEmpty ? '0' : controller.text,
+                    controller.text.isEmpty ? '1' : controller.text,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -3151,7 +3239,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             // Plus button
             GestureDetector(
               onTap: () {
-                int currentCount = int.tryParse(controller.text) ?? 0;
+                int currentCount = int.tryParse(controller.text) ?? 1;
                 setState(() {
                   controller.text = (currentCount + 1).toString();
                 });
@@ -3179,30 +3267,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         
         const SizedBox(height: 4),
         Text(
-          'Number of people accompanying you',
+          'Total number of people including you',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
           ),
         ),
-        const SizedBox(height: 8),
-        // Only show the blue info card if number of people is 10 or less
-        if (shouldShowInfoCard)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: Text(
-              ' ',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue[800],
-              ),
-            ),
-          ),
+
       ],
     );
   }
@@ -3220,15 +3291,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
+        Column(
           children: [
-            Expanded(
-              child: _buildDateField('From Date', _fromDateController),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildDateField('To Date', _toDateController),
-            ),
+            _buildDateField('From Date', _fromDateController),
+            const SizedBox(height: 16),
+            _buildDateField('To Date', _toDateController),
           ],
         ),
       ],
@@ -3834,10 +3901,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   String? _getSelectedSecretaryName() {
-    print('🔍 _getSelectedSecretaryName() called');
-    print('🔍 _selectedSecretary: $_selectedSecretary');
-    print('🔍 _availableAssignees count: ${_availableAssignees.length}');
-
     if (_selectedSecretary == null)
       return 'None - I am not in touch with any secretary';
 
@@ -3846,10 +3909,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final selectedSecretary = _availableAssignees.firstWhere(
         (secretary) => secretary['id']?.toString() == _selectedSecretary,
       );
-      print('🔍 Found secretary in list: $selectedSecretary');
       return selectedSecretary['name']?.toString();
     } catch (e) {
-      print('🔍 Secretary not found in list');
       return null;
     }
   }
@@ -5475,42 +5536,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   
                                   const SizedBox(height: 6),
                                   
-                                  // Remove Photo
-                                  GestureDetector(
-                                    onTap: () => _removeGuestPhoto(index),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
-                                        horizontal: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red[50],
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: Colors.red[200]!,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red[700],
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Remove Photo',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.red[700],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+
                                 ],
                               ),
                             ],
@@ -5993,23 +6019,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _removeGuestPhoto(guestIndex),
-                icon: Icon(Icons.close, size: 16),
-                label: const Text('Remove'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  foregroundColor: Colors.red[600],
-                  side: BorderSide(color: Colors.red[300]!),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
+
           ],
         ),
       ],
@@ -6079,7 +6089,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         print('📱 Notification ID: ${result['data']?['notificationId']}');
       } else {
         print('⚠️ Failed to send appointment update notification: ${result['message']}');
-        print('🔍 Error details: ${result['error']}');
       }
 
     } catch (e) {

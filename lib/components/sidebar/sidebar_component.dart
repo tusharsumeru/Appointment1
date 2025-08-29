@@ -19,7 +19,9 @@ import '../../action/action.dart';
 import '../../action/storage_service.dart';
 
 class SidebarComponent extends StatefulWidget {
-  const SidebarComponent({super.key});
+  final String? currentRoute;
+  
+  const SidebarComponent({super.key, this.currentRoute});
 
   @override
   State<SidebarComponent> createState() => _SidebarComponentState();
@@ -27,12 +29,15 @@ class SidebarComponent extends StatefulWidget {
 
 class _SidebarComponentState extends State<SidebarComponent> {
   Map<String, dynamic>? _userData;
+  Map<String, dynamic>? _sidebarCounts;
   bool _isLoading = true;
+  bool _isLoadingCounts = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadSidebarCounts();
   }
 
   Future<void> _loadUserData() async {
@@ -100,6 +105,29 @@ class _SidebarComponentState extends State<SidebarComponent> {
     }
   }
 
+  // Load sidebar counts
+  Future<void> _loadSidebarCounts() async {
+    try {
+      final result = await ActionService.getSidebarCounts();
+      if (result['success']) {
+        setState(() {
+          _sidebarCounts = result['data'];
+          _isLoadingCounts = false;
+        });
+      } else {
+        print('Error loading sidebar counts: ${result['message']}');
+        setState(() {
+          _isLoadingCounts = false;
+        });
+      }
+    } catch (error) {
+      print('Error loading sidebar counts: $error');
+      setState(() {
+        _isLoadingCounts = false;
+      });
+    }
+  }
+
   // Optional: Refresh user data in background (uncomment if you want to keep data fresh)
   // Future<void> _refreshUserDataInBackground() async {
   //   try {
@@ -116,6 +144,101 @@ class _SidebarComponentState extends State<SidebarComponent> {
   //     print('Error refreshing user data: $error');
   //   }
   // }
+
+  // Helper method to get count for menu items
+  String _getCount(String key) {
+    if (_isLoadingCounts || _sidebarCounts == null) {
+      return '0';
+    }
+    final count = _sidebarCounts![key];
+    return count?.toString() ?? '0';
+  }
+
+  // Helper method to check if a menu item is active
+  bool _isActive(String routeName) {
+    return widget.currentRoute == routeName;
+  }
+
+  // Helper method to get count badge background color
+  Color _getCountBackgroundColor(String routeName) {
+    return _isActive(routeName) ? Colors.white : Colors.grey.shade200;
+  }
+
+  // Helper method to get active tile decoration
+  BoxDecoration? _getActiveTileDecoration(String routeName) {
+    if (_isActive(routeName)) {
+      return BoxDecoration(
+        color: Colors.grey.shade100,
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(12),
+      );
+    }
+    return null;
+  }
+
+  // Helper method to get icon color
+  Color _getIconColor(String routeName) {
+    return _isActive(routeName) ? Colors.grey.shade800 : Colors.deepOrange;
+  }
+
+  // Helper method to get text color
+  Color _getTextColor(String routeName) {
+    return _isActive(routeName) ? Colors.grey.shade900 : Colors.black;
+  }
+
+  // Helper method to get text weight
+  FontWeight _getTextWeight(String routeName) {
+    return _isActive(routeName) ? FontWeight.w500 : FontWeight.normal;
+  }
+
+  // Helper method to get count text color
+  Color _getCountTextColor(String routeName) {
+    return _isActive(routeName) ? Colors.grey.shade800 : Colors.grey.shade700;
+  }
+
+  // Reusable method to create menu item
+  Widget _buildMenuItem({
+    required String routeName,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    String? count,
+  }) {
+    return Container(
+      decoration: _getActiveTileDecoration(routeName),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: _getIconColor(routeName),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: _getTextColor(routeName),
+            fontWeight: _getTextWeight(routeName),
+          ),
+        ),
+        trailing: count != null
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getCountBackgroundColor(routeName),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  count,
+                  style: TextStyle(
+                    color: _getCountTextColor(routeName),
+                    fontSize: 12,
+                    fontWeight: _getTextWeight(routeName),
+                  ),
+                ),
+              )
+            : null,
+        onTap: onTap,
+      ),
+    );
+  }
 
   Future<void> _handleLogout() async {
     // Show confirmation dialog
@@ -203,9 +326,11 @@ class _SidebarComponentState extends State<SidebarComponent> {
     bool isUser = userRole == 'user' || userRole == 'client';
 
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
+      child: Container(
+        color: Colors.white,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
           // Header
           Container(
             decoration: const BoxDecoration(
@@ -270,11 +395,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
           // Secretary and Super Admin menu items
           if (isSecretary || isSuperAdmin) ...[
-            ListTile(
-              leading: const Icon(Icons.inbox, color: Colors.deepOrange),
-              title: const Text('Inbox'),
+            _buildMenuItem(
+              routeName: 'inbox',
+              icon: Icons.inbox,
+              title: 'Inbox',
+              count: _getCount('inbox'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const InboxScreen()),
@@ -282,11 +409,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.today, color: Colors.deepOrange),
-              title: const Text('Today'),
+            _buildMenuItem(
+              routeName: 'today',
+              icon: Icons.today,
+              title: 'Today',
+              count: _getCount('today'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const TodayScreen()),
@@ -294,11 +423,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.event, color: Colors.deepOrange),
-              title: const Text('Tomorrow'),
+            _buildMenuItem(
+              routeName: 'tomorrow',
+              icon: Icons.event,
+              title: 'Tomorrow',
+              count: _getCount('tomorrow'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -308,11 +439,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.schedule, color: Colors.deepOrange),
-              title: const Text('Upcoming'),
+            _buildMenuItem(
+              routeName: 'upcoming',
+              icon: Icons.schedule,
+              title: 'Upcoming',
+              count: _getCount('upcoming'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -322,14 +455,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(
-                Icons.assignment_ind,
-                color: Colors.deepOrange,
-              ),
-              title: const Text('Assigned to Me'),
+            _buildMenuItem(
+              routeName: 'assignedToMe',
+              icon: Icons.assignment_ind,
+              title: 'Assigned to Me',
+              count: _getCount('assignedToMe'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -339,11 +471,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.star, color: Colors.deepOrange),
-              title: const Text('Starred'),
+            _buildMenuItem(
+              routeName: 'starred',
+              icon: Icons.star,
+              title: 'Starred',
+              count: _getCount('starred'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -353,11 +487,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.deepOrange),
-              title: const Text('Deleted Appointments'),
+            _buildMenuItem(
+              routeName: 'deleted',
+              icon: Icons.delete_outline,
+              title: 'Deleted Appointments',
+              count: _getCount('deleted'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -367,14 +503,28 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(
-                Icons.add_circle_outline,
-                color: Colors.deepOrange,
-              ),
-              title: const Text('Add New'),
+            _buildMenuItem(
+              routeName: 'darshanLine',
+              icon: Icons.queue,
+              title: 'Darshan Line',
+              count: _getCount('darshanLine'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DashboardScreen(),
+                  ),
+                );
+              },
+            ),
+
+            _buildMenuItem(
+              routeName: 'addNew',
+              icon: Icons.add_circle_outline,
+              title: 'Add New',
+              onTap: () {
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const AddNewScreen()),
@@ -382,11 +532,12 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.search, color: Colors.deepOrange),
-              title: const Text('Global Search'),
+            _buildMenuItem(
+              routeName: 'globalSearch',
+              icon: Icons.search,
+              title: 'Global Search',
               onTap: () {
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const GlobalSearchScreen()),
@@ -399,20 +550,21 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
           // Admin-specific menu items (to be implemented)
           if (isAdmin && !isSuperAdmin) ...[
-            ListTile(
-              leading: const Icon(
-                Icons.admin_panel_settings,
-                color: Colors.deepOrange,
-              ),
-              title: const Text('Admin Dashboard'),
+            _buildMenuItem(
+              routeName: 'adminDashboard',
+              icon: Icons.admin_panel_settings,
+              title: 'Admin Dashboard',
+              count: '0',
               onTap: () {
                 Navigator.pop(context);
                 // TODO: Navigate to admin dashboard
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.people, color: Colors.deepOrange),
-              title: const Text('Manage Users'),
+            _buildMenuItem(
+              routeName: 'manageUsers',
+              icon: Icons.people,
+              title: 'Manage Users',
+              count: '0',
               onTap: () {
                 Navigator.pop(context);
                 // TODO: Navigate to user management
@@ -422,20 +574,21 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
           // User/Client-specific menu items (to be implemented)
           if (isUser) ...[
-            ListTile(
-              leading: const Icon(
-                Icons.calendar_today,
-                color: Colors.deepOrange,
-              ),
-              title: const Text('My Appointments'),
+            _buildMenuItem(
+              routeName: 'myAppointments',
+              icon: Icons.calendar_today,
+              title: 'My Appointments',
+              count: '0',
               onTap: () {
                 Navigator.pop(context);
                 // TODO: Navigate to user appointments
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.history, color: Colors.deepOrange),
-              title: const Text('Appointment History'),
+            _buildMenuItem(
+              routeName: 'appointmentHistory',
+              icon: Icons.history,
+              title: 'Appointment History',
+              count: '0',
               onTap: () {
                 Navigator.pop(context);
                 // TODO: Navigate to appointment history
@@ -471,20 +624,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           //   },
           // ),
 
-          // Dashboard Navigation Item
-          ListTile(
-            leading: const Icon(Icons.dashboard, color: Colors.deepOrange),
-            title: const Text('Darshan Line'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DashboardScreen(),
-                ),
-              );
-            },
-          ),
+
 
           // User Profile Navigation Item
           // ListTile(
@@ -555,6 +695,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             onTap: _handleLogout,
           ),
         ],
+        ),
       ),
     );
   }

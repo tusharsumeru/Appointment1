@@ -302,13 +302,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       print(
         'DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers',
       );
-      if (accompanyUsers != null && accompanyUsers['users'] != null) {
-        final List<dynamic> users = accompanyUsers['users'];
-        // Set number of users to total count (accompanying users + 1 for main user)
-        _numberOfUsersController.text = (users.length + 1).toString();
-        print(
-          'DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (total people including main user)',
-        );
+      if (accompanyUsers != null) {
+        final List<dynamic> users = accompanyUsers['users'] ?? [];
+        final numberOfUsers = accompanyUsers['numberOfUsers'];
+        
+        print('DEBUG LOAD: users.length = ${users.length}, numberOfUsers = $numberOfUsers');
+        
+        if (users.isNotEmpty) {
+          // Use the length of users array + 1 for main user (when users array has data)
+          _numberOfUsersController.text = (users.length + 1).toString();
+          print(
+            'DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (total people including main user)',
+          );
+        } else if (numberOfUsers != null) {
+          // Use numberOfUsers field + 1 for main user (when users array is empty)
+          final int totalUsers = (numberOfUsers is int ? numberOfUsers : int.tryParse(numberOfUsers.toString()) ?? 0) + 1;
+          _numberOfUsersController.text = totalUsers.toString();
+          print(
+            'DEBUG LOAD: Set numberOfUsers to $totalUsers (using numberOfUsers field + 1)',
+          );
+        } else {
+          _numberOfUsersController.text = '1';
+          print('DEBUG LOAD: Set numberOfUsers to 1 (just main user)');
+        }
       } else {
         _numberOfUsersController.text = '1';
         print('DEBUG LOAD: Set numberOfUsers to 1 (just main user)');

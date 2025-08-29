@@ -1554,29 +1554,32 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         return;
       }
       
-      // Use createdBy as the user identifier (since it contains the same info as userId)
+      // Use createdBy._id as the user identifier
       String userId;
       
       if (createdBy is Map<String, dynamic>) {
-        // Try to get user ID from createdBy object
-        userId = createdBy['_id']?.toString() ?? 
-                createdBy['userId']?.toString() ?? 
-                createdBy['id']?.toString() ?? 
-                createdBy.toString(); // Fallback to string representation
+        // Get the _id from createdBy object
+        userId = createdBy['_id']?.toString() ?? '';
       } else {
-        // If createdBy is not a Map, use its string representation
-        userId = createdBy.toString();
+        // If createdBy is not a Map, use empty string
+        userId = '';
+      }
+      
+      // Check if we have a valid userId
+      if (userId.isEmpty) {
+        setState(() {
+          _upcomingAppointments = [];
+          _appointmentHistory = [];
+          _isLoadingOverview = false;
+        });
+        return;
       }
 
       // Fetch upcoming appointments
       final upcomingResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
-      // Use local appointment data instead of API call for appointment history
-      // Get statusHistory from appointmentStatus object
-      final historyResult = {
-        'success': true,
-        'data': _getStatusHistoryFromAppointment(),
-      };
+      // Fetch appointment history from API (same as upcoming appointments but filter for completed)
+      final historyResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
 
       
@@ -1601,9 +1604,28 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _upcomingAppointments = [];
           }
           
-          if (historyResult['success'] == true && historyResult['data'] != null) {
-            final historyData = historyResult['data'] as List<Map<String, dynamic>>;
-            _appointmentHistory = historyData;
+          if (historyResult['success'] && historyResult['data'] != null) {
+            final List<dynamic> historyData = historyResult['data'];
+            if (historyData is List) {
+              // Filter for completed appointments only
+              _appointmentHistory = historyData.where((item) {
+                if (item is Map<String, dynamic>) {
+                  final status = item['appointmentStatus']?['status']?.toString()?.toLowerCase();
+                  return status == 'completed';
+                }
+                return false;
+              }).map((item) {
+                if (item is Map<String, dynamic>) {
+                  return item;
+                } else if (item is Map) {
+                  return Map<String, dynamic>.from(item);
+                } else {
+                  return <String, dynamic>{};
+                }
+              }).toList();
+            } else {
+              _appointmentHistory = [];
+            }
           } else {
             _appointmentHistory = [];
           }
@@ -1630,48 +1652,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     }
   }
 
-  List<Map<String, dynamic>> _getStatusHistoryFromAppointment() {
-    // Get statusHistory from appointmentStatus object
-    final appointmentStatus = widget.appointment['appointmentStatus'];
-    if (appointmentStatus is Map<String, dynamic>) {
-      final statusHistory = appointmentStatus['statusHistory'];
-      if (statusHistory is List) {
-        // Convert statusHistory to the format expected by the UI
-        return statusHistory.map((statusItem) {
-          if (statusItem is Map<String, dynamic>) {
-            final changedBy = statusItem['changedBy'];
-            String changedByName = 'Unknown';
-            String changedByEmail = '';
-            
-            if (changedBy is Map<String, dynamic>) {
-              changedByName = changedBy['fullName']?.toString() ?? 'Unknown';
-              changedByEmail = changedBy['email']?.toString() ?? '';
-            }
-            
-            return {
-              'status': statusItem['status']?.toString() ?? 'Unknown',
-              'changedAt': statusItem['changedAt']?.toString() ?? '',
-              'changedBy': {
-                'fullName': changedByName,
-                'email': changedByEmail,
-                'userId': changedBy?['userId']?.toString() ?? '',
-                'updatedTimestamp': changedBy?['updatedTimestamp']?.toString() ?? '',
-              },
-              'appointmentId': widget.appointment['appointmentId']?.toString() ?? '',
-              'createdBy': widget.appointment['createdBy'],
-              'appointmentStatus': widget.appointment['appointmentStatus'],
-              'createdAt': statusItem['createdAt']?.toString() ?? '',
-              'updatedAt': statusItem['updatedAt']?.toString() ?? '',
-            };
-          }
-          return <String, dynamic>{};
-        }).toList();
-      }
-    }
-    
-    // Fallback to empty list if no status history found
-    return [];
-  }
+
 
   Future<void> _refreshAppointmentsOverview() async {
     await _fetchAppointmentsOverview();
@@ -2471,6 +2452,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildReminderContent() {
+    // Check if appointment already has scheduled data
+    final scheduledDateTime = widget.appointment['scheduledDateTime'];
+    final hasExistingSchedule = scheduledDateTime is Map<String, dynamic> && 
+                               scheduledDateTime['date'] != null && 
+                               scheduledDateTime['time'] != null;
+    
+    final title = hasExistingSchedule ? 'Edit Schedule' : 'Schedule Appointment';
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
@@ -2479,10 +2468,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       ),
       child: Column(
         children: [
-          _buildActionHeader('Schedule Appointment'),
+          _buildActionHeader(title),
           Expanded(
             child: ReminderForm(
               appointment: widget.appointment,
+              isFromScheduleScreens: widget.isFromScheduleScreens,
               onRefresh: () {
                 // Refresh the detail page data
                 _fetchAppointmentsOverview();
@@ -3852,7 +3842,26 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                               '${_upcomingAppointments.where((appointment) {
                                 if (appointment is Map<String, dynamic>) {
                                   final status = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
-                                  return status == 'scheduled' || status == 'confirmed';
+                                  final scheduledDate = appointment['scheduledDateTime']?['date']?.toString();
+                                  
+                                  // Check if status is scheduled or confirmed
+                                  final isValidStatus = status == 'scheduled' || status == 'confirmed';
+                                  
+                                  // Check if date is in the future
+                                  bool isFutureDate = false;
+                                  if (scheduledDate != null && scheduledDate.isNotEmpty) {
+                                    try {
+                                      final appointmentDate = DateTime.parse(scheduledDate);
+                                      final now = DateTime.now();
+                                      // Consider it future if it's today or later (including time)
+                                      isFutureDate = appointmentDate.isAfter(now.subtract(const Duration(days: 1)));
+                                    } catch (e) {
+                                      // If date parsing fails, don't show it
+                                      isFutureDate = false;
+                                    }
+                                  }
+                                  
+                                  return isValidStatus && isFutureDate;
                                 }
                                 return false;
                               }).length} items',
@@ -3876,26 +3885,96 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: _upcomingAppointments.where((appointment) {
-                                // Filter to show only scheduled appointments, not pending ones
+                                // Filter to show only scheduled/confirmed appointments with future dates
                                 if (appointment is Map<String, dynamic>) {
                                   final status = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
-                                  return status == 'scheduled' || status == 'confirmed';
+                                  final scheduledDate = appointment['scheduledDateTime']?['date']?.toString();
+                                  
+                                  // Check if status is scheduled or confirmed
+                                  final isValidStatus = status == 'scheduled' || status == 'confirmed';
+                                  
+                                  // Check if date is in the future
+                                  bool isFutureDate = false;
+                                  if (scheduledDate != null && scheduledDate.isNotEmpty) {
+                                    try {
+                                      final appointmentDate = DateTime.parse(scheduledDate);
+                                      final now = DateTime.now();
+                                      // Consider it future if it's today or later (including time)
+                                      isFutureDate = appointmentDate.isAfter(now.subtract(const Duration(days: 1)));
+                                    } catch (e) {
+                                      // If date parsing fails, don't show it
+                                      isFutureDate = false;
+                                    }
+                                  }
+                                  
+                                  return isValidStatus && isFutureDate;
                                 }
                                 return false;
                               }).map((appointment) {
                                 try {
-                                  return _buildAppointmentItem(
-                                    appointment['createdBy']?['fullName']?.toString() ?? 'Unknown User',
-                                    _formatAppointmentDateTime(appointment),
-                                    appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
-                                    _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
-                                  );
+                                  // Extract the required fields
+                                  final purpose = appointment['appointmentPurpose']?.toString() ?? 
+                                                appointment['appointmentSubject']?.toString() ?? 'No Purpose';
+                                  final venueLabel = appointment['scheduledDateTime']?['venueLabel']?.toString() ?? 'No Venue';
+                                  final secretary = appointment['assignedSecretary']?['fullName']?.toString() ?? 'No Secretary';
+                                  final date = appointment['scheduledDateTime']?['date']?.toString() ?? 'No Date';
+                                  final time = appointment['scheduledDateTime']?['time']?.toString() ?? 'No Time';
+                                  
+                                  // Format date and time
+                                  String formattedDate = 'No Date';
+                                  String formattedTime = 'No Time';
+                                  
+                                  if (date != 'No Date' && date.isNotEmpty) {
+                                    try {
+                                      final dateTime = DateTime.parse(date);
+                                      final months = [
+                                        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                                      ];
+                                      formattedDate = '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year}';
+                                    } catch (e) {
+                                      formattedDate = date;
+                                    }
+                                  }
+                                  
+                                  if (time != 'No Time' && time.isNotEmpty) {
+                                    try {
+                                      final timeParts = time.split(':');
+                                      if (timeParts.length >= 2) {
+                                        final hour = int.parse(timeParts[0]);
+                                        final minute = timeParts[1];
+                                        final period = hour >= 12 ? 'PM' : 'AM';
+                                        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                                        formattedTime = '${displayHour}:${minute} $period';
+                                      } else {
+                                        formattedTime = time;
+                                      }
+                                    } catch (e) {
+                                      formattedTime = time;
+                                    }
+                                  }
+                                  
+                                  // Create display name with purpose, venue, and secretary
+                                  String displayName = '$purpose - $venueLabel - $secretary';
+                                  
+                                                                      return _buildAppointmentItem(
+                                      purpose: purpose,
+                                      venueLabel: venueLabel,
+                                      secretary: secretary,
+                                      date: formattedDate,
+                                      time: formattedTime,
+                                      status: appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
+                                      statusColor: _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
+                                    );
                                 } catch (e) {
                                   return _buildAppointmentItem(
-                                    'Unknown User',
-                                    'Date not specified',
-                                    'Unknown',
-                                    Colors.grey,
+                                    purpose: 'Unknown Purpose',
+                                    venueLabel: 'Unknown Venue',
+                                    secretary: 'Unknown Secretary',
+                                    date: 'Unknown Date',
+                                    time: 'Unknown Time',
+                                    status: 'Unknown',
+                                    statusColor: Colors.grey,
                                   );
                                 }
                               }).toList(),
@@ -4024,20 +4103,68 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
                             child: Column(
-                              children: _appointmentHistory.where((appointment) => appointment is Map<String, dynamic>).map((appointment) {
+                              children: _appointmentHistory.map((appointment) {
                                 try {
+                                  // Extract the required fields from upcoming appointments API data
+                                  final purpose = appointment['appointmentPurpose']?.toString() ?? 
+                                                appointment['appointmentSubject']?.toString() ?? 'No Purpose';
+                                  final venueLabel = appointment['scheduledDateTime']?['venueLabel']?.toString() ?? 'No Venue';
+                                  final secretary = appointment['assignedSecretary']?['fullName']?.toString() ?? 'No Secretary';
+                                  final date = appointment['scheduledDateTime']?['date']?.toString() ?? 'No Date';
+                                  final time = appointment['scheduledDateTime']?['time']?.toString() ?? 'No Time';
+                                  
+                                  // Format date and time
+                                  String formattedDate = 'No Date';
+                                  String formattedTime = 'No Time';
+                                  
+                                  if (date != 'No Date' && date.isNotEmpty) {
+                                    try {
+                                      final dateTime = DateTime.parse(date);
+                                      final months = [
+                                        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                                      ];
+                                      formattedDate = '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year}';
+                                    } catch (e) {
+                                      formattedDate = date;
+                                    }
+                                  }
+                                  
+                                  if (time != 'No Time' && time.isNotEmpty) {
+                                    try {
+                                      final timeParts = time.split(':');
+                                      if (timeParts.length >= 2) {
+                                        final hour = int.parse(timeParts[0]);
+                                        final minute = timeParts[1];
+                                        final period = hour >= 12 ? 'PM' : 'AM';
+                                        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                                        formattedTime = '${displayHour}:${minute} $period';
+                                      } else {
+                                        formattedTime = time;
+                                      }
+                                    } catch (e) {
+                                      formattedTime = time;
+                                    }
+                                  }
+                                  
                                   return _buildAppointmentItem(
-                                    appointment['changedBy']?['fullName']?.toString() ?? 'Unknown User',
-                                    _formatStatusHistoryDateTime(appointment),
-                                    appointment['status']?.toString() ?? 'Unknown',
-                                    _getStatusColor(appointment['status']?.toString() ?? 'unknown'),
+                                    purpose: purpose,
+                                    venueLabel: venueLabel,
+                                    secretary: secretary,
+                                    date: formattedDate,
+                                    time: formattedTime,
+                                    status: appointment['appointmentStatus']?['status']?.toString() ?? 'Unknown',
+                                    statusColor: _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'unknown'),
                                   );
                                 } catch (e) {
                                   return _buildAppointmentItem(
-                                    'Unknown User',
-                                    'Date not specified',
-                                    'Unknown',
-                                    Colors.grey,
+                                    purpose: 'Unknown Purpose',
+                                    venueLabel: 'Unknown Venue',
+                                    secretary: 'Unknown Secretary',
+                                    date: 'Unknown Date',
+                                    time: 'Unknown Time',
+                                    status: 'Unknown',
+                                    statusColor: Colors.grey,
                                   );
                                 }
                               }).toList(),
@@ -4056,65 +4183,97 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
-  Widget _buildAppointmentItem(String name, String dateTime, String status, Color statusColor) {
+  Widget _buildAppointmentItem({
+    required String purpose,
+    required String venueLabel,
+    required String secretary,
+    required String date,
+    required String time,
+    required String status,
+    required Color statusColor,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Colors.transparent),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // First row: Name on left, Status on right
-          Row(
-            children: [
-              // Name
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            // Handle tap to view appointment details
+            print('Tapped on appointment: $purpose');
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                
+                // Appointment details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Purpose
+                      Text(
+                        purpose,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      // Venue Label and Secretary
+                      Text(
+                        '$venueLabel, $secretary',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      // Date and Time
+                      Text(
+                        '$date, $time',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              
-              // Status
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: statusColor,
+                
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 4),
-          
-          // Second row: Date and Time
-          Text(
-            dateTime,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

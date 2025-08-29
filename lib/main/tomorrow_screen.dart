@@ -260,10 +260,15 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
           ),
 
           // Tomorrow card component
-          Expanded(child: TomorrowCardComponent(
-            key: ValueKey(_refreshCounter),
-            selectedDate: _selectedDate,
-          )),
+          Expanded(
+            child: Container(
+              color: Colors.white,
+              child: TomorrowCardComponent(
+                key: ValueKey(_refreshCounter),
+                selectedDate: _selectedDate,
+              ),
+            ),
+          ),
         ],
       ),
     );

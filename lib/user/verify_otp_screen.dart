@@ -401,24 +401,35 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                           const SizedBox(height: 32),
 
                           // OTP Input Fields
-                          Center(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 350),
-                              child: Row(
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              // Calculate responsive dimensions
+                              final screenWidth = constraints.maxWidth;
+                              final isSmallScreen = screenWidth < 350;
+                              final isMediumScreen = screenWidth < 400;
+                              
+                              // Responsive sizing
+                              final fieldWidth = isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0);
+                              final fieldHeight = isSmallScreen ? 44.0 : (isMediumScreen ? 46.0 : 48.0);
+                              final fontSize = isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0);
+                              final horizontalMargin = isSmallScreen ? 1.0 : (isMediumScreen ? 1.5 : 2.0);
+                              final contentPadding = isSmallScreen ? 8.0 : (isMediumScreen ? 10.0 : 12.0);
+                              
+                              return Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: List.generate(6, (index) {
                                   return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                                    width: 48,
+                                    margin: EdgeInsets.symmetric(horizontal: horizontalMargin),
+                                    width: fieldWidth,
                                     child: SizedBox(
-                                      height: 48,
+                                      height: fieldHeight,
                                       child: TextFormField(
                                         controller: _otpControllers[index],
                                         focusNode: _focusNodes[index],
                                         keyboardType: TextInputType.number,
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 18,
+                                        style: TextStyle(
+                                          fontSize: fontSize,
                                           fontWeight: FontWeight.w600,
                                         ),
                                         inputFormatters: [
@@ -448,7 +459,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                               color: Colors.grey.shade400,
                                             ),
                                           ),
-                                          contentPadding: const EdgeInsets.all(12),
+                                          contentPadding: EdgeInsets.all(contentPadding),
                                         ),
                                         onChanged: (value) =>
                                             _onOtpChanged(value, index),
@@ -456,8 +467,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                     ),
                                   );
                                 }),
-                              ),
-                            ),
+                              );
+                            },
                           ),
 
                           const SizedBox(height: 32),
@@ -544,77 +555,105 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
                           const SizedBox(height: 32),
 
-                          // Resend and Back links
-                          Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Text(
-                                    "Didn't receive the code? ",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF52525B), // zinc-600
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: _resendTimer > 0 || _isResendLoading
-                                        ? null
-                                        : _resendOtp,
-                                    child: _isResendLoading
-                                        ? const SizedBox(
-                                            width: 12,
-                                            height: 12,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                    Color(
-                                                      0xFFEA580C,
-                                                    ), // orange-600
-                                                  ),
-                                            ),
-                                          )
-                                        : Text(
-                                            _resendTimer > 0
-                                                ? 'Resend in ${_formatTime(_resendTimer)}'
-                                                : 'Resend',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: _resendTimer > 0
-                                                  ? Colors.grey.shade400
-                                                  : const Color(
-                                                      0xFFEA580C,
-                                                    ), // orange-600
-                                            ),
-                                          ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              GestureDetector(
-                                onTap: () => Navigator.of(context).pop(),
-                                child: const Text(
-                                  '← Back to Login',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF71717A), // zinc-500
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                                                     // Resend link
+                           Row(
+                             mainAxisAlignment: MainAxisAlignment.center,
+                             children: [
+                               const Text(
+                                 "Didn't receive the code? ",
+                                 style: TextStyle(
+                                   fontSize: 12,
+                                   color: Color(0xFF52525B), // zinc-600
+                                 ),
+                               ),
+                               GestureDetector(
+                                 onTap: _resendTimer > 0 || _isResendLoading
+                                     ? null
+                                     : _resendOtp,
+                                 child: _isResendLoading
+                                     ? const SizedBox(
+                                         width: 12,
+                                         height: 12,
+                                         child: CircularProgressIndicator(
+                                           strokeWidth: 2,
+                                           valueColor:
+                                               AlwaysStoppedAnimation<Color>(
+                                                 Color(
+                                                   0xFFEA580C,
+                                                 ), // orange-600
+                                               ),
+                                         ),
+                                       )
+                                     : Text(
+                                         _resendTimer > 0
+                                             ? 'Resend in ${_formatTime(_resendTimer)}'
+                                             : 'Resend',
+                                         style: TextStyle(
+                                           fontSize: 12,
+                                           fontWeight: FontWeight.w500,
+                                           color: _resendTimer > 0
+                                               ? Colors.grey.shade400
+                                               : const Color(
+                                                   0xFFEA580C,
+                                                 ), // orange-600
+                                         ),
+                                       ),
+                               ),
+                             ],
+                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+                                             ),
+                     ),
+                   ),
+                   
+                   // Back to Login link (outside the card)
+                   const SizedBox(height: 32),
+                   GestureDetector(
+                     onTap: () => Navigator.of(context).pop(),
+                     child: Container(
+                       padding: const EdgeInsets.symmetric(
+                         horizontal: 24,
+                         vertical: 12,
+                       ),
+                       decoration: BoxDecoration(
+                         color: Colors.white.withOpacity(0.8),
+                         borderRadius: BorderRadius.circular(20),
+                         border: Border.all(color: Colors.grey.shade200),
+                         boxShadow: [
+                           BoxShadow(
+                             color: Colors.grey.shade200.withOpacity(0.3),
+                             blurRadius: 8,
+                             offset: const Offset(0, 2),
+                           ),
+                         ],
+                       ),
+                       child: Row(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           Icon(
+                             Icons.arrow_back,
+                             size: 18,
+                             color: Colors.grey.shade600,
+                           ),
+                           const SizedBox(width: 8),
+                           Text(
+                             'Back to Login',
+                             style: TextStyle(
+                               fontSize: 16,
+                               fontWeight: FontWeight.w500,
+                               color: Colors.grey.shade700,
+                             ),
+                           ),
+                         ],
+                       ),
+                     ),
+                   ),
+                 ],
+               ),
+             ),
+           ),
+         ),
+       ),
+     );
+   }
+ }

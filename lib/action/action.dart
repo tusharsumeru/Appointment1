@@ -7323,4 +7323,65 @@ static Future<Map<String, dynamic>> registerUser({
       };
     }
   }
+
+  // SideBar Count
+  static Future<Map<String, dynamic>> getSidebarCounts() async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+      print('DEBUG SIDEBAR: Making API call to $baseUrl/appointment/sidebar-counts');
+      // Make API call with authorization header
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/sidebar-counts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      print('DEBUG SIDEBAR: Response status code: ${response.statusCode}');
+      print('DEBUG SIDEBAR: Response body: ${response.body}');
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        print('DEBUG SIDEBAR: Success response data: ${responseData['data']}');
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Sidebar counts retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        print('DEBUG SIDEBAR: 401 Unauthorized - Session expired');
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        // Other error
+        print('DEBUG SIDEBAR: Error response: ${responseData['message']}');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to get sidebar counts',
+        };
+      }
+    } catch (error) {
+      print('DEBUG SIDEBAR: Network error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
 }
