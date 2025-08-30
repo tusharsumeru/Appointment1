@@ -71,6 +71,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   File? _selectedImage;
   File? _selectedAttachment; // For file attachments
   bool _isAttendingProgram = false;
+  
+  // Appointment purpose validation
+  String? _appointmentPurposeError;
 
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
@@ -309,8 +312,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _validateForm() {
+    // Validate appointment purpose
+    String purposeText = _appointmentPurposeController.text.trim();
+    if (purposeText.isEmpty) {
+      _appointmentPurposeError = 'Appointment purpose is required';
+    } else if (purposeText.length < 3) {
+      _appointmentPurposeError = 'Minimum 3 characters required';
+    } else if (!RegExp(r'^[a-zA-Z]').hasMatch(purposeText)) {
+      _appointmentPurposeError = 'Must start with a letter';
+    } else if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(purposeText)) {
+      _appointmentPurposeError = 'Only letters and spaces are allowed';
+    } else {
+      _appointmentPurposeError = null;
+    }
+
     bool basicFormValid =
-        _appointmentPurposeController.text.isNotEmpty &&
+        _appointmentPurposeError == null &&
         _preferredFromDateController.text.isNotEmpty &&
         _preferredToDateController.text.isNotEmpty;
 
@@ -1672,6 +1689,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     placeholder:
                         'Please describe the purpose of your appointment in detail',
                     onChanged: (value) => _validateForm(),
+                    errorMessage: _appointmentPurposeError,
                   ),
                   const SizedBox(height: 20),
 
@@ -2207,9 +2225,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                 width: double.infinity,
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: _programDateRangeError != null
-                                        ? Colors.red
-                                        : const Color(0xFFF97316),
+                                    color: const Color(0xFFF97316),
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -2240,16 +2256,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                 ),
                               ),
                             ),
-                            if (_programDateRangeError != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                _programDateRangeError!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
                           ],
                         ),
 
@@ -2313,7 +2319,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             if (_programDateRangeError != null) ...[
                               const SizedBox(height: 4),
                               Text(
-                                _programDateRangeError!,
+                                'End date must be after or equal to start date',
                                 style: const TextStyle(
                                   color: Colors.red,
                                   fontSize: 12,
@@ -2471,6 +2477,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required TextEditingController controller,
     required String placeholder,
     Function(String)? onChanged,
+    String? errorMessage,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2488,6 +2495,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           controller: controller,
           onChanged: onChanged,
           maxLines: 4,
+          inputFormatters: [
+            // Prevent leading spaces
+            FilteringTextInputFormatter.deny(RegExp(r'^\s')),
+            // Allow only letters and spaces
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+          ],
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: TextStyle(color: Colors.grey[400]),
@@ -2495,18 +2508,39 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.deepPurple),
+              borderSide: BorderSide(
+                color: errorMessage != null ? Colors.red : Colors.deepPurple,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[300]!),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.red[500]!),
             ),
           ),
         ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorMessage,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
       ],
     );
   }

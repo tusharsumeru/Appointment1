@@ -255,30 +255,33 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       if (attendingCourseDetails != null &&
           attendingCourseDetails is Map<String, dynamic>) {
         
-        // Check the isAttending field from the database
-        final isAttending = attendingCourseDetails['isAttending'];
-        if (isAttending == true) {
+        // Check if there are program dates - if dates exist, user is attending a program
+        final fromDate = attendingCourseDetails['fromDate'];
+        final toDate = attendingCourseDetails['toDate'];
+        
+        if (fromDate != null && toDate != null) {
           _isAttendingProgram = true;
-          print('📅 Program attendance data found: isAttending = true');
+          print('📅 Program attendance data found: dates exist, setting _isAttendingProgram = true');
           
           // Load program date range
-          final fromDate = attendingCourseDetails['fromDate'];
-          final toDate = attendingCourseDetails['toDate'];
-
-          if (fromDate != null) {
+          try {
             final from = DateTime.parse(fromDate);
             _programFromDateController.text =
                 '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year}';
+          } catch (e) {
+            print('📅 Error parsing program from date: $e');
           }
 
-          if (toDate != null) {
+          try {
             final to = DateTime.parse(toDate);
             _programToDateController.text =
                 '${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year}';
+          } catch (e) {
+            print('📅 Error parsing program to date: $e');
           }
         } else {
           _isAttendingProgram = false;
-          print('📅 Program attendance data found: isAttending = false');
+          print('📅 Program attendance data found but no dates, setting _isAttendingProgram = false');
         }
       } else {
         // Explicitly set to false if no program details exist
@@ -303,31 +306,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'DEBUG LOAD: Setting numberOfUsers. accompanyUsers: $accompanyUsers',
       );
       if (accompanyUsers != null) {
-        final List<dynamic> users = accompanyUsers['users'] ?? [];
+        // Check if numberOfUsers field exists (for large groups > 10)
         final numberOfUsers = accompanyUsers['numberOfUsers'];
-        
-        print('DEBUG LOAD: users.length = ${users.length}, numberOfUsers = $numberOfUsers');
-        
-        if (users.isNotEmpty) {
-          // Use the length of users array + 1 for main user (when users array has data)
+        if (numberOfUsers != null && numberOfUsers > 0) {
+          // For large groups, numberOfUsers represents accompanying users count
+          // So total people = numberOfUsers + 1 (main user)
+          _numberOfUsersController.text = (numberOfUsers + 1).toString();
+          print(
+            'DEBUG LOAD: Set numberOfUsers to ${numberOfUsers + 1} (from numberOfUsers field, total people including main user)',
+          );
+        } else if (accompanyUsers['users'] != null) {
+          // For small groups, count the users array
+          final List<dynamic> users = accompanyUsers['users'];
           _numberOfUsersController.text = (users.length + 1).toString();
           print(
-            'DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (total people including main user)',
-          );
-        } else if (numberOfUsers != null) {
-          // Use numberOfUsers field + 1 for main user (when users array is empty)
-          final int totalUsers = (numberOfUsers is int ? numberOfUsers : int.tryParse(numberOfUsers.toString()) ?? 0) + 1;
-          _numberOfUsersController.text = totalUsers.toString();
-          print(
-            'DEBUG LOAD: Set numberOfUsers to $totalUsers (using numberOfUsers field + 1)',
+            'DEBUG LOAD: Set numberOfUsers to ${users.length + 1} (from users array, total people including main user)',
           );
         } else {
           _numberOfUsersController.text = '1';
-          print('DEBUG LOAD: Set numberOfUsers to 1 (just main user)');
+          print('DEBUG LOAD: Set numberOfUsers to 1 (no accompanyUsers data)');
         }
       } else {
         _numberOfUsersController.text = '1';
-        print('DEBUG LOAD: Set numberOfUsers to 1 (just main user)');
+        print('DEBUG LOAD: Set numberOfUsers to 1 (no accompanyUsers)');
       }
 
       _validateForm();
@@ -1390,6 +1391,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     List<TextInputFormatter>? inputFormatters,
     int? maxLength,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1410,16 +1412,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           maxLength: maxLength,
           validator: validator,
           autovalidateMode: AutovalidateMode.onUserInteraction,
+          readOnly: readOnly,
           decoration: InputDecoration(
             hintText: placeholder,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.deepPurple),
+            ),
+            filled: true,
+            fillColor: readOnly ? Colors.grey[100] : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 12,
             ),
             counterText: '', // Hide character counter
           ),
-          onChanged: (_) => _validateForm(),
+          onChanged: readOnly ? null : (_) => _validateForm(),
         ),
       ],
     );
@@ -3076,6 +3093,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     label: 'Reference Name',
                                     controller: _referenceNameController,
                                     placeholder: 'Your name',
+                                    readOnly: true,
                                   ),
                                   const SizedBox(height: 12),
 
@@ -3085,6 +3103,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     controller: _referenceEmailController,
                                     placeholder: 'Your email',
                                     keyboardType: TextInputType.emailAddress,
+                                    readOnly: true,
                                   ),
                                   const SizedBox(height: 12),
 
@@ -3094,6 +3113,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     controller: _referencePhoneController,
                                     placeholder: 'Your phone number',
                                     keyboardType: TextInputType.phone,
+                                    readOnly: true,
                                   ),
                                 ],
                               ],
@@ -3765,82 +3785,92 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                         const SizedBox(height: 20),
 
                         // Guest Information Cards (for accompanying users)
-                        if ((int.tryParse(_numberOfUsersController.text) ?? 1) >
-                                1 &&
-                            (int.tryParse(_numberOfUsersController.text) ??
-                                    1) <=
-                                11) ...[
-                          const Text(
-                            'Accompany User Details',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Please provide details for accompany users',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ..._guestControllers.asMap().entries.map((entry) {
-                            int index = entry.key;
-                            Map<String, TextEditingController> guest =
-                                entry.value;
-                            return _buildGuestCard(index + 1, guest);
-                          }).toList(),
-                          const SizedBox(height: 20),
-                        ] else if ((int.tryParse(
-                                  _numberOfUsersController.text,
-                                ) ??
-                                1) >
-                            11) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.orange.shade700,
-                                      size: 20,
+                        Builder(
+                          builder: (context) {
+                            final totalPeopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
+                            
+                            if (totalPeopleCount > 1 && totalPeopleCount <= 11) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Accompany User Details',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Large Group Appointment',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.orange.shade700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'For appointments with more than 10 accompany users, additional person details are not required.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.orange.shade600,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Please provide details for accompany users',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ..._guestControllers.asMap().entries.map((entry) {
+                                    int index = entry.key;
+                                    Map<String, TextEditingController> guest =
+                                        entry.value;
+                                    return _buildGuestCard(index + 1, guest);
+                                  }).toList(),
+                                  const SizedBox(height: 20),
+                                ],
+                              );
+                            } else if (totalPeopleCount >= 12) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.orange.shade200),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              color: Colors.orange.shade700,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Large Group Appointment',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.orange.shade700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'For appointments with more than 10 accompany users, additional person details are not required.',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.orange.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                ],
+                              );
+                            } else {
+                              return const SizedBox.shrink();
+                            }
+                          },
+                        ),
 
                         // Date Range Section
                         const Text(
@@ -4160,143 +4190,28 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           Column(
                             children: [
                               // Program Start Date
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Program Start',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFFF97316),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  GestureDetector(
-                                    onTap: () => _selectDate(
-                                      context,
-                                      _programFromDateController,
-                                    ),
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: _programDateRangeError != null
-                                              ? Colors.red
-                                              : const Color(0xFFF97316),
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: TextField(
-                                        controller: _programFromDateController,
-                                        enabled: false,
-                                        decoration: InputDecoration(
-                                          hintText: 'dd-mm-yyyy',
-                                          hintStyle: TextStyle(
-                                            color: Colors.grey[400],
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                          border: InputBorder.none,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 16,
-                                              ),
-                                          prefixIcon: Icon(
-                                            Icons.calendar_today,
-                                            color: const Color(0xFFF97316),
-                                          ),
-                                          suffixIcon: Icon(
-                                            Icons.arrow_drop_down,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_programDateRangeError != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _programDateRangeError!,
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                              _buildDateField(
+                                label: 'Program Start',
+                                controller: _programFromDateController,
+                                onTap: () => _selectDate(
+                                  context,
+                                  _programFromDateController,
+                                ),
                               ),
 
                               const SizedBox(height: 16),
 
                               // Program End Date
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Program End',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFFF97316),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  GestureDetector(
-                                    onTap: () => _selectDate(
-                                      context,
-                                      _programToDateController,
-                                    ),
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: _programDateRangeError != null
-                                              ? Colors.red
-                                              : const Color(0xFFF97316),
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: TextField(
-                                        controller: _programToDateController,
-                                        enabled: false,
-                                        decoration: InputDecoration(
-                                          hintText: 'dd-mm-yyyy',
-                                          hintStyle: TextStyle(
-                                            color: Colors.grey[400],
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                          border: InputBorder.none,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 16,
-                                              ),
-                                          prefixIcon: Icon(
-                                            Icons.calendar_today,
-                                            color: const Color(0xFFF97316),
-                                          ),
-                                          suffixIcon: Icon(
-                                            Icons.arrow_drop_down,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_programDateRangeError != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _programDateRangeError!,
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                              _buildDateField(
+                                label: 'Program End',
+                                controller: _programToDateController,
+                                onTap: () => _selectDate(
+                                  context,
+                                  _programToDateController,
+                                ),
+                                errorMessage: _programDateRangeError != null 
+                                    ? 'End date must be after or equal to start date' 
+                                    : null,
                               ),
                             ],
                           ),

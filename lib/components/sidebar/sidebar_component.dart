@@ -9,6 +9,7 @@ import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
 import '../../main/change_password_screen.dart';
+import '../../main/account_settings_screen.dart';
 // import '../../main/export_data_screen.dart';
 // import '../../main/forward_request_logs_screen.dart';
 import '../../main/deleted_appointments_screen.dart';
@@ -328,70 +329,76 @@ class _SidebarComponentState extends State<SidebarComponent> {
     return Drawer(
       child: Container(
         color: Colors.white,
-        child: ListView(
-          padding: EdgeInsets.zero,
+        child: Column(
           children: [
-          // Header
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.deepOrange, Colors.orange],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            // Fixed Header
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.deepOrange, Colors.orange],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // User Avatar
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.white,
+                    backgroundImage: _userData?['profilePhoto'] != null
+                        ? NetworkImage(_userData!['profilePhoto'])
+                        : null,
+                    child: _userData?['profilePhoto'] == null
+                        ? const Icon(
+                            Icons.person,
+                            size: 30,
+                            color: Colors.deepOrange,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  // User Name
+                  Flexible(
+                    child: Text(
+                      _isLoading
+                          ? 'Loading...'
+                          : _userData?['fullName'] ?? 'User',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // User Email
+                  Flexible(
+                    child: Text(
+                      _isLoading
+                          ? 'Loading...'
+                          : _userData?['email'] ?? 'user@example.com',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // User Avatar
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.white,
-                  backgroundImage: _userData?['profilePhoto'] != null
-                      ? NetworkImage(_userData!['profilePhoto'])
-                      : null,
-                  child: _userData?['profilePhoto'] == null
-                      ? const Icon(
-                          Icons.person,
-                          size: 30,
-                          color: Colors.deepOrange,
-                        )
-                      : null,
-                ),
-                const SizedBox(height: 8),
-                // User Name
-                Flexible(
-                  child: Text(
-                    _isLoading
-                        ? 'Loading...'
-                        : _userData?['fullName'] ?? 'User',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                // User Email
-                Flexible(
-                  child: Text(
-                    _isLoading
-                        ? 'Loading...'
-                        : _userData?['email'] ?? 'user@example.com',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
+            
+            // Scrollable Menu Items
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
 
           // Secretary and Super Admin menu items
           if (isSecretary || isSuperAdmin) ...[
@@ -641,6 +648,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
           const Divider(),
 
           ListTile(
+            leading: const Icon(Icons.account_circle, color: Colors.grey),
+            title: const Text('Account Settings'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AccountSettingsScreen(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
             leading: const Icon(Icons.lock_reset, color: Colors.grey),
             title: const Text('Change Password'),
             onTap: () {
@@ -694,7 +715,10 @@ class _SidebarComponentState extends State<SidebarComponent> {
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
             onTap: _handleLogout,
           ),
-        ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -336,23 +336,35 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return 'Regular Meeting';
   }
 
-  String _getEntryDate(Map<String, dynamic> appointment) {
-    final status = _getAppointmentStatus(appointment).toLowerCase();
-    
-    if (status == 'pending') {
-      return 'N/A';
-    } else if (status == 'scheduled') {
-      // For scheduled appointments, show the date from scheduledDateTime
-      final scheduledDateTime = appointment['scheduledDateTime'];
-      if (scheduledDateTime is Map<String, dynamic>) {
-        final date = scheduledDateTime['date'];
-        if (date != null) {
-          return _formatDate(date);
-        }
+  String _getScheduledDate(Map<String, dynamic> appointment) {
+    // Show scheduled date if available, otherwise show N/A
+    final scheduledDateTime = appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final date = scheduledDateTime['date'];
+      if (date != null && date.toString().isNotEmpty) {
+        return _formatDate(date);
       }
     }
     
-    // For other statuses, show the createdAt date
+    // Return N/A if no scheduled date
+    return 'N/A';
+  }
+
+  String _getEntryDate(Map<String, dynamic> appointment) {
+    // Show preferred date range for entry date
+    final preferredDateRange = appointment['preferredDateRange'];
+    if (preferredDateRange is Map<String, dynamic>) {
+      final fromDate = preferredDateRange['fromDate'];
+      final toDate = preferredDateRange['toDate'];
+      
+      if (fromDate != null && toDate != null) {
+        return '${_formatDate(fromDate)} - ${_formatDate(toDate)}';
+      } else if (fromDate != null) {
+        return _formatDate(fromDate);
+      }
+    }
+    
+    // Fallback to createdAt date if no preferred date range
     return _formatDate(appointment['createdAt']);
   }
 
@@ -599,7 +611,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                     _buildDetailRow(
                       icon: Icons.calendar_today,
                       label: 'Appointment Date',
-                      value: _formatDate(appointment['preferredDateRange']?['fromDate']),
+                      value: _getScheduledDate(appointment),
                     ),
                     const SizedBox(height: 12),
                     
@@ -775,6 +787,33 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       return;
     }
 
+    // Check appointment status from search result first
+    final appointmentStatus = appointment['appointmentStatus'];
+    String? status;
+    if (appointmentStatus is Map<String, dynamic>) {
+      status = appointmentStatus['status']?.toString()?.toLowerCase();
+    }
+    
+    // Check if appointment has scheduled date
+    final scheduledDateTime = appointment['scheduledDateTime'];
+    bool hasScheduledDate = false;
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final scheduledDate = scheduledDateTime['date']?.toString();
+      hasScheduledDate = scheduledDate != null && scheduledDate.isNotEmpty;
+    }
+
+    // Determine if appointment is scheduled
+    bool isScheduled = false;
+    if (status != null) {
+      // Check if status is scheduled or confirmed
+      isScheduled = status == 'scheduled' || status == 'confirmed';
+    }
+    
+    // If not scheduled by status, check if it has a scheduled date
+    if (!isScheduled && hasScheduledDate) {
+      isScheduled = true;
+    }
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -800,17 +839,34 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       Navigator.of(context).pop();
 
       if (result['success'] && result['data'] != null) {
-        // Navigate to appointment detail page with fetched data
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AppointmentDetailPage(
-              appointment: result['data'],
-              isFromDeletedAppointments: false,
-              isFromScheduleScreens: false,
+        final appointmentData = result['data'];
+        
+        // Navigate based on appointment status
+        if (isScheduled) {
+          // For scheduled appointments, navigate to detail page with schedule screens flag
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppointmentDetailPage(
+                appointment: appointmentData,
+                isFromDeletedAppointments: false,
+                isFromScheduleScreens: true, // Set to true for scheduled appointments
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          // For unscheduled appointments, navigate to detail page without schedule screens flag
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppointmentDetailPage(
+                appointment: appointmentData,
+                isFromDeletedAppointments: false,
+                isFromScheduleScreens: false, // Set to false for unscheduled appointments
+              ),
+            ),
+          );
+        }
       } else {
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1578,6 +1578,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       // Fetch upcoming appointments
       final upcomingResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
+      // Debug: Print the API response
+      print('DEBUG: API Response for upcoming appointments:');
+      print('DEBUG: Success: ${upcomingResult['success']}');
+      print('DEBUG: Data length: ${upcomingResult['data']?.length ?? 0}');
+      if (upcomingResult['data'] != null) {
+        for (int i = 0; i < (upcomingResult['data'] as List).length; i++) {
+          final appointment = upcomingResult['data'][i];
+          print('DEBUG: Appointment $i: ${appointment['appointmentId']} - Status: ${appointment['appointmentStatus']?['status']} - Date: ${appointment['scheduledDateTime']?['date']}');
+        }
+      }
+      
       // Fetch appointment history from API (same as upcoming appointments but filter for completed)
       final historyResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
@@ -1607,11 +1618,32 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           if (historyResult['success'] && historyResult['data'] != null) {
             final List<dynamic> historyData = historyResult['data'];
             if (historyData is List) {
-              // Filter for completed appointments only
+              // Show everything that's NOT in upcoming appointments (simple logic)
               _appointmentHistory = historyData.where((item) {
                 if (item is Map<String, dynamic>) {
                   final status = item['appointmentStatus']?['status']?.toString()?.toLowerCase();
-                  return status == 'completed';
+                  final scheduledDate = item['scheduledDateTime']?['date']?.toString();
+                  
+                  // Check if this is a future scheduled appointment (same logic as upcoming)
+                  bool isUpcoming = false;
+                  if (scheduledDate != null && scheduledDate.isNotEmpty) {
+                    try {
+                      final appointmentDate = DateTime.parse(scheduledDate);
+                      final now = DateTime.now();
+                      // Check if status is scheduled/confirmed AND date is in the future
+                      final isValidStatus = status == 'scheduled' || status == 'confirmed';
+                      final isFutureDate = appointmentDate.isAfter(DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1)));
+                      isUpcoming = isValidStatus && isFutureDate;
+                    } catch (e) {
+                      isUpcoming = false;
+                    }
+                  }
+                  
+                  // Include everything that's NOT upcoming AND NOT unscheduled
+                  final hasScheduledDate = scheduledDate != null && scheduledDate.isNotEmpty;
+                  final isUnscheduled = !hasScheduledDate && status != 'completed';
+                  
+                  return !isUpcoming && !isUnscheduled;
                 }
                 return false;
               }).map((item) {
@@ -1623,6 +1655,23 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                   return <String, dynamic>{};
                 }
               }).toList();
+              
+              // Sort by date (most recent first)
+              _appointmentHistory.sort((a, b) {
+                final dateA = a['scheduledDateTime']?['date']?.toString() ?? '';
+                final dateB = b['scheduledDateTime']?['date']?.toString() ?? '';
+                
+                if (dateA.isNotEmpty && dateB.isNotEmpty) {
+                  try {
+                    final dateTimeA = DateTime.parse(dateA);
+                    final dateTimeB = DateTime.parse(dateB);
+                    return dateTimeB.compareTo(dateTimeA); // Most recent first
+                  } catch (e) {
+                    return 0;
+                  }
+                }
+                return 0;
+              });
             } else {
               _appointmentHistory = [];
             }
@@ -3889,9 +3938,24 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                 if (appointment is Map<String, dynamic>) {
                                   final status = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
                                   final scheduledDate = appointment['scheduledDateTime']?['date']?.toString();
+                                  final appointmentId = appointment['appointmentId']?.toString();
+                                  
+                                  // Debug: Print appointment details
+                                  print('DEBUG: Checking appointment $appointmentId');
+                                  print('DEBUG: Status: $status');
+                                  print('DEBUG: Scheduled date: $scheduledDate');
+                                  print('DEBUG: Full scheduledDateTime: ${appointment['scheduledDateTime']}');
+                                  if (appointment['scheduledDateTime'] is Map) {
+                                    final scheduledDateTime = appointment['scheduledDateTime'] as Map;
+                                    print('DEBUG: scheduledDateTime keys: ${scheduledDateTime.keys.toList()}');
+                                    print('DEBUG: date value: ${scheduledDateTime['date']}');
+                                    print('DEBUG: time value: ${scheduledDateTime['time']}');
+                                    print('DEBUG: venueLabel value: ${scheduledDateTime['venueLabel']}');
+                                  }
                                   
                                   // Check if status is scheduled or confirmed
                                   final isValidStatus = status == 'scheduled' || status == 'confirmed';
+                                  print('DEBUG: Is valid status: $isValidStatus');
                                   
                                   // Check if date is in the future
                                   bool isFutureDate = false;
@@ -3899,15 +3963,33 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     try {
                                       final appointmentDate = DateTime.parse(scheduledDate);
                                       final now = DateTime.now();
-                                      // Consider it future if it's today or later (including time)
-                                      isFutureDate = appointmentDate.isAfter(now.subtract(const Duration(days: 1)));
+                                      
+                                      // Compare only the date part (ignoring time)
+                                      final today = DateTime(now.year, now.month, now.day);
+                                      final appointmentDay = DateTime(appointmentDate.year, appointmentDate.month, appointmentDate.day);
+                                      
+                                      // Consider it future if it's today or later
+                                      isFutureDate = appointmentDay.isAfter(today.subtract(const Duration(days: 1)));
+                                      
+                                      print('DEBUG: Appointment date: $appointmentDate');
+                                      print('DEBUG: Appointment day: $appointmentDay');
+                                      print('DEBUG: Today: $today');
+                                      print('DEBUG: Now: $now');
+                                      print('DEBUG: Is future date: $isFutureDate');
                                     } catch (e) {
                                       // If date parsing fails, don't show it
                                       isFutureDate = false;
+                                      print('DEBUG: Date parsing failed: $e');
                                     }
+                                  } else {
+                                    print('DEBUG: No scheduled date found');
                                   }
                                   
-                                  return isValidStatus && isFutureDate;
+                                  final shouldShow = isValidStatus && isFutureDate;
+                                  print('DEBUG: Should show appointment $appointmentId: $shouldShow');
+                                  print('DEBUG: ---');
+                                  
+                                  return shouldShow;
                                 }
                                 return false;
                               }).map((appointment) {
@@ -3957,15 +4039,17 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                   // Create display name with purpose, venue, and secretary
                                   String displayName = '$purpose - $venueLabel - $secretary';
                                   
-                                                                      return _buildAppointmentItem(
-                                      purpose: purpose,
-                                      venueLabel: venueLabel,
-                                      secretary: secretary,
-                                      date: formattedDate,
-                                      time: formattedTime,
-                                      status: appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
-                                      statusColor: _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
-                                    );
+                                                                                                        return _buildAppointmentItem(
+                                    purpose: purpose,
+                                    venueLabel: venueLabel,
+                                    secretary: secretary,
+                                    date: formattedDate,
+                                    time: formattedTime,
+                                    status: appointment['appointmentStatus']?['status']?.toString() ?? 'Pending',
+                                    statusColor: _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'pending'),
+                                    isTbs: _isTbsAppointment(appointment),
+                                    appointment: appointment,
+                                  );
                                 } catch (e) {
                                   return _buildAppointmentItem(
                                     purpose: 'Unknown Purpose',
@@ -3975,6 +4059,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     time: 'Unknown Time',
                                     status: 'Unknown',
                                     statusColor: Colors.grey,
+                                    isTbs: false,
+                                    appointment: appointment,
                                   );
                                 }
                               }).toList(),
@@ -4147,7 +4233,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     }
                                   }
                                   
-                                  return _buildAppointmentItem(
+                                  return _buildAppointmentHistoryItem(
                                     purpose: purpose,
                                     venueLabel: venueLabel,
                                     secretary: secretary,
@@ -4155,9 +4241,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     time: formattedTime,
                                     status: appointment['appointmentStatus']?['status']?.toString() ?? 'Unknown',
                                     statusColor: _getStatusColor(appointment['appointmentStatus']?['status']?.toString() ?? 'unknown'),
+                                    isTbs: _isTbsAppointment(appointment),
+                                    appointment: appointment,
                                   );
                                 } catch (e) {
-                                  return _buildAppointmentItem(
+                                  return _buildAppointmentHistoryItem(
                                     purpose: 'Unknown Purpose',
                                     venueLabel: 'Unknown Venue',
                                     secretary: 'Unknown Secretary',
@@ -4165,6 +4253,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                     time: 'Unknown Time',
                                     status: 'Unknown',
                                     statusColor: Colors.grey,
+                                    isTbs: false,
+                                    appointment: appointment,
                                   );
                                 }
                               }).toList(),
@@ -4183,6 +4273,67 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
+  // Helper method to check if appointment is TBS
+  bool _isTbsAppointment(Map<String, dynamic> appointment) {
+    final communicationPreferences = appointment['communicationPreferences'];
+    
+    // Debug: Print the communication preferences
+    print('DEBUG: Checking TBS for appointment ${appointment['appointmentId']}');
+    print('DEBUG: communicationPreferences: $communicationPreferences');
+    
+    if (communicationPreferences is List) {
+      final hasTbsReq = communicationPreferences.any(
+        (pref) => pref.toString() == 'TBS/Req',
+      );
+      print('DEBUG: Has TBS/Req: $hasTbsReq');
+      return hasTbsReq;
+    }
+    
+    print('DEBUG: communicationPreferences is not a List, returning false');
+    return false;
+  }
+
+  // Helper method to format venue label based on TBS status and shortName
+  String _formatVenueLabel(Map<String, dynamic> appointment) {
+    // Check if it's TBS appointment
+    final communicationPreferences = appointment['communicationPreferences'];
+    if (communicationPreferences is List) {
+      final hasTbsReq = communicationPreferences.any(
+        (pref) => pref.toString() == 'TBS/Req',
+      );
+      if (hasTbsReq) {
+        return 'TBS/Req';
+      }
+    }
+    
+    // If not TBS, check scheduledVenue.shortName
+    final scheduledVenue = appointment['scheduledVenue'];
+    if (scheduledVenue is Map && scheduledVenue['shortName'] != null) {
+      return scheduledVenue['shortName'].toString();
+    }
+    
+    // If no shortName, return "Scheduled"
+    return 'Scheduled';
+  }
+
+  // Helper method to get short secretary name from uppercase letters
+  String _getShortSecretaryName(String fullName) {
+    if (fullName.isEmpty || fullName == 'No Secretary') {
+      return 'No Sec';
+    }
+    
+    // Extract all uppercase letters from the name
+    final uppercaseLetters = fullName.split('').where((char) => char == char.toUpperCase() && char != char.toLowerCase()).toList();
+    
+    if (uppercaseLetters.isNotEmpty) {
+      // If there are uppercase letters, return them combined
+      return uppercaseLetters.join('');
+    } else {
+      // If no uppercase letters, return first two letters
+      return fullName.length >= 2 ? fullName.substring(0, 2).toUpperCase() : fullName.toUpperCase();
+    }
+  }
+
   Widget _buildAppointmentItem({
     required String purpose,
     required String venueLabel,
@@ -4191,89 +4342,127 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     required String time,
     required String status,
     required Color statusColor,
+    required bool isTbs,
+    required Map<String, dynamic> appointment,
   }) {
+    // Format venue and secretary based on TBS status
+    final formattedVenue = _formatVenueLabel(appointment);
+    final formattedSecretary = _getShortSecretaryName(secretary);
+    
+    // Debug: Print what's being displayed
+    print('DEBUG: Building appointment item');
+    print('DEBUG: Purpose: $purpose');
+    print('DEBUG: Venue: $venueLabel');
+    print('DEBUG: Secretary: $secretary');
+    print('DEBUG: Date: $date');
+    print('DEBUG: Time: $time');
+    print('DEBUG: Is TBS: $isTbs');
+    print('DEBUG: Formatted venue: $formattedVenue');
+    print('DEBUG: Formatted secretary: $formattedSecretary');
+    
+    final displayText = isTbs 
+      ? '$purpose, $formattedVenue, $date, $formattedSecretary'
+      : '$purpose, $formattedVenue, $date, $formattedSecretary';
+    print('DEBUG: Final display text: $displayText');
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.transparent),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            // Handle tap to view appointment details
-            print('Tapped on appointment: $purpose');
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Bullet point
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                
-                // Appointment details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Purpose
-                      Text(
-                        purpose,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      // Venue Label and Secretary
-                      Text(
-                        '$venueLabel, $secretary',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      // Date and Time
-                      Text(
-                        '$date, $time',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ),
-              ],
+              color: Colors.blue[600],
+              shape: BoxShape.circle,
             ),
           ),
-        ),
+          const SizedBox(width: 12),
+          
+          // Appointment details
+          Expanded(
+            child: Text(
+              displayText,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.visible,
+              softWrap: true,
+              maxLines: null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppointmentHistoryItem({
+    required String purpose,
+    required String venueLabel,
+    required String secretary,
+    required String date,
+    required String time,
+    required String status,
+    required Color statusColor,
+    required bool isTbs,
+    required Map<String, dynamic> appointment,
+  }) {
+    // Format display text based on appointment status for history
+    String displayText;
+    final appointmentStatus = appointment['appointmentStatus']?['status']?.toString()?.toLowerCase();
+    final hasScheduledDate = appointment['scheduledDateTime']?['date'] != null;
+    
+    // Get short secretary name
+    final shortSecretaryName = _getShortSecretaryName(secretary);
+    
+    if (appointmentStatus == 'completed') {
+      // Completed: purpose, Done, schedule date, secretary
+      displayText = '$purpose, Done, $date, $shortSecretaryName';
+    } else if (appointmentStatus == 'scheduled' && hasScheduledDate) {
+      // Scheduled: purpose, Scheduled, schedule date, secretary
+      displayText = '$purpose, Scheduled, $date, $shortSecretaryName';
+    } else {
+      // Not scheduled: purpose, Not Scheduled
+      displayText = '$purpose, Not Scheduled';
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Bullet point
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Colors.green[600], // Different color for history
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          // Appointment details
+          Expanded(
+            child: Text(
+              displayText,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.visible,
+              softWrap: true,
+              maxLines: null,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -4303,8 +4492,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  maxLines: null,
                 ),
               ],
             ),

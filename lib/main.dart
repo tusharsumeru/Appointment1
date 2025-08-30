@@ -18,6 +18,7 @@ import 'main/tomorrow_screen.dart';
 import 'main/add_new_screen.dart';
 import 'main/deleted_appointments_screen.dart';
 import 'main/global_search_screen.dart';
+import 'main/account_settings_screen.dart';
 import 'user/user_screen.dart';
 import 'auth/notification_setup_screen.dart';
 import 'guard/guard_screen.dart';
@@ -332,6 +333,7 @@ class MyApp extends StatelessWidget {
         '/user': (context) => const UserScreen(),
         '/guard': (context) => const GuardScreen(),
         '/fcm-token': (context) => const FCMTokenScreen(),
+        '/account-settings': (context) => const AccountSettingsScreen(),
         '/fcm-setup': (context) => NotificationSetupScreen(
           isNewUser: true,
           userData: {},
