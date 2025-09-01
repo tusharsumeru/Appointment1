@@ -243,6 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
+                  physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching
                   child: Column(
                     children: [
                       const SizedBox(height: 20),

@@ -254,6 +254,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Set background color to white
       appBar: AppBar(
         title: Text('$_appointmentTypeText'),
         flexibleSpace: Container(
@@ -298,9 +299,11 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
             )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
+              physics: const ClampingScrollPhysics(), // Prevent overscroll but allow normal scrolling
               child: Center(
                 child: Card(
                   elevation: 4,
+                  color: Colors.white, // Set card background to white
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16.0),
                   ),

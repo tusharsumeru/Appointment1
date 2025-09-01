@@ -112,8 +112,10 @@ class _UserSidebarState extends State<UserSidebar> {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      width: 280, // Fixed width to prevent stretching
       child: ListView(
         padding: EdgeInsets.zero,
+        physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching from top
         children: [
           // Header
           Container(

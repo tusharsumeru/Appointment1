@@ -274,6 +274,7 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
+              physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching
               itemCount: appointments.length,
               itemBuilder: (context, index) {
                 final appointment = appointments[index];

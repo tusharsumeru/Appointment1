@@ -232,7 +232,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     } else if (appointmentType?.toLowerCase() == 'myself') {
       if (index == 0) {
-        return '(Main Appointee #1)'; // Show main appointee label
+        return '(Adult)'; // Don't duplicate the main appointee label
       } else {
         // Get age from API data for accompanying users
         final accompanyUsers = widget.appointment['accompanyUsers'];
@@ -255,7 +255,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     } else {
       // Regular appointment logic
       if (index == 0) {
-        return '(Main Appointee #1)'; // Show main appointee label
+        return '(Adult)'; // Don't duplicate the main appointee label
       } else {
         // Get age from API data
         final accompanyUsers = widget.appointment['accompanyUsers'];
@@ -2300,24 +2300,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Notes & Remarks Section - Always show for all screens
             _buildNotesRemarksSection(),
             
-            // Only show other sections if NOT from schedule screens
-            if (!widget.isFromScheduleScreens) ...[
-              // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
-              if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
-                _buildAccompanyingUsersSection(),
-              ],
-              
-              // Teacher Verification Section - Only show if user is verified and NOT a guest appointment
-              if (_isTeacher() && !_isGuestAppointment()) ...[
-                _buildTeacherVerificationSection(),
-              ] else ...[
-                // Basic Information Section for non-verified users or guest appointments
-                _buildBasicInformationSection(),
-              ],
-              
-              // Appointments Overview Section
-              _buildAppointmentsOverviewSection(),
+            // Show all sections for all screens (including schedule screens)
+            // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
+            if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
+              _buildAccompanyingUsersSection(),
             ],
+            
+            // Teacher Verification Section - Only show if user is verified and NOT a guest appointment
+            if (_isTeacher() && !_isGuestAppointment()) ...[
+              _buildTeacherVerificationSection(),
+            ] else ...[
+              // Basic Information Section for non-verified users or guest appointments
+              _buildBasicInformationSection(),
+            ],
+            
+            // Appointments Overview Section
+            _buildAppointmentsOverviewSection(),
             
             const SizedBox(height: 20),
           ],
@@ -2874,8 +2872,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Show reference person information for guest appointments
             if (_isGuestAppointment()) ...[
               _buildMainCardDetailRow('Reference Person', _getReferencePersonName(), Icons.person_add),
-              _buildMainCardDetailRow('Reference Person Email', _getReferencePersonEmail(), Icons.email),
-              _buildMainCardDetailRow('Reference Person Phone', _getReferencePersonPhone(), Icons.phone),
             ],
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[

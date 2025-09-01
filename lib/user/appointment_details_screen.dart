@@ -25,6 +25,22 @@ class AppointmentDetailsScreen extends StatefulWidget {
 }
 
 class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
+  // Scroll controller for auto-scrolling
+  final ScrollController _scrollController = ScrollController();
+  
+  // Focus nodes for form fields
+  final FocusNode _appointmentPurposeFocus = FocusNode();
+  final FocusNode _guestNameFocus = FocusNode();
+  final FocusNode _guestEmailFocus = FocusNode();
+  final FocusNode _guestPhoneFocus = FocusNode();
+  final FocusNode _guestDesignationFocus = FocusNode();
+  final FocusNode _guestCompanyFocus = FocusNode();
+  final FocusNode _guestLocationFocus = FocusNode();
+  final FocusNode _numberOfUsersFocus = FocusNode();
+  
+  // Focus nodes for guest fields
+  final Map<int, Map<String, FocusNode>> _guestFocusNodes = {};
+
   // Form controllers
   final TextEditingController _appointmentPurposeController =
       TextEditingController();
@@ -136,10 +152,32 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     _validateForm();
     _loadLocations();
     _loadReferenceInfo();
+    
+    // Add listeners to focus nodes for auto-scrolling
+    _addFocusListeners();
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    
+    // Dispose focus nodes
+    _appointmentPurposeFocus.dispose();
+    _guestNameFocus.dispose();
+    _guestEmailFocus.dispose();
+    _guestPhoneFocus.dispose();
+    _guestDesignationFocus.dispose();
+    _guestCompanyFocus.dispose();
+    _guestLocationFocus.dispose();
+    _numberOfUsersFocus.dispose();
+    
+    // Dispose guest focus nodes
+    for (var guestFocuses in _guestFocusNodes.values) {
+      for (var focusNode in guestFocuses.values) {
+        focusNode.dispose();
+      }
+    }
+    
     _appointmentPurposeController.dispose();
     _numberOfUsersController.dispose();
     _preferredFromDateController.dispose();
@@ -167,6 +205,137 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       guest['age']?.dispose();
     }
     super.dispose();
+  }
+
+  // Add focus listeners for auto-scrolling
+  void _addFocusListeners() {
+    _appointmentPurposeFocus.addListener(() {
+      if (_appointmentPurposeFocus.hasFocus) {
+        _scrollToField(_appointmentPurposeFocus);
+      }
+    });
+    
+    _guestNameFocus.addListener(() {
+      if (_guestNameFocus.hasFocus) {
+        _scrollToField(_guestNameFocus);
+      }
+    });
+    
+    _guestEmailFocus.addListener(() {
+      if (_guestEmailFocus.hasFocus) {
+        _scrollToField(_guestEmailFocus);
+      }
+    });
+    
+    _guestPhoneFocus.addListener(() {
+      if (_guestPhoneFocus.hasFocus) {
+        _scrollToField(_guestPhoneFocus);
+      }
+    });
+    
+    _guestDesignationFocus.addListener(() {
+      if (_guestDesignationFocus.hasFocus) {
+        _scrollToField(_guestDesignationFocus);
+      }
+    });
+    
+    _guestCompanyFocus.addListener(() {
+      if (_guestCompanyFocus.hasFocus) {
+        _scrollToField(_guestCompanyFocus);
+      }
+    });
+    
+    _guestLocationFocus.addListener(() {
+      if (_guestLocationFocus.hasFocus) {
+        _scrollToField(_guestLocationFocus);
+      }
+    });
+    
+    _numberOfUsersFocus.addListener(() {
+      if (_numberOfUsersFocus.hasFocus) {
+        _scrollToField(_numberOfUsersFocus);
+      }
+    });
+  }
+
+  // Auto-scroll to focused field
+  void _scrollToField(FocusNode focusNode) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (focusNode.hasFocus && _scrollController.hasClients) {
+        // Get the render object of the focused widget
+        final RenderObject? renderObject = focusNode.context?.findRenderObject();
+        if (renderObject != null) {
+          final RenderBox renderBox = renderObject as RenderBox;
+          final position = renderBox.localToGlobal(Offset.zero);
+          
+          // Calculate the scroll offset to bring the field into view
+          final screenHeight = MediaQuery.of(context).size.height;
+          final fieldHeight = renderBox.size.height;
+          final currentScrollOffset = _scrollController.offset;
+          
+          // Calculate target scroll position
+          double targetOffset = currentScrollOffset;
+          
+          // If field is below the visible area
+          if (position.dy > screenHeight * 0.7) {
+            targetOffset = currentScrollOffset + (position.dy - screenHeight * 0.6);
+          }
+          // If field is above the visible area
+          else if (position.dy < screenHeight * 0.3) {
+            targetOffset = currentScrollOffset - (screenHeight * 0.4 - position.dy);
+          }
+          
+          // Ensure scroll offset is within bounds
+          targetOffset = targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent);
+          
+          // Animate to the target position
+          _scrollController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
+  }
+
+  // Move focus to next field
+  void _moveToNextField(FocusNode currentFocus, FocusNode? nextFocus) {
+    if (nextFocus != null) {
+      currentFocus.unfocus();
+      FocusScope.of(context).requestFocus(nextFocus);
+    }
+  }
+
+  // Get or create focus nodes for guest fields
+  Map<String, FocusNode> _getGuestFocusNodes(int guestNumber) {
+    if (!_guestFocusNodes.containsKey(guestNumber)) {
+      _guestFocusNodes[guestNumber] = {
+        'name': FocusNode(),
+        'phone': FocusNode(),
+        'age': FocusNode(),
+      };
+      
+      // Add listeners for auto-scrolling
+      _guestFocusNodes[guestNumber]!['name']!.addListener(() {
+        if (_guestFocusNodes[guestNumber]!['name']!.hasFocus) {
+          _scrollToField(_guestFocusNodes[guestNumber]!['name']!);
+        }
+      });
+      
+      _guestFocusNodes[guestNumber]!['phone']!.addListener(() {
+        if (_guestFocusNodes[guestNumber]!['phone']!.hasFocus) {
+          _scrollToField(_guestFocusNodes[guestNumber]!['phone']!);
+        }
+      });
+      
+      _guestFocusNodes[guestNumber]!['age']!.addListener(() {
+        if (_guestFocusNodes[guestNumber]!['age']!.hasFocus) {
+          _scrollToField(_guestFocusNodes[guestNumber]!['age']!);
+        }
+      });
+    }
+    return _guestFocusNodes[guestNumber]!;
   }
 
   void _updateGuestControllers() {
@@ -320,8 +489,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _appointmentPurposeError = 'Minimum 3 characters required';
     } else if (!RegExp(r'^[a-zA-Z]').hasMatch(purposeText)) {
       _appointmentPurposeError = 'Must start with a letter';
-    } else if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(purposeText)) {
-      _appointmentPurposeError = 'Only letters and spaces are allowed';
     } else {
       _appointmentPurposeError = null;
     }
@@ -1108,6 +1275,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Set background color to white
       appBar: AppBar(
         title: const Text('Appointment Details'),
         flexibleSpace: Container(
@@ -1134,13 +1302,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       drawer: const SidebarComponent(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
+        controller: _scrollController,
+        physics: const ClampingScrollPhysics(), // Prevent overscroll but allow normal scrolling
         child: Center(
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Padding(
+                      child: Card(
+              elevation: 4,
+              color: Colors.white, // Set card background to white
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1211,6 +1382,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               controller: _referenceNameController,
                               placeholder: 'Your name will appear here',
                               isReadOnly: true,
+                              focusNode: null, // No focus for read-only field
                             ),
                             const SizedBox(height: 12),
 
@@ -1221,6 +1393,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               placeholder: 'Your email will appear here',
                               keyboardType: TextInputType.emailAddress,
                               isReadOnly: true,
+                              focusNode: null, // No focus for read-only field
                             ),
                             const SizedBox(height: 12),
 
@@ -1229,6 +1402,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               label: 'Reference Phone',
                               controller: _referencePhoneController,
                               isReadOnly: true,
+                              focusNode: null, // No focus for read-only field
                             ),
                           ],
                         ],
@@ -1260,6 +1434,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       label: 'Full Name of the Guest *',
                       controller: _guestNameController,
                       placeholder: 'Enter guest\'s full name',
+                      focusNode: _guestNameFocus,
+                      onSubmitted: () {
+                        // Move to next field when submitted
+                        _moveToNextField(_guestNameFocus, _guestEmailFocus);
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -1268,6 +1447,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       label: 'Email ID of the Guest *',
                       controller: _guestEmailController,
                       placeholder: 'guest@email.com',
+                      focusNode: _guestEmailFocus,
+                      onSubmitted: () {
+                        // Move to next field when submitted
+                        _moveToNextField(_guestEmailFocus, _guestPhoneFocus);
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -1280,6 +1464,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       label: 'Designation *',
                       controller: _guestDesignationController,
                       placeholder: 'Guest\'s professional title',
+                      focusNode: _guestDesignationFocus,
+                      onSubmitted: () {
+                        // Move to next field when submitted
+                        _moveToNextField(_guestDesignationFocus, _guestCompanyFocus);
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -1288,6 +1477,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       label: 'Company/Organization *',
                       controller: _guestCompanyController,
                       placeholder: 'Guest\'s organization name',
+                      focusNode: _guestCompanyFocus,
+                      onSubmitted: () {
+                        // Move to next field when submitted
+                        _moveToNextField(_guestCompanyFocus, _guestLocationFocus);
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -1690,6 +1884,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         'Please describe the purpose of your appointment in detail',
                     onChanged: (value) => _validateForm(),
                     errorMessage: _appointmentPurposeError,
+                    focusNode: _appointmentPurposeFocus,
+                    onSubmitted: () {
+                      // Move to next field when submitted
+                      _moveToNextField(_appointmentPurposeFocus, _guestNameFocus);
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -1972,7 +2171,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ..._guestControllers.asMap().entries.map((entry) {
                       int index = entry.key;
                       Map<String, TextEditingController> guest = entry.value;
-                      return _buildGuestCard(index + 1, guest);
+                      return _buildGuestCard(index + 1, guest, index);
                     }).toList(),
                     const SizedBox(height: 20),
                   ] else if ((int.tryParse(_numberOfUsersController.text) ??
@@ -2136,13 +2335,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                   const SizedBox(height: 20),
 
+                  // Date Range & Program Attendance Header
+                  const Text('Date Range & Program Attendance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+
                   // Program Attendance Question
-                  const Text(
+                  Text(
                     'Are you attending any program at the Bangalore Ashram during these dates? *',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -2478,6 +2680,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required String placeholder,
     Function(String)? onChanged,
     String? errorMessage,
+    FocusNode? focusNode,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2493,13 +2697,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           onChanged: onChanged,
+          onSubmitted: (_) => onSubmitted?.call(),
           maxLines: 4,
           inputFormatters: [
             // Prevent leading spaces
             FilteringTextInputFormatter.deny(RegExp(r'^\s')),
-            // Allow only letters and spaces
-            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
           ],
           decoration: InputDecoration(
             hintText: placeholder,
@@ -2604,10 +2808,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Widget _buildGuestCard(
     int guestNumber,
     Map<String, TextEditingController> guest,
+    int index,
   ) {
     // Check if photo is required (age >= 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age >= 12;
+    final guestFocusNodes = _getGuestFocusNodes(guestNumber);
 
     return Card(
       elevation: 2,
@@ -2648,6 +2854,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               controller: guest['name']!,
               placeholder: "Enter guest's full name",
               onChanged: (value) => _validateForm(),
+              focusNode: guestFocusNodes['name'],
+              onSubmitted: () {
+                // Move to next field (phone) when submitted
+                _moveToNextField(guestFocusNodes['name']!, guestFocusNodes['phone']);
+              },
             ),
             const SizedBox(height: 16),
 
@@ -2676,6 +2887,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   return 'Please enter 1-120';
                 }
                 return null;
+              },
+              focusNode: guestFocusNodes['age'],
+              onSubmitted: () {
+                // Move to next guest or next section when submitted
+                if (index < _guestControllers.length - 1) {
+                  // Move to next guest's name field
+                  final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
+                  _moveToNextField(guestFocusNodes['age']!, nextGuestFocusNodes['name']);
+                } else {
+                  // Move to next section (appointment purpose)
+                  _moveToNextField(guestFocusNodes['age']!, _appointmentPurposeFocus);
+                }
               },
             ),
 
@@ -3079,6 +3302,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     int? maxLength,
     Function(String)? onChanged,
     String? Function(String?)? validator,
+    FocusNode? focusNode,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3094,10 +3319,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           maxLength: maxLength,
           onChanged: onChanged,
+          onFieldSubmitted: (_) => onSubmitted?.call(),
           validator: validator,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           decoration: InputDecoration(
@@ -3224,6 +3451,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required String placeholder,
     TextInputType? keyboardType,
     bool isReadOnly = false,
+    FocusNode? focusNode,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3239,8 +3468,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           enabled: !isReadOnly,
+          onSubmitted: (_) => onSubmitted?.call(),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: TextStyle(color: Colors.grey[400]),
@@ -3272,11 +3503,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-  // Email field with validation
+    // Email field with validation
   Widget _buildEmailField({
     required String label,
     required TextEditingController controller,
     required String placeholder,
+    FocusNode? focusNode,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3292,7 +3525,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: TextInputType.emailAddress,
+          onSubmitted: (_) => onSubmitted?.call(),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: TextStyle(color: Colors.grey[400]),
@@ -3312,7 +3547,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 color: _guestEmailError != null
                     ? Colors.red
                     : Colors.grey[300]!,
-              ),
+            ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -3361,6 +3596,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required String label,
     required TextEditingController controller,
     bool isReadOnly = false,
+    FocusNode? focusNode,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3377,10 +3614,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Phone Number Field (without country code)
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: TextInputType.number,
           maxLength: 10,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           enabled: !isReadOnly,
+          onSubmitted: (_) => onSubmitted?.call(),
           decoration: InputDecoration(
             filled: true,
             fillColor: isReadOnly ? Colors.grey[100] : Colors.white,
@@ -4068,9 +4307,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             Expanded(
               child: TextField(
                 controller: _guestPhoneController,
+                focusNode: _guestPhoneFocus,
                 keyboardType: TextInputType.number,
                 maxLength: 10,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onSubmitted: (_) {
+                  // Move to next field when submitted
+                  _moveToNextField(_guestPhoneFocus, _guestDesignationFocus);
+                },
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
@@ -4114,6 +4358,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     TextEditingController controller,
   ) {
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
+    final guestFocusNodes = _getGuestFocusNodes(guestNumber);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4208,11 +4453,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             Expanded(
               child: TextField(
                 controller: controller,
+                focusNode: guestFocusNodes['phone'],
                 keyboardType: TextInputType.number,
                 maxLength: 10,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: (value) {
                   _validateForm();
+                },
+                onSubmitted: (_) {
+                  // Move to next field (age) when submitted
+                  _moveToNextField(guestFocusNodes['phone']!, guestFocusNodes['age']);
                 },
                 decoration: InputDecoration(
                   filled: true,
@@ -4432,6 +4682,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Search input field
         TextField(
           controller: _guestLocationController,
+          focusNode: _guestLocationFocus,
           onChanged: (value) {
             // Debounce the search
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -4445,6 +4696,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             if (_guestLocationController.text.isNotEmpty) {
               _searchLocations(_guestLocationController.text);
             }
+          },
+          onSubmitted: (_) {
+            // Move to next field when submitted
+            _moveToNextField(_guestLocationFocus, _numberOfUsersFocus);
           },
           decoration: InputDecoration(
             hintText: 'Start typing guest\'s location...',

@@ -37,6 +37,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Set<String> _selectedRoles = {};
   String _selectedCountryCode = '+91';
   String _selectedCountryFlag = '🇮🇳';
+  bool _isFormValid = false;
+  
+  // Scroll controller for auto-scrolling to errors
+  final ScrollController _scrollController = ScrollController();
 
   // Location variables
   List<String> _locationSuggestions = [];
@@ -60,6 +64,23 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _teacherVerificationError;
 
   @override
+  void initState() {
+    super.initState();
+    
+    // Add listeners to text controllers for form validation
+    _fullNameController.addListener(_validateForm);
+    _emailController.addListener(_validateForm);
+    _passwordController.addListener(_validateForm);
+    _phoneController.addListener(_validateForm);
+    _designationController.addListener(_validateForm);
+    _companyController.addListener(_validateForm);
+    _locationController.addListener(_validateForm);
+    
+    // Initial form validation
+    _validateForm();
+  }
+
+  @override
   void dispose() {
     _fullNameController.dispose();
     _emailController.dispose();
@@ -72,7 +93,92 @@ class _SignupScreenState extends State<SignupScreen> {
     _teacherEmailController.dispose();
     _teacherPhoneController.dispose();
     _locationDebounceTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  // Validate form and update button state
+  void _validateForm() {
+    bool isValid = true;
+
+    // Check required fields
+    if (_fullNameController.text.trim().isEmpty) isValid = false;
+    if (_emailController.text.trim().isEmpty) isValid = false;
+    if (_passwordController.text.isEmpty) isValid = false;
+    if (_phoneController.text.trim().isEmpty) isValid = false;
+    if (_designationController.text.trim().isEmpty) isValid = false;
+    if (_companyController.text.trim().isEmpty) isValid = false;
+    if (_locationController.text.trim().isEmpty) isValid = false;
+
+    // Check if profile photo is selected
+    if (_selectedImageFile == null) isValid = false;
+
+    // Check teacher verification if teacher type is 'yes'
+    if (_selectedTeacherType == 'yes') {
+      if (!_isTeacherVerified) isValid = false;
+    }
+
+    setState(() {
+      _isFormValid = isValid;
+    });
+  }
+
+  // Scroll to first error field
+  void _scrollToFirstError() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        // Find the first field with error and scroll to it
+        if (_fullNameController.text.trim().isEmpty) {
+          _scrollToField(0); // Personal Information section
+        } else if (_emailController.text.trim().isEmpty || 
+                   !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text.trim())) {
+          _scrollToField(0); // Personal Information section
+        } else if (_passwordController.text.isEmpty || _passwordController.text.length < 6) {
+          _scrollToField(0); // Personal Information section
+        } else if (_phoneController.text.trim().isEmpty) {
+          _scrollToField(0); // Personal Information section
+        } else if (_designationController.text.trim().isEmpty) {
+          _scrollToField(1); // Professional Details section
+        } else if (_companyController.text.trim().isEmpty) {
+          _scrollToField(1); // Professional Details section
+        } else if (_locationController.text.trim().isEmpty) {
+          _scrollToField(2); // Location section
+        } else if (_selectedImageFile == null) {
+          _scrollToField(3); // Profile Photo section
+        }
+      }
+    });
+  }
+
+  // Scroll to specific section
+  void _scrollToField(int sectionIndex) {
+    if (_scrollController.hasClients) {
+      // Calculate approximate position for each section
+      double targetPosition = 0;
+      switch (sectionIndex) {
+        case 0: // Personal Information
+          targetPosition = 0;
+          break;
+        case 1: // Professional Details
+          targetPosition = 400;
+          break;
+        case 2: // Location
+          targetPosition = 600;
+          break;
+        case 3: // Profile Photo
+          targetPosition = 800;
+          break;
+        case 4: // Additional Roles
+          targetPosition = 1000;
+          break;
+      }
+      
+      _scrollController.animateTo(
+        targetPosition,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   // Fetch location suggestions
@@ -173,6 +279,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _selectedImageFile = File(image.path);
           _selectedImagePath = image.path;
         });
+        _validateForm();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +306,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _selectedImageFile = File(image.path);
           _selectedImagePath = image.path;
         });
+        _validateForm();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -693,6 +801,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _isTeacherVerified = true;
           _teacherVerificationData = result['data'];
         });
+        _validateForm();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -744,6 +853,7 @@ class _SignupScreenState extends State<SignupScreen> {
             backgroundColor: Colors.red,
           ),
         );
+        _scrollToFirstError();
         return;
       }
 
@@ -857,6 +967,7 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _scrollController,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Form(
@@ -981,7 +1092,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleSignup,
+                          onPressed: (_isLoading || !_isFormValid) ? null : _handleSignup,
                           style:
                               ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
@@ -996,15 +1107,19 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                           child: Container(
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFF97316), Color(0xFFEAB308)],
+                              gradient: LinearGradient(
+                                colors: _isFormValid 
+                                  ? [const Color(0xFFF97316), const Color(0xFFEAB308)]
+                                  : [Colors.grey.shade400, Colors.grey.shade400],
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                               ),
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: _isFormValid 
+                                    ? Colors.black.withOpacity(0.1)
+                                    : Colors.transparent,
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1023,24 +1138,26 @@ class _SignupScreenState extends State<SignupScreen> {
                                             ),
                                       ),
                                     )
-                                  : const Row(
+                                  : Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          'Complete Registration',
+                                          _isFormValid ? 'Complete Registration' : 'Fill All Required Fields',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w600,
                                             color: Colors.white,
                                           ),
                                         ),
-                                        SizedBox(width: 8),
-                                        Icon(
-                                          Icons.arrow_forward,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
+                                        if (_isFormValid) ...[
+                                          const SizedBox(width: 8),
+                                          const Icon(
+                                            Icons.arrow_forward,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ],
                                       ],
                                     ),
                             ),
@@ -1159,6 +1276,10 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           validator: (value) {
             if (isRequired && (value == null || value.isEmpty)) {
+              // Trigger scroll to this field after validation
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToFirstError();
+              });
               return '$label is required';
             }
             if (keyboardType == TextInputType.emailAddress &&
@@ -1167,6 +1288,10 @@ class _SignupScreenState extends State<SignupScreen> {
               if (!RegExp(
                 r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
               ).hasMatch(value)) {
+                // Trigger scroll to this field after validation
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _scrollToFirstError();
+                });
                 return 'Please enter a valid email';
               }
             }
@@ -1233,9 +1358,17 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
+              // Trigger scroll to this field after validation
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToFirstError();
+              });
               return 'Password is required';
             }
             if (value.length < 6) {
+              // Trigger scroll to this field after validation
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToFirstError();
+              });
               return 'Password must be at least 6 characters';
             }
             return null;
@@ -1309,6 +1442,10 @@ class _SignupScreenState extends State<SignupScreen> {
               onChanged: _onLocationChanged,
               validator: (value) {
                 if (value == null || value.isEmpty) {
+                  // Trigger scroll to this field after validation
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToFirstError();
+                  });
                   return 'Location is required';
                 }
                 return null;
@@ -1493,6 +1630,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
+                    // Trigger scroll to this field after validation
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToFirstError();
+                    });
                     return 'Phone number is required';
                   }
                   return null;
@@ -1641,6 +1782,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 _teacherEmailController.clear();
                 _teacherPhoneController.clear();
               });
+              _validateForm();
             },
             child: Text(
               'Change teacher status',
@@ -1697,6 +1839,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (value == 'yes' && !isSelected) {
           _showTeacherVerificationBottomSheet();
         }
+        _validateForm();
       },
       child: Container(
         height: 60,
@@ -1920,6 +2063,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 _selectedImageFile = null;
                 _selectedImagePath = null;
               });
+              _validateForm();
             },
             icon: const Icon(Icons.close, color: Colors.red),
           ),
