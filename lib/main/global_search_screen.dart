@@ -1371,6 +1371,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                                       ),
                                     )
                                   : ListView.builder(
+                                      physics: const ClampingScrollPhysics(),
                                       controller: _scrollController,
                                       itemCount: _searchResults.length + (_hasMoreData ? 1 : 0),
                                       itemBuilder: (context, index) {

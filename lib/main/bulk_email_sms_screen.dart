@@ -152,6 +152,7 @@ class _BulkEmailSmsScreenState extends State<BulkEmailSmsScreen> {
             // Cards list
             Expanded(
               child: ListView(
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
                   _RecipientCard(

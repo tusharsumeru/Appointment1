@@ -489,6 +489,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           : Container(
               color: Colors.grey.shade50,
               child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [

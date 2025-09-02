@@ -161,115 +161,117 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
         ],
       ),
       drawer: const SidebarComponent(),
-      body: Column(
-        children: [
-          // Header with refresh button and calendar icon
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Date selector button on the left
-                GestureDetector(
-                  onTap: () => _selectDate(context),
-                  child: Container(
-                    width: 192, // w-48 equivalent (48 * 4 = 192)
-                    height: 44, // h-11 equivalent (11 * 4 = 44)
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 2,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _getFormattedDate(_selectedDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.normal,
+      body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          children: [
+            // Header with refresh button and calendar icon
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Date selector button on the left
+                  GestureDetector(
+                    onTap: () => _selectDate(context),
+                    child: Container(
+                      width: 192, // w-48 equivalent (48 * 4 = 192)
+                      height: 44, // h-11 equivalent (11 * 4 = 44)
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
                           ),
-                        ),
-                        Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 20,
-                          color: Colors.grey.shade600,
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _getFormattedDate(_selectedDate),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 20,
+                            color: Colors.grey.shade600,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                // Refresh button on the right
-                GestureDetector(
-                  onTap: () {
-                    // Refresh the tomorrow card component
-                    setState(() {
-                      _refreshCounter++;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[600],
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.refresh,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Refresh',
-                          style: TextStyle(
+                  // Refresh button on the right
+                  GestureDetector(
+                    onTap: () {
+                      // Refresh the tomorrow card component
+                      setState(() {
+                        _refreshCounter++;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[600],
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.refresh,
                             color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Refresh',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Tomorrow card component
-          Expanded(
-            child: Container(
+            // Tomorrow card component
+            Container(
+              height: MediaQuery.of(context).size.height - 200, // Adjust height for scrollable content
               color: Colors.white,
               child: TomorrowCardComponent(
                 key: ValueKey(_refreshCounter),
                 selectedDate: _selectedDate,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

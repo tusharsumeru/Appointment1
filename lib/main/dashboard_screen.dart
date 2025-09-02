@@ -944,6 +944,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                       : _error != null
                           ? Center(child: Text('Error: $_error'))
                                                      : ListView.builder(
+                               physics: const ClampingScrollPhysics(),
                                itemCount: _filteredAppointments.length + (_hasMoreData ? 1 : 0),
                                itemBuilder: (context, index) {
                                  // Debug print to check load more logic

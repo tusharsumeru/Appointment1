@@ -463,118 +463,45 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
                 )
               : Column(
                   children: [
-                    // Filter and Refresh buttons
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      color: Colors.white,
-                      child: Row(
-                        children: [
-                          // Filter dropdown button
-                          Container(
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: Colors.grey[200]!),
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Filter',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.keyboard_arrow_down,
-                                  size: 16,
-                                  color: Colors.grey[500],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          // Refresh button
-                          InkWell(
-                            onTap: () {
-                              _fetchAppointments();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Refreshing assigned appointments...'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              height: 32,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                border: Border.all(color: Colors.transparent),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.refresh,
-                                    size: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Refresh',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+
                     // Appointments List
                     Expanded(
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: _appointments.length + (_hasMoreAppointments ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          // Show load more button at the end
-                          if (index == _appointments.length) {
-                            return _hasMoreAppointments
-                                ? _buildLoadMoreButton()
-                                : const SizedBox.shrink();
-                          }
-                          
-                          final appointment = _appointments[index];
-                          return AppointmentCard(
-                            appointment: appointment,
-                            index: index, // Pass the index for alternating colors
-                            onStarToggle: (isStarred) async {
-                              print('🔍 Assigned to Me onStarToggle - received isStarred: $isStarred');
-                              final appointmentId = appointment['appointmentId']?.toString() ?? 
-                                                  appointment['_id']?.toString() ?? '';
-                              print('🔍 Assigned to Me onStarToggle - appointmentId: $appointmentId');
-                              await _toggleStar(appointmentId);
-                            },
+                      child: RefreshIndicator(
+                        onRefresh: () async {
+                          await _fetchAppointments();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Refreshing assigned appointments...'),
+                              backgroundColor: Colors.green,
+                            ),
                           );
                         },
+                        child: ListView.builder(
+                          physics: const ClampingScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          itemCount: _appointments.length + (_hasMoreAppointments ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            // Show load more button at the end
+                            if (index == _appointments.length) {
+                              return _hasMoreAppointments
+                                  ? _buildLoadMoreButton()
+                                  : const SizedBox.shrink();
+                            }
+                            
+                            final appointment = _appointments[index];
+                            return AppointmentCard(
+                              appointment: appointment,
+                              index: index, // Pass the index for alternating colors
+                              onStarToggle: (isStarred) async {
+                                print('🔍 Assigned to Me onStarToggle - received isStarred: $isStarred');
+                                final appointmentId = appointment['appointmentId']?.toString() ?? 
+                                                    appointment['_id']?.toString() ?? '';
+                                print('🔍 Assigned to Me onStarToggle - appointmentId: $appointmentId');
+                                await _toggleStar(appointmentId);
+                              },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],

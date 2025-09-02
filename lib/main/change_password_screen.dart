@@ -168,6 +168,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         color: Colors.grey[50],
         child: SafeArea(
           child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
             child: Center(
               child: ConstrainedBox(

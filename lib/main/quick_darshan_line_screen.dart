@@ -87,6 +87,7 @@ class _QuickDarshanLineScreenState extends State<QuickDarshanLineScreen> {
             // Cards list
             Expanded(
               child: ListView(
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
                   QuickDarshanCardComponent(

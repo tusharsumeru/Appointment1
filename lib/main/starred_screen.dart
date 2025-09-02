@@ -689,6 +689,7 @@ class _StarredScreenState extends State<StarredScreen> {
                     // Appointments List
                     Expanded(
                       child: ListView.builder(
+                        physics: const ClampingScrollPhysics(),
                         padding: EdgeInsets.zero,
                         itemCount: _appointments.length + (_hasMoreAppointments ? 1 : 0),
                         itemBuilder: (context, index) {

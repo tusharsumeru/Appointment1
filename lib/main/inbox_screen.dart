@@ -790,10 +790,8 @@ class _InboxScreenState extends State<InboxScreen> {
           child: Stack(
             children: [
               ListView.builder(
-                padding: const EdgeInsets.only(
-                  top: 20,
-                  bottom: 20,
-                ), // Adjusted padding
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.zero,
                 itemCount:
                     _appointments.length +
                     (_hasMoreData ? 1 : 0), // +1 for load more button

@@ -420,6 +420,8 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
                 // Logs List
                 Expanded(
                   child: ListView.builder(
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.zero,
                     itemCount: _logsData.length,
                     itemBuilder: (context, index) {
                       final log = _logsData[index];

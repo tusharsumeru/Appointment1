@@ -828,6 +828,7 @@ class _DeletedAppointmentsScreenState extends State<DeletedAppointmentsScreen> {
     return RefreshIndicator(
       onRefresh: () => _loadDeletedAppointments(refresh: true),
       child: ListView.builder(
+        physics: const ClampingScrollPhysics(),
         controller: _scrollController,
         padding: EdgeInsets.zero,
         itemCount: _appointments.length + (_hasNextPage ? 1 : 0),

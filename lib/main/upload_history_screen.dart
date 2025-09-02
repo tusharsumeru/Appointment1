@@ -142,7 +142,8 @@ class _UploadHistoryScreenState extends State<UploadHistoryScreen> {
             // History cards
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.zero,
                 itemCount: _historyData.length,
                 itemBuilder: (context, index) {
                   final item = _historyData[index];
