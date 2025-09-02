@@ -8,6 +8,7 @@ import '../../main/dashboard_screen.dart';
 import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
+import '../../main/reference_from_list_screen.dart';
 import '../../main/change_password_screen.dart';
 import '../../main/account_settings_screen.dart';
 // import '../../main/export_data_screen.dart';
@@ -535,6 +536,19 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const AddNewScreen()),
+                );
+              },
+            ),
+
+            _buildMenuItem(
+              routeName: 'referenceFormList',
+              icon: Icons.list_alt,
+              title: 'Reference Form List',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReferenceFromListScreen()),
                 );
               },
             ),

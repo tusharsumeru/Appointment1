@@ -7324,6 +7324,209 @@ static Future<Map<String, dynamic>> registerUser({
     }
   }
 
+  // Get all reference forms
+  static Future<Map<String, dynamic>> getAllReferenceForms({
+    String? status,
+    String? search,
+    String? startDate,
+    String? endDate,
+    int page = 1,
+    int limit = 10,
+    int? pageSize,
+    String sortBy = "createdAt",
+    String sortOrder = "desc",
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+      };
+      // Add optional parameters
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (startDate != null && startDate.isNotEmpty) {
+        queryParams['startDate'] = startDate;
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        queryParams['endDate'] = endDate;
+      }
+      if (pageSize != null) {
+        queryParams['pageSize'] = pageSize.toString();
+      }
+      // Make API call
+      final url = '$baseUrl/reference-forms/get-all-reference-forms';
+      print(':outbox_tray: Calling getAllReferenceForms API: $url');
+      print(':outbox_tray: Query parameters: $queryParams');
+      final response = await http.get(
+        Uri.parse(url).replace(queryParameters: queryParams),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+      );
+      print(':outbox_tray: getAllReferenceForms API response status: ${response.statusCode}');
+      print(':outbox_tray: getAllReferenceForms API response body: ${response.body}');
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(':x: Failed to parse getAllReferenceForms response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Reference forms retrieved successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve reference forms',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print(':x: getAllReferenceForms error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Update reference form status
+  static Future<Map<String, dynamic>> updateReferenceFormStatus({
+    required String formId,
+    required String status,
+    String? secretaryRemark,
+  }) async {
+    try {
+      // Get authentication token
+      final authToken = await StorageService.getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+      // Validate required parameters
+      if (formId.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Form ID is required.',
+        };
+      }
+      if (status.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Status is required.',
+        };
+      }
+      // Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'status': status,
+      };
+      // Add optional secretary remark if provided
+      if (secretaryRemark != null && secretaryRemark.isNotEmpty) {
+        requestBody['secretaryRemark'] = secretaryRemark;
+      }
+      // Make API call
+      final url = '$baseUrl/reference-forms/update-status/$formId';
+      print(':outbox_tray: Calling updateReferenceFormStatus API: $url');
+      print(':outbox_tray: Request body: ${jsonEncode(requestBody)}');
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+      print(':outbox_tray: updateReferenceFormStatus API response status: ${response.statusCode}');
+      print(':outbox_tray: updateReferenceFormStatus API response body: ${response.body}');
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(':x: Failed to parse updateReferenceFormStatus response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Reference form status updated successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request parameters',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Reference form not found',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to update reference form status',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print(':x: updateReferenceFormStatus error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // SideBar Count
   static Future<Map<String, dynamic>> getSidebarCounts() async {
     try {
