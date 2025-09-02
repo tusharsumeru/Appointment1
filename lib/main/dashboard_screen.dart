@@ -365,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
       final guestPhone = guestInformation['phoneNumber']?.toString();
       if (guestPhone != null && guestPhone.isNotEmpty) {
-        return guestPhone;
+        return _ensurePlusPrefix(guestPhone);
       }
     }
     
@@ -375,10 +375,25 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       final countryCode = phoneNumber['countryCode']?.toString() ?? '';
       final number = phoneNumber['number']?.toString() ?? '';
       if (countryCode.isNotEmpty && number.isNotEmpty) {
-        return '$countryCode$number';
+        return _ensurePlusPrefix('$countryCode$number');
       }
     }
-    return phoneNumber?.toString() ?? '';
+    return _ensurePlusPrefix(phoneNumber?.toString() ?? '');
+  }
+
+  // Helper function to ensure phone number has + prefix
+  String _ensurePlusPrefix(String phoneNumber) {
+    if (phoneNumber.isEmpty) return phoneNumber;
+    
+    // Remove any existing + and spaces
+    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[\s\+]'), '');
+    
+    // If it starts with a number, add + prefix
+    if (cleanNumber.isNotEmpty && RegExp(r'^\d').hasMatch(cleanNumber)) {
+      return '+$cleanNumber';
+    }
+    
+    return phoneNumber; // Return original if it doesn't start with a number
   }
 
   // Email functionality
@@ -1129,3 +1144,4 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 }
+

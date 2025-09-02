@@ -934,7 +934,7 @@ class _ReminderFormState extends State<ReminderForm> {
                       widget.onClose?.call();
                       Navigator.pop(context);
                     },
-                    child: const Text('Cancel'),
+                    child: const Text('Close'),
                   ),
                 ),
                 const SizedBox(width: 16),

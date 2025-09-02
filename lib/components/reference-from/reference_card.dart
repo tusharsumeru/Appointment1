@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../action/action.dart';
+import '../common/profile_photo_dialog.dart'; // Add this import
 
 class ReferenceCard extends StatefulWidget {
   final Map<String, dynamic> referenceData;
   final VoidCallback? onViewDetails;
   final VoidCallback? onStatusUpdated;
+  final int index; // Add index parameter for alternating colors
 
   const ReferenceCard({
     super.key,
     required this.referenceData,
     this.onViewDetails,
     this.onStatusUpdated,
+    required this.index, // Add index parameter
   });
 
   @override
@@ -20,6 +24,7 @@ class ReferenceCard extends StatefulWidget {
 class _ReferenceCardState extends State<ReferenceCard> {
   bool _isApproving = false;
   bool _isRejecting = false;
+  final TextEditingController _remarkController = TextEditingController();
 
   // Helper getters for easy access to data
   String get name => widget.referenceData['name'] ?? 'Unknown';
@@ -41,12 +46,14 @@ class _ReferenceCardState extends State<ReferenceCard> {
     try {
       print('🔄 Calling updateReferenceFormStatus for formId: $formId');
       print('🔄 Status: Approved');
-      print('🔄 Secretary remark: Approved by secretary');
+      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
       
       final result = await ActionService.updateReferenceFormStatus(
         formId: formId,
         status: 'Approved',
-        secretaryRemark: 'Approved by secretary',
+        secretaryRemark: _remarkController.text.trim().isNotEmpty 
+            ? _remarkController.text.trim() 
+            : 'Approved by secretary',
       );
       
       print('🔄 API Response: $result');
@@ -77,12 +84,14 @@ class _ReferenceCardState extends State<ReferenceCard> {
     try {
       print('🔄 Calling updateReferenceFormStatus for formId: $formId');
       print('🔄 Status: Rejected');
-      print('🔄 Secretary remark: Rejected by secretary');
+      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
       
       final result = await ActionService.updateReferenceFormStatus(
         formId: formId,
         status: 'Rejected',
-        secretaryRemark: 'Rejected by secretary',
+        secretaryRemark: _remarkController.text.trim().isNotEmpty 
+            ? _remarkController.text.trim() 
+            : 'Rejected by secretary',
       );
       
       print('🔄 API Response: $result');
@@ -124,6 +133,16 @@ class _ReferenceCardState extends State<ReferenceCard> {
     );
   }
 
+  // Remove the old _showFullImage method and replace with ProfilePhotoDialog
+  void _showProfilePhoto(BuildContext context, String imageUrl) {
+    ProfilePhotoDialog.showWithErrorHandling(
+      context,
+      imageUrl: imageUrl,
+      userName: name,
+      description: "$name's profile photo",
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Debug logging to see the data structure
@@ -140,6 +159,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
     return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           elevation: 2,
+          color: widget.index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0), // Alternating colors like person card
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -152,22 +172,25 @@ class _ReferenceCardState extends State<ReferenceCard> {
              Row(
                children: [
                  // Profile Picture
-                 CircleAvatar(
-                   radius: 25,
-                   backgroundColor: Colors.grey[200],
-                   backgroundImage: profilePic != null
-                       ? NetworkImage(profilePic!)
-                       : null,
-                   child: profilePic == null
-                       ? Text(
-                           name.isNotEmpty ? name[0].toUpperCase() : '?',
-                           style: const TextStyle(
-                             fontSize: 20,
-                             fontWeight: FontWeight.bold,
-                             color: Colors.deepOrange,
-                           ),
-                         )
-                       : null,
+                 GestureDetector(
+                   onTap: profilePic != null ? () => _showProfilePhoto(context, profilePic!) : null,
+                   child: CircleAvatar(
+                     radius: 25,
+                     backgroundColor: Colors.grey[200],
+                     backgroundImage: profilePic != null
+                         ? NetworkImage(profilePic!)
+                         : null,
+                     child: profilePic == null
+                         ? Text(
+                             name.isNotEmpty ? name[0].toUpperCase() : '?',
+                             style: const TextStyle(
+                               fontSize: 20,
+                               fontWeight: FontWeight.bold,
+                               color: Colors.deepOrange,
+                             ),
+                           )
+                         : null,
+                   ),
                  ),
                  const SizedBox(width: 12),
                  // Name
@@ -256,7 +279,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
                  ),
                  label: const Text('View Details'),
                  style: ElevatedButton.styleFrom(
-                   backgroundColor: Colors.lightBlue,
+                   backgroundColor: Colors.orange,
                    foregroundColor: Colors.white,
                    shape: RoundedRectangleBorder(
                      borderRadius: BorderRadius.circular(8),
@@ -269,7 +292,55 @@ class _ReferenceCardState extends State<ReferenceCard> {
              ),
              // Only show Approve/Reject buttons if status is pending
              if (status.toLowerCase() == 'pending') ...[
-               const SizedBox(height: 12),
+               const SizedBox(height: 22),
+               // Secretary Remark Text Field
+               Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   const Text(
+                     'Secretary Remark(optional):',
+                     style: TextStyle(
+                       fontSize: 14,
+                       fontWeight: FontWeight.w600,
+                       color: Colors.black87,
+                     ),
+                   ),
+                   const SizedBox(height: 8),
+                                      TextField(
+                     controller: _remarkController,
+                     inputFormatters: [
+                       FilteringTextInputFormatter.deny(RegExp(r'^\s')),
+                       FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
+                     ],
+                     decoration: InputDecoration(
+                       hintText: 'Enter your remark',
+                       hintStyle: TextStyle(
+                         fontWeight: FontWeight.normal,
+                         fontSize: 14,
+                       
+                       color: Colors.black87,
+                       ),
+                       border: OutlineInputBorder(
+                         borderRadius: BorderRadius.circular(8),
+                         borderSide: BorderSide(color: Colors.grey[300]!),
+                       ),
+                       enabledBorder: OutlineInputBorder(
+                         borderRadius: BorderRadius.circular(8),
+                         borderSide: BorderSide(color: Colors.grey[300]!),
+                       ),
+                       focusedBorder: OutlineInputBorder(
+                         borderRadius: BorderRadius.circular(8),
+                         borderSide: const BorderSide(color: Colors.grey, width: 2),
+                       ),
+                       filled: true,
+                       fillColor: Colors.grey[50],
+                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                     ),
+                     maxLines: 2,
+                   ),
+                   const SizedBox(height: 12),
+                 ],
+               ),
                // Accept and Reject Buttons
                Row(
                  children: [
@@ -382,5 +453,11 @@ class _ReferenceCardState extends State<ReferenceCard> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _remarkController.dispose();
+    super.dispose();
   }
 }

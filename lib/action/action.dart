@@ -5958,6 +5958,110 @@ static Future<Map<String, dynamic>> registerUser({
     }
   }
 
+  // Validate duplicate photo
+  static Future<Map<String, dynamic>> validateDuplicatePhoto(
+    File photoFile,
+  ) async {
+    try {
+      print('🔍 Starting duplicate photo validation for: ${photoFile.path}');
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/validate-duplicate-photo'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add the photo file
+      if (await photoFile.exists()) {
+        try {
+          print('📸 Adding photo file to request: ${photoFile.path}');
+          final photoStream = http.ByteStream(photoFile.openRead());
+          final photoLength = await photoFile.length();
+          print('📸 Photo file size: ${photoLength} bytes');
+
+          // Get file extension and name
+          final fileName = photoFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'jpg';
+          final mimeType = _getMimeType(fileExtension);
+
+          final photoMultipart = http.MultipartFile(
+            'file', // Field name expected by the API
+            photoStream,
+            photoLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(photoMultipart);
+          print('📸 Photo file added successfully to multipart request');
+        } catch (photoError) {
+          print('❌ Error adding photo file: $photoError');
+          return {
+            'success': false,
+            'message': 'Error processing photo file: ${photoError.toString()}',
+          };
+        }
+      } else {
+        print('⚠️ Photo file does not exist: ${photoFile.path}');
+        return {'success': false, 'message': 'Photo file not found'};
+      }
+
+      print('📤 Sending duplicate photo validation request to: ${request.url}');
+      print('📤 Request headers: ${request.headers}');
+      print('📤 Total files being sent: ${request.files.length}');
+
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Duplicate photo validation response status: ${response.statusCode}');
+      print('📥 Duplicate photo validation response body: ${response.body}');
+
+      // Parse response
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('✅ Duplicate photo validation completed successfully!');
+        print('🔍 Validation result: ${responseData['data']}');
+
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Duplicate photo validation completed',
+        };
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ Duplicate photo validation failed: ${errorData['message']}');
+        print('🔍 Error response data: $errorData');
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Failed to validate duplicate photos',
+          'error': errorData['error'],
+          'data': errorData, // Include the full error response data
+          'statusCode': response.statusCode,
+        };
+      }
+    } catch (e) {
+      print('❌ Error in validateDuplicatePhoto: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'error': e.toString(),
+      };
+    }
+  }
+
   // Create sub user with profile photo
   static Future<Map<String, dynamic>> createSubUser(File photoFile) async {
     try {

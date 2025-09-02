@@ -334,7 +334,22 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         child: _buildTeacherVerificationBottomSheet(),
       ),
-    );
+    ).then((_) {
+      // When the bottom sheet is closed, check if we need to revert teacher type
+      // This handles cases where the user closes the sheet without completing verification
+      if (_selectedTeacherType == 'yes' && !_isTeacherVerified) {
+        setState(() {
+          _selectedTeacherType = 'no';
+          _teacherVerificationData = null;
+          _teacherVerificationError = null;
+          // Clear teacher form data since verification wasn't completed
+          _teacherCodeController.clear();
+          _teacherEmailController.clear();
+          _teacherPhoneController.clear();
+        });
+        _validateForm();
+      }
+    });
   }
 
   Widget _buildTeacherVerificationBottomSheet() {
@@ -408,7 +423,20 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        // If teacher type was changed to 'yes' but verification wasn't completed,
+                        // revert back to 'no' when closing
+                        if (_selectedTeacherType == 'yes' && !_isTeacherVerified) {
+                          setState(() {
+                            _selectedTeacherType = 'no';
+                            // Clear any teacher verification data
+                            _teacherVerificationData = null;
+                            _teacherVerificationError = null;
+                          });
+                          _validateForm();
+                        }
+                        Navigator.of(context).pop();
+                      },
                       icon: const Icon(Icons.close, color: Colors.grey, size: 20),
                     ),
                   ],
@@ -1647,6 +1675,19 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildTeacherTypeSelection() {
+    // Ensure teacher type is consistent with verification status
+    if (_selectedTeacherType == 'yes' && !_isTeacherVerified) {
+      // If teacher type is 'yes' but not verified, reset to 'no'
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _selectedTeacherType = 'no';
+          _teacherVerificationData = null;
+          _teacherVerificationError = null;
+        });
+        _validateForm();
+      });
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1654,7 +1695,7 @@ class _SignupScreenState extends State<SignupScreen> {
         const Row(
           children: [
             Text(
-              'Are you an Art Of Living teacher?',
+              'Are you an Art of Living teacher?',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -1834,12 +1875,14 @@ class _SignupScreenState extends State<SignupScreen> {
   }) {
     return GestureDetector(
       onTap: () {
-        onTap();
-        // Show teacher verification bottom sheet for yes
-        if (value == 'yes' && !isSelected) {
+        // If selecting 'yes', show verification form first
+        if (value == 'yes') {
           _showTeacherVerificationBottomSheet();
+        } else {
+          // If selecting 'no', update immediately
+          onTap();
+          _validateForm();
         }
-        _validateForm();
       },
       child: Container(
         height: 60,

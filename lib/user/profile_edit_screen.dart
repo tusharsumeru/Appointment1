@@ -777,7 +777,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           Row(
                             children: [
                               Text(
-                                'Are you an Art Of Living teacher?',
+                                'Are you an Art of Living teacher?',
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey.shade700,

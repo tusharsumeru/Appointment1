@@ -24,6 +24,9 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
   bool isCreatingSubUser = false;
   Map<String, dynamic>? validationResult;
   bool isValidationComplete = false;
+  bool isDuplicateValidationComplete = false;
+  Map<String, dynamic>? duplicateValidationResult;
+  String? duplicateValidationError;
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -39,32 +42,70 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
         setState(() {
           selectedImage = File(image.path);
           isUploading = true;
+          validationResult = null;
+          isValidationComplete = false;
+          duplicateValidationResult = null;
+          isDuplicateValidationComplete = false;
+          duplicateValidationError = null;
         });
         
-        // Upload and validate the image
+        // Step 1: Upload and validate the image
         final result = await ActionService.validateProfilePhoto(selectedImage!);
         
         setState(() {
-          isUploading = false;
           validationResult = result;
           isValidationComplete = true;
         });
         
-        // Check if validation was successful based on response data
+        // Check if initial validation was successful
         bool isValidationSuccessful = result['success'] == true;
         
-        // Also check the status field in the response data
-        if (result['data'] != null && result['data']['status'] != null) {
-          isValidationSuccessful = result['data']['status'] != 'non_verified';
-        }
-        
         if (isValidationSuccessful) {
-          // Image uploaded and validated successfully
-          if (widget.onPhotoSelected != null) {
-            widget.onPhotoSelected!(selectedImage!);
+          // Step 2: Perform duplicate photo validation
+          setState(() {
+            isUploading = true;
+          });
+          
+          try {
+            final duplicateResult = await ActionService.validateDuplicatePhoto(selectedImage!);
+            
+            setState(() {
+              duplicateValidationResult = duplicateResult;
+              isDuplicateValidationComplete = true;
+              isUploading = false;
+            });
+            
+            // Check if duplicate validation passed
+            if (duplicateResult['success'] == true) {
+              final apiResult = duplicateResult['data']?['apiResult'];
+              if (apiResult != null && apiResult['duplicates_found'] == true) {
+                // Duplicate photo detected
+                setState(() {
+                  duplicateValidationError = "Duplicate photo detected. This photo is too similar to an existing photo in your account.";
+                });
+              } else {
+                // No duplicates found, proceed with sub-user creation
+                if (widget.onPhotoSelected != null) {
+                  widget.onPhotoSelected!(selectedImage!);
+                }
+              }
+            } else {
+              // Duplicate validation failed
+              setState(() {
+                duplicateValidationError = duplicateResult['message'] ?? "Failed to validate for duplicates. Please try again.";
+              });
+            }
+          } catch (duplicateError) {
+            setState(() {
+              isUploading = false;
+              duplicateValidationError = "Error checking for duplicates: ${duplicateError.toString()}";
+            });
           }
         } else {
-          // Handle validation failure - keep the image for display
+          // Initial validation failed
+          setState(() {
+            isUploading = false;
+          });
           print('🔍 Validation failed: ${result['message']}');
           print('🔍 Status code: ${result['statusCode']}');
           print('🔍 Response data: ${result['data']}');
@@ -122,12 +163,52 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
       selectedImage = null;
       validationResult = null;
       isValidationComplete = false;
+      isDuplicateValidationComplete = false;
+      duplicateValidationResult = null;
+      duplicateValidationError = null;
       isCreatingSubUser = false;
     });
   }
 
+  bool _canProceedWithSubUserCreation() {
+    // Check if initial validation passed and duplicate validation is complete
+    if (validationResult == null || !_isValidationSuccessful(validationResult!)) {
+      return false;
+    }
+    
+    if (!isDuplicateValidationComplete) {
+      return false;
+    }
+    
+    // Check if there are no duplicate validation errors
+    if (duplicateValidationError != null) {
+      return false;
+    }
+    
+    // Check if duplicate validation result is successful
+    if (duplicateValidationResult != null && duplicateValidationResult!['success'] == true) {
+      final apiResult = duplicateValidationResult!['data']?['apiResult'];
+      if (apiResult != null && apiResult['duplicates_found'] == true) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
   Future<void> _createSubUser() async {
     if (selectedImage == null) return;
+
+    // Double-check that we can proceed with sub-user creation
+    if (!_canProceedWithSubUserCreation()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please wait for photo validation to complete'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       isCreatingSubUser = true;
@@ -302,7 +383,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _isValidationSuccessful(validationResult!)
+                            color: validationResult != null && _isValidationSuccessful(validationResult!)
                                 ? Colors.transparent
                                 : Colors.red,
                             width: 2,
@@ -331,16 +412,106 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                       
                       const SizedBox(height: 16),
                       
-                      // Success Message
+                      // Initial Validation Message
                       Text(
-                        _getValidationMessage(validationResult!),
+                        validationResult != null ? _getValidationMessage(validationResult!) : 'Validation in progress...',
                         style: TextStyle(
                           fontSize: 14,
-                          color: _isValidationSuccessful(validationResult!)
+                          color: validationResult != null && _isValidationSuccessful(validationResult!)
                               ? Colors.green.shade700
                               : Colors.red.shade700,
                         ),
                       ),
+                      
+                      // Show duplicate validation status if initial validation passed
+                      if (validationResult != null && _isValidationSuccessful(validationResult!) && isDuplicateValidationComplete) ...[
+                        const SizedBox(height: 16),
+                        
+                        if (duplicateValidationError != null) ...[
+                          // Duplicate photo error
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              border: Border.all(color: Colors.red.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  color: Colors.red.shade700,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    duplicateValidationError!,
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (duplicateValidationResult != null && duplicateValidationResult!['success'] == true) ...[
+                          // Duplicate validation passed
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              border: Border.all(color: Colors.green.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: Colors.green.shade700,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'No duplicate photos detected. You can proceed with creating a sub-user.',
+                                    style: TextStyle(
+                                      color: Colors.green.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                      
+                      // Show loading for duplicate validation
+                      if (validationResult != null && _isValidationSuccessful(validationResult!) && !isDuplicateValidationComplete && isUploading) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Checking for duplicate photos...',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       
                       const SizedBox(height: 20),
                       
@@ -364,11 +535,11 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _isValidationSuccessful(validationResult!) && !isCreatingSubUser
+                              onPressed: _canProceedWithSubUserCreation() && !isCreatingSubUser
                                   ? _createSubUser
                                   : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _isValidationSuccessful(validationResult!)
+                                backgroundColor: _canProceedWithSubUserCreation()
                                     ? const Color(0xFFF97316)
                                     : Colors.grey.shade300,
                                 foregroundColor: Colors.white,
@@ -393,11 +564,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                                         Text('Creating...'),
                                       ],
                                     )
-                                  : Text(
-                                      _isValidationSuccessful(validationResult!)
-                                          ? 'Create Sub User'
-                                          : 'Create Sub User',
-                                    ),
+                                  : const Text('Create Sub User'),
                             ),
                           ),
                         ],
@@ -431,9 +598,11 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Uploading and validating...',
-                              style: TextStyle(
+                            Text(
+                              isValidationComplete && !isDuplicateValidationComplete
+                                  ? 'Checking for duplicate photos...'
+                                  : 'Uploading and validating...',
+                              style: const TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFF374151), // gray-700
                                 fontWeight: FontWeight.w500,
@@ -502,7 +671,11 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                         ),
                       ),
                       child: Text(
-                        isUploading ? 'Uploading...' : 'Choose Photo',
+                        isUploading 
+                            ? (isValidationComplete && !isDuplicateValidationComplete 
+                                ? 'Checking Duplicates...' 
+                                : 'Uploading...')
+                            : 'Choose Photo',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

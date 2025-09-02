@@ -18,6 +18,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
   // Dynamic data for reference cards
   List<Map<String, dynamic>> _referenceData = [];
   bool _isLoading = true;
+  bool _isApplyingFilters = false; // New flag for filter application
   String? _errorMessage;
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _filteredReferenceData = [];
@@ -27,20 +28,90 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
+  // Pagination variables
+  int _currentPage = 1;
+  int _totalPages = 1;
+  bool _hasMoreData = true;
+  bool _isLoadingMore = false;
+  int _totalItems = 0;
+
   @override
   void initState() {
     super.initState();
     _loadReferenceData();
-    _searchController.addListener(_filterData);
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    // Debounce search to avoid too many API calls
+    Future.delayed(const Duration(milliseconds: 500), () {
+      // Check if widget is still mounted before proceeding
+      if (mounted && _searchController.text == _lastSearchTerm) {
+        _applySearchFilter();
+      }
+    });
+    _lastSearchTerm = _searchController.text;
+  }
+
+  String _lastSearchTerm = '';
+
+  void _applySearchFilter() {
+    if (!mounted) return;
+    
+    final searchTerm = _searchController.text.trim();
+    
+    if (searchTerm.isEmpty) {
+      // If search is empty, reload data with current filters (excluding search)
+      _loadReferenceDataWithFilters();
+    } else {
+      // Apply search filter locally for better UX
+      _filterData();
+    }
+  }
+
+  String _getActiveFiltersText() {
+    List<String> activeFilters = [];
+    
+    if (_selectedStatus != 'all') {
+      activeFilters.add('Status: ${_capitalizeFirst(_selectedStatus)}');
+    }
+    
+    if (_startDate != null) {
+      activeFilters.add('From: ${_formatDate(_startDate!)}');
+    }
+    
+    if (_endDate != null) {
+      activeFilters.add('To: ${_formatDate(_endDate!)}');
+    }
+    
+    if (activeFilters.isEmpty) {
+      return 'No active filters';
+    }
+    
+    return 'Active filters: ${activeFilters.join(', ')}';
+  }
+
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   void _clearFilters() {
-    setState(() {
+    if (!mounted) return;
+    
+    _safeSetState(() {
       _selectedStatus = 'all';
       _startDate = null;
       _endDate = null;
+      // Reset pagination when clearing filters
+      _currentPage = 1;
+      _hasMoreData = true;
     });
-    _filterData();
+    _applyFilters();
   }
 
   @override
@@ -49,95 +120,268 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadReferenceData() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+  // Helper method to safely check if widget is mounted and update state
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) {
+      setState(fn);
+    }
+  }
 
-      print('Loading reference data from API...');
-      final result = await ActionService.getAllReferenceForms();
+  Future<void> _loadReferenceData() async {
+    if (!mounted) return;
+    await _loadReferenceDataWithFilters();
+  }
+
+  Future<void> _loadReferenceDataWithFilters({bool isRefresh = false}) async {
+    try {
+      // Check if widget is still mounted before proceeding
+      if (!mounted) {
+        print('Widget no longer mounted, aborting API call');
+        return;
+      }
+
+      // Reset pagination on refresh
+      if (isRefresh) {
+        _currentPage = 1;
+        _hasMoreData = true;
+        _referenceData.clear();
+        _filteredReferenceData.clear();
+      }
+
+      // Only show loading state if it's not a refresh operation and not loading more
+      if (!isRefresh && !_isLoadingMore) {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+        });
+      }
+
+      print('Loading reference data from API with filters...');
+      print('Current filters - Status: $_selectedStatus, StartDate: $_startDate, EndDate: $_endDate');
+      
+      // Prepare filter parameters
+      String? statusFilter;
+      if (_selectedStatus != 'all') {
+        statusFilter = _selectedStatus;
+        print('Applying status filter: $statusFilter');
+      }
+      
+      String? startDateFilter;
+      if (_startDate != null) {
+        startDateFilter = _startDate!.toIso8601String().split('T')[0]; // Format: YYYY-MM-DD
+        print('Applying start date filter: $startDateFilter');
+      }
+      
+      String? endDateFilter;
+      if (_endDate != null) {
+        endDateFilter = _endDate!.toIso8601String().split('T')[0]; // Format: YYYY-MM-DD
+        print('Applying end date filter: $endDateFilter');
+      }
+      
+      String? searchFilter;
+      final searchTerm = _searchController.text.trim();
+      if (searchTerm.isNotEmpty) {
+        searchFilter = searchTerm;
+        print('Applying search filter: $searchFilter');
+      }
+      
+      print('Calling API with filters: status=$statusFilter, search=$searchFilter, startDate=$startDateFilter, endDate=$endDateFilter, page=$_currentPage');
+      
+      final result = await ActionService.getAllReferenceForms(
+        status: statusFilter,
+        search: searchFilter,
+        startDate: startDateFilter,
+        endDate: endDateFilter,
+        page: _currentPage,
+        limit: 10,
+      );
+      
+      // Check if widget is still mounted after API call
+      if (!mounted) {
+        print('Widget disposed after API call, aborting setState');
+        return;
+      }
       
       print('API Response: $result');
       
       if (result['success'] == true) {
         final data = result['data'];
         if (data != null && data['forms'] != null) {
+          final forms = List<Map<String, dynamic>>.from(data['forms']);
+          final pagination = data['pagination'];
+          
+          // Update pagination data
+          if (pagination != null) {
+            _totalPages = pagination['totalPages'] ?? 1;
+            _currentPage = pagination['currentPage'] ?? _currentPage;
+            _totalItems = pagination['totalItems'] ?? 0;
+            _hasMoreData = _currentPage < _totalPages;
+          }
+          
           setState(() {
-            _referenceData = List<Map<String, dynamic>>.from(data['forms']);
-            _filteredReferenceData = List<Map<String, dynamic>>.from(data['forms']);
+            if (isRefresh) {
+              _referenceData = forms;
+              _filteredReferenceData = forms;
+            } else {
+              _referenceData.addAll(forms);
+              _filteredReferenceData.addAll(forms);
+            }
             _isLoading = false;
+            _isLoadingMore = false;
           });
-          print('Loaded ${_referenceData.length} reference forms');
-          print('First reference data: ${_referenceData.isNotEmpty ? _referenceData.first : 'No data'}');
+          
+          print('✅ Successfully loaded ${forms.length} reference forms with applied filters');
+          print('Pagination: Page $_currentPage of $_totalPages, Total: $_totalItems, HasMore: $_hasMoreData');
+          print('Total forms in state: ${_referenceData.length}');
+          
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isRefresh 
+                    ? '✅ Data refreshed successfully! Found $_totalItems reference forms.'
+                    : 'Filters applied successfully! Found $_totalItems reference forms.'
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         } else {
-          setState(() {
-            _errorMessage = 'No reference forms found';
-            _isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              if (isRefresh) {
+                _referenceData = [];
+                _filteredReferenceData = [];
+              }
+              _errorMessage = 'No reference forms found with current filters';
+              _isLoading = false;
+              _isLoadingMore = false;
+            });
+          }
+          print('⚠️ No forms found with current filters');
         }
       } else {
-        setState(() {
-          _errorMessage = result['message'] ?? 'Failed to load reference forms';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = result['message'] ?? 'Failed to load reference forms';
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+        print('❌ API error: ${result['message']}');
       }
     } catch (e) {
-      print('Error loading reference data: $e');
-      setState(() {
-        _errorMessage = 'Error: $e';
-        _isLoading = false;
-      });
+      print('❌ Error loading reference data: $e');
+      
+      // Check if widget is still mounted before setState
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error loading data: $e';
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error applying filters: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
   void _filterData() {
+    if (!mounted) return;
+    
     final searchTerm = _searchController.text.toLowerCase();
-    setState(() {
-      if (searchTerm.isEmpty && _selectedStatus == 'all' && _startDate == null && _endDate == null) {
-        _filteredReferenceData = List.from(_referenceData);
-      } else {
-        _filteredReferenceData = _referenceData.where((reference) {
-          // Search term filter
-          final name = (reference['name'] ?? '').toString().toLowerCase();
-          final email = (reference['email'] ?? '').toString().toLowerCase();
-          final phone = (reference['phone'] ?? '').toString().toLowerCase();
-          final status = (reference['status'] ?? '').toString().toLowerCase();
-          
-          bool matchesSearch = searchTerm.isEmpty || 
-                              name.contains(searchTerm) ||
-                              email.contains(searchTerm) ||
-                              phone.contains(searchTerm) ||
-                              status.contains(searchTerm);
-          
-          // Status filter
-          bool matchesStatus = _selectedStatus == 'all' || 
-                              status.toLowerCase() == _selectedStatus.toLowerCase();
-          
-          // Date filter
-          bool matchesDate = true;
-          if (_startDate != null || _endDate != null) {
-            try {
-              final createdAt = DateTime.parse(reference['createdAt'] ?? '');
-              if (_startDate != null && createdAt.isBefore(_startDate!)) {
-                matchesDate = false;
-              }
-              if (_endDate != null && createdAt.isAfter(_endDate!)) {
-                matchesDate = false;
-              }
-            } catch (e) {
-              matchesDate = false;
-            }
-          }
-          
-          return matchesSearch && matchesStatus && matchesDate;
-        }).toList();
-      }
+    
+    // Apply search filter locally (for better UX)
+    if (searchTerm.isEmpty) {
+      _filteredReferenceData = List.from(_referenceData);
+    } else {
+      _filteredReferenceData = _referenceData.where((reference) {
+        final name = (reference['name'] ?? '').toString().toLowerCase();
+        final email = (reference['email'] ?? '').toString().toLowerCase();
+        final phone = (reference['phone'] ?? '').toString().toLowerCase();
+        final status = (reference['status'] ?? '').toString().toLowerCase();
+        
+        return name.contains(searchTerm) ||
+               email.contains(searchTerm) ||
+               phone.contains(searchTerm) ||
+               status.contains(searchTerm);
+      }).toList();
+    }
+    
+    // Safely update the UI if widget is still mounted
+    _safeSetState(() {
+      // Trigger rebuild to show filtered results
     });
   }
 
+  Future<void> _applyFilters() async {
+    if (!mounted) return;
+    
+    try {
+      print('Applying filters: status=$_selectedStatus, startDate=$_startDate, endDate=$_endDate');
+      
+      // Reset pagination when applying new filters
+      _currentPage = 1;
+      _hasMoreData = true;
+      
+      // Set applying filters state
+      if (mounted) {
+        setState(() {
+          _isApplyingFilters = true;
+        });
+      }
+      
+      // Reload data from API with new filters
+      await _loadReferenceDataWithFilters();
+      
+      // Clear applying filters state
+      if (mounted) {
+        setState(() {
+          _isApplyingFilters = false;
+        });
+      }
+    } catch (e) {
+      print('Error applying filters: $e');
+      
+      // Clear applying filters state on error
+      if (mounted) {
+        setState(() {
+          _isApplyingFilters = false;
+        });
+      }
+      
+      // Fallback to local filtering if API fails
+      if (mounted) {
+        _filterData();
+      }
+    }
+  }
+
+  Future<void> _loadMoreReferenceForms() async {
+    if (!_hasMoreData || _isLoading || _isLoadingMore) return;
+    
+    if (mounted) {
+      setState(() {
+        _isLoadingMore = true;
+        _currentPage++;
+      });
+    }
+    
+    await _loadReferenceDataWithFilters();
+  }
+
   void _onViewDetails(Map<String, dynamic> reference) {
+    if (!mounted) return;
+    
     print('Viewing details for reference: $reference');
     Navigator.push(
       context,
@@ -150,9 +394,13 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
   }
 
   void _showFilterBottomSheet() {
+    if (!mounted) return;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: false, // Prevent accidental dismissal
+      enableDrag: false, // Prevent drag to dismiss
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -176,9 +424,29 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           });
         },
         onClearFilters: _clearFilters,
-        onApplyFilters: () {
-          Navigator.pop(context);
-          _filterData();
+        onApplyFilters: () async {
+          // Close the bottom sheet first
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+          
+          // Show loading indicator
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Applying filters...'),
+                  backgroundColor: Colors.blue,
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            } catch (e) {
+              print('Error showing snackbar: $e');
+            }
+          }
+          
+          // Apply filters
+          await _applyFilters();
         },
       ),
     );
@@ -189,12 +457,27 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text(
-          'Reference From List',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+        title: Row(
+          children: [
+            const Text(
+              'Reference From List',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
+              ),
+            ),
+            if (_isLoading && !_isApplyingFilters) ...[
+              const SizedBox(width: 8),
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ],
+          ],
         ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -214,7 +497,9 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () {
-              Scaffold.of(context).openDrawer();
+              if (mounted) {
+                Scaffold.of(context).openDrawer();
+              }
             },
           ),
         ),
@@ -227,20 +512,44 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         ),
       ),
       drawer: const SidebarComponent(),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF5F5F5),
-              Color(0xFFE0E0E0),
-            ],
+      body: Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.white, // Keep screen background white
+            child: _buildBody(),
           ),
-        ),
-        child: _buildBody(),
+          
+          // Loading overlay when applying filters
+          if (_isApplyingFilters)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Applying filters...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -281,7 +590,9 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
-                        _searchController.clear();
+                        if (mounted) {
+                          _searchController.clear();
+                        }
                       },
                     )
                   : null,
@@ -304,36 +615,131 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           ),
         ),
         
-        // Filter Button
+        // Filter Button and Active Filters Display
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: Column(
             children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showFilterBottomSheet,
-                  icon: const Icon(Icons.filter_list, size: 18),
-                  label: const Text('Filter'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    foregroundColor: Colors.black87,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _isApplyingFilters ? null : () {
+                      if (mounted) {
+                        _showFilterBottomSheet();
+                      }
+                    },
+                    icon: _isApplyingFilters 
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                          ),
+                        )
+                      : const Icon(Icons.filter_list, size: 18),
+                    label: Text(_isApplyingFilters ? 'Applying...' : 'Filter'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isApplyingFilters ? Colors.grey[300] : Colors.grey[200],
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                ),
+                ],
               ),
+              
+
             ],
           ),
         ),
         
         const SizedBox(height: 8),
         
-        // Reference List
+        // Reference List with Pull-to-Refresh
         Expanded(
-          child: _buildReferenceList(),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              print('🔄 Pull-to-refresh triggered');
+              await _loadReferenceDataWithFilters(isRefresh: true);
+            },
+            color: Colors.deepOrange,
+            backgroundColor: Colors.white,
+            strokeWidth: 3,
+            child: _buildReferenceList(),
+          ),
+        ),
+        
+        // Pagination Info
+        if (_referenceData.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Showing ${_referenceData.length} of $_totalItems reference forms',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Page $_currentPage of $_totalPages',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        
+        // Load More Button - Always visible
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16.0),
+          child: ElevatedButton(
+            onPressed: (_isLoadingMore || !_hasMoreData) ? null : () => _loadMoreReferenceForms(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _hasMoreData ? Colors.deepOrange : Colors.grey[400],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: _isLoadingMore
+                ? const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text('Loading...'),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.keyboard_arrow_down),
+                      const SizedBox(width: 8),
+                      Text(_hasMoreData ? 'Load More' : 'No More Data'),
+                    ],
+                  ),
+          ),
         ),
       ],
     );
@@ -371,7 +777,11 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadReferenceData,
+              onPressed: () {
+                if (mounted) {
+                  _loadReferenceData();
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepOrange,
                 foregroundColor: Colors.white,
@@ -423,8 +833,13 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         print('Building reference card $index: $reference');
         return ReferenceCard(
           referenceData: reference,
+          index: index, // Add index parameter for alternating colors
           onViewDetails: () => _onViewDetails(reference),
-          onStatusUpdated: () => _loadReferenceData(),
+          onStatusUpdated: () {
+            if (mounted) {
+              _loadReferenceData();
+            }
+          },
         );
       },
     );

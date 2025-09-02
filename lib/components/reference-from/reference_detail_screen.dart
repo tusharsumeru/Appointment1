@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../common/profile_photo_dialog.dart'; // Add this import
 
 class ReferenceDetailScreen extends StatelessWidget {
   final Map<String, dynamic> referenceData;
@@ -18,16 +19,21 @@ class ReferenceDetailScreen extends StatelessWidget {
   String get createdAt => referenceData['createdAt'] != null 
       ? DateTime.parse(referenceData['createdAt']).toString().split(' ')[0]
       : '';
-  String get updatedAt => referenceData['updatedAt'] != null 
-      ? DateTime.parse(referenceData['updatedAt']).toString().split(' ')[0]
-      : '';
   String get secretaryRemark => referenceData['secretaryRemark'] ?? 'No remarks provided';
   String get details => referenceData['details'] ?? 'No details provided';
   String get remarks => referenceData['remarks'] ?? 'No remarks provided';
+  String get reasonForForm => referenceData['reasonForForm'] ?? 'No reason provided';
+  String get gurudevWhere => referenceData['gurudevWhere'] ?? 'No location provided';
+  String get gurudevWhen => referenceData['gurudevWhen'] != null 
+      ? DateTime.parse(referenceData['gurudevWhen']).toString().split(' ')[0]
+      : 'No date provided';
+  String get someoneElseWho => referenceData['someoneElseWho'] ?? 'No name provided';
+  String get someoneElseWhere => referenceData['someoneElseWhere'] ?? 'No location provided';
+  String get someoneElseContext => referenceData['someoneElseContext'] ?? 'No context provided';
+  String get datesAtAshram => referenceData['datesAtAshram'] ?? 'No dates provided';
   List<String> get coursesTaught => referenceData['coursesTaught'] != null 
       ? List<String>.from(referenceData['coursesTaught'])
       : [];
-  String get registrationReason => referenceData['registrationReason'] ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +46,15 @@ class ReferenceDetailScreen extends StatelessWidget {
     print('ReferenceDetailScreen - teacherCode: $teacherCode');
     print('ReferenceDetailScreen - createdAt: $createdAt');
     print('ReferenceDetailScreen - coursesTaught: $coursesTaught');
-    print('ReferenceDetailScreen - registrationReason: $registrationReason');
+    print('ReferenceDetailScreen - reasonForForm: $reasonForForm');
+    print('ReferenceDetailScreen - gurudevWhere: $gurudevWhere');
+    print('ReferenceDetailScreen - gurudevWhen: $gurudevWhen');
+    print('ReferenceDetailScreen - someoneElseWho: $someoneElseWho');
+    print('ReferenceDetailScreen - someoneElseWhere: $someoneElseWhere');
+    print('ReferenceDetailScreen - someoneElseContext: $someoneElseContext');
+    print('ReferenceDetailScreen - datesAtAshram: $datesAtAshram');
+    print('ReferenceDetailScreen - remarks: $remarks');
+    print('ReferenceDetailScreen - secretaryRemark: $secretaryRemark');
     print('ReferenceDetailScreen - profilePic: $profilePic');
     print('ReferenceDetailScreen - photo field: ${referenceData['photo']}');
     print('ReferenceDetailScreen - profilePic field: ${referenceData['profilePic']}');
@@ -109,22 +123,27 @@ class ReferenceDetailScreen extends StatelessWidget {
                   child: Row(
                     children: [
                       // Profile Picture
-                      CircleAvatar(
-                        radius: 35,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: profilePic != null && profilePic!.isNotEmpty
-                            ? NetworkImage(profilePic!)
+                      GestureDetector(
+                        onTap: profilePic != null && profilePic!.isNotEmpty 
+                            ? () => _showProfilePhoto(context, profilePic!) 
                             : null,
-                        child: profilePic == null || profilePic!.isEmpty
-                            ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.deepOrange,
-                                ),
-                              )
-                            : null,
+                        child: CircleAvatar(
+                          radius: 35,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: profilePic != null && profilePic!.isNotEmpty
+                              ? NetworkImage(profilePic!)
+                              : null,
+                          child: profilePic == null || profilePic!.isEmpty
+                              ? Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.deepOrange,
+                                  ),
+                                )
+                              : null,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       // Name and Email
@@ -138,14 +157,6 @@ class ReferenceDetailScreen extends StatelessWidget {
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -163,15 +174,22 @@ class ReferenceDetailScreen extends StatelessWidget {
               _buildInfoCard(
                 'Reference Information',
                 [
+                  _buildInfoRow(Icons.info, 'Status', status),
                   _buildInfoRow(Icons.email, 'Email Address', email),
                   _buildInfoRow(Icons.phone, 'Phone Number', phone),
                   _buildInfoRow(Icons.calendar_today, 'Created Date', createdAt),
-                  _buildInfoRow(Icons.schedule, 'Updated Date', updatedAt),
                   _buildInfoRow(Icons.person, 'Teacher Code', teacherCode),
                   _buildInfoRow(Icons.school, 'Teaching Details', details),
-                  _buildInfoRow(Icons.comment, 'Secretary Remarks', secretaryRemark),
                   _buildInfoRow(Icons.book, 'Courses Taught', coursesTaught.isNotEmpty ? coursesTaught.join(', ') : 'No courses'),
-                  _buildInfoRow(Icons.info, 'Registration Reason', registrationReason.isNotEmpty ? registrationReason : 'No registration reason provided'),
+                  _buildInfoRow(Icons.info, 'Reason for Form', reasonForForm),
+                  _buildInfoRow(Icons.location_on, 'Gurudev Location', gurudevWhere),
+                  _buildInfoRow(Icons.schedule, 'Gurudev Date', gurudevWhen),
+                  _buildInfoRow(Icons.person_add, 'Someone Else Who', someoneElseWho),
+                  _buildInfoRow(Icons.location_city, 'Someone Else Where', someoneElseWhere),
+                  _buildInfoRow(Icons.chat, 'Someone Else Context', someoneElseContext),
+                  _buildInfoRow(Icons.calendar_month, 'Dates at Ashram', datesAtAshram),
+                  _buildInfoRow(Icons.note, 'Remarks', remarks),
+                  _buildInfoRow(Icons.comment, 'Secretary Remarks', secretaryRemark),
                 ],
               ),
               const SizedBox(height: 20),
@@ -213,33 +231,27 @@ class ReferenceDetailScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Colors.grey[600],
+          SizedBox(
+            width: 140, // Fixed width for labels like person card
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.normal,
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                fontWeight: FontWeight.normal,
+              ),
             ),
           ),
         ],
@@ -287,6 +299,16 @@ class ReferenceDetailScreen extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
       ),
+    );
+  }
+
+  // Add this method to show profile photo dialog
+  void _showProfilePhoto(BuildContext context, String imageUrl) {
+    ProfilePhotoDialog.showWithErrorHandling(
+      context,
+      imageUrl: imageUrl,
+      userName: name,
+      description: "$name's profile photo",
     );
   }
 }

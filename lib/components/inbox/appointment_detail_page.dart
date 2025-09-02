@@ -2669,7 +2669,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
       final guestPhone = guestInformation['phoneNumber']?.toString();
       if (guestPhone != null && guestPhone.isNotEmpty) {
-        return guestPhone;
+        return _ensurePlusPrefix(guestPhone);
       }
     }
     
@@ -2685,7 +2685,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           final countryCode = mobileNumber['countryCode']?.toString() ?? '';
           final number = mobileNumber['number']?.toString() ?? '';
           if (number.isNotEmpty) {
-            return '$countryCode$number';
+            return _ensurePlusPrefix('$countryCode$number');
           }
         }
       }
@@ -2698,12 +2698,27 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       final number = phoneNumber['number']?.toString() ?? '';
       if (countryCode.isNotEmpty && number.isNotEmpty) {
         // Return full phone number with country code
-        return '$countryCode$number';
+        return _ensurePlusPrefix('$countryCode$number');
       }
     }
     // If it's a string, return as is
     final phoneString = phoneNumber?.toString() ?? '';
-    return phoneString;
+    return _ensurePlusPrefix(phoneString);
+  }
+
+  // Helper function to ensure phone number has + prefix
+  String _ensurePlusPrefix(String phoneNumber) {
+    if (phoneNumber.isEmpty) return phoneNumber;
+    
+    // Remove any existing + and spaces
+    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[\s\+]'), '');
+    
+    // If it starts with a number, add + prefix
+    if (cleanNumber.isNotEmpty && RegExp(r'^\d').hasMatch(cleanNumber)) {
+      return '+$cleanNumber';
+    }
+    
+    return phoneNumber; // Return original if it doesn't start with a number
   }
 
   String _formatPhoneNumber(dynamic phoneData) {
@@ -2871,7 +2886,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
             // Show reference person information for guest appointments
             if (_isGuestAppointment()) ...[
-              _buildMainCardDetailRow('Reference Person', _getReferencePersonName(), Icons.person_add),
+              _buildMainCardDetailRow('Guest Referred By', _getReferencePersonName(), Icons.person_add),
             ],
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[
@@ -3390,13 +3405,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           // Purpose
           if (!_isQuickAppointment()) ...[
             if (_getQuickAppointmentPurpose().isNotEmpty) ...[
-              _buildDetailRow('Purpose', _getQuickAppointmentPurpose(), Icons.info),
+              _buildDetailRow('Purpose of appointment', _getQuickAppointmentPurpose(), Icons.info),
             ] else ...[
-              _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+              _buildDetailRow('Purpose of appointment', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
             ],
           ] else ...[
             // For quick appointments, show basic info without duplicating quick appointment data
-            _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
+            _buildDetailRow('Purpose of appointment', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
           ],
           
           // Tags

@@ -68,7 +68,11 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                 ),
               ),
               IconButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                },
                 icon: const Icon(Icons.close),
               ),
             ],
@@ -86,11 +90,13 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
               margin: const EdgeInsets.only(bottom: 8),
               child: InkWell(
                 onTap: () {
-                  setState(() {
-                    _selectedStatus = status;
-                  });
-                  widget.onStatusChanged(status);
-                  Navigator.pop(context);
+                  if (mounted) {
+                    setState(() {
+                      _selectedStatus = status;
+                    });
+                    widget.onStatusChanged(status);
+                    Navigator.pop(context);
+                  }
                 },
                 child: Container(
                   width: double.infinity,
@@ -149,7 +155,11 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                 ),
               ),
               IconButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                },
                 icon: const Icon(Icons.close),
               ),
             ],
@@ -221,7 +231,7 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now(),
                     );
-                    if (date != null) {
+                    if (date != null && mounted) {
                       setState(() {
                         _startDate = date;
                       });
@@ -280,7 +290,7 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now(),
                     );
-                    if (date != null) {
+                    if (date != null && mounted) {
                       setState(() {
                         _endDate = date;
                       });
@@ -324,15 +334,17 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    setState(() {
-                      _selectedStatus = 'all';
-                      _startDate = null;
-                      _endDate = null;
-                    });
-                    widget.onStatusChanged('all');
-                    widget.onStartDateChanged(null);
-                    widget.onEndDateChanged(null);
-                    widget.onClearFilters();
+                    if (mounted) {
+                      setState(() {
+                        _selectedStatus = 'all';
+                        _startDate = null;
+                        _endDate = null;
+                      });
+                      widget.onStatusChanged('all');
+                      widget.onStartDateChanged(null);
+                      widget.onEndDateChanged(null);
+                      widget.onClearFilters();
+                    }
                   },
                   child: const Text('Clear Filters'),
                 ),
@@ -341,8 +353,9 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
-                    widget.onApplyFilters();
+                    if (mounted) {
+                      widget.onApplyFilters();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepOrange,
