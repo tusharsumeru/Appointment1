@@ -514,44 +514,60 @@ class UserAppointmentCard extends StatelessWidget {
                     // Purpose of Meeting
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.3)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.orange.shade50.withOpacity(0.5),
+                            Colors.yellow.shade50.withOpacity(0.3),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.orange.shade100.withOpacity(0.4),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.description,
-                            size: 20,
-                            color: headerColor ?? const Color(0xFFF97316),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.description_outlined,
+                              size: 20,
+                              color: Colors.orange.shade700,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Purpose of Meeting',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: headerColor ?? const Color(0xFFF97316),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'Purpose of Meeting',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange.shade800,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   purpose,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: (headerColor ?? const Color(0xFFF97316)).withOpacity(0.8),
-                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade700,
+                                    height: 1.4,
                                   ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),

@@ -30,6 +30,7 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
   late String _selectedStatus;
   late DateTime? _startDate;
   late DateTime? _endDate;
+  String? _dateError;
 
   @override
   void initState() {
@@ -37,6 +38,24 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
     _selectedStatus = widget.selectedStatus;
     _startDate = widget.startDate;
     _endDate = widget.endDate;
+  }
+
+  void _validateDates() {
+    if (_startDate != null && _endDate != null) {
+      if (_startDate!.isAfter(_endDate!)) {
+        setState(() {
+          _dateError = 'From date cannot be greater than To date';
+        });
+      } else {
+        setState(() {
+          _dateError = null;
+        });
+      }
+    } else {
+      setState(() {
+        _dateError = null;
+      });
+    }
   }
 
   void _showStatusBottomSheet() {
@@ -236,6 +255,7 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                         _startDate = date;
                       });
                       widget.onStartDateChanged(date);
+                      _validateDates();
                     }
                   },
                   child: Container(
@@ -267,6 +287,39 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
             ),
           ),
           
+          // Add error message display
+          if (_dateError != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                border: Border.all(color: Colors.red.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _dateError!,
+                      style: TextStyle(
+                        color: Colors.red.shade600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
           // To Date Field
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 0),
@@ -295,6 +348,7 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
                         _endDate = date;
                       });
                       widget.onEndDateChanged(date);
+                      _validateDates();
                     }
                   },
                   child: Container(
@@ -352,13 +406,13 @@ class _ReferenceFormFilterState extends State<ReferenceFormFilter> {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: _dateError != null ? null : () {
                     if (mounted) {
                       widget.onApplyFilters();
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepOrange,
+                    backgroundColor: _dateError != null ? Colors.grey : Colors.deepOrange,
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Apply Filters'),

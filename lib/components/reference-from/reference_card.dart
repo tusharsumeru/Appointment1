@@ -24,6 +24,7 @@ class ReferenceCard extends StatefulWidget {
 class _ReferenceCardState extends State<ReferenceCard> {
   bool _isApproving = false;
   bool _isRejecting = false;
+  bool _showRemarkSection = false;
   final TextEditingController _remarkController = TextEditingController();
 
   // Helper getters for easy access to data
@@ -32,8 +33,49 @@ class _ReferenceCardState extends State<ReferenceCard> {
   String get phone => widget.referenceData['phone'] ?? 'No phone';
   String get status => widget.referenceData['status'] ?? 'Unknown';
   String? get profilePic => widget.referenceData['photo'] ?? widget.referenceData['profilePic'];
-  String get createdAt => widget.referenceData['createdAt'] ?? 'No date';
+  String get createdAt => _formatDate(widget.referenceData['createdAt'] ?? 'No date');
   String get formId => widget.referenceData['_id'] ?? widget.referenceData['id'] ?? '';
+
+  // Helper method to format date in IST
+  String _formatDate(String dateString) {
+    if (dateString == 'No date') return 'No date';
+    
+    try {
+      // Parse ISO date string (UTC)
+      DateTime utcDate = DateTime.parse(dateString);
+      
+      // Convert to IST (UTC + 5:30)
+      DateTime istDate = utcDate.add(const Duration(hours: 5, minutes: 30));
+      
+      // Format to user-friendly format: "3 Sep 2025, 3:05 AM IST"
+      List<String> months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      
+      String day = istDate.day.toString();
+      String month = months[istDate.month - 1];
+      String year = istDate.year.toString();
+      
+      // Format time in IST
+      String hour = istDate.hour.toString().padLeft(2, '0');
+      String minute = istDate.minute.toString().padLeft(2, '0');
+      String amPm = istDate.hour >= 12 ? 'PM' : 'AM';
+      int displayHour = istDate.hour > 12 ? istDate.hour - 12 : (istDate.hour == 0 ? 12 : istDate.hour);
+      
+      return '$day $month $year, $displayHour:$minute $amPm';
+    } catch (e) {
+      // If parsing fails, return the original string
+      return dateString;
+    }
+  }
+
+  // Show remark section
+  void _toggleRemarkSection() {
+    setState(() {
+      _showRemarkSection = true;
+    });
+  }
 
   // Handle accept action
   Future<void> _handleAccept() async {
@@ -59,7 +101,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
       print('🔄 API Response: $result');
 
       if (result['success'] == true) {
-        _showSuccessMessage('Reference form approved successfully!');
+        // Trigger refresh to fetch updated data immediately
         widget.onStatusUpdated?.call();
       } else {
         _showErrorMessage(result['message'] ?? 'Failed to approve reference form');
@@ -97,7 +139,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
       print('🔄 API Response: $result');
 
       if (result['success'] == true) {
-        _showSuccessMessage('Reference form rejected successfully!');
+        // Trigger refresh to fetch updated data immediately
         widget.onStatusUpdated?.call();
       } else {
         _showErrorMessage(result['message'] ?? 'Failed to reject reference form');
@@ -293,118 +335,170 @@ class _ReferenceCardState extends State<ReferenceCard> {
              // Only show Approve/Reject buttons if status is pending
              if (status.toLowerCase() == 'pending') ...[
                const SizedBox(height: 22),
-               // Secretary Remark Text Field
-               Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   const Text(
-                     'Secretary Remark(optional):',
-                     style: TextStyle(
-                       fontSize: 14,
-                       fontWeight: FontWeight.w600,
-                       color: Colors.black87,
+               
+               // Show initial Approve/Reject buttons if remark section is not shown
+               if (!_showRemarkSection) ...[
+                 Row(
+                   children: [
+                     Expanded(
+                       child: ElevatedButton.icon(
+                         onPressed: _toggleRemarkSection,
+                         icon: const Icon(
+                           Icons.check,
+                           size: 16,
+                         ),
+                         label: const Text('Approve'),
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: Colors.green,
+                           foregroundColor: Colors.white,
+                           shape: RoundedRectangleBorder(
+                             borderRadius: BorderRadius.circular(8),
+                           ),
+                           padding: const EdgeInsets.symmetric(
+                             vertical: 12,
+                           ),
+                         ),
+                       ),
                      ),
-                   ),
-                   const SizedBox(height: 8),
-                                      TextField(
-                     controller: _remarkController,
-                     inputFormatters: [
-                       FilteringTextInputFormatter.deny(RegExp(r'^\s')),
-                       FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
-                     ],
-                     decoration: InputDecoration(
-                       hintText: 'Enter your remark',
-                       hintStyle: TextStyle(
-                         fontWeight: FontWeight.normal,
+                     const SizedBox(width: 12),
+                     Expanded(
+                       child: ElevatedButton.icon(
+                         onPressed: _toggleRemarkSection,
+                         icon: const Icon(
+                           Icons.close,
+                           size: 16,
+                         ),
+                         label: const Text('Reject'),
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: Colors.red,
+                           foregroundColor: Colors.white,
+                           shape: RoundedRectangleBorder(
+                             borderRadius: BorderRadius.circular(8),
+                           ),
+                           padding: const EdgeInsets.symmetric(
+                             vertical: 12,
+                           ),
+                         ),
+                       ),
+                     ),
+                   ],
+                 ),
+               ],
+               
+               // Show remark section and final action buttons when _showRemarkSection is true
+               if (_showRemarkSection) ...[
+                 // Secretary Remark Text Field
+                 Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     const Text(
+                       'Secretary Remark(optional):',
+                       style: TextStyle(
                          fontSize: 14,
-                       
-                       color: Colors.black87,
+                         fontWeight: FontWeight.w600,
+                         color: Colors.black87,
                        ),
-                       border: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(8),
-                         borderSide: BorderSide(color: Colors.grey[300]!),
-                       ),
-                       enabledBorder: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(8),
-                         borderSide: BorderSide(color: Colors.grey[300]!),
-                       ),
-                       focusedBorder: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(8),
-                         borderSide: const BorderSide(color: Colors.grey, width: 2),
-                       ),
-                       filled: true,
-                       fillColor: Colors.grey[50],
-                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                      ),
-                     maxLines: 2,
-                   ),
-                   const SizedBox(height: 12),
-                 ],
-               ),
-               // Accept and Reject Buttons
-               Row(
-                 children: [
-                   Expanded(
-                     child: ElevatedButton.icon(
-                       onPressed: (_isApproving || _isRejecting) ? null : _handleAccept,
-                       icon: _isApproving 
-                           ? const SizedBox(
-                               width: 16,
-                               height: 16,
-                               child: CircularProgressIndicator(
-                                 strokeWidth: 2,
-                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                               ),
-                             )
-                           : const Icon(
-                               Icons.check,
-                               size: 16,
-                             ),
-                       label: Text(_isApproving ? 'Approving...' : 'Approve'),
-                       style: ElevatedButton.styleFrom(
-                         backgroundColor: Colors.green,
-                         foregroundColor: Colors.white,
-                         shape: RoundedRectangleBorder(
+                     const SizedBox(height: 8),
+                     TextField(
+                       controller: _remarkController,
+                       inputFormatters: [
+                         FilteringTextInputFormatter.deny(RegExp(r'^\s')),
+                         FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
+                       ],
+                       decoration: InputDecoration(
+                         hintText: 'Enter your remark',
+                         hintStyle: TextStyle(
+                           fontWeight: FontWeight.normal,
+                           fontSize: 14,
+                           color: Colors.black87,
+                         ),
+                         border: OutlineInputBorder(
                            borderRadius: BorderRadius.circular(8),
+                           borderSide: BorderSide(color: Colors.grey[300]!),
                          ),
-                         padding: const EdgeInsets.symmetric(
-                           vertical: 12,
-                         ),
-                       ),
-                     ),
-                   ),
-                   const SizedBox(width: 12),
-                   Expanded(
-                     child: ElevatedButton.icon(
-                       onPressed: (_isApproving || _isRejecting) ? null : _handleReject,
-                       icon: _isRejecting 
-                           ? const SizedBox(
-                               width: 16,
-                               height: 16,
-                               child: CircularProgressIndicator(
-                                 strokeWidth: 2,
-                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                               ),
-                             )
-                           : const Icon(
-                               Icons.close,
-                               size: 16,
-                             ),
-                       label: Text(_isRejecting ? 'Rejecting...' : 'Reject'),
-                       style: ElevatedButton.styleFrom(
-                         backgroundColor: Colors.red,
-                         foregroundColor: Colors.white,
-                         shape: RoundedRectangleBorder(
+                         enabledBorder: OutlineInputBorder(
                            borderRadius: BorderRadius.circular(8),
+                           borderSide: BorderSide(color: Colors.grey[300]!),
                          ),
-                         padding: const EdgeInsets.symmetric(
-                           vertical: 12,
+                         focusedBorder: OutlineInputBorder(
+                           borderRadius: BorderRadius.circular(8),
+                           borderSide: const BorderSide(color: Colors.grey, width: 2),
+                         ),
+                         filled: true,
+                         fillColor: Colors.grey[50],
+                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                       ),
+                       maxLines: 2,
+                     ),
+                     const SizedBox(height: 12),
+                   ],
+                 ),
+                 // Final Accept and Reject Buttons
+                 Row(
+                   children: [
+                     Expanded(
+                       child: ElevatedButton.icon(
+                         onPressed: (_isApproving || _isRejecting) ? null : _handleAccept,
+                         icon: _isApproving 
+                             ? const SizedBox(
+                                 width: 16,
+                                 height: 16,
+                                 child: CircularProgressIndicator(
+                                   strokeWidth: 2,
+                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                 ),
+                               )
+                             : const Icon(
+                                 Icons.check,
+                                 size: 16,
+                               ),
+                         label: Text(_isApproving ? 'Approving...' : 'Approve'),
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: Colors.green,
+                           foregroundColor: Colors.white,
+                           shape: RoundedRectangleBorder(
+                             borderRadius: BorderRadius.circular(8),
+                           ),
+                           padding: const EdgeInsets.symmetric(
+                             vertical: 12,
+                           ),
                          ),
                        ),
                      ),
-                   ),
-                 ],
-               ),
+                     const SizedBox(width: 12),
+                     Expanded(
+                       child: ElevatedButton.icon(
+                         onPressed: (_isApproving || _isRejecting) ? null : _handleReject,
+                         icon: _isRejecting 
+                             ? const SizedBox(
+                                 width: 16,
+                                 height: 16,
+                                 child: CircularProgressIndicator(
+                                   strokeWidth: 2,
+                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                 ),
+                               )
+                             : const Icon(
+                                 Icons.close,
+                                 size: 16,
+                               ),
+                         label: Text(_isRejecting ? 'Rejecting...' : 'Reject'),
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: Colors.red,
+                           foregroundColor: Colors.white,
+                           shape: RoundedRectangleBorder(
+                             borderRadius: BorderRadius.circular(8),
+                           ),
+                           padding: const EdgeInsets.symmetric(
+                             vertical: 12,
+                           ),
+                         ),
+                       ),
+                     ),
+                   ],
+                 ),
+               ],
              ],
           ],
         ),

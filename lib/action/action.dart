@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
 import 'storage_service.dart';
 import 'jwt_utils.dart'; // Added import for JwtUtils
 import '../services/notification_service.dart'; // Added import for NotificationService
@@ -5960,10 +5961,11 @@ static Future<Map<String, dynamic>> registerUser({
 
   // Validate duplicate photo
   static Future<Map<String, dynamic>> validateDuplicatePhoto(
-    File photoFile,
-  ) async {
+    File photoFile, {
+    String submitType = 'subuser', // Default to subuser type
+  }) async {
     try {
-      print('🔍 Starting duplicate photo validation for: ${photoFile.path}');
+      print('🔍 Starting duplicate photo validation for: ${photoFile.path} with submit_type: $submitType');
 
       final token = await StorageService.getToken();
       if (token == null) {
@@ -5973,65 +5975,58 @@ static Future<Map<String, dynamic>> registerUser({
         };
       }
 
-      // Create multipart request for file upload
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/auth/validate-duplicate-photo'),
-      );
-
-      // Add authorization header
-      request.headers['Authorization'] = 'Bearer $token';
-
-      // Add the photo file
-      if (await photoFile.exists()) {
-        try {
-          print('📸 Adding photo file to request: ${photoFile.path}');
-          final photoStream = http.ByteStream(photoFile.openRead());
-          final photoLength = await photoFile.length();
-          print('📸 Photo file size: ${photoLength} bytes');
-
-          // Get file extension and name
-          final fileName = photoFile.path.split('/').last;
-          final fileExtension = fileName.contains('.')
-              ? fileName.split('.').last
-              : 'jpg';
-          final mimeType = _getMimeType(fileExtension);
-
-          final photoMultipart = http.MultipartFile(
-            'file', // Field name expected by the API
-            photoStream,
-            photoLength,
-            filename: fileName,
-            contentType: MediaType.parse(mimeType),
-          );
-          request.files.add(photoMultipart);
-          print('📸 Photo file added successfully to multipart request');
-        } catch (photoError) {
-          print('❌ Error adding photo file: $photoError');
-          return {
-            'success': false,
-            'message': 'Error processing photo file: ${photoError.toString()}',
-          };
-        }
-      } else {
+      // Check if file exists and has content
+      if (!await photoFile.exists()) {
         print('⚠️ Photo file does not exist: ${photoFile.path}');
-        return {'success': false, 'message': 'Photo file not found'};
+        return {'success': false, 'message': 'File does not exist'};
       }
 
-      print('📤 Sending duplicate photo validation request to: ${request.url}');
-      print('📤 Request headers: ${request.headers}');
-      print('📤 Total files being sent: ${request.files.length}');
+      final fileSize = await photoFile.length();
+      if (fileSize == 0) {
+        print('⚠️ Photo file is empty: ${photoFile.path}');
+        return {'success': false, 'message': 'File is empty'};
+      }
 
-      // Send the request
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      print('📸 Photo file size: ${fileSize} bytes');
+
+      // Create FormData like web version
+      final dio = Dio();
+      
+      // Get file extension and determine proper MIME type
+      final fileName = photoFile.path.split('/').last;
+      final fileExtension = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
+      final mimeType = _getMimeType(fileExtension);
+      
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          photoFile.path,
+          filename: fileName,
+          contentType: MediaType.parse(mimeType),
+        ),
+      });
+
+      // Set authorization header
+      dio.options.headers['Authorization'] = 'Bearer $token';
+
+      // Create URL with query parameter
+      final url = '$baseUrl/auth/validate-duplicate-photo?submit_type=$submitType';
+
+      print('📤 Sending duplicate photo validation request to: $url');
+      print('📤 Request headers: ${dio.options.headers}');
+      print('📤 FormData fields: ${formData.fields}');
+      print('📤 FormData files: ${formData.files.map((f) => '${f.key}: ${f.value.filename}').join(', ')}');
+      print('📤 File MIME type: $mimeType');
+      print('📤 File extension: $fileExtension');
+
+      // Send the request using Dio (like web FormData)
+      final response = await dio.post(url, data: formData);
 
       print('📥 Duplicate photo validation response status: ${response.statusCode}');
-      print('📥 Duplicate photo validation response body: ${response.body}');
+      print('📥 Duplicate photo validation response body: ${response.data}');
 
       // Parse response
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        final responseData = response.data;
         print('✅ Duplicate photo validation completed successfully!');
         print('🔍 Validation result: ${responseData['data']}');
 
@@ -6041,14 +6036,10 @@ static Future<Map<String, dynamic>> registerUser({
           'message': responseData['message'] ?? 'Duplicate photo validation completed',
         };
       } else {
-        final errorData = jsonDecode(response.body);
-        print('❌ Duplicate photo validation failed: ${errorData['message']}');
-        print('🔍 Error response data: $errorData');
+        print('❌ Duplicate photo validation failed: ${response.statusMessage}');
         return {
           'success': false,
-          'message': errorData['message'] ?? 'Failed to validate duplicate photos',
-          'error': errorData['error'],
-          'data': errorData, // Include the full error response data
+          'message': response.statusMessage ?? 'Failed to validate duplicate photos',
           'statusCode': response.statusCode,
         };
       }
@@ -7691,4 +7682,83 @@ static Future<Map<String, dynamic>> registerUser({
       };
     }
   }
+
+  // Delete Sub User
+  static Future<Map<String, dynamic>> deleteSubUser(String subUserId) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      print('DEBUG DELETE SUB USER: Making API call to $baseUrl/auth/sub-user-delete/$subUserId');
+      
+      // Make API call with authorization header
+      final response = await http.delete(
+        Uri.parse('$baseUrl/auth/sub-user-delete/$subUserId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('DEBUG DELETE SUB USER: Response status code: ${response.statusCode}');
+      print('DEBUG DELETE SUB USER: Response body: ${response.body}');
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        print('DEBUG DELETE SUB USER: Success response data: ${responseData['data']}');
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Sub user deleted successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Cannot delete main user account',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        print('DEBUG DELETE SUB USER: 401 Unauthorized - Session expired');
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Sub user not found',
+        };
+      } else {
+        // Other error
+        print('DEBUG DELETE SUB USER: Error response: ${responseData['message']}');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to delete sub user',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print('DEBUG DELETE SUB USER: Network error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+      }
+    }
 }

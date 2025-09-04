@@ -19,6 +19,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
   bool hasError = false;
   String errorMessage = '';
   Map<String, dynamic>? userData;
+  bool isDeleteMode = false; // New state for delete mode
 
   @override
   void initState() {
@@ -140,6 +141,187 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
     );
   }
 
+  void _showDeleteConfirmation(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Stack(
+              children: [
+                // Close button
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 24,
+                      color: Colors.grey,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(32, 32),
+                    ),
+                  ),
+                ),
+                // Content
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon
+                    Container(
+                      height: 48,
+                      width: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.warning_rounded,
+                        size: 24,
+                        color: Colors.red.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Title
+                    const Text(
+                      'Delete Sub-User',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Description
+                    Text(
+                      'Are you sure you want to delete "${user['fullName']}"? This action cannot be undone.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade300,
+                              foregroundColor: Colors.grey.shade700,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              _deleteSubUser(user);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade500,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _deleteSubUser(Map<String, dynamic> user) async {
+    if (user['isMainUser'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete main user account'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await ActionService.deleteSubUser(user['userId']);
+
+      if (result['success'] == true) {
+        // Remove the deleted user from the local list
+        setState(() {
+          subUsers.removeWhere((u) => u['userId'] == user['userId']);
+          isDeleteMode = false; // Exit delete mode after successful deletion
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Divine Picture deleted successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to delete Divine Picture'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $error'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   Widget _buildOptimizedImage({
     required String imageUrl,
     Widget? placeholder,
@@ -188,40 +370,73 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
   Widget _buildUserCard(Map<String, dynamic> user) {
     final isMainUser = user['isMainUser'] == true;
     
-    return GestureDetector(
-      onTap: () => _onUserTap(user),
-      child: Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isMainUser ? const Color(0xFFF97316) : Colors.blue,
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () => _onUserTap(user),
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isMainUser ? const Color(0xFFF97316) : Colors.blue,
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipOval(
-          child: _buildOptimizedImage(
-            imageUrl: user['profilePhoto'] ?? '',
-            fit: BoxFit.cover,
-            placeholder: Container(
-              color: Colors.grey.shade300,
-              child: const Icon(
-                Icons.person,
-                size: 50,
-                color: Colors.grey,
+            child: ClipOval(
+              child: _buildOptimizedImage(
+                imageUrl: user['profilePhoto'] ?? '',
+                fit: BoxFit.cover,
+                placeholder: Container(
+                  color: Colors.grey.shade300,
+                  child: const Icon(
+                    Icons.person,
+                    size: 50,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
+        // Cross mark for delete mode (sub users only)
+        if (!isMainUser && isDeleteMode)
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: () => _showDeleteConfirmation(user),
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.close,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -274,7 +489,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Click on a user to view their details',
+                'Click on a user to view their details. Use delete mode to remove sub-users.',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -346,6 +561,43 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
                 // Users Grid - 3 columns with Add Photo button integrated
                 Column(
                   children: [
+                    // Title and Delete Button in same row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Divine Pictures',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              isDeleteMode = !isDeleteMode;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDeleteMode ? Colors.red : const Color(0xFFF97316),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: Icon(
+                            isDeleteMode ? Icons.close : Icons.delete_outline,
+                            size: 20,
+                          ),
+                          label: Text(
+                            isDeleteMode ? 'Cancel Delete' : 'Delete',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
                     for (int i = 0; i < (subUsers.length + 1); i += 3)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20),

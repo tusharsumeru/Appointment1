@@ -27,6 +27,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
   bool isDuplicateValidationComplete = false;
   Map<String, dynamic>? duplicateValidationResult;
   String? duplicateValidationError;
+  String? subUserCreationError; // New variable for sub-user creation errors
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -47,6 +48,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
           duplicateValidationResult = null;
           isDuplicateValidationComplete = false;
           duplicateValidationError = null;
+          subUserCreationError = null;
         });
         
         // Step 1: Upload and validate the image
@@ -67,7 +69,10 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
           });
           
           try {
-            final duplicateResult = await ActionService.validateDuplicatePhoto(selectedImage!);
+            final duplicateResult = await ActionService.validateDuplicatePhoto(
+              selectedImage!,
+              submitType: 'subuser',
+            );
             
             setState(() {
               duplicateValidationResult = duplicateResult;
@@ -92,7 +97,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
             } else {
               // Duplicate validation failed
               setState(() {
-                duplicateValidationError = duplicateResult['message'] ?? "Failed to validate for duplicates. Please try again.";
+                duplicateValidationError = "⚠️ Duplicate photo detected";
               });
             }
           } catch (duplicateError) {
@@ -166,6 +171,7 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
       isDuplicateValidationComplete = false;
       duplicateValidationResult = null;
       duplicateValidationError = null;
+      subUserCreationError = null;
       isCreatingSubUser = false;
     });
   }
@@ -234,24 +240,17 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
         // Close the bottom sheet
         Navigator.of(context).pop();
       } else {
-        // Sub user creation failed
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to create sub user'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Sub user creation failed - show error in bottom sheet instead of toast
+        setState(() {
+          isCreatingSubUser = false;
+          // Store the error message to display in the UI
+          subUserCreationError = result['message'] ?? 'Failed to create sub user';
+        });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error creating sub user: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
       setState(() {
         isCreatingSubUser = false;
+        subUserCreationError = 'Error creating sub user: $e';
       });
     }
   }
@@ -488,6 +487,38 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                         ],
                       ],
                       
+                      // Show sub-user creation error if it exists
+                      if (subUserCreationError != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            border: Border.all(color: Colors.orange.shade200),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.orange.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  subUserCreationError!,
+                                  style: TextStyle(
+                                    color: Colors.orange.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      
                       // Show loading for duplicate validation
                       if (validationResult != null && _isValidationSuccessful(validationResult!) && !isDuplicateValidationComplete && isUploading) ...[
                         const SizedBox(height: 16),
@@ -535,11 +566,11 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _canProceedWithSubUserCreation() && !isCreatingSubUser
+                              onPressed: _canProceedWithSubUserCreation() && !isCreatingSubUser && subUserCreationError == null
                                   ? _createSubUser
                                   : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _canProceedWithSubUserCreation()
+                                backgroundColor: _canProceedWithSubUserCreation() && subUserCreationError == null
                                     ? const Color(0xFFF97316)
                                     : Colors.grey.shade300,
                                 foregroundColor: Colors.white,

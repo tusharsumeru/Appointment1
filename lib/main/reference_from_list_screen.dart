@@ -223,6 +223,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
               _referenceData = forms;
               _filteredReferenceData = forms;
             } else {
+              // For pagination (load more), add to existing data
               _referenceData.addAll(forms);
               _filteredReferenceData.addAll(forms);
             }
@@ -233,21 +234,9 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           print('✅ Successfully loaded ${forms.length} reference forms with applied filters');
           print('Pagination: Page $_currentPage of $_totalPages, Total: $_totalItems, HasMore: $_hasMoreData');
           print('Total forms in state: ${_referenceData.length}');
+          print('🔍 After filter - Total data: ${_referenceData.length}, Filtered data: ${_filteredReferenceData.length}');
           
-          // Show success message
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  isRefresh 
-                    ? '✅ Data refreshed successfully! Found $_totalItems reference forms.'
-                    : 'Filters applied successfully! Found $_totalItems reference forms.'
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
+          // Data loaded successfully - no need for toast message
         } else {
           if (mounted) {
             setState(() {
@@ -332,6 +321,10 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
       // Reset pagination when applying new filters
       _currentPage = 1;
       _hasMoreData = true;
+      
+      // Clear existing data when applying filters
+      _referenceData.clear();
+      _filteredReferenceData.clear();
       
       // Set applying filters state
       if (mounted) {
@@ -430,20 +423,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             Navigator.pop(context);
           }
           
-          // Show loading indicator
-          if (mounted) {
-            try {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Applying filters...'),
-                  backgroundColor: Colors.blue,
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            } catch (e) {
-              print('Error showing snackbar: $e');
-            }
-          }
+          // Filters are being applied - loading overlay will show
           
           // Apply filters
           await _applyFilters();
@@ -578,87 +558,83 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
 
     return Column(
       children: [
-        // Search Bar
+        // Search Bar and Filter Button in one row
         Container(
           margin: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search reference forms...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        if (mounted) {
-                          _searchController.clear();
-                        }
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ),
-        
-        // Filter Button and Active Filters Display
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _isApplyingFilters ? null : () {
-                      if (mounted) {
-                        _showFilterBottomSheet();
-                      }
-                    },
-                    icon: _isApplyingFilters 
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-                          ),
-                        )
-                      : const Icon(Icons.filter_list, size: 18),
-                    label: Text(_isApplyingFilters ? 'Applying...' : 'Filter'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isApplyingFilters ? Colors.grey[300] : Colors.grey[200],
-                      foregroundColor: Colors.black87,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              // Search Field - Expandable
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search reference forms...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              if (mounted) {
+                                _searchController.clear();
+                              }
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
-                ],
+                ),
               ),
               
-
+              // Spacing between search and filter
+              const SizedBox(width: 12),
+              
+              // Filter Button
+              ElevatedButton.icon(
+                onPressed: _isApplyingFilters ? null : () {
+                  if (mounted) {
+                    _showFilterBottomSheet();
+                  }
+                },
+                icon: _isApplyingFilters 
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                      ),
+                    )
+                  : const Icon(Icons.filter_list, size: 18),
+                label: Text(_isApplyingFilters ? 'Applying...' : 'Filter'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isApplyingFilters ? Colors.grey[300] : Colors.grey[200],
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
             ],
           ),
         ),
         
-        const SizedBox(height: 8),
+        const SizedBox(height: 0),
         
         // Reference List with Pull-to-Refresh
         Expanded(
@@ -837,7 +813,8 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           onViewDetails: () => _onViewDetails(reference),
           onStatusUpdated: () {
             if (mounted) {
-              _loadReferenceData();
+              // Refresh data with current filters and search
+              _loadReferenceDataWithFilters(isRefresh: true);
             }
           },
         );

@@ -42,7 +42,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Map<int, String?> _faceMatchErrors = {};
   
   // Filter state
-  String _selectedFilter = '30_days'; // Default to 30 days
+  String _selectedFilter = '90_days'; // Default to 90 days
   bool _isRefreshing = false;
   
   // Appointments overview state
@@ -2237,22 +2237,30 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAssignedSecretary() {
-    // Check if there's an assigned secretary in the appointment
+    // Debug: Print the assigned secretary data structure
     final assignedSecretary = widget.appointment['assignedSecretary'];
+    print('DEBUG: assignedSecretary data: $assignedSecretary');
+    print('DEBUG: assignedSecretary type: ${assignedSecretary.runtimeType}');
+    
+    // Check if there's an assigned secretary in the appointment
     if (assignedSecretary is Map<String, dynamic>) {
       final secretaryName = assignedSecretary['fullName']?.toString() ?? 
                            assignedSecretary['name']?.toString();
+      print('DEBUG: Found secretary name from assignedSecretary: $secretaryName');
       if (secretaryName != null && secretaryName.isNotEmpty) {
         return secretaryName;
       }
     } else if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
-      return assignedSecretary;
+      // If it's a string, it might be a MongoDB ID - we should not display it
+      print('DEBUG: assignedSecretary is a string (likely MongoDB ID): $assignedSecretary');
+      // Don't return MongoDB IDs, continue to other checks
     }
     
     // Check appointmentLocation for assigned secretary
     final appointmentLocation = widget.appointment['appointmentLocation'];
     if (appointmentLocation is Map<String, dynamic>) {
       final assignedSecretaries = appointmentLocation['assignedSecretaries'];
+      print('DEBUG: assignedSecretaries from appointmentLocation: $assignedSecretaries');
       if (assignedSecretaries is List && assignedSecretaries.isNotEmpty) {
         final firstSecretary = assignedSecretaries.first;
         if (firstSecretary is Map<String, dynamic>) {
@@ -2260,6 +2268,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           if (secretaryId is Map<String, dynamic>) {
             final secretaryName = secretaryId['fullName']?.toString() ?? 
                                  secretaryId['name']?.toString();
+            print('DEBUG: Found secretary name from appointmentLocation: $secretaryName');
             if (secretaryName != null && secretaryName.isNotEmpty) {
               return secretaryName;
             }
@@ -2268,6 +2277,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       }
     }
     
+    // Check if assignedSecretary is a string that looks like a MongoDB ID
+    if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
+      // Check if it looks like a MongoDB ObjectId (24 hex characters)
+      if (RegExp(r'^[a-f\d]{24}$').hasMatch(assignedSecretary)) {
+        print('DEBUG: assignedSecretary appears to be a MongoDB ObjectId: $assignedSecretary');
+        return 'Secretary ID: ${assignedSecretary.substring(0, 8)}...'; // Show partial ID for debugging
+      }
+    }
+    
+    print('DEBUG: No secretary name found, returning "Not assigned"');
     return 'Not assigned';
   }
 
@@ -2837,12 +2856,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           child: Text(
                             _getAppointmentName(),
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
+                            overflow: TextOverflow.visible,
+                            maxLines: null,
                           ),
                         ),
                       ],
@@ -2873,7 +2892,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
             _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
-            _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.assignment_ind),
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[
               _buildMainCardDetailRowWithAttachment('Attachment', _getAttachmentFilename(), Icons.attach_file),
@@ -4569,35 +4587,41 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.lightBlue[100], // Ocean blue background
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.lightBlue[300]!),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.lightBlue[800],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.lightBlue[100], // Ocean blue background
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.lightBlue[300]!),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.lightBlue[800],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => _copyToClipboard(value),
-                  borderRadius: BorderRadius.circular(2),
-                  child: Icon(
-                    Icons.copy,
-                    size: 14,
-                    color: Colors.lightBlue[700],
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _copyToClipboard(value),
+                    borderRadius: BorderRadius.circular(2),
+                    child: Icon(
+                      Icons.copy,
+                      size: 14,
+                      color: Colors.lightBlue[700],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

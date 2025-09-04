@@ -612,6 +612,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final userType = user['userType'] ?? 'unknown';
     final status = user['status'] ?? 'unknown';
     final profilePhotoUrl = user['profilePhotoUrl'];
+    final totalUsers = _getTotalNumberOfUsers();
+    final isAccompanyingUserWithoutPhoto = userType != 'main' && profilePhotoUrl == null && totalUsers > 10;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -634,14 +636,52 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // First line: Index and Name (removed status from right corner)
-          Text(
-            '${index + 1}. $fullName${userType == 'main' ? ' (Main Appointee)' : ''}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-            ),
+          // First line: Index and Name with photo availability indicator
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${index + 1}. $fullName${userType == 'main' ? ' (Main Appointee)' : ''}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ),
+              if (isAccompanyingUserWithoutPhoto) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.orange[700],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'No Photo',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
           
@@ -730,7 +770,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'No profile photo',
+                              isAccompanyingUserWithoutPhoto 
+                                ? 'Photo not required\nfor groups > 10'
+                                : 'No profile photo',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: const Color(0xFFF97316).withOpacity(0.7),
@@ -1081,13 +1124,39 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    _getTotalNumberOfUsers().toString(),
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFF97316),
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        _getTotalNumberOfUsers().toString(),
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFF97316),
+                                        ),
+                                      ),
+                                      if (_getTotalNumberOfUsers() > 10) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: Colors.orange.withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Large Group',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.orange[700],
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
@@ -1125,6 +1194,56 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Photo Policy Information Banner (show when total users > 10)
+                      if (_getTotalNumberOfUsers() > 10) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.blue[700],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Photo Policy for Large Groups',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blue[700],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'For groups with more than 10 people, only the main appointee\'s photo is required. Accompanying users are identified by name and other details.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blue[600],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

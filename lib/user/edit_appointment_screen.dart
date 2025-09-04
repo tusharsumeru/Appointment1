@@ -723,31 +723,72 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           _isMainGuestPhotoUploading = true;
         });
 
-        // Upload to S3
+        // First check for duplicate photos with submit_type=accompanyuser
         try {
-          final result = await ActionService.uploadAndValidateProfilePhoto(
+          final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
             _mainGuestPhotoFile!,
+            submitType: 'accompanyuser',
           );
 
-          if (result['success'] == true) {
-            final s3Url = result['data']['s3Url'];
-            print('✅ Main guest photo uploaded successfully!');
-            print('📸 S3 URL received: $s3Url');
-            setState(() {
-              _mainGuestPhotoUrl = s3Url;
-              _isMainGuestPhotoUploading = false;
-            });
-            _validateForm();
+          // Check if duplicates were found (similar to web version logic)
+          final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+          
+          if (!duplicatesFound) {
+            // No duplicates found, proceed with upload and validation
+            final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+              _mainGuestPhotoFile!,
+            );
+
+            if (uploadResult['success'] == true) {
+              final s3Url = uploadResult['data']['s3Url'];
+              print('✅ Main guest photo uploaded successfully!');
+              print('📸 S3 URL received: $s3Url');
+              
+              // Photo uploaded and validated successfully
+              setState(() {
+                _mainGuestPhotoUrl = s3Url;
+                _isMainGuestPhotoUploading = false;
+              });
+              _validateForm();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Main guest photo duplicate check passed, uploaded, and validated successfully!',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              setState(() {
+                _isMainGuestPhotoUploading = false;
+              });
+
+              // Show backend error message in dialog
+              final errorMessage =
+                  uploadResult['error'] ??
+                  uploadResult['message'] ??
+                  'Photo validation failed';
+              _showPhotoValidationErrorDialog(errorMessage, () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _mainGuestPhotoFile = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              });
+            }
           } else {
+            // Duplicates found - show error and clear photo
             setState(() {
               _isMainGuestPhotoUploading = false;
             });
 
-            // Show backend error message in dialog
-            final errorMessage =
-                result['error'] ??
-                result['message'] ??
-                'Photo validation failed';
+            // Update form validation
+            _validateForm();
+
+            // Show duplicate photo error message (similar to web version)
+            final errorMessage = "Duplicate photo detected — This image matches an existing photo.";
             _showPhotoValidationErrorDialog(errorMessage, () {
               // Clear any previous state and allow user to pick again
               setState(() {
@@ -1058,7 +1099,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final totalPeopleCount =
         int.tryParse(_numberOfUsersController.text) ?? 1;
     final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
-    if (accompanyUsersCount > 0 && accompanyUsersCount <= 10) {
+    if (accompanyUsersCount > 0 && accompanyUsersCount <= 9) {
       for (var guest in _guestControllers) {
         if (guest['name']?.text.isEmpty == true ||
             guest['phone']?.text.isEmpty == true ||
@@ -1200,7 +1241,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
         updateData['accompanyUsers'] = {
           'numberOfUsers': accompanyUsersCount,
-          'users': accompanyUsersCount > 10 ? [] : accompanyUsers,
+          'users': accompanyUsersCount > 9 ? [] : accompanyUsers,
         };
         print(
           'DEBUG SAVE: Sending accompanyUsers with ${accompanyUsers.length} users',
@@ -1956,42 +1997,73 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       });
 
       try {
-        // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(
+        // First check for duplicate photos with submit_type=accompanyuser
+        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
           File(pickedFile.path),
+          submitType: 'accompanyuser',
         );
 
-        if (result['success']) {
-          final s3Url = result['s3Url'];
-          setState(() {
-            _guestImages[guestNumber] = s3Url;
-            _guestUploading[guestNumber] = false;
-          });
+        // Check if duplicates were found (similar to web version logic)
+        final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+        
+        if (!duplicatesFound) {
+          // No duplicates found, proceed with upload and validation
+          final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+            File(pickedFile.path),
+          );
 
-          print('✅ Guest $guestNumber photo uploaded to S3: $s3Url');
+          if (uploadResult['success']) {
+            final s3Url = uploadResult['s3Url'];
+            
+            // Photo uploaded and validated successfully
+            setState(() {
+              _guestImages[guestNumber] = s3Url;
+              _guestUploading[guestNumber] = false;
+            });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Guest $guestNumber photo uploaded and validated successfully!',
+            print('✅ Guest $guestNumber photo uploaded to S3: $s3Url');
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Guest $guestNumber photo duplicate check passed, uploaded, and validated successfully!',
+                ),
+                backgroundColor: Colors.green,
               ),
-              backgroundColor: Colors.green,
-            ),
-          );
+            );
+          } else {
+            setState(() {
+              _guestUploading[guestNumber] = false;
+            });
+
+            print(
+              '❌ Guest $guestNumber photo upload failed: ${uploadResult['message']}',
+            );
+
+            // Show backend error message in dialog
+            final errorMessage =
+                uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(
+              'Guest $guestNumber: $errorMessage',
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _guestImages.remove(guestNumber);
+                  _guestUploading[guestNumber] = false;
+                });
+              },
+            );
+          }
         } else {
+          // Duplicates found - show error and clear photo
           setState(() {
             _guestUploading[guestNumber] = false;
           });
 
-          print(
-            '❌ Guest $guestNumber photo upload failed: ${result['message']}',
-          );
-
-          // Show backend error message in dialog
-          final errorMessage =
-              result['error'] ?? result['message'] ?? 'Photo validation failed';
+          // Show duplicate photo error message (similar to web version)
+          final errorMessage = "Guest $guestNumber: Duplicate photo detected — This image matches an existing photo.";
           _showPhotoValidationErrorDialog(
-            'Guest $guestNumber: $errorMessage',
+            errorMessage,
             () {
               // Clear any previous state and allow user to pick again
               setState(() {
@@ -3789,7 +3861,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           builder: (context) {
                             final totalPeopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
                             
-                            if (totalPeopleCount > 1 && totalPeopleCount <= 11) {
+                            if (totalPeopleCount > 1 && totalPeopleCount <= 10) {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -3819,7 +3891,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   const SizedBox(height: 20),
                                 ],
                               );
-                            } else if (totalPeopleCount >= 12) {
+                            } else if (totalPeopleCount >= 11) {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -3836,25 +3908,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       children: [
                                         Row(
                                           children: [
-                                            Icon(
-                                              Icons.info_outline,
-                                              color: Colors.orange.shade700,
-                                              size: 20,
-                                            ),
+                                            // Icon(
+                                            //   Icons.info_outline,
+                                            //   color: Colors.orange.shade700,
+                                            //   size: 20,
+                                            // ),
                                             const SizedBox(width: 8),
-                                            Text(
-                                              'Large Group Appointment',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.orange.shade700,
-                                              ),
-                                            ),
+                                                                                    // Text(
+                                        //   'Large Group Appointment',
+                                        //   style: TextStyle(
+                                        //     fontSize: 16,
+                                        //     fontWeight: FontWeight.w600,
+                                        //     color: Colors.orange.shade700,
+                                        //   ),
+                                        // ),
                                           ],
                                         ),
-                                        const SizedBox(height: 8),
+                                        // const SizedBox(height: 8),
                                         Text(
-                                          'For appointments with more than 10 accompany users, additional person details are not required.',
+                                          'For appointments with more than 10 people, individual details for additional accompanying people are not required.',
                                           style: TextStyle(
                                             fontSize: 14,
                                             color: Colors.orange.shade600,
@@ -4448,3 +4520,4 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 }
+

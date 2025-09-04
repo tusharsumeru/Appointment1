@@ -149,6 +149,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     super.initState();
     // Initialize numberOfUsers to 1 by default (including the main user)
     _numberOfUsersController.text = '1';
+    
+    // Set default secretary selection to "None"
+    _selectedSecretary = null; // null represents "None" option
+    
     _validateForm();
     _loadLocations();
     _loadReferenceInfo();
@@ -342,8 +346,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     int totalPeopleCount = int.tryParse(_numberOfUsersController.text) ?? 1;
     int accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
 
-    // If more than 10 accompany users, don't create dynamic cards
-    if (accompanyUsersCount > 10) {
+    // If more than 9 accompany users (10+ total people), don't create dynamic cards
+    if (accompanyUsersCount > 9) {
       // Clear all existing controllers and data
       for (var guest in _guestControllers) {
         guest['name']?.dispose();
@@ -544,8 +548,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         int.tryParse(_numberOfUsersController.text) ?? 1;
     final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
 
-    if (accompanyUsersCount > 10) {
-      // For more than 10 accompany users, no guest validation needed
+    if (accompanyUsersCount > 9) {
+      // For more than 9 accompany users (10+ total people), no guest validation needed
       guestFormValid = true;
     } else {
       // Validate individual guest details for <= 10 accompany users
@@ -616,31 +620,63 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       });
 
       try {
-        // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(
+        // First check for duplicate photos with submit_type=accompanyuser
+        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
           File(pickedFile.path),
+          submitType: 'accompanyuser',
         );
 
-        if (result['success']) {
-          final s3Url = result['s3Url'];
-
-          setState(() {
-            _mainGuestPhotoUrl = s3Url;
-            _isMainGuestPhotoUploading = false;
-          });
-
-          // Update form validation
-          _validateForm();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Main guest photo uploaded and validated successfully!',
-              ),
-              backgroundColor: Colors.green,
-            ),
+        // Check if duplicates were found (similar to web version logic)
+        final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+        
+        if (!duplicatesFound) {
+          // No duplicates found, proceed with upload and validation
+          final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+            File(pickedFile.path),
           );
+
+          if (uploadResult['success']) {
+            final s3Url = uploadResult['s3Url'];
+            
+            // Photo uploaded and validated successfully
+            setState(() {
+              _mainGuestPhotoUrl = s3Url;
+              _isMainGuestPhotoUploading = false;
+            });
+
+            // Update form validation
+            _validateForm();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Main guest photo duplicate check passed, uploaded, and validated successfully!',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+
+            // Update form validation
+            _validateForm();
+
+            // Show backend error message in dialog
+            final errorMessage =
+                uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(errorMessage, () {
+              // Clear any previous state and allow user to pick again
+              setState(() {
+                _selectedImage = null;
+                _mainGuestPhotoUrl = null;
+                _isMainGuestPhotoUploading = false;
+              });
+            });
+          }
         } else {
+          // Duplicates found - show error and clear photo
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
@@ -648,9 +684,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           // Update form validation
           _validateForm();
 
-          // Show backend error message in dialog
-          final errorMessage =
-              result['error'] ?? result['message'] ?? 'Photo validation failed';
+          // Show duplicate photo error message (similar to web version)
+          final errorMessage = "Duplicate photo detected — This image matches an existing photo.";
           _showPhotoValidationErrorDialog(errorMessage, () {
             // Clear any previous state and allow user to pick again
             setState(() {
@@ -670,7 +705,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
         // Show error message in dialog
         _showPhotoValidationErrorDialog(
-          'Error uploading photo: ${e.toString()}',
+          'Error processing photo: ${e.toString()}',
           () {
             // Clear any previous state and allow user to pick again
             setState(() {
@@ -762,7 +797,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-  // Guest image handling methods
+    // Guest image handling methods
   Future<void> _pickGuestImage(ImageSource source, int guestNumber) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
@@ -774,36 +809,67 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       });
 
       try {
-        // Upload photo immediately and get S3 URL
-        final result = await ActionService.uploadAndValidateProfilePhoto(
+        // First check for duplicate photos with submit_type=accompanyuser
+        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
           File(pickedFile.path),
+          submitType: 'accompanyuser',
         );
 
-        if (result['success']) {
-          final s3Url = result['s3Url'];
-          setState(() {
-            _guestImages[guestNumber] = s3Url;
-            _guestUploading[guestNumber] = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Guest $guestNumber photo uploaded and validated successfully!',
-              ),
-              backgroundColor: Colors.green,
-            ),
+        // Check if duplicates were found (similar to web version logic)
+        final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+        
+        if (!duplicatesFound) {
+          // No duplicates found, proceed with upload and validation
+          final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+            File(pickedFile.path),
           );
+
+          if (uploadResult['success']) {
+            final s3Url = uploadResult['s3Url'];
+            
+            // Photo uploaded and validated successfully
+            setState(() {
+              _guestImages[guestNumber] = s3Url;
+              _guestUploading[guestNumber] = false;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Guest $guestNumber photo duplicate check passed, uploaded, and validated successfully!',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            setState(() {
+              _guestUploading[guestNumber] = false;
+            });
+
+            // Show backend error message in dialog
+            final errorMessage =
+                uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+            _showPhotoValidationErrorDialog(
+              'Guest $guestNumber: $errorMessage',
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _guestImages.remove(guestNumber);
+                  _guestUploading[guestNumber] = false;
+                });
+              },
+            );
+          }
         } else {
+          // Duplicates found - show error and clear photo
           setState(() {
             _guestUploading[guestNumber] = false;
           });
 
-          // Show backend error message in dialog
-          final errorMessage =
-              result['error'] ?? result['message'] ?? 'Photo validation failed';
+          // Show duplicate photo error message (similar to web version)
+          final errorMessage = "Guest $guestNumber: Duplicate photo detected — This image matches an existing photo.";
           _showPhotoValidationErrorDialog(
-            'Guest $guestNumber: $errorMessage',
+            errorMessage,
             () {
               // Clear any previous state and allow user to pick again
               setState(() {
@@ -820,7 +886,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
         // Show error message in dialog
         _showPhotoValidationErrorDialog(
-          'Guest $guestNumber: Error uploading photo: ${e.toString()}',
+          'Guest $guestNumber: Error processing photo: ${e.toString()}',
           () {
             // Clear any previous state and allow user to pick again
             setState(() {
@@ -858,6 +924,61 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         setState(() {
           _locations = locations;
           _isLoadingLocations = false;
+          
+          // Debug: Print all locations to see the structure
+          print('DEBUG: Available locations:');
+          for (int i = 0; i < locations.length; i++) {
+            final location = locations[i];
+            print('Location $i: ${location['name']} (ID: ${location['locationId']}, MongoID: ${location['_id']})');
+          }
+          
+          // Set Bangalore as default location - try multiple variations
+          Map<String, dynamic> bangaloreLocation = {};
+          
+          // Try different ways to find Bangalore
+          for (final location in locations) {
+            final locationName = location['name']?.toString().toLowerCase() ?? '';
+            if (locationName.contains('bangalore') || 
+                locationName.contains('bangaluru') ||
+                locationName.contains('bengaluru') ||
+                locationName.contains('bengalore')) {
+              bangaloreLocation = location;
+              print('DEBUG: Found Bangalore location: ${location['name']}');
+              break;
+            }
+          }
+          
+          // If still not found, try to find by locationId or _id if we know the specific ID
+          if (bangaloreLocation.isEmpty) {
+            // Try to find by the known Bangalore MongoDB ID
+            bangaloreLocation = locations.firstWhere(
+              (location) => location['_id'] == '6889dbd15b943e342f660060',
+              orElse: () => {},
+            );
+            
+            if (bangaloreLocation.isNotEmpty) {
+              print('DEBUG: Found Bangalore location by MongoDB ID: ${bangaloreLocation['name']}');
+            } else {
+              print('DEBUG: Bangalore location not found by name or ID');
+            }
+          }
+          
+          if (bangaloreLocation.isNotEmpty) {
+            _selectedAppointmentLocation = bangaloreLocation['name'];
+            _selectedLocationId = bangaloreLocation['locationId'];
+            _selectedLocationMongoId = bangaloreLocation['_id'];
+            
+            print('DEBUG: Set default location to: ${_selectedAppointmentLocation}');
+            print('DEBUG: Location ID: ${_selectedLocationId}');
+            print('DEBUG: Location Mongo ID: ${_selectedLocationMongoId}');
+            
+            // Load secretaries for Bangalore location
+            if (_selectedLocationId != null) {
+              _loadSecretariesForLocation(_selectedLocationId!);
+            }
+          } else {
+            print('DEBUG: No Bangalore location found, no default will be set');
+          }
         });
       } else {
         setState(() {
@@ -1043,11 +1164,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'toDate': _parseDateToISO(_preferredToDateController.text),
       };
 
-      // Add accompanyUsers if there are additional users (only for <= 10 accompany users)
+      // Add accompanyUsers if there are additional users (only for <= 9 accompany users)
       final totalPeopleCount =
           int.tryParse(_numberOfUsersController.text) ?? 1;
       final accompanyUsersCount = totalPeopleCount - 1; // Subtract 1 for the main user
-      if (_guestControllers.isNotEmpty && accompanyUsersCount <= 10) {
+      if (_guestControllers.isNotEmpty && accompanyUsersCount <= 9) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
           var guest = _guestControllers[i];
@@ -1081,8 +1202,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'numberOfUsers': accompanyUsers.length,
           'users': accompanyUsers,
         };
-      } else if (accompanyUsersCount > 10) {
-        // For more than 10 accompany users, just send the total count without individual details
+      } else if (accompanyUsersCount > 9) {
+        // For more than 9 accompany users (10+ total people), just send the total count without individual details
         appointmentData['accompanyUsers'] = {
           'numberOfUsers':
               accompanyUsersCount, // Use the accompany users count
@@ -1878,7 +1999,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                   // Appointment Purpose
                   _buildTextArea(
-                    label: 'Appointment Purpose',
+                    label: 'Purpose of Meeting',
                     controller: _appointmentPurposeController,
                     placeholder:
                         'Please describe the purpose of your appointment in detail',
@@ -2176,7 +2297,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     const SizedBox(height: 20),
                   ] else if ((int.tryParse(_numberOfUsersController.text) ??
                           1) >
-                      11) ...[
+                      10) ...[
                     // Show message for more than 10 accompany users
                     Container(
                       width: double.infinity,
@@ -2194,25 +2315,25 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.info_outline,
-                                color: Colors.orange.shade700,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Large Group Appointment',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
+                              // Icon(
+                              //   Icons.info_outline,
+                              //   color: Colors.orange.shade700,
+                              //   size: 20,
+                              // ),
+                              // const SizedBox(width: 8),
+                              // const Text(
+                              //   'Large Group Appointment',
+                              //   style: TextStyle(
+                              //     fontSize: 16,
+                              //     fontWeight: FontWeight.w600,
+                              //     color: Colors.black87,
+                              //   ),
+                              // ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          // const SizedBox(height: 8),
                           Text(
-                            'For appointments with more than 10 accompany users, additional person details are not required.',
+                            'For appointments with more than 10 people, individual details for additional accompanying people are not required.',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade700,
@@ -5092,3 +5213,4 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 }
+

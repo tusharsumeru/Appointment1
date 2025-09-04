@@ -682,7 +682,9 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                       const SizedBox(height: 48),
                       // Icon
                       Icon(
-                        Icons.image_not_supported_outlined,
+                        widget.isMainUser 
+                            ? Icons.account_circle_outlined
+                            : Icons.image_not_supported_outlined,
                         size: 96,
                         color: Colors.grey.shade400,
                       ),
@@ -690,7 +692,9 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                       
                       // Title
                       Text(
-                        'No Divine Pictures Found',
+                        widget.isMainUser 
+                            ? 'No Divine Pictures Available'
+                            : 'No Divine Pictures Found',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 20,
@@ -704,7 +708,9 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
-                          'We couldn\'t find any divine pictures for this user in the last 90 days.',
+                          widget.isMainUser
+                              ? 'No divine pictures have been uploaded yet for this account. Divine pictures are automatically generated from darshan photos.'
+                              : 'We couldn\'t find any divine pictures for this user in the last 90 days.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
@@ -714,19 +720,21 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
                       
-                      // Bullet points
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Column(
-                          children: [
-                            _buildBulletPoint('Pictures are searched from the last 90 days'),
-                            const SizedBox(height: 4),
-                            _buildBulletPoint('Make sure the user has attended darshan recently'),
-                            const SizedBox(height: 4),
-                            _buildBulletPoint('Try selecting a different user from above'),
-                          ],
+                      // Bullet points (only for sub-users)
+                      if (!widget.isMainUser)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Column(
+                            children: [
+                              _buildBulletPoint('Pictures are searched from the last 90 days'),
+                              const SizedBox(height: 4),
+                              _buildBulletPoint('Make sure the user has attended darshan recently'),
+                              const SizedBox(height: 4),
+                              _buildBulletPoint('Try selecting a different user from above'),
+                            ],
+                          ),
                         ),
-                      ),
+                      
                       const SizedBox(height: 24),
                       
                       // Button
@@ -742,9 +750,9 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'View All Users',
-                          style: TextStyle(
+                        child: Text(
+                          widget.isMainUser ? 'Go Back' : 'View All Users',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
