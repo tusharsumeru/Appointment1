@@ -83,7 +83,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         }
       }
     } catch (error) {
-      print('Error loading user data: $error');
       setState(() {
         _isLoading = false;
       });

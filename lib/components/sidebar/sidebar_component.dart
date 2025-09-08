@@ -15,6 +15,8 @@ import '../../main/account_settings_screen.dart';
 // import '../../main/forward_request_logs_screen.dart';
 import '../../main/deleted_appointments_screen.dart';
 import '../../main/global_search_screen.dart';
+import '../../main/unique_phone_code_screen.dart';
+import '../../main/create_desk_user_screen.dart';
 import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
@@ -398,6 +400,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             // Scrollable Menu Items
             Expanded(
               child: ListView(
+                physics: const ClampingScrollPhysics(),
                 padding: EdgeInsets.zero,
                 children: [
 
@@ -593,6 +596,22 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
           ],
 
+          // Create Desk User - Available for both Admin and Super Admin
+          // if (isAdmin) ...[
+          //   _buildMenuItem(
+          //     routeName: 'createDeskUser',
+          //     icon: Icons.person_add,
+          //     title: 'Create Desk User',
+          //     onTap: () {
+          //       Navigator.pop(context);
+          //       Navigator.pushReplacement(
+          //         context,
+          //         MaterialPageRoute(builder: (context) => const CreateDeskUserScreen()),
+          //       );
+          //     },
+          //   ),
+          // ],
+
           // User/Client-specific menu items (to be implemented)
           if (isUser) ...[
             _buildMenuItem(
@@ -670,6 +689,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const AccountSettingsScreen(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.phone_android, color: Colors.grey),
+            title: const Text('Unique Phone Code'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UniquePhoneCodeScreen(),
                 ),
               );
             },

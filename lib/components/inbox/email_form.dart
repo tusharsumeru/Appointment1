@@ -94,10 +94,6 @@ class _EmailFormState extends State<EmailForm> {
           final bool isActive = template['isActive'] ?? true;
           
           // Debug logging for each template
-          print('📋 Template Found:');
-          print('  - ID: $id');
-          print('  - Name: "$name"');
-          print('  - Is Active: $isActive');
           
           // Only add active templates
           if (isActive && id.isNotEmpty) {
@@ -119,9 +115,7 @@ class _EmailFormState extends State<EmailForm> {
         }
         
         // Debug logging for final template list
-        print('📚 Final Template List:');
         for (var template in _emailTemplates) {
-          print('  - ${template['value']}: "${template['label']}"');
         }
         
         setState(() {});
@@ -149,7 +143,17 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   String _getAppointmentName() {
-    // Use createdBy.fullName to match backend logic exactly
+    // If guest appointment, prefer guest's full name
+    final appointmentType = widget.appointment['appointmentType']?.toString();
+    final guestInformation = widget.appointment['guestInformation'];
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestFullName = guestInformation['fullName']?.toString();
+      if (guestFullName != null && guestFullName.isNotEmpty) {
+        return guestFullName;
+      }
+    }
+
+    // Otherwise use createdBy.fullName
     final createdBy = widget.appointment['createdBy'];
     if (createdBy is Map<String, dynamic>) {
       final createdByFullName = createdBy['fullName']?.toString();
@@ -157,20 +161,19 @@ class _EmailFormState extends State<EmailForm> {
         return createdByFullName;
       }
     }
-    
-    // If createdBy.fullName is not available, use userFullName as fallback
+
+    // Fallbacks
     final userFullName = widget.appointment['userFullName']?.toString();
     if (userFullName != null && userFullName.isNotEmpty) {
       return userFullName;
     }
-    
-    // Try multiple possible fields for the name
+
     final fullName = widget.appointment['fullName']?.toString();
     final name = widget.appointment['name']?.toString();
     final userName = widget.appointment['userName']?.toString();
     final userCurrentDesignation = widget.appointment['userCurrentDesignation']?.toString();
     final email = widget.appointment['email']?.toString();
-    
+
     return fullName ?? name ?? userName ?? userCurrentDesignation ?? email ?? 'Unknown';
   }
 
@@ -370,7 +373,6 @@ class _EmailFormState extends State<EmailForm> {
   bool _isRescheduleTemplate() {
     // Simple check: if template ID matches the reschedule template ID, show the card
     final isReschedule = _selectedTemplate == '6885fbc5d64696d83a0d7f16';
-    print('🔍 RESCHEDULE CHECK: $_selectedTemplate == 6885fbc5d64696d83a0d7f16 = $isReschedule');
     return isReschedule;
   }
 
@@ -460,6 +462,7 @@ class _EmailFormState extends State<EmailForm> {
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
+                  physics: const ClampingScrollPhysics(),
                   itemCount: venues.length,
                   itemBuilder: (context, index) {
                     final venue = venues[index];
@@ -611,8 +614,6 @@ class _EmailFormState extends State<EmailForm> {
         
         // Check if this is the reschedule template
         _showRescheduleForm = _isRescheduleTemplate();
-        print('📧 TEMPLATE SELECTED: $value');
-        print('🔄 SHOW RESCHEDULE FORM: $_showRescheduleForm');
         
         // Clear reschedule form if not reschedule template
         if (!_showRescheduleForm) {
@@ -813,7 +814,6 @@ class _EmailFormState extends State<EmailForm> {
       return text;
     } catch (e) {
       // If HTML parsing fails, return the original string
-      print('Error parsing HTML: $e');
       return htmlString;
     }
   }
@@ -904,7 +904,6 @@ class _EmailFormState extends State<EmailForm> {
       return text;
     } catch (e) {
       // If HTML parsing fails, return the original string
-      print('Error parsing HTML: $e');
       return htmlString;
     }
   }
@@ -1288,6 +1287,7 @@ class _EmailFormState extends State<EmailForm> {
                 Expanded(
                   child: Scrollbar(
                     child: ListView.builder(
+                      physics: const ClampingScrollPhysics(),
                       itemCount: _emailTemplates.length,
                       itemBuilder: (context, index) {
                         final template = _emailTemplates[index];
@@ -1327,8 +1327,6 @@ class _EmailFormState extends State<EmailForm> {
                                 
                                 // Check if this is the reschedule template
                                 _showRescheduleForm = _isRescheduleTemplate();
-                                print('📧 TEMPLATE SELECTED IN MODAL: ${template['value']}');
-                                print('🔄 SHOW RESCHEDULE FORM: $_showRescheduleForm');
                                 
                                 // Clear reschedule form if not reschedule template
                                 if (!_showRescheduleForm) {
@@ -1406,11 +1404,6 @@ class _EmailFormState extends State<EmailForm> {
       }
       
       // Debug logging
-      print('📧 Email sending debug info:');
-      print('Original appointee email: $appointeeEmail');
-      print('CC emails: $cc');
-      print('Combined appointee email: $combinedAppointeeEmail');
-      print('BCC emails: $bcc');
       
       final result = await ActionService.sendAppointmentEmailAction(
         appointeeEmail: combinedAppointeeEmail,
@@ -1610,6 +1603,7 @@ class _EmailFormState extends State<EmailForm> {
             // Form
             Expanded(
               child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 controller: _scrollController,
                 padding: EdgeInsets.only(
                   left: 16,
@@ -1803,7 +1797,6 @@ class _EmailFormState extends State<EmailForm> {
                         // Debug log for UI
                         Builder(
                           builder: (context) {
-                            print('🎨 UI: Showing reschedule form, _showRescheduleForm = $_showRescheduleForm');
                             return const SizedBox.shrink();
                           },
                         ),

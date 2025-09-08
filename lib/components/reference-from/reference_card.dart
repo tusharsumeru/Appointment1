@@ -251,63 +251,89 @@ class _ReferenceCardState extends State<ReferenceCard> {
                ],
              ),
              const SizedBox(height: 16),
-             // Email Row
-             Row(
-               children: [
-                 Icon(
-                   Icons.email,
-                   size: 16,
-                   color: Colors.grey[600],
-                 ),
-                 const SizedBox(width: 8),
-                 Expanded(
-                   child: Text(
-                     email,
-                     style: TextStyle(
-                       fontSize: 14,
-                       color: Colors.grey[600],
+             // Big Square Image
+             Center(
+               child: GestureDetector(
+                 onTap: profilePic != null ? () => _showProfilePhoto(context, profilePic!) : null,
+                 child: Container(
+                   width: 200,
+                   height: 200,
+                   decoration: BoxDecoration(
+                     borderRadius: BorderRadius.circular(12),
+                     color: Colors.grey[200],
+                     border: Border.all(
+                       color: Colors.grey[300]!,
+                       width: 1,
                      ),
                    ),
+                   child: profilePic != null
+                       ? ClipRRect(
+                           borderRadius: BorderRadius.circular(12),
+                           child: Image.network(
+                             profilePic!,
+                             fit: BoxFit.cover,
+                             loadingBuilder: (context, child, loadingProgress) {
+                               if (loadingProgress == null) return child;
+                               return Center(
+                                 child: CircularProgressIndicator(
+                                   value: loadingProgress.expectedTotalBytes != null
+                                       ? loadingProgress.cumulativeBytesLoaded /
+                                           loadingProgress.expectedTotalBytes!
+                                       : null,
+                                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                                 ),
+                               );
+                             },
+                             errorBuilder: (context, error, stackTrace) {
+                               return Container(
+                                 decoration: BoxDecoration(
+                                   color: Colors.grey[200],
+                                   borderRadius: BorderRadius.circular(12),
+                                 ),
+                                 child: Column(
+                                   mainAxisAlignment: MainAxisAlignment.center,
+                                   children: [
+                                     Icon(
+                                       Icons.person,
+                                       size: 60,
+                                       color: Colors.grey[400],
+                                     ),
+                                     const SizedBox(height: 8),
+                                     Text(
+                                       name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                       style: TextStyle(
+                                         fontSize: 40,
+                                         fontWeight: FontWeight.bold,
+                                         color: Colors.grey[600],
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               );
+                             },
+                           ),
+                         )
+                       : Column(
+                           mainAxisAlignment: MainAxisAlignment.center,
+                           children: [
+                             Icon(
+                               Icons.person,
+                               size: 60,
+                               color: Colors.grey[400],
+                             ),
+                             const SizedBox(height: 8),
+                             Text(
+                               name.isNotEmpty ? name[0].toUpperCase() : '?',
+                               style: TextStyle(
+                                 fontSize: 40,
+                                 fontWeight: FontWeight.bold,
+                                 color: Colors.grey[600],
+                               ),
+                             ),
+                           ],
+                         ),
                  ),
-               ],
-             ),
-             const SizedBox(height: 12),
-             // Date Row
-             Row(
-               children: [
-                 Icon(
-                   Icons.calendar_today,
-                   size: 16,
-                   color: Colors.grey[600],
-                 ),
-                 const SizedBox(width: 8),
-                 Text(
-                   createdAt,
-                   style: TextStyle(
-                     fontSize: 14,
-                     color: Colors.grey[600],
-                   ),
-                 ),
-               ],
-             ),
-             const SizedBox(height: 12),
-             // Phone Row
-             Row(
-               children: [
-                 Icon(
-                   Icons.phone,
-                   size: 16,
-                   color: Colors.grey[600],
-                 ),
-                 const SizedBox(width: 8),
-                 Text(
-                   phone,
-                   style: TextStyle(
-                     fontSize: 14,
-                     color: Colors.grey[600],
-                   ),
-                 ),
-               ],
+               ),
              ),
             const SizedBox(height: 16),
                          // Actions Row

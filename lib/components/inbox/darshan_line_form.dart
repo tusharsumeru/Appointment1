@@ -58,7 +58,6 @@ class _DarshanLineFormState extends State<DarshanLineForm> {
       _selectedDarshanLine = option;
     });
     // Here you would call your move_darshan_line function
-    print('Moving appointment $appointmentId to $option');
   }
 
   void _moveBackstage(String appointmentId, String option) {
@@ -66,7 +65,6 @@ class _DarshanLineFormState extends State<DarshanLineForm> {
       _selectedDarshanLine = option;
     });
     // Here you would call your move_backstage function
-    print('Moving appointment $appointmentId to backstage $option');
   }
 
   @override
@@ -88,6 +86,7 @@ class _DarshanLineFormState extends State<DarshanLineForm> {
           // Form
           Flexible(
             child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,

@@ -50,7 +50,6 @@ class _InboxScreenState extends State<InboxScreen> {
       final filterValue = _getFilterValueForAPI(_selectedFilter);
       await _fetchAppointmentsFromAPI(filter: filterValue);
     } catch (error) {
-      print('Error loading appointments: $error');
       setState(() {
         _isLoading = false;
       });
@@ -70,20 +69,14 @@ class _InboxScreenState extends State<InboxScreen> {
       if (filter != null) {
         if (filter == 'assigned') {
           assigned = true;
-          print('🔍 Using assigned=true parameter');
         } else if (filter == 'unassigned') {
           unassigned = true;
-          print('🔍 Using unassigned=true parameter');
         } else {
           // For secretary names, find the secretary ID
           assignedSecretary = filter;
-          print('🔍 Using assignedSecretary=$assignedSecretary parameter');
         }
       }
 
-      print(
-        '🔍 API Call - assignedSecretary: $assignedSecretary, assigned: $assigned, unassigned: $unassigned',
-      );
 
       final result = await ActionService.getAppointmentsForSecretary(
         status: 'pending',
@@ -100,7 +93,6 @@ class _InboxScreenState extends State<InboxScreen> {
         final List<dynamic> appointmentsData = result['data'] ?? [];
 
         // Show all appointments including starred ones
-        print('🔍 Fetch - total appointments: ${appointmentsData.length}');
 
         if (isLoadMore) {
           // Append new data to existing list
@@ -160,23 +152,16 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _toggleStar(String appointmentId) async {
-    print('🔍 Toggle Star - appointmentId: $appointmentId');
-    print('🔍 Toggle Star - total appointments: ${_appointments.length}');
 
     // Find the appointment index
     final index = _appointments.indexWhere((appointment) {
       final appId = appointment['appointmentId']?.toString();
       final appMongoId = appointment['_id']?.toString();
-      print(
-        '🔍 Toggle Star - checking appointment: appId=$appId, appMongoId=$appMongoId',
-      );
       return appId == appointmentId || appMongoId == appointmentId;
     });
 
-    print('🔍 Toggle Star - found index: $index');
 
     if (index == -1) {
-      print('🔍 Toggle Star - appointment not found!');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -190,15 +175,11 @@ class _InboxScreenState extends State<InboxScreen> {
 
     // Get current starred status
     final currentStarredStatus = _appointments[index]['starred'] == true;
-    print('🔍 Toggle Star - current starred status: $currentStarredStatus');
 
     // Optimistically update UI first
     setState(() {
       _appointments[index]['starred'] = !currentStarredStatus;
     });
-    print(
-      '🔍 Toggle Star - optimistically updated to: ${!currentStarredStatus}',
-    );
 
     try {
       // Call the API to update starred status
@@ -207,15 +188,11 @@ class _InboxScreenState extends State<InboxScreen> {
         appointmentId,
         starred: desiredStarredStatus,
       );
-      print('🔍 Toggle Star - API result: $result');
 
       if (result['success']) {
         // Update with the actual response from API
         final newStarredStatus =
             result['data']?['starred'] ?? !currentStarredStatus;
-        print(
-          '🔍 Toggle Star - new starred status from API: $newStarredStatus',
-        );
 
         // Check if the API response matches our expected toggle
         // If API returns the same status as before, it means the toggle didn't work as expected
@@ -225,9 +202,6 @@ class _InboxScreenState extends State<InboxScreen> {
             ? newStarredStatus
             : expectedNewStatus;
 
-        print(
-          '🔍 Toggle Star - expected status: $expectedNewStatus, final status: $finalStatus',
-        );
 
         setState(() {
           // Update the starred status in the list (keep appointment in inbox)
@@ -249,9 +223,6 @@ class _InboxScreenState extends State<InboxScreen> {
         }
       } else {
         // Revert the optimistic update on failure
-        print(
-          '🔍 Toggle Star - API failed, reverting to: $currentStarredStatus',
-        );
         setState(() {
           _appointments[index]['starred'] = currentStarredStatus;
         });
@@ -269,7 +240,6 @@ class _InboxScreenState extends State<InboxScreen> {
       }
     } catch (e) {
       // Revert the optimistic update on error
-      print('🔍 Toggle Star - Exception occurred: $e');
       setState(() {
         _appointments[index]['starred'] = currentStarredStatus;
       });
@@ -314,15 +284,10 @@ class _InboxScreenState extends State<InboxScreen> {
           setState(() {
             _secretaries = secretariesData.cast<Map<String, dynamic>>();
           });
-          print(
-            'Fetched ${_secretaries.length} secretaries (limited to top 4)',
-          );
         }
       } else {
-        print('Failed to fetch secretaries: ${result['message']}');
       }
     } catch (e) {
-      print('Error fetching secretaries: $e');
     } finally {
       setState(() {
         _isLoadingSecretaries = false;
@@ -334,13 +299,10 @@ class _InboxScreenState extends State<InboxScreen> {
   String? _getFilterValueForAPI(String selectedFilter) {
     switch (selectedFilter) {
       case 'All':
-        print('🔍 Filter: All -> null (no filter)');
         return null; // No filter needed
       case 'Assigned':
-        print('🔍 Filter: Assigned -> "assigned" (assigned parameter)');
         return 'assigned'; // Use assigned parameter
       case 'Unassigned':
-        print('🔍 Filter: Unassigned -> "unassigned" (unassigned parameter)');
         return 'unassigned'; // Use unassigned parameter
       default:
         // For secretary names, find the secretary ID
@@ -349,9 +311,6 @@ class _InboxScreenState extends State<InboxScreen> {
           orElse: () => {},
         );
         final secretaryId = secretary['_id']?.toString();
-        print(
-          '🔍 Filter: $selectedFilter -> $secretaryId (assignedSecretary parameter)',
-        );
         return secretaryId; // Return secretary ID for assignedSecretary parameter
     }
   }
@@ -375,7 +334,6 @@ class _InboxScreenState extends State<InboxScreen> {
 
         // Get filter value for API
         final filterValue = _getFilterValueForAPI(option);
-        print('Filter changed to: $option, API filter value: $filterValue');
 
         // Reset pagination and fetch filtered data
         _currentPage = 1;
@@ -806,16 +764,10 @@ class _InboxScreenState extends State<InboxScreen> {
                     appointment: appointment,
                     index: index, // Pass the index for alternating colors
                     onStarToggle: (isStarred) async {
-                      print(
-                        '🔍 Inbox onStarToggle - received isStarred: $isStarred',
-                      );
                       final appointmentId =
                           appointment['appointmentId']?.toString() ??
                           appointment['_id']?.toString() ??
                           '';
-                      print(
-                        '🔍 Inbox onStarToggle - appointmentId: $appointmentId',
-                      );
                       await _toggleStar(appointmentId);
                     },
 

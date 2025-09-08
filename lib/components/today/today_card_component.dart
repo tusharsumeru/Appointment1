@@ -479,7 +479,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     return RefreshIndicator(
       onRefresh: _fetchTodayAppointments,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

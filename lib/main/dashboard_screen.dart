@@ -115,12 +115,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             _currentPage++;
             _hasMoreData = data.length >= _pageSize;
           });
-          print("🔍 Load More - data.length: ${data.length}, pageSize: $_pageSize, hasMoreData: $_hasMoreData");
         } else {
           setState(() {
             _hasMoreData = false;
           });
-          print("🔍 Load More - no more data, hasMoreData: $_hasMoreData");
         }
       } else {
         // Replace data for fresh load
@@ -132,15 +130,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           // This allows users to try loading more even if the first page is small
           _hasMoreData = data.length > 0;
         });
-        print("🔍 Fresh Load - data.length: ${data.length}, pageSize: $_pageSize, hasMoreData: $_hasMoreData");
       }
       
-      print("📦 Appointments Fetched: ${_appointments.length} total");
     } catch (e) {
       setState(() {
         _error = e.toString();
       });
-      print("❌ Error fetching appointments: $e");
     } finally {
       setState(() {
         _isLoading = false;
@@ -455,7 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height * 0.4,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -544,7 +539,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         color: Colors.transparent,
                   child: InkWell(
             onTap: _isLoadingMore ? null : () {
-              print("🔍 Load more button tapped!");
               _loadMore();
             },
           borderRadius: BorderRadius.circular(12),
@@ -718,7 +712,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       final peopleCount = accompanyCount + 1; // Include main applicant
       return peopleCount;
     } catch (e) {
-      print('Error calculating people count: $e');
       return 1; // Default to 1 on error
     }
   }
@@ -963,11 +956,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                itemCount: _filteredAppointments.length + (_hasMoreData ? 1 : 0),
                                itemBuilder: (context, index) {
                                  // Debug print to check load more logic
-                                 print("🔍 ListView - index: $index, total: ${_filteredAppointments.length}, hasMoreData: $_hasMoreData");
                                  
                                  // Show load more button at the end
                                  if (index == _filteredAppointments.length) {
-                                   print("🔍 Showing load more button at index: $index");
                                    return _buildLoadMoreButton();
                                  }
                                  
@@ -994,12 +985,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                     _showMessageForm(item);
                                   },
                                   onAddPressed: () {
-                                    // Direct call functionality (third icon)
-                                    _makePhoneCall(item);
+                                    // Open call bottom sheet
+                                    _showCallForm(item);
                                   },
                                   onCallPressed: () {
-                                    // Direct call functionality - opens phone dialer
-                                    _makePhoneCall(item);
+                                    // Open call bottom sheet with guest/reference options
+                                    _showCallForm(item);
                                   },
                                   onGroupPressed: () {
                                     // Show email form

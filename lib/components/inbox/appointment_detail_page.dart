@@ -293,18 +293,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         final matches = apiResult[_selectedFilter]?['matches'] as List<dynamic>? ?? [];
         
         // Debug: Print match count for this user with selected filter
-        print('User $index (${result['fullName']}): ${_selectedFilter} matches = ${matches.length}');
         
         return matches.length;
       } else {
         // apiResult is null - no face match data for this user
-        print('User $index (${result['fullName']}): apiResult is null - no face match data');
         return 0;
       }
     }
     
     // If no face match data available, return 0 (no matches found)
-    print('User $index: No face match results found');
     return 0;
   }
 
@@ -448,7 +445,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             }
           }
         } catch (e) {
-          print('Error parsing date: $e');
         }
       }
     }
@@ -819,23 +815,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         });
         
         // Debug: Print the results
-        print('User $userIndex: Found ${faceMatchResults.length} face match results');
         if (faceMatchResults.isNotEmpty) {
           final userData = faceMatchResults[0];
-          print('User $userIndex: User name: ${userData['fullName']}');
-          print('User $userIndex: Age: ${userData['age']}');
-          print('User $userIndex: Profile photo: ${userData['profilePhotoUrl']}');
           final apiResult = userData['apiResult'];
           if (apiResult != null) {
             final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
             final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
             final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-            print('User $userIndex: Matches - 30d: ${matches30.length}, 60d: ${matches60.length}, 90d: ${matches90.length}');
           } else {
-            print('User $userIndex: apiResult is null - no face match data available');
           }
         } else {
-          print('User $userIndex: No face match results found');
         }
       } else {
         setState(() {
@@ -1352,23 +1341,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   // Debug method to print quick appointment data
   void _debugQuickAppointmentData() {
     final apptType = widget.appointment['appt_type']?.toString();
-    print('🔍 Debug: Appointment type: $apptType');
     
     if (apptType == 'quick') {
       final quickApt = widget.appointment['quick_apt'];
-      print('🔍 Debug: Quick appointment data: $quickApt');
       
       if (quickApt is Map<String, dynamic>) {
         final optional = quickApt['optional'];
         final details = quickApt['details'];
-        print('🔍 Debug: Optional data: $optional');
-        print('🔍 Debug: Details data: $details');
         
         // Test our helper methods
-        print('🔍 Debug: Email: "${_getQuickAppointmentEmail()}"');
-        print('🔍 Debug: Phone: "${_getQuickAppointmentPhone()}"');
-        print('🔍 Debug: Purpose: "${_getQuickAppointmentPurpose()}"');
-        print('🔍 Debug: Remarks: "${_getQuickAppointmentRemarks()}"');
       }
     }
   }
@@ -1496,10 +1477,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     try {
       // Refresh face match data for all users including main user
       final attendeeCount = _getAttendeeCount();
-      // print('Refresh: Starting refresh for $attendeeCount users');
       
       for (int i = 0; i < attendeeCount; i++) {
-        // print('Refresh: Fetching data for user $i');
         await _fetchFaceMatchData(i);
       }
       
@@ -1579,13 +1558,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       final upcomingResult = await ActionService.getUpcomingAppointmentsByUser(userId: userId);
       
       // Debug: Print the API response
-      print('DEBUG: API Response for upcoming appointments:');
-      print('DEBUG: Success: ${upcomingResult['success']}');
-      print('DEBUG: Data length: ${upcomingResult['data']?.length ?? 0}');
       if (upcomingResult['data'] != null) {
         for (int i = 0; i < (upcomingResult['data'] as List).length; i++) {
           final appointment = upcomingResult['data'][i];
-          print('DEBUG: Appointment $i: ${appointment['appointmentId']} - Status: ${appointment['appointmentStatus']?['status']} - Date: ${appointment['scheduledDateTime']?['date']}');
         }
       }
       
@@ -2005,6 +1980,33 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     return 'Happiness Program';
   }
 
+  String _getProgramDateRange() {
+    final attendingCourseDetails = widget.appointment['attendingCourseDetails'];
+    if (attendingCourseDetails is Map<String, dynamic>) {
+      final isAttending = attendingCourseDetails['isAttending'];
+      if (isAttending == true) {
+        final fromDate = attendingCourseDetails['fromDate'];
+        final toDate = attendingCourseDetails['toDate'];
+        
+        if (fromDate != null && toDate != null) {
+          try {
+            final from = DateTime.parse(fromDate.toString());
+            final to = DateTime.parse(toDate.toString());
+            
+            // Use the same format as requested dates
+            final fromFormatted = _formatDateToReadable(from);
+            final toFormatted = _formatDateToReadable(to);
+            
+            return '$fromFormatted To $toFormatted';
+          } catch (e) {
+            return 'Invalid date format';
+          }
+        }
+      }
+    }
+    return 'Not attending any program';
+  }
+
   List<String> _getUserTags() {
     // Check createdBy.userTags
     final createdBy = widget.appointment['createdBy'];
@@ -2239,20 +2241,16 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   String _getAssignedSecretary() {
     // Debug: Print the assigned secretary data structure
     final assignedSecretary = widget.appointment['assignedSecretary'];
-    print('DEBUG: assignedSecretary data: $assignedSecretary');
-    print('DEBUG: assignedSecretary type: ${assignedSecretary.runtimeType}');
     
     // Check if there's an assigned secretary in the appointment
     if (assignedSecretary is Map<String, dynamic>) {
       final secretaryName = assignedSecretary['fullName']?.toString() ?? 
                            assignedSecretary['name']?.toString();
-      print('DEBUG: Found secretary name from assignedSecretary: $secretaryName');
       if (secretaryName != null && secretaryName.isNotEmpty) {
         return secretaryName;
       }
     } else if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
       // If it's a string, it might be a MongoDB ID - we should not display it
-      print('DEBUG: assignedSecretary is a string (likely MongoDB ID): $assignedSecretary');
       // Don't return MongoDB IDs, continue to other checks
     }
     
@@ -2260,7 +2258,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final appointmentLocation = widget.appointment['appointmentLocation'];
     if (appointmentLocation is Map<String, dynamic>) {
       final assignedSecretaries = appointmentLocation['assignedSecretaries'];
-      print('DEBUG: assignedSecretaries from appointmentLocation: $assignedSecretaries');
       if (assignedSecretaries is List && assignedSecretaries.isNotEmpty) {
         final firstSecretary = assignedSecretaries.first;
         if (firstSecretary is Map<String, dynamic>) {
@@ -2268,7 +2265,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           if (secretaryId is Map<String, dynamic>) {
             final secretaryName = secretaryId['fullName']?.toString() ?? 
                                  secretaryId['name']?.toString();
-            print('DEBUG: Found secretary name from appointmentLocation: $secretaryName');
             if (secretaryName != null && secretaryName.isNotEmpty) {
               return secretaryName;
             }
@@ -2281,12 +2277,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
       // Check if it looks like a MongoDB ObjectId (24 hex characters)
       if (RegExp(r'^[a-f\d]{24}$').hasMatch(assignedSecretary)) {
-        print('DEBUG: assignedSecretary appears to be a MongoDB ObjectId: $assignedSecretary');
         return 'Secretary ID: ${assignedSecretary.substring(0, 8)}...'; // Show partial ID for debugging
       }
     }
     
-    print('DEBUG: No secretary name found, returning "Not assigned"');
     return 'Not assigned';
   }
 
@@ -2305,6 +2299,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         actions: [],
       ),
       body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
         child: Column(
           children: [
             // Main User Information Section
@@ -2345,9 +2340,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   Widget _buildActionButtonsSection() {
     // Debug: Print appointment data structure
-    print('DEBUG: Building action buttons section');
-    print('DEBUG: Appointment keys: ${widget.appointment.keys.toList()}');
-    print('DEBUG: isFromScheduleScreens: ${widget.isFromScheduleScreens}');
     
     // Debug: Check location information
     final appointmentLocation = widget.appointment['appointmentLocation'];
@@ -2355,10 +2347,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final venue = widget.appointment['venue'];
     final scheduledDateTime = widget.appointment['scheduledDateTime'];
     
-    print('DEBUG: appointmentLocation: $appointmentLocation');
-    print('DEBUG: location: $location');
-    print('DEBUG: venue: $venue');
-    print('DEBUG: scheduledDateTime: $scheduledDateTime');
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -2429,7 +2417,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 icon: Icons.call,
                 label: 'Call',
                 color: Colors.black,
-                onTap: _makePhoneCall,
+                onTap: () => _showActionBottomSheet(context, 'call'),
               ),
               // Show Assign button for all screens (no QR button)
               _buildActionButton(
@@ -2437,7 +2425,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 label: 'Assign',
                 color: Colors.black,
                 onTap: () {
-                  print('DEBUG: Assign button tapped');
                   _showActionBottomSheet(context, 'assign');
                 },
               ),
@@ -2491,7 +2478,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   void _showActionBottomSheet(BuildContext context, String action) {
-    print('DEBUG: _showActionBottomSheet() called with action: $action');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2501,7 +2487,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   Widget _buildActionContent(String action) {
-    print('DEBUG: _buildActionContent() called with action: $action');
     switch (action) {
       case 'reminder':
         return _buildReminderContent();
@@ -2509,10 +2494,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         return _buildEmailContent();
       case 'message':
         return _buildMessageContent();
+      case 'call':
+        return _buildCallContent();
       case 'assign':
         return _buildAssignContent();
       default:
-        print('DEBUG: Unknown action: $action');
         return const SizedBox.shrink();
     }
   }
@@ -2583,9 +2569,23 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
+  Widget _buildCallContent() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.4,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          _buildActionHeader('Make Call'),
+          Expanded(child: CallForm(appointment: widget.appointment)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAssignContent() {
-    print('DEBUG: _buildAssignContent() called');
-    print('DEBUG: Appointment data passed to AssignForm: ${widget.appointment.keys.toList()}');
     
     return Container(
       height: MediaQuery.of(context).size.height * 0.6,
@@ -2599,7 +2599,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           Expanded(child: AssignForm(
             appointment: widget.appointment,
             onRefresh: () {
-              print('DEBUG: AssignForm onRefresh called');
               // Refresh the detail page data if needed
               setState(() {});
             },
@@ -2892,6 +2891,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
             _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
+            _buildMainCardDetailRow('Program Date', _getProgramDateRange(), Icons.event),
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[
               _buildMainCardDetailRowWithAttachment('Attachment', _getAttachmentFilename(), Icons.attach_file),
@@ -2900,6 +2900,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             // Show original details for other screens
             _buildMainCardDetailRowWithCopy('Appointment ID', _getAppointmentId(), Icons.tag),
             _buildMainCardDetailRow('Req. Dates', _getDateRange(), Icons.calendar_today),
+            _buildMainCardDetailRow('Program Date', _getProgramDateRange(), Icons.event),
             _buildMainCardDetailRow('Location', _getLocation(), Icons.location_on),
             _buildMainCardDetailRow('Requesting Appointment for', '${_getAttendeeCount()} People', Icons.people),
             // Show reference person information for guest appointments
@@ -3039,7 +3040,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     final userMatches = _getUserMatches(actualIndex);
                     
                     // Debug: Print what data is being used for each card
-                    print('Building card for index $actualIndex: Name="$userName", Label="$userLabel", Matches=$userMatches');
                     
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -3057,6 +3057,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               const SizedBox(height: 16),
               // Number Indicators (dynamic based on filtered attendee count)
               SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -3132,6 +3133,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ],
       ),
       child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3432,8 +3434,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildDetailRow('Purpose of appointment', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
           ],
           
-          // Tags
-          _buildUserTagsRow(),
+          // Tags (hide for guest appointments)
+          if (!_isGuestAppointment()) _buildUserTagsRow(),
         ],
       ),
     );
@@ -3529,9 +3531,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           
           const SizedBox(height: 16),
           
-          // Purpose and Tags only
+          // Purpose and Tags only (hide tags for guest appointments)
           _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
-          _buildUserTagsRow(),
+          if (!_isGuestAppointment()) _buildUserTagsRow(),
         ],
       ),
     );
@@ -3960,6 +3962,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           thickness: 6,
                           radius: const Radius.circular(10),
                           child: SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: _upcomingAppointments.where((appointment) {
@@ -3970,21 +3973,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                   final appointmentId = appointment['appointmentId']?.toString();
                                   
                                   // Debug: Print appointment details
-                                  print('DEBUG: Checking appointment $appointmentId');
-                                  print('DEBUG: Status: $status');
-                                  print('DEBUG: Scheduled date: $scheduledDate');
-                                  print('DEBUG: Full scheduledDateTime: ${appointment['scheduledDateTime']}');
                                   if (appointment['scheduledDateTime'] is Map) {
                                     final scheduledDateTime = appointment['scheduledDateTime'] as Map;
-                                    print('DEBUG: scheduledDateTime keys: ${scheduledDateTime.keys.toList()}');
-                                    print('DEBUG: date value: ${scheduledDateTime['date']}');
-                                    print('DEBUG: time value: ${scheduledDateTime['time']}');
-                                    print('DEBUG: venueLabel value: ${scheduledDateTime['venueLabel']}');
                                   }
                                   
                                   // Check if status is scheduled or confirmed
                                   final isValidStatus = status == 'scheduled' || status == 'confirmed';
-                                  print('DEBUG: Is valid status: $isValidStatus');
                                   
                                   // Check if date is in the future
                                   bool isFutureDate = false;
@@ -4000,23 +3994,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                                       // Consider it future if it's today or later
                                       isFutureDate = appointmentDay.isAfter(today.subtract(const Duration(days: 1)));
                                       
-                                      print('DEBUG: Appointment date: $appointmentDate');
-                                      print('DEBUG: Appointment day: $appointmentDay');
-                                      print('DEBUG: Today: $today');
-                                      print('DEBUG: Now: $now');
-                                      print('DEBUG: Is future date: $isFutureDate');
                                     } catch (e) {
                                       // If date parsing fails, don't show it
                                       isFutureDate = false;
-                                      print('DEBUG: Date parsing failed: $e');
                                     }
                                   } else {
-                                    print('DEBUG: No scheduled date found');
                                   }
                                   
                                   final shouldShow = isValidStatus && isFutureDate;
-                                  print('DEBUG: Should show appointment $appointmentId: $shouldShow');
-                                  print('DEBUG: ---');
                                   
                                   return shouldShow;
                                 }
@@ -4216,6 +4201,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           thickness: 6,
                           radius: const Radius.circular(10),
                           child: SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: _appointmentHistory.map((appointment) {
@@ -4307,18 +4293,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final communicationPreferences = appointment['communicationPreferences'];
     
     // Debug: Print the communication preferences
-    print('DEBUG: Checking TBS for appointment ${appointment['appointmentId']}');
-    print('DEBUG: communicationPreferences: $communicationPreferences');
     
     if (communicationPreferences is List) {
       final hasTbsReq = communicationPreferences.any(
         (pref) => pref.toString() == 'TBS/Req',
       );
-      print('DEBUG: Has TBS/Req: $hasTbsReq');
       return hasTbsReq;
     }
     
-    print('DEBUG: communicationPreferences is not a List, returning false');
     return false;
   }
 
@@ -4379,20 +4361,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final formattedSecretary = _getShortSecretaryName(secretary);
     
     // Debug: Print what's being displayed
-    print('DEBUG: Building appointment item');
-    print('DEBUG: Purpose: $purpose');
-    print('DEBUG: Venue: $venueLabel');
-    print('DEBUG: Secretary: $secretary');
-    print('DEBUG: Date: $date');
-    print('DEBUG: Time: $time');
-    print('DEBUG: Is TBS: $isTbs');
-    print('DEBUG: Formatted venue: $formattedVenue');
-    print('DEBUG: Formatted secretary: $formattedSecretary');
     
     final displayText = isTbs 
       ? '$purpose, $formattedVenue, $date, $formattedSecretary'
       : '$purpose, $formattedVenue, $date, $formattedSecretary';
-    print('DEBUG: Final display text: $displayText');
     
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -4792,11 +4764,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     try {
       final appointmentId = _getAppointmentId();
       if (appointmentId.isEmpty) {
-        print('DEBUG: No appointment ID found for fetching updated data');
         return;
       }
 
-      print('DEBUG: Fetching updated appointment data for ID: $appointmentId');
       
       // Show loading indicator
       setState(() {
@@ -4813,9 +4783,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           widget.appointment.addAll(result['data']);
         });
         
-        print('DEBUG: Successfully fetched updated appointment data');
       } else {
-        print('DEBUG: Failed to fetch updated appointment data: ${result['message']}');
         // Optionally show error message to user
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -4828,7 +4796,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         }
       }
     } catch (e) {
-      print('DEBUG: Error fetching updated appointment data: $e');
       // Optionally show error message to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -5115,9 +5082,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final patientName = _getAppointmentName();
     
     // Debug: Print the URL to console
-    print('🔍 QR Code URL: $qrUrl');
-    print('🔍 Appointment ID: $appointmentId');
-    print('🔍 MongoDB ID: ${appointment['_id']}');
 
     showDialog(
       context: context,
@@ -5193,8 +5157,6 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           // Debug: Print the error details
-                          print('❌ QR Code Error: $error');
-                          print('❌ Stack Trace: $stackTrace');
                           
                           return GestureDetector(
                             onTap: () {

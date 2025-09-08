@@ -282,7 +282,6 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
       return text;
     } catch (e) {
       // If HTML parsing fails, return the original string
-      print('Error parsing HTML: $e');
       return htmlString;
     }
   }
@@ -387,7 +386,6 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
       return text;
     } catch (e) {
       // If HTML parsing fails, return the original string
-      print('Error parsing HTML: $e');
       return htmlString;
     }
   }
@@ -644,10 +642,6 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
         requestBody['content'] = content;
       }
 
-      print('📧 Sending bulk email request:');
-      print('Template ID: $_selectedTemplate');
-      print('Recipients count: ${recipients.length}');
-      print('Request body: $requestBody');
 
       // Call the bulk email API
       final result = await ActionService.sendBulkEmail(
@@ -808,6 +802,7 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
                 Expanded(
                   child: Scrollbar(
                     child: ListView.builder(
+                      physics: const ClampingScrollPhysics(),
                       itemCount: _emailTemplates.length,
                       itemBuilder: (context, index) {
                         final template = _emailTemplates[index];
@@ -907,6 +902,7 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
             // Form
             Expanded(
               child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 controller: _scrollController,
                 padding: EdgeInsets.only(
                   left: 16,
@@ -1079,6 +1075,7 @@ class _BulkEmailFormState extends State<BulkEmailForm> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12.0),
                               child: SingleChildScrollView(
+                                physics: const ClampingScrollPhysics(),
                                 child: _buildEmailContentWidget(_emailTemplateController.text),
                               ),
                             ),

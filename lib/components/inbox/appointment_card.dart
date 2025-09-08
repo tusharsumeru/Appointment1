@@ -282,7 +282,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     icon: Icons.call,
                     label: 'Call',
                     color: Colors.black,
-                    onTap: _makePhoneCall,
+                    onTap: () => _showActionBottomSheet(context, 'call'),
                   ),
                   _buildActionButton(
                     icon: Icons.assignment_ind,
@@ -297,9 +297,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
                     iconColor: isStarred ? Colors.amber : Colors.black,
                     textColor: Colors.black,
                     onTap: () async {
-                      print('🔍 Star Button - clicked for appointment: $id');
-                      print('🔍 Star Button - current starred status: $isStarred');
-                      print('🔍 Star Button - calling onStarToggle with: ${!isStarred}');
                       // Notify parent to handle the star toggle
                       widget.onStarToggle?.call(!isStarred);
                     },
@@ -398,6 +395,9 @@ class _AppointmentCardState extends State<AppointmentCard> {
   Widget _buildFooterSection() {
     final assignedSecretary = _getAssignedSecretary();
     final attendeeCount = _getAttendeeCount();
+    final isGuestAppointment = widget.appointment['appointmentType']?.toString().toLowerCase() == 'guest' || 
+        (widget.appointment['guestInformation'] is Map<String, dynamic> && 
+         widget.appointment['guestInformation']['fullName']?.toString().isNotEmpty == true);
     
     return Container(
       padding: const EdgeInsets.only(top: 4),
@@ -428,6 +428,42 @@ class _AppointmentCardState extends State<AppointmentCard> {
               ],
             ),
           ),
+          
+          // Guest indicator if it's a guest appointment
+          if (isGuestAppointment) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.shade300,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.person_add,
+                    size: 12,
+                    color: Colors.orange.shade700,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'GUEST',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           
           // People count badge
           Container(
@@ -1109,5 +1145,14 @@ class _AppointmentCardState extends State<AppointmentCard> {
     }
     return '';
   }
+
+  String _getAppointmentStatus() {
+    final appointmentStatus = widget.appointment['appointmentStatus'];
+    if (appointmentStatus is Map<String, dynamic>) {
+      return appointmentStatus['status']?.toString() ?? 'Unknown';
+    }
+    return 'Unknown';
+  }
+
 }
 

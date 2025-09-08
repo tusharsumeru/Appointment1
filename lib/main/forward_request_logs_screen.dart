@@ -77,7 +77,6 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
       _currentSearchQuery = query;
     });
     // Handle search logic here
-    print('Search query: $query');
   }
 
   void _onFiltersApplied(Map<String, dynamic> filters) {
@@ -85,7 +84,6 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
       _currentFilters = filters;
     });
     // Handle filter logic here
-    print('Filters applied: $filters');
   }
 
   String _getStatusColor(String status) {
@@ -211,8 +209,6 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
   Widget build(BuildContext context) {
     // Debug: Print the first log entry
     if (_logsData.isNotEmpty) {
-      print('First log entry: ${_logsData[0]}');
-      print('First log appointmentId: ${_logsData[0]['appointmentId']}');
     }
     return Scaffold(
       appBar: AppBar(
@@ -425,8 +421,6 @@ class _ForwardRequestLogsScreenState extends State<ForwardRequestLogsScreen> {
                     itemCount: _logsData.length,
                     itemBuilder: (context, index) {
                       final log = _logsData[index];
-                      print('Debug - log data: $log'); // Debug print
-                      print('Debug - appointmentId: ${log['appointmentId']}'); // Debug print
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(

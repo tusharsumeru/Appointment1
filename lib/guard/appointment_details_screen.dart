@@ -212,33 +212,45 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   int _getTotalNumberOfUsers() {
-    if (detailedAppointmentData == null) return 0;
-    
+    // Prefer top-level totalUsers when available (used for large groups)
     try {
-      // First try to get numberOfUsers from accompanyUsers
-      final accompanyUsers = detailedAppointmentData!['accompanyUsers'];
-      if (accompanyUsers is Map<String, dynamic>) {
-        final numberOfUsers = accompanyUsers['numberOfUsers'];
-        if (numberOfUsers != null) {
-          final result = int.tryParse(numberOfUsers.toString()) ?? 0;
-          // Add 1 for the main user (total = main user + accompanying users)
-          return result + 1;
+      if (appointmentData != null && appointmentData!['totalUsers'] != null) {
+        final total = int.tryParse(appointmentData!['totalUsers'].toString()) ?? 0;
+        if (total > 0) {
+          return total;
         }
       }
-      
-      // Fallback: try direct numberOfUsers field
-      final directNumberOfUsers = detailedAppointmentData!['numberOfUsers'];
-      if (directNumberOfUsers != null) {
-        final result = int.tryParse(directNumberOfUsers.toString()) ?? 0;
-        return result;
+
+      if (detailedAppointmentData != null) {
+        // Try to get numberOfUsers from accompanyUsers
+        final accompanyUsers = detailedAppointmentData!['accompanyUsers'];
+        if (accompanyUsers is Map<String, dynamic>) {
+          final numberOfUsers = accompanyUsers['numberOfUsers'];
+          if (numberOfUsers != null) {
+            final result = int.tryParse(numberOfUsers.toString()) ?? 0;
+            // Add 1 for the main user (total = main user + accompanying users)
+            if (result > 0) {
+              return result + 1;
+            }
+          }
+        }
+
+        // Fallback: try direct numberOfUsers field
+        final directNumberOfUsers = detailedAppointmentData!['numberOfUsers'];
+        if (directNumberOfUsers != null) {
+          final result = int.tryParse(directNumberOfUsers.toString()) ?? 0;
+          if (result > 0) {
+            return result;
+          }
+        }
       }
-      
+
       // Final fallback: count users from the appointmentData (check-in status data)
       if (appointmentData != null && appointmentData!['users'] != null) {
         final usersList = appointmentData!['users'] as List<dynamic>;
         return usersList.length;
       }
-      
+
       return 0;
     } catch (e) {
       return 0;
@@ -258,9 +270,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   bool _hasPendingUsers() {
-    if (appointmentData == null || appointmentData!['users'] == null) return false;
-    
-    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    if (appointmentData == null) return false;
+    // If backend provides aggregate totals (large group), use them to decide
+    final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+    final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? const [];
+
+    if (totalUsers > usersList.length) {
+      // Large group: pending if not all checked in
+      return checkedInUsers < totalUsers;
+    }
+
+    // Normal case: derive from individual users
     return usersList.any((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();
@@ -269,12 +290,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   int _getTotalUsers() {
-    if (appointmentData == null || appointmentData!['users'] == null) return 0;
-    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
-    return usersList.length;
+    // Show top-level total users when available (especially for groups > 10)
+    return _getTotalNumberOfUsers();
   }
 
   int _getAdmittedUsers() {
+    // Prefer backend-provided aggregate when available
+    if (appointmentData != null && appointmentData!['checkedInUsers'] != null) {
+      return int.tryParse(appointmentData!['checkedInUsers'].toString()) ?? 0;
+    }
     if (appointmentData == null || appointmentData!['users'] == null) return 0;
     final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
     return usersList.where((user) {
@@ -285,8 +309,22 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   int _getRejectedUsers() {
-    if (appointmentData == null || appointmentData!['users'] == null) return 0;
-    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    if (appointmentData == null) return 0;
+    final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? const [];
+    final mainStatus = appointmentData!['mainStatus']?.toString().toLowerCase();
+
+    // Large group aggregate handling
+    if (totalUsers > usersList.length) {
+      if (mainStatus == 'rejected') {
+        // Backend processed all; treat as all rejected
+        return totalUsers;
+      }
+      // Unknown per-user rejections in large group; default to 0
+      return 0;
+    }
+
+    // Small group exact count
     return usersList.where((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();
@@ -295,8 +333,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   int _getNotArrivedUsers() {
-    if (appointmentData == null || appointmentData!['users'] == null) return 0;
-    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    if (appointmentData == null) return 0;
+    final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+    final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? const [];
+
+    // Large group: derive not arrived from aggregates
+    if (totalUsers > usersList.length && totalUsers > 0) {
+      final pending = totalUsers - checkedInUsers;
+      return pending >= 0 ? pending : 0;
+    }
+
+    // Small group: derive from per-user statuses
     return usersList.where((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();
@@ -338,7 +386,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     int checkedInCount = 0;
     int rejectedCount = 0;
-    int totalUsers = users.length;
+    final expectedTotal = _getTotalNumberOfUsers();
+    final observedTotal = users.length;
 
     for (final user in users) {
       final status = user['status']?.toString().toLowerCase();
@@ -349,22 +398,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
     }
 
-    // All users admitted
-    if (checkedInCount == totalUsers) {
+    // If we only have partial user list (large group), use partial logic
+    if (expectedTotal > observedTotal) {
+      if (checkedInCount > 0) return 'checked_in_partial';
+      if (rejectedCount > 0) return 'checked_in_partial';
+      return 'not_arrived';
+    }
+
+    // Full list logic
+    if (checkedInCount == expectedTotal && expectedTotal > 0) {
       return 'checked_in';
     }
-    
-    // All users rejected
-    if (rejectedCount == totalUsers) {
+    if (rejectedCount == expectedTotal && expectedTotal > 0) {
       return 'rejected';
     }
-    
-    // All users not arrived
     if (checkedInCount == 0 && rejectedCount == 0) {
       return 'not_arrived';
     }
-    
-    // Mixed conditions (some accepted, some rejected, some not arrived, etc.)
     return 'checked_in_partial';
   }
 
@@ -394,6 +444,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           checkInStatusId: appointmentData!['_id'],
           mainStatus: mainStatus,
           users: updatedUsers,
+          totalUsers: _getTotalNumberOfUsers(),
         );
 
         if (result['success']) {
@@ -448,6 +499,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           checkInStatusId: appointmentData!['_id'],
           mainStatus: mainStatus,
           users: updatedUsers,
+          totalUsers: _getTotalNumberOfUsers(),
         );
 
         if (result['success']) {
@@ -484,38 +536,78 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     try {
       final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
-      final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
-        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
-        return {
-          ...userMap,
+      final totalUsersCount = _getTotalNumberOfUsers();
+      final isLargeGroup = totalUsersCount > 10;
+
+      if (isLargeGroup) {
+        // For large groups, only main user is present in array; send directive with totalUsers
+        final mainUser = usersList.isNotEmpty ? usersList.first as Map<String, dynamic> : <String, dynamic>{};
+        final updatedMainUser = {
+          ...mainUser,
           'status': 'checked_in',
           'checkedInAt': DateTime.now().toIso8601String(),
         };
-      }).toList();
 
-      final result = await ActionService.updateCheckInStatus(
-        checkInStatusId: appointmentData!['_id'],
-        mainStatus: 'checked_in',
-        users: updatedUsers,
-      );
-
-      if (result['success']) {
-        setState(() {
-          appointmentData = result['data'];
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All users admitted successfully'),
-            backgroundColor: Colors.green,
-          ),
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: 'checked_in',
+          users: [updatedMainUser],
+          totalUsers: totalUsersCount,
         );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('All $totalUsersCount users admitted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to admit all users'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to admit all users'),
-            backgroundColor: Colors.red,
-          ),
+        // Small group: process entire list
+        final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
+          final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+          return {
+            ...userMap,
+            'status': 'checked_in',
+            'checkedInAt': DateTime.now().toIso8601String(),
+          };
+        }).toList();
+
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: 'checked_in',
+          users: updatedUsers,
         );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('All users admitted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to admit all users'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -532,38 +624,76 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     try {
       final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
-      final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
-        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
-        return {
-          ...userMap,
+      final totalUsersCount = _getTotalNumberOfUsers();
+      final isLargeGroup = totalUsersCount > 10;
+
+      if (isLargeGroup) {
+        final mainUser = usersList.isNotEmpty ? usersList.first as Map<String, dynamic> : <String, dynamic>{};
+        final updatedMainUser = {
+          ...mainUser,
           'status': 'rejected',
           'rejectedAt': DateTime.now().toIso8601String(),
         };
-      }).toList();
 
-      final result = await ActionService.updateCheckInStatus(
-        checkInStatusId: appointmentData!['_id'],
-        mainStatus: 'rejected',
-        users: updatedUsers,
-      );
-
-      if (result['success']) {
-        setState(() {
-          appointmentData = result['data'];
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All users rejected successfully'),
-            backgroundColor: Colors.orange,
-          ),
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: 'rejected',
+          users: [updatedMainUser],
+          totalUsers: totalUsersCount,
         );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('All $totalUsersCount users rejected successfully'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to reject all users'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to reject all users'),
-            backgroundColor: Colors.red,
-          ),
+        final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
+          final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+          return {
+            ...userMap,
+            'status': 'rejected',
+            'rejectedAt': DateTime.now().toIso8601String(),
+          };
+        }).toList();
+
+        final result = await ActionService.updateCheckInStatus(
+          checkInStatusId: appointmentData!['_id'],
+          mainStatus: 'rejected',
+          users: updatedUsers,
         );
+
+        if (result['success']) {
+          setState(() {
+            appointmentData = result['data'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('All users rejected successfully'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to reject all users'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1067,6 +1197,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                           ),
                                         ],
                                       ),
+                                      if (_getTotalNumberOfUsers() > 10) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.people,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Total Users: ${_getTotalUsers()}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -1077,94 +1228,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Total Number of Users Card
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFF97316).withOpacity(0.3),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF97316).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.people,
-                                color: Color(0xFFF97316),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Total Users',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        _getTotalNumberOfUsers().toString(),
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFFF97316),
-                                        ),
-                                      ),
-                                      if (_getTotalNumberOfUsers() > 10) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: Colors.orange.withOpacity(0.3),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'Large Group',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.orange[700],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
+                      // Removed Total Number of Users Card
+                      const SizedBox(height: 0),
 
                       // Show completion message when all users are processed (moved above count)
                       if (!_hasPendingUsers()) ...[

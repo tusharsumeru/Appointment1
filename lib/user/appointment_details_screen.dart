@@ -207,6 +207,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
+      guest['uniquePhoneCode']?.dispose();
     }
     super.dispose();
   }
@@ -318,6 +319,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'name': FocusNode(),
         'phone': FocusNode(),
         'age': FocusNode(),
+        'uniquePhoneCode': FocusNode(),
       };
       
       // Add listeners for auto-scrolling
@@ -353,6 +355,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
       }
       _guestControllers.clear();
       _guestImages.clear();
@@ -371,6 +374,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
 
         // Also remove associated data
         int guestNumber = i + 1;
@@ -392,6 +396,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'name': TextEditingController(),
         'phone': TextEditingController(),
         'age': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(),
       };
       _guestControllers.add(controllers);
 
@@ -556,16 +561,31 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       for (int i = 0; i < _guestControllers.length; i++) {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
+        final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
+        final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
 
-        if (guest['name']?.text.isEmpty == true ||
-            guest['phone']?.text.isEmpty == true ||
-            guest['age']?.text.isEmpty == true) {
+        // Check required fields
+        if (guest['name']?.text.isEmpty == true || guest['age']?.text.isEmpty == true) {
           guestFormValid = false;
           break;
         }
 
+        // Phone number is required unless unique phone code is provided for age < 12 or age > 60
+        if (age < 12 || age > 60) {
+          // For age < 12 or age > 60, either phone number OR unique phone code is required
+          if (guest['phone']?.text.isEmpty == true && !hasUniquePhoneCode) {
+            guestFormValid = false;
+            break;
+          }
+        } else {
+          // For other ages, phone number is always required
+          if (guest['phone']?.text.isEmpty == true) {
+            guestFormValid = false;
+            break;
+          }
+        }
+
         // Validate age range (1-120)
-        final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
         if (age < 1 || age > 120) {
           guestFormValid = false;
           break;
@@ -1174,20 +1194,31 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
 
-          // Store phoneNumber as object with countryCode and number (number includes country code)
+          // Store phoneNumber as object with countryCode and local number only
           final countryCode =
               '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
           final phoneNumber = guest['phone']?.text.trim() ?? '';
-          final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null;
+          final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null; // keep for display if needed
+          final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
+          final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
-            'phoneNumber': {
-              'countryCode': countryCode,
-              'number': fullPhoneNumber, // number now includes country code
-            },
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
+
+          // Only add phoneNumber if we have a phone number OR if we don't have unique phone code
+          if (fullPhoneNumber != null || !hasUniquePhoneCode) {
+            guestData['phoneNumber'] = {
+              'countryCode': countryCode,
+              'number': phoneNumber, // save only local number
+            };
+          }
+
+          // Add unique phone code as alternativePhone if provided
+          if (hasUniquePhoneCode) {
+            guestData['alternativePhone'] = uniquePhoneCode;
+          }
 
           // Add photo if available for this guest
           if (_guestImages.containsKey(guestNumber)) {
@@ -1208,6 +1239,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'numberOfUsers':
               accompanyUsersCount, // Use the accompany users count
           'users': [], // Empty array since individual details not required
+        };
+      } else {
+        // Ensure accompanyUsers is always an object for backend safety when none provided
+        appointmentData['accompanyUsers'] = {
+          'numberOfUsers': 0,
+          'users': [],
         };
       }
 
@@ -1369,12 +1406,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           },
         );
       } else {
-        // Show error message
+        // Show full error (message + error) and allow wrapping
+        final msg = result['message']?.toString() ?? '';
+        final err = result['error']?.toString() ?? '';
+        final full = [msg, err].where((s) => s.isNotEmpty).join('\n');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Failed to create appointment'),
+            content: Text(full.isNotEmpty ? full : 'Failed to create appointment', maxLines: null),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
           ),
         );
       }
@@ -1382,12 +1422,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       // Hide loading indicator
       Navigator.pop(context);
 
-      // Show error message
+      // Show error message (ensure full visibility)
+      final text = 'Error: $e';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(text, maxLines: null),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -2162,7 +2203,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Total Number of People',
+                        'Number of People',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -2275,19 +2316,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                   // Guest Information Cards
                   if (_guestControllers.isNotEmpty) ...[
-                    const Text(
-                      'Accompany User Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    // const Text(
+                    //   'Accompany User Details',
+                    //   style: TextStyle(
+                    //     fontSize: 18,
+                    //     fontWeight: FontWeight.bold,
+                    //     color: Colors.black87,
+                    //   ),
+                    // ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Please provide details for accompany users',
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
-                    ),
+                    // const Text(
+                    //   'Please provide details for accompany users',
+                    //   style: TextStyle(fontSize: 14, color: Colors.black54),
+                    // ),
                     const SizedBox(height: 16),
                     ..._guestControllers.asMap().entries.map((entry) {
                       int index = entry.key;
@@ -2457,17 +2498,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   const SizedBox(height: 20),
 
                   // Date Range & Program Attendance Header
-                  const Text('Date Range & Program Attendance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const Text('Are you attending any program at the Bangalore Ashram ?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
 
                   // Program Attendance Question
-                  Text(
-                    'Are you attending any program at the Bangalore Ashram during these dates? *',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
+                  // Text(
+                  //   'Are you attending any program at the Bangalore Ashram during these dates? *',
+                  //   style: TextStyle(
+                  //     fontSize: 14,
+                  //     fontWeight: FontWeight.w500,
+                  //     color: Colors.grey.shade700,
+                  //   ),
+                  // ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -2957,7 +2998,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Accompany User $guestNumber',
+                    'Details of person ${guestNumber + 1}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -2973,18 +3014,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             _buildGuestTextField(
               label: 'Full Name',
               controller: guest['name']!,
-              placeholder: "Enter guest's full name",
+              placeholder: "Enter person full name",
               onChanged: (value) => _validateForm(),
               focusNode: guestFocusNodes['name'],
               onSubmitted: () {
-                // Move to next field (phone) when submitted
-                _moveToNextField(guestFocusNodes['name']!, guestFocusNodes['phone']);
+                // Move to next field (age) when submitted
+                _moveToNextField(guestFocusNodes['name']!, guestFocusNodes['age']);
               },
             ),
-            const SizedBox(height: 16),
-
-            // Contact Number
-            _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
             const SizedBox(height: 16),
 
             // Age
@@ -3011,17 +3048,49 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               },
               focusNode: guestFocusNodes['age'],
               onSubmitted: () {
-                // Move to next guest or next section when submitted
-                if (index < _guestControllers.length - 1) {
-                  // Move to next guest's name field
-                  final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
-                  _moveToNextField(guestFocusNodes['age']!, nextGuestFocusNodes['name']);
-                } else {
-                  // Move to next section (appointment purpose)
-                  _moveToNextField(guestFocusNodes['age']!, _appointmentPurposeFocus);
-                }
+                // Move to next field (phone) when submitted
+                _moveToNextField(guestFocusNodes['age']!, guestFocusNodes['phone']);
               },
             ),
+            const SizedBox(height: 16),
+
+            // Contact Number
+            _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
+            const SizedBox(height: 16),
+
+            // Unique Phone Code (only show if age < 12 or age > 60)
+            if (age < 12 || age > 60) ...[
+              const SizedBox(height: 16),
+              _buildGuestTextField(
+                label: 'Unique Phone Code (Optional)',
+                controller: guest['uniquePhoneCode']!,
+                placeholder: 'Enter unique phone code if available (makes phone number optional)',
+                onChanged: (value) {
+                  _validateForm();
+                  setState(() {}); // Rebuild to update phone field label
+                },
+                focusNode: guestFocusNodes['uniquePhoneCode'],
+                onSubmitted: () {
+                  // Move to next guest or next section when submitted
+                  if (index < _guestControllers.length - 1) {
+                    // Move to next guest's name field
+                    final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
+                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
+                  } else {
+                    // Move to next section (appointment purpose)
+                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
+                  }
+                },
+              ),
+              const SizedBox(height: 4),
+              // Text(
+              //   'If you provide a unique phone code, the phone number field becomes optional',
+              //   style: TextStyle(
+              //     fontSize: 12,
+              //     color: Colors.grey[600],
+              //   ),
+              // ),
+            ],
 
             // Photo Section (only show if age >= 12)
             if (isPhotoRequired) ...[
@@ -4480,12 +4549,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   ) {
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
     final guestFocusNodes = _getGuestFocusNodes(guestNumber);
+    
+    // Find the guest data to check age and unique phone code
+    final guestIndex = guestNumber - 1;
+    final guest = guestIndex < _guestControllers.length ? _guestControllers[guestIndex] : null;
+    final age = guest != null ? int.tryParse(guest['age']?.text ?? '0') ?? 0 : 0;
+    final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
+    
+    // Determine if phone is required
+    final isPhoneRequired = age >= 12 && age <= 60 || (age < 12 || age > 60) && !hasUniquePhoneCode;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Contact Number *',
+        Text(
+          isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -4582,8 +4660,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   _validateForm();
                 },
                 onSubmitted: (_) {
-                  // Move to next field (age) when submitted
-                  _moveToNextField(guestFocusNodes['phone']!, guestFocusNodes['age']);
+                  // Move to next guest or next section when submitted
+                  final guestIndex = guestNumber - 1;
+                  if (guestIndex < _guestControllers.length - 1) {
+                    // Move to next guest's name field
+                    final nextGuestFocusNodes = _getGuestFocusNodes(guestNumber + 1);
+                    _moveToNextField(guestFocusNodes['phone']!, nextGuestFocusNodes['name']);
+                  } else {
+                    // Move to next section (appointment purpose)
+                    _moveToNextField(guestFocusNodes['phone']!, _appointmentPurposeFocus);
+                  }
                 },
                 decoration: InputDecoration(
                   filled: true,

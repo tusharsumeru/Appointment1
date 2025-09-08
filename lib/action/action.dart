@@ -2873,6 +2873,7 @@ class ActionService {
     required String checkInStatusId,
     String? mainStatus,
     List<Map<String, dynamic>>? users,
+    int? totalUsers,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -2892,6 +2893,9 @@ class ActionService {
       }
       if (users != null) {
         requestBody['users'] = users;
+      }
+      if (totalUsers != null) {
+        requestBody['totalUsers'] = totalUsers;
       }
 
       final response = await http.put(
@@ -5667,6 +5671,102 @@ static Future<Map<String, dynamic>> registerUser({
 
   ////////////////////////////////////////////////////---------------user---------------------////////////////////////////
   // Create appointment method using enhanced API with file attachment support
+  // Validate accompany users with unique phone code logic
+  static List<String> _validateAccompanyUsers(Map<String, dynamic> accompanyUsers) {
+    final errors = <String>[];
+    
+    if (accompanyUsers == null || accompanyUsers['users'] == null || !(accompanyUsers['users'] is List)) {
+      return ['Invalid accompanyUsers structure'];
+    }
+
+    final users = accompanyUsers['users'] as List;
+    
+    for (int i = 0; i < users.length; i++) {
+      final user = users[i] as Map<String, dynamic>;
+      final userIndex = i + 1;
+      
+      // Validate required fields
+      if (user['fullName'] == null || user['fullName'].toString().trim().isEmpty) {
+        errors.add('User $userIndex: Full name is required');
+      }
+      
+      final age = int.tryParse(user['age']?.toString() ?? '0') ?? 0;
+      if (age < 1 || age > 120) {
+        errors.add('User $userIndex: Age must be between 1 and 120');
+      }
+      
+      // Check if user has unique phone code (sent as alternativePhone)
+      final hasUniquePhoneCode = user['alternativePhone'] != null && 
+          user['alternativePhone'].toString().trim().isNotEmpty;
+      
+      // Phone number validation based on age and unique phone code
+      if (age < 12 || age > 60) {
+        // For age < 12 or age > 60, either phone number OR unique phone code is required
+        if (!hasUniquePhoneCode) {
+          bool hasPhoneNumber = false;
+          if (user['phoneNumber'] != null) {
+            if (user['phoneNumber'] is Map) {
+              final phoneObj = user['phoneNumber'] as Map<String, dynamic>;
+              hasPhoneNumber = phoneObj['number'] != null && 
+                  phoneObj['number'].toString().trim().isNotEmpty;
+            } else if (user['phoneNumber'] is String) {
+              hasPhoneNumber = user['phoneNumber'].toString().trim().isNotEmpty;
+            }
+          }
+          
+          if (!hasPhoneNumber) {
+            errors.add('User $userIndex: Either phone number or unique phone code is required for age $age');
+          }
+        }
+      } else {
+        // For other ages, phone number is always required
+        bool hasPhoneNumber = false;
+        if (user['phoneNumber'] != null) {
+          if (user['phoneNumber'] is Map) {
+            final phoneObj = user['phoneNumber'] as Map<String, dynamic>;
+            hasPhoneNumber = phoneObj['number'] != null && 
+                phoneObj['number'].toString().trim().isNotEmpty;
+          } else if (user['phoneNumber'] is String) {
+            hasPhoneNumber = user['phoneNumber'].toString().trim().isNotEmpty;
+          }
+        }
+        
+        if (!hasPhoneNumber) {
+          errors.add('User $userIndex: Phone number is required for age $age');
+        }
+      }
+      
+      // Validate unique phone code format if provided
+      if (hasUniquePhoneCode) {
+        final uniquePhoneCode = user['alternativePhone'].toString().trim();
+        // Basic format validation - allow alphanumeric characters, 3-20 characters
+        final uniquePhoneCodeRegex = RegExp(r'^[A-Za-z0-9]{3,20}$');
+        if (!uniquePhoneCodeRegex.hasMatch(uniquePhoneCode)) {
+          errors.add('User $userIndex: Invalid unique phone code format (3-20 alphanumeric characters)');
+        }
+      }
+    }
+    
+    return errors;
+  }
+
+  // Normalize phone value (object or string) into a comparable string of digits: countryCode+number
+  static String _normalizePhone(dynamic phoneValue) {
+    if (phoneValue == null) return '';
+    if (phoneValue is Map) {
+      final ccRaw = (phoneValue['countryCode']?.toString() ?? '');
+      final numRaw = (phoneValue['number']?.toString() ?? '');
+      final ccDigits = ccRaw.replaceAll(RegExp(r'[^0-9]'), '');
+      final numDigits = numRaw.replaceAll(RegExp(r'[^0-9]'), '');
+      return (ccDigits + numDigits).trim();
+    }
+    if (phoneValue is String) {
+      // Keep digits only to avoid format differences breaking equality
+      return phoneValue.replaceAll(RegExp(r'[^0-9]'), '').trim();
+    }
+    return '';
+  }
+
   static Future<Map<String, dynamic>> createAppointment(
     Map<String, dynamic> appointmentData, {
     File? attachmentFile,
@@ -5675,6 +5775,109 @@ static Future<Map<String, dynamic>> registerUser({
       print('🚀 Creating appointment with data: $appointmentData');
       if (attachmentFile != null) {
         print('📎 Attachment file: ${attachmentFile.path}');
+      }
+
+      // Validate accompany users if present
+      if (appointmentData['accompanyUsers'] != null) {
+        final validationErrors = _validateAccompanyUsers(appointmentData['accompanyUsers']);
+        if (validationErrors.isNotEmpty) {
+          print('❌ Accompany users validation failed: $validationErrors');
+          return {
+            'success': false,
+            'message': 'Validation failed',
+            'error': validationErrors.join('; '),
+          };
+        }
+      }
+
+      // Check duplicate mobile numbers among accompany users and main/guest user
+      try {
+        final accompanyUsers = appointmentData['accompanyUsers'];
+        if (accompanyUsers != null && accompanyUsers is Map && accompanyUsers['users'] is List) {
+          final users = (accompanyUsers['users'] as List).cast<dynamic>();
+          final seen = <String>{};
+          final duplicateNumbers = <String>[];
+
+          String _tryNormalize(dynamic v) => _normalizePhone(v);
+          void _seedPhone(dynamic v) {
+            final p = _tryNormalize(v);
+            if (p.isEmpty) return;
+            if (seen.contains(p)) {
+              duplicateNumbers.add(p);
+            } else {
+              seen.add(p);
+            }
+          }
+
+          // Seed set with main user / guest phone
+          // 1) From local storage (authenticated user's phone)
+          try {
+            final currentUser = await StorageService.getUserData();
+            if (currentUser != null && currentUser['phoneNumber'] != null) {
+              _seedPhone(currentUser['phoneNumber']);
+            }
+            // Also try common alternate fields in user record
+            if (currentUser != null) {
+              for (final key in ['mobileNumber', 'mobile', 'phone']) {
+                if (currentUser.containsKey(key) && currentUser[key] != null) {
+                  _seedPhone(currentUser[key]);
+                }
+              }
+            }
+          } catch (_) {}
+
+          // 2) From request payload if available
+          if (appointmentData['phoneNumber'] != null) {
+            _seedPhone(appointmentData['phoneNumber']);
+          }
+          for (final key in ['mobileNumber', 'mobile', 'phone']) {
+            if (appointmentData.containsKey(key) && appointmentData[key] != null) {
+              _seedPhone(appointmentData[key]);
+            }
+          }
+
+          // 3) If guest appointment, include guest phone
+          try {
+            final apptFor = appointmentData['appointmentFor'];
+            final apptType = apptFor is Map ? (apptFor['type']?.toString()) : appointmentData['appointmentType']?.toString();
+            if (apptType == 'guest' && appointmentData['guestInformation'] is Map) {
+              final guestInfo = appointmentData['guestInformation'] as Map;
+              if (guestInfo['phoneNumber'] != null) _seedPhone(guestInfo['phoneNumber']);
+              for (final key in ['mobileNumber', 'mobile', 'phone']) {
+                if (guestInfo.containsKey(key) && guestInfo[key] != null) {
+                  _seedPhone(guestInfo[key]);
+                }
+              }
+            }
+          } catch (_) {}
+
+          for (final u in users) {
+            if (u is Map && u['phoneNumber'] != null) {
+              final phoneStr = _normalizePhone(u['phoneNumber']);
+              if (phoneStr.isNotEmpty) {
+                if (seen.contains(phoneStr)) {
+                  duplicateNumbers.add(phoneStr);
+                } else {
+                  seen.add(phoneStr);
+                }
+              }
+            }
+          }
+
+          if (duplicateNumbers.isNotEmpty) {
+            final msg = 'It seems you have entered the same mobile number more than once: ${duplicateNumbers.join(', ')}';
+            print('❌ Duplicate phone numbers found: $msg');
+            return {
+              'success': false,
+              'message': 'Please check the mobile numbers you have entered',
+              'error': msg,
+            };
+          }
+          print('✅ Duplicate phone validation passed. Checked numbers: ${seen.toList()}');
+        }
+      } catch (e) {
+        // Non-blocking: If normalization fails, do not stop request
+        print('⚠️ Duplicate phone validation skipped due to error: $e');
       }
 
       final token = await StorageService.getToken();
@@ -5714,6 +5917,18 @@ static Future<Map<String, dynamic>> registerUser({
       print('   - accompanyUsers: ${appointmentData['accompanyUsers']}');
       print('   - assignedSecretary: ${appointmentData['assignedSecretary']}');
       print('   - guestInformation: ${appointmentData['guestInformation']}');
+
+      // Ensure accompanyUsers is always present to avoid backend undefined access
+      if (appointmentData['accompanyUsers'] == null) {
+        appointmentData['accompanyUsers'] = {
+          'numberOfUsers': 0,
+          'users': [],
+        };
+      }
+      // Ensure numberOfUsers defaults to 1 (main user only)
+      if (appointmentData['numberOfUsers'] == null) {
+        appointmentData['numberOfUsers'] = 1;
+      }
 
       // Check if we have an attachment file
       if (attachmentFile != null && await attachmentFile.exists()) {
@@ -7622,6 +7837,190 @@ static Future<Map<String, dynamic>> registerUser({
     }
   }
 
+  // Create alternative phone
+  static Future<Map<String, dynamic>> createAlternativePhone(String number) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/alternative-phone'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'number': number,
+        }),
+      );
+
+      // Check if response is HTML (404 or server error)
+      if (response.body.trim().startsWith('<!DOCTYPE html>') || 
+          response.body.trim().startsWith('<html>')) {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'API endpoint not found. Please check if the backend endpoint is implemented.',
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'statusCode': 201,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Alternative phone created successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Validation failed',
+          'error': responseData['error'],
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to create alternative phone',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Get all alternative phones
+  static Future<Map<String, dynamic>> getAlternativePhones() async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/alternative-phone'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Check if response is HTML (404 or server error)
+      if (response.body.trim().startsWith('<!DOCTYPE html>') || 
+          response.body.trim().startsWith('<html>')) {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'API endpoint not found. Please check if the backend endpoint is implemented.',
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Alternative phones retrieved successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve alternative phones',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Update alternative phone
+  static Future<Map<String, dynamic>> updateAlternativePhone(String id, String number) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/alternative-phone/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'number': number,
+        }),
+      );
+
+      // Check if response is HTML (404 or server error)
+      if (response.body.trim().startsWith('<!DOCTYPE html>') || 
+          response.body.trim().startsWith('<html>')) {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'API endpoint not found. Please check if the backend endpoint is implemented.',
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Alternative phone updated successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to update alternative phone',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // SideBar Count
   static Future<Map<String, dynamic>> getSidebarCounts() async {
     try {
@@ -7761,4 +8160,113 @@ static Future<Map<String, dynamic>> registerUser({
       };
       }
     }
+
+  /// Create Desk User API Function
+  /// Creates a new desk user with the provided information
+  /// 
+  /// Parameters:
+  /// - formData: Map containing user information (fullName, email, password, etc.)
+  /// - profileImage: Optional File object for profile photo
+  /// 
+  /// Returns:
+  /// - Map with success status, message, and user data
+  /// 
+  /// Usage:
+  /// ```dart
+  /// final result = await ActionService.createDeskUser(formData, profileImage);
+  /// if (result['success']) {
+  ///   // Handle success
+  /// } else {
+  ///   // Handle error
+  /// }
+  /// ```
+  static Future<Map<String, dynamic>> createDeskUser(
+    Map<String, dynamic> formData,
+    File? profileImage,
+  ) async {
+    try {
+      // Get auth token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Authentication token not found. Please login again.',
+        };
+      }
+
+      // Create multipart request
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${_baseUrl}/desk-user'),
+      );
+
+      // Add headers
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      });
+
+      // Add profile image if provided
+      if (profileImage != null) {
+        final imageBytes = await profileImage.readAsBytes();
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'profilePhoto',
+            imageBytes,
+            filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ),
+        );
+      }
+
+      // Add form fields
+      formData.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty) {
+          if (value is Map) {
+            // Handle nested objects like phoneNumber
+            request.fields[key] = jsonEncode(value);
+          } else if (value is List) {
+            // Handle arrays like userTags
+            request.fields[key] = jsonEncode(value);
+          } else if (value is bool) {
+            // Handle boolean values
+            request.fields[key] = value.toString();
+          } else {
+            // Handle string values
+            request.fields[key] = value.toString();
+          }
+        }
+      });
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Desk user created successfully',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to create desk user',
+          'data': responseData['data'],
+          'error': responseData['error'],
+        };
+      }
+    } catch (e) {
+      print('Create desk user error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': e.toString(),
+      };
+    }
+  }
 }

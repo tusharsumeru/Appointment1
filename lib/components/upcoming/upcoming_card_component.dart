@@ -492,7 +492,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     return RefreshIndicator(
       onRefresh: _fetchUpcomingAppointments,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

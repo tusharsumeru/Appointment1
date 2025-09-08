@@ -65,6 +65,7 @@ class FilterBottomSheet extends StatelessWidget {
           // Options list
           Flexible(
             child: ListView(
+              physics: const ClampingScrollPhysics(),
               shrinkWrap: true,
               padding: const EdgeInsets.only(bottom: 20),
               children: [
@@ -171,8 +172,6 @@ class FilterBottomSheetForDeleted extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('FilterBottomSheetForDeleted - secretaries: $secretaries'); // Debug print
-    print('FilterBottomSheetForDeleted - secretaries length: ${secretaries.length}'); // Debug print
     
     return Container(
       decoration: const BoxDecoration(
@@ -225,6 +224,7 @@ class FilterBottomSheetForDeleted extends StatelessWidget {
           // Options list
           Flexible(
             child: ListView(
+              physics: const ClampingScrollPhysics(),
               shrinkWrap: true,
               padding: const EdgeInsets.only(bottom: 20),
               children: [
@@ -238,7 +238,6 @@ class FilterBottomSheetForDeleted extends StatelessWidget {
                   ),
                   // Secretary options
                   ...secretaries.map((secretary) {
-                    print('Processing secretary: $secretary'); // Debug print
                     return _buildFilterOption(
                       secretary['fullName'] ?? 'Unknown',
                     );
@@ -332,8 +331,6 @@ class FilterBottomSheetForStarred extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('FilterBottomSheetForStarred - secretaries: $secretaries'); // Debug print
-    print('FilterBottomSheetForStarred - secretaries length: ${secretaries.length}'); // Debug print
     
     return Container(
       decoration: const BoxDecoration(
@@ -386,6 +383,7 @@ class FilterBottomSheetForStarred extends StatelessWidget {
           // Options list
           Flexible(
             child: ListView(
+              physics: const ClampingScrollPhysics(),
               shrinkWrap: true,
               padding: const EdgeInsets.only(bottom: 20),
               children: [
@@ -399,7 +397,6 @@ class FilterBottomSheetForStarred extends StatelessWidget {
                   ),
                   // Secretary options
                   ...secretaries.map((secretary) {
-                    print('Processing secretary: $secretary'); // Debug print
                     return _buildFilterOption(
                       secretary['fullName'] ?? 'Unknown',
                     );

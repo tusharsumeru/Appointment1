@@ -6,24 +6,29 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import '../action/action.dart';
-import 'verify_otp_screen.dart';
+import '../../action/action.dart';
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+class CreateDeskUserForm extends StatefulWidget {
+  final VoidCallback? onSave;
+  final VoidCallback? onCancel;
+  
+  const CreateDeskUserForm({
+    super.key,
+    this.onSave,
+    this.onCancel,
+  });
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<CreateDeskUserForm> createState() => _CreateDeskUserFormState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _CreateDeskUserFormState extends State<CreateDeskUserForm> {
   final _formKey = GlobalKey<FormState>();
 
   // Personal Information Controllers
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
 
   // Professional Details Controllers
@@ -33,7 +38,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // State Variables
   bool _isPasswordVisible = false;
-  bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   String _selectedTeacherType = 'no';
   Set<String> _selectedRoles = {};
@@ -73,7 +77,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _fullNameController.addListener(_validateForm);
     _emailController.addListener(_validateForm);
     _passwordController.addListener(_validateForm);
-    _confirmPasswordController.addListener(_validateForm);
     _phoneController.addListener(_validateForm);
     _designationController.addListener(_validateForm);
     _companyController.addListener(_validateForm);
@@ -88,7 +91,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     _phoneController.dispose();
     _designationController.dispose();
     _companyController.dispose();
@@ -105,23 +107,17 @@ class _SignupScreenState extends State<SignupScreen> {
   void _validateForm() {
     bool isValid = true;
 
-    // Check required fields
+    // Check required fields (matching API requirements)
     if (_fullNameController.text.trim().isEmpty) isValid = false;
     if (_emailController.text.trim().isEmpty) isValid = false;
-    if (_passwordController.text.isEmpty) isValid = false;
-    if (_confirmPasswordController.text.isEmpty) isValid = false;
+    if (_passwordController.text.isEmpty || _passwordController.text.length < 8) isValid = false;
     if (_phoneController.text.trim().isEmpty) isValid = false;
     if (_designationController.text.trim().isEmpty) isValid = false;
     if (_companyController.text.trim().isEmpty) isValid = false;
-    if (_locationController.text.trim().isEmpty) isValid = false;
 
-    // Check if profile photo is selected
-    if (_selectedImageFile == null) isValid = false;
-
-    // Check teacher verification if teacher type is 'yes'
-    if (_selectedTeacherType == 'yes') {
-      if (!_isTeacherVerified) isValid = false;
-    }
+    // Profile photo is optional for desk user creation
+    // Location is optional for desk user creation
+    // Teacher verification is optional
 
     setState(() {
       _isFormValid = isValid;
@@ -139,8 +135,6 @@ class _SignupScreenState extends State<SignupScreen> {
                    !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text.trim())) {
           _scrollToField(0); // Personal Information section
         } else if (_passwordController.text.isEmpty || _passwordController.text.length < 6) {
-          _scrollToField(0); // Personal Information section
-        } else if (_confirmPasswordController.text.isEmpty || _confirmPasswordController.text != _passwordController.text) {
           _scrollToField(0); // Personal Information section
         } else if (_phoneController.text.trim().isEmpty) {
           _scrollToField(0); // Personal Information section
@@ -878,25 +872,43 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  void _toggleConfirmPasswordVisibility() {
+  void _clearForm() {
+    // Clear all text controllers
+    _fullNameController.clear();
+    _emailController.clear();
+    _passwordController.clear();
+    _phoneController.clear();
+    _designationController.clear();
+    _companyController.clear();
+    _locationController.clear();
+    _teacherCodeController.clear();
+    _teacherEmailController.clear();
+    _teacherPhoneController.clear();
+
+    // Reset form state
     setState(() {
-      _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+      _isPasswordVisible = false;
+      _selectedTeacherType = 'no';
+      _selectedRoles.clear();
+      _selectedCountryCode = '+91';
+      _selectedCountryFlag = '🇮🇳';
+      _selectedImageFile = null;
+      _selectedImagePath = null;
+      _isTeacherVerified = false;
+      _teacherVerificationData = null;
+      _teacherVerificationError = null;
+      _teacherCountryCode = '+91';
+      _teacherCountryFlag = '🇮🇳';
+      _locationSuggestions.clear();
     });
+
+    // Validate form to update button state
+    _validateForm();
   }
 
   void _handleSignup() async {
     if (_formKey.currentState!.validate()) {
-      // Check if profile photo is selected
-      if (_selectedImageFile == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a profile photo'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        _scrollToFirstError();
-        return;
-      }
+      // Profile photo is optional for desk user creation
 
       setState(() {
         _isLoading = true;
@@ -919,24 +931,29 @@ class _SignupScreenState extends State<SignupScreen> {
               '$_teacherCountryCode ${_teacherPhoneController.text.trim()}';
         }
 
+        // Prepare form data for createDeskUser API (matching backend requirements)
+        final formData = {
+          // Required fields
+          'fullName': _fullNameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text,
+          'phoneNumber': fullPhoneNumber,
+          'designation': _designationController.text.trim(),
+          'company': _companyController.text.trim(),
+          
+          // Optional fields
+          'full_address': _locationController.text.trim().isNotEmpty ? _locationController.text.trim() : null,
+          'userTags': _selectedRoles.isNotEmpty ? _selectedRoles.toList() : [],
+          'aol_teacher': _selectedTeacherType == 'yes',
+          'teachercode': teacherCode,
+          'teacheremail': teacherEmail,
+          'mobilenumber': teacherMobile,
+        };
 
-
-        // Call registration API
-        final result = await ActionService.registerUser(
-          fullName: _fullNameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          phoneNumber: fullPhoneNumber,
-          designation: _designationController.text.trim(),
-          company: _companyController.text.trim(),
-          full_address: _locationController.text.trim(),
-          userTags: _selectedRoles.toList(),
-          aol_teacher: _selectedTeacherType == 'yes',
-          teacher_type: _selectedTeacherType == 'yes' ? 'Teacher' : null,
-          teachercode: teacherCode,
-          teacheremail: teacherEmail,
-          mobilenumber: teacherMobile,
-          profilePhotoFile: _selectedImageFile!,
+        // Call createDeskUser API (profile photo is optional)
+        final result = await ActionService.createDeskUser(
+          formData,
+          _selectedImageFile, // Can be null
         );
 
         setState(() {
@@ -945,30 +962,27 @@ class _SignupScreenState extends State<SignupScreen> {
 
         if (mounted) {
           if (result['success']) {
-            // Registration successful
+            // Desk user creation successful
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  result['message'] ??
-                      'Registration successful! Please check your email for OTP verification.',
+                  result['message'] ?? 'Desk user created successfully!',
                 ),
                 backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
               ),
             );
 
-            // Navigate to OTP verification screen
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) =>
-                    VerifyOtpScreen(email: _emailController.text.trim()),
-              ),
-            );
+            // Don't redirect - just show success message
+            // Clear form for creating another user
+            _clearForm();
           } else {
-            // Registration failed
+            // Desk user creation failed
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Registration failed'),
+                content: Text(result['message'] ?? 'Failed to create desk user'),
                 backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
               ),
             );
           }
@@ -992,48 +1006,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Create Account',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const ClampingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Form(
-              key: _formKey,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 800),
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.shade200.withOpacity(0.5),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+    return SingleChildScrollView(
+      controller: _scrollController,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                       // Personal Information Section
                       _buildSectionHeader(
                         'Personal Information',
@@ -1063,9 +1044,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       const SizedBox(height: 16),
 
                       _buildPasswordField(),
-                      const SizedBox(height: 16),
-
-                      _buildConfirmPasswordField(),
                       const SizedBox(height: 16),
 
                       _buildPhoneNumberField(),
@@ -1122,7 +1100,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                       // Additional Roles Section
                       _buildSectionHeader(
-                        'Additional Roles',
+                        'Additional Roles (Optional)',
                         'Select all roles that apply to you',
                         null,
                       ),
@@ -1188,7 +1166,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          _isFormValid ? 'Complete Registration' : 'Fill All Required Fields',
+                                          _isFormValid ? 'Create Desk User' : 'Fill All Required Fields',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w600,
@@ -1213,11 +1191,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
-      ),
-    );
+        );
   }
 
   Widget _buildSectionHeader(String title, String subtitle, IconData? icon) {
@@ -1230,12 +1204,14 @@ class _SignupScreenState extends State<SignupScreen> {
               Icon(icon, color: Colors.grey.shade600, size: 24),
               const SizedBox(width: 12),
             ],
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
             ),
           ],
@@ -1409,88 +1385,12 @@ class _SignupScreenState extends State<SignupScreen> {
               });
               return 'Password is required';
             }
-            if (value.length < 6) {
+            if (value.length < 8) {
               // Trigger scroll to this field after validation
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _scrollToFirstError();
               });
-              return 'Password must be at least 6 characters';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConfirmPasswordField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Text(
-              'Confirm Password',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(width: 4),
-            Text(
-              '*',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _confirmPasswordController,
-          obscureText: !_isConfirmPasswordVisible,
-          decoration: InputDecoration(
-            hintText: 'Re-enter your password',
-            prefixIcon: const Icon(Icons.lock_outlined, color: Colors.grey),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: Colors.grey.shade600,
-              ),
-              onPressed: _toggleConfirmPasswordVisibility,
-            ),
-            filled: true,
-            fillColor: Colors.grey.shade50.withOpacity(0.5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              // Trigger scroll to this field after validation
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollToFirstError();
-              });
-              return 'Please confirm your password';
-            }
-            if (value != _passwordController.text) {
-              // Trigger scroll to this field after validation
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollToFirstError();
-              });
-              return 'Passwords do not match';
+              return 'Password must be at least 8 characters';
             }
             return null;
           },
@@ -1515,8 +1415,12 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             SizedBox(width: 4),
             Text(
-              '*',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              '(Optional)',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ),
@@ -1561,16 +1465,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               onChanged: _onLocationChanged,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  // Trigger scroll to this field after validation
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _scrollToFirstError();
-                  });
-                  return 'Location is required';
-                }
-                return null;
-              },
+              // No validation since location is optional
             ),
             if (_locationSuggestions.isNotEmpty)
               Container(
@@ -1616,156 +1511,157 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildPhoneNumberField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Text(
-              'Phone Number',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Row(
+        children: [
+          Text(
+            'Phone Number',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
-            SizedBox(width: 4),
-            Text(
-              '*',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            // Country Code Dropdown with Image
-            GestureDetector(
-              onTap: () {
-                showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                    bottomSheetHeight: 500,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                    inputDecoration: InputDecoration(
-                      labelText: 'Search',
-                      hintText: 'Start typing to search',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: const Color(0xFF8C98A8).withOpacity(0.2),
-                        ),
+          ),
+          SizedBox(width: 4),
+          Text(
+            '*',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center, // Align vertically
+        children: [
+          // Country Code Dropdown with Image
+          GestureDetector(
+            onTap: () {
+              showCountryPicker(
+                context: context,
+                showPhoneCode: true,
+                countryListTheme: CountryListThemeData(
+                  flagSize: 25,
+                  backgroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black,
+                  ),
+                  bottomSheetHeight: 500,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20.0),
+                    topRight: Radius.circular(20.0),
+                  ),
+                  inputDecoration: InputDecoration(
+                    labelText: 'Search',
+                    hintText: 'Start typing to search',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: const Color(0xFF8C98A8).withOpacity(0.2),
                       ),
                     ),
                   ),
-                  onSelect: (Country country) {
-                    setState(() {
-                      _selectedCountryCode = '+${country.phoneCode}';
-                      _selectedCountryFlag = country.flagEmoji;
-                    });
-                  },
-                );
-              },
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(
+                ),
+                onSelect: (Country country) {
+                  setState(() {
+                    _selectedCountryCode = '+${country.phoneCode}';
+                    _selectedCountryFlag = country.flagEmoji;
+                  });
+                },
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _selectedCountryFlag,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedCountryCode,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Phone Number Input
+          Expanded(
+            child: TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.number,
+              maxLength: 10,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              decoration: InputDecoration(
+                hintText: '',
+                filled: true,
+                fillColor: Colors.grey.shade50.withOpacity(0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: Colors.grey.shade400,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _selectedCountryFlag,
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedCountryCode,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.arrow_drop_down,
-                      color: Colors.grey,
-                      size: 20,
-                    ),
-                  ],
-                ),
+                counterText: '', // Hide the character counter
               ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  // Trigger scroll to this field after validation
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToFirstError();
+                  });
+                  return 'Phone number is required';
+                }
+                return null;
+              },
             ),
-            const SizedBox(width: 8),
-            // Phone Number Input
-            Expanded(
-              child: TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.number,
-                maxLength: 10,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                decoration: InputDecoration(
-                  hintText: '',
-                  filled: true,
-                  fillColor: Colors.grey.shade50.withOpacity(0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade400,
-                      width: 2,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  counterText: '', // Hide the character counter
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    // Trigger scroll to this field after validation
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _scrollToFirstError();
-                    });
-                    return 'Phone number is required';
-                  }
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
 
   Widget _buildTeacherTypeSelection() {
     // Ensure teacher type is consistent with verification status
@@ -1797,8 +1693,12 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             SizedBox(width: 4),
             Text(
-              '*',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              '(Optional)',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ),
@@ -2055,20 +1955,27 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 Icon(Icons.person, color: Colors.grey.shade400, size: 24),
                 const SizedBox(width: 12),
-                const Text(
-                  'Profile Photo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Text(
-                  '*',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Profile Photo',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        '(Optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

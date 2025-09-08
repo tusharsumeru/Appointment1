@@ -560,6 +560,7 @@ class _ReminderFormState extends State<ReminderForm> {
           // Form
           Expanded(
             child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Form(
                 key: _formKey,

@@ -65,8 +65,6 @@ class _MessageFormState extends State<MessageForm> {
     _referenceMobile = _extractReferenceMobile();
     
     // Debug: Log extracted phone numbers
-    print('📱 Extracted Appointee Mobile: $_appointeeMobile');
-    print('📱 Extracted Reference Mobile: $_referenceMobile');
 
     // Set default values - unchecked by default
     _appointeeMobileChecked = false;
@@ -78,6 +76,17 @@ class _MessageFormState extends State<MessageForm> {
 
   // Data extraction methods - now centralized and reusable
   String _extractFirstName() {
+    // If guest appointment, use guest's full name to derive first name
+    final appointmentType = _appointmentData['appointmentType']?.toString();
+    final guestInformation = _appointmentData['guestInformation'];
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestFullName = guestInformation['fullName']?.toString() ?? '';
+      if (guestFullName.isNotEmpty) {
+        final parts = guestFullName.split(' ');
+        return parts.isNotEmpty ? parts[0] : guestFullName;
+      }
+    }
+
     final createdBy = _appointmentData['createdBy'];
     if (createdBy is Map<String, dynamic>) {
       final fullName = createdBy['fullName']?.toString() ?? '';
@@ -90,16 +99,24 @@ class _MessageFormState extends State<MessageForm> {
   }
 
   String _extractFullName() {
+    // If guest appointment, prefer guest's full name
+    final appointmentType = _appointmentData['appointmentType']?.toString();
+    final guestInformation = _appointmentData['guestInformation'];
+    if (appointmentType == 'guest' && guestInformation is Map<String, dynamic>) {
+      final guestFullName = guestInformation['fullName']?.toString();
+      if (guestFullName != null && guestFullName.isNotEmpty) {
+        return guestFullName;
+      }
+    }
+
     // Try userFullName first (from the actual data structure)
     final userFullName = _appointmentData['userFullName']?.toString();
-
     if (userFullName != null && userFullName.isNotEmpty) {
       return userFullName;
     }
 
     // Fallback to createdBy.fullName
     final createdBy = _appointmentData['createdBy'];
-
     if (createdBy is Map<String, dynamic>) {
       final createdByFullName = createdBy['fullName']?.toString() ?? '';
       return createdByFullName;
@@ -429,6 +446,7 @@ Appointment Details:
                 Expanded(
                   child: Scrollbar(
                     child: ListView.builder(
+                      physics: const ClampingScrollPhysics(),
                       itemCount: smsTemplateNames.length,
                       itemBuilder: (context, index) {
                         final template = smsTemplateNames[index];
@@ -609,11 +627,6 @@ Appointment Details:
       };
 
       // Debug: Log what we're sending
-      print('📤 SMS Form - Appointee Mobile: $_appointeeMobile');
-      print('📤 SMS Form - Reference Mobile: $_referenceMobile');
-      print('📤 SMS Form - Use Appointee: $_appointeeMobileChecked');
-      print('📤 SMS Form - Use Reference: $_referenceMobileChecked');
-      print('📤 SMS Form - Other SMS: ${_otherSmsController.text.trim().isNotEmpty ? _otherSmsController.text.trim() : 'None'}');
       
       final result = await ActionService.sendAppointmentSms(
         appointeeMobile: _appointeeMobile,
@@ -676,6 +689,7 @@ Appointment Details:
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

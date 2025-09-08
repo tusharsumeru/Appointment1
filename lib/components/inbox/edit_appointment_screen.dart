@@ -187,7 +187,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final assignedSecretary = widget.appointment['assignedSecretary'];
     if (assignedSecretary is Map<String, dynamic>) {
       _selectedSecretary = assignedSecretary['_id']?.toString();
-      print('DEBUG: Set selected secretary to: $_selectedSecretary');
     } else {
       // Fallback to secretary field if assignedSecretary is not available
       _selectedSecretary = secretaryId.isNotEmpty ? secretaryId : null;
@@ -222,6 +221,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
+      guest['uniquePhoneCode']?.dispose();
     }
     
     super.dispose();
@@ -361,7 +361,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
       return 'Not specified';
     } catch (e) {
-      print('Error in _getCreatedByName: $e');
       return 'Not specified';
     }
   }
@@ -381,7 +380,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
       return 'Not specified';
     } catch (e) {
-      print('Error in _getCreatedByEmail: $e');
       return 'Not specified';
     }
   }
@@ -496,7 +494,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       
       return 'Not specified';
     } catch (e) {
-      print('Error in _getCreatedByDesignation: $e');
       return 'Not specified';
     }
   }
@@ -565,7 +562,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       
       return 'Not specified';
     } catch (e) {
-      print('Error in _getCreatedByCompany: $e');
       return 'Not specified';
     }
   }
@@ -640,6 +636,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
+      guest['uniquePhoneCode']?.dispose();
     }
     _guestControllers.clear();
     _guestImages.clear();
@@ -678,6 +675,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'name': TextEditingController(text: guest['fullName'] ?? ''),
         'age': ageController,
         'phone': TextEditingController(text: number),
+        'uniquePhoneCode': TextEditingController(text: guest['alternatePhoneNumber']?.toString() ?? 
+                                                      guest['uniquePhoneCode']?.toString() ?? 
+                                                      guest['alternativePhone']?.toString() ?? 
+                                                      guest['alternatePhone']?.toString() ?? ''),
+      });
+      
+      // Debug: Print all available fields in guest data
+      print('Loading guest ${i + 1} data - All available fields:');
+      guest.forEach((key, value) {
+        print('  - $key: $value');
       });
       
       // Initialize associated data
@@ -738,6 +745,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'name': TextEditingController(),
           'age': ageController,
           'phone': TextEditingController(),
+          'uniquePhoneCode': TextEditingController(),
         });
         
         // Initialize associated data
@@ -754,6 +762,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
       }
       
       // Remove from lists (remove from the end)
@@ -776,6 +785,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
+      guest['uniquePhoneCode']?.dispose();
     }
     _guestControllers.clear();
     _guestImages.clear();
@@ -815,6 +825,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'name': TextEditingController(),
         'age': ageController,
         'phone': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(),
       });
       
       // Initialize associated data
@@ -835,7 +846,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
       
       if (pickedFile != null) {
-        print('📸 Guest $guestIndex image selected: ${pickedFile.path}');
 
         // Show uploading state
         setState(() {
@@ -855,24 +865,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _guestUploading[guestIndex + 1] = false;
             });
 
-            print('✅ Guest $guestIndex photo uploaded to S3: $s3Url');
 
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Guest ${guestIndex + 1} photo uploaded and validated successfully!',
-                  ),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
+            // Photo uploaded successfully
           } else {
             setState(() {
               _guestUploading[guestIndex + 1] = false;
             });
 
-            print('❌ Guest $guestIndex photo upload failed: ${result['message']}');
 
             // Show backend error message in dialog
             final errorMessage =
@@ -893,7 +892,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             _guestUploading[guestIndex + 1] = false;
           });
 
-          print('❌ Error uploading guest $guestIndex photo: $e');
 
           // Show error message in dialog
           _showPhotoValidationErrorDialog(
@@ -927,13 +925,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _guestUploading[guestIndex + 1] = false;
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Photo removed successfully!'),
-        backgroundColor: Colors.orange,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // Photo removed
   }
 
   // Guest photo display methods for guest appointments
@@ -947,7 +939,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
       
       if (pickedFile != null) {
-        print('📸 Guest display image selected: ${pickedFile.path}');
 
         // Show uploading state
         setState(() {
@@ -969,22 +960,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _guestUploading[0] = false;
             });
 
-            print('✅ Guest display photo uploaded to S3: $s3Url');
 
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Guest photo uploaded and validated successfully!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
+            // Guest photo uploaded successfully
           } else {
             setState(() {
               _guestUploading[0] = false;
             });
 
-            print('❌ Guest display photo upload failed: ${result['message']}');
 
             // Show backend error message in dialog
             final errorMessage =
@@ -1005,7 +987,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             _guestUploading[0] = false;
           });
 
-          print('❌ Error uploading guest display photo: $e');
 
           // Show error message in dialog
           _showPhotoValidationErrorDialog(
@@ -1039,13 +1020,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _guestUploading[0] = false;
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Guest photo removed successfully!'),
-        backgroundColor: Colors.orange,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // Guest photo removed
   }
 
   int _getGuestIndexFromPhotoUrl(String photoUrl) {
@@ -1684,7 +1659,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Photo of the Guest Required for Age 12 years and Above',
+          'Photo of the Person Required for Age 12 years and Above',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 12),
@@ -1812,7 +1787,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         });
       }
     } catch (e) {
-      print('Error loading current user: $e');
     }
   }
 
@@ -1828,10 +1802,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       String? locationId;
       if (_selectedLocation != null) {
         locationId = _selectedLocation;
-        print('DEBUG: Using selected locationId = $locationId');
       } else {
         locationId = _extractLocationId();
-        print('DEBUG: Extracted locationId from appointment data = $locationId');
       }
       
       if (locationId == null) {
@@ -1844,15 +1816,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Call the API to get secretaries for this location
-      print('DEBUG: Calling API with locationId: $locationId');
       final result = await ActionService.getAssignedSecretariesByAshramLocation(
         locationId: locationId,
       );
-      print('DEBUG: API result: $result');
 
       if (result['success']) {
         final List<dynamic> secretariesData = result['data'] ?? [];
-        print('DEBUG: Secretaries data received: $secretariesData');
         
         // Transform the API response to match our expected format
         final List<Map<String, dynamic>> secretaries = secretariesData.map((secretary) {
@@ -1861,7 +1830,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           final isCurrentUser = secretaryId == _currentUserId;
           final isAssigned = secretaryName == _assignedSecretaryId;
           
-          print('DEBUG: Processing secretary: $secretaryId - $secretaryName');
           
           return {
             'id': secretaryId,
@@ -1871,13 +1839,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           };
         }).toList();
         
-        print('DEBUG: Transformed secretaries: $secretaries');
 
         setState(() {
           _availableAssignees = secretaries;
           _isLoadingSecretaries = false;
         });
-        print('DEBUG: Updated _availableAssignees with ${secretaries.length} secretaries');
         
         // Ensure the assigned secretary is selected if not already set
         if (_selectedSecretary == null && _assignedSecretaryId != null) {
@@ -1889,10 +1855,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               setState(() {
                 _selectedSecretary = assignedSecretary['id'];
               });
-              print('DEBUG: Auto-selected assigned secretary: $_selectedSecretary');
             }
           } catch (e) {
-            print('DEBUG: Could not find assigned secretary in list');
           }
         }
         
@@ -1901,7 +1865,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           setState(() {
             _selectedSecretary = secretaries.first['id']?.toString();
           });
-          print('DEBUG: Auto-selected first secretary: $_selectedSecretary');
         }
       } else {
         setState(() {
@@ -1986,95 +1949,66 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Try to get location ID from various possible fields
     // First check scheduledDateTime.venue (from the actual data structure)
     final scheduledDateTime = widget.appointment['scheduledDateTime'];
-    print('DEBUG: scheduledDateTime = $scheduledDateTime');
     if (scheduledDateTime is Map<String, dynamic>) {
       final venue = scheduledDateTime['venue'];
-      print('DEBUG: venue from scheduledDateTime = $venue');
       if (venue != null) {
-        print('DEBUG: Using venue from scheduledDateTime = $venue');
         return venue.toString();
       }
     }
 
     // Try appointmentLocation field
     final appointmentLocation = widget.appointment['appointmentLocation'];
-    print('DEBUG: appointmentLocation = $appointmentLocation');
     if (appointmentLocation != null) {
       // If it's an object, extract the _id field
       if (appointmentLocation is Map<String, dynamic>) {
         final id = appointmentLocation['_id']?.toString();
-        print('DEBUG: Extracted _id from appointmentLocation = $id');
         return id;
       }
-      print('DEBUG: Using appointmentLocation as string = ${appointmentLocation.toString()}');
       return appointmentLocation.toString();
     }
 
     // Try location field
     final location = widget.appointment['location'];
-    print('DEBUG: location = $location');
     if (location != null) {
       // If it's an object, extract the _id field
       if (location is Map<String, dynamic>) {
         final id = location['_id']?.toString();
-        print('DEBUG: Extracted _id from location = $id');
         return id;
       }
-      print('DEBUG: Using location as string = ${location.toString()}');
       return location.toString();
     }
 
     // Try venue field directly
     final venue = widget.appointment['venue'];
-    print('DEBUG: venue = $venue');
     if (venue != null) {
       // If it's an object, extract the _id field
       if (venue is Map<String, dynamic>) {
         final id = venue['_id']?.toString();
-        print('DEBUG: Extracted _id from venue = $id');
         return id;
       }
-      print('DEBUG: Using venue as string = ${venue.toString()}');
       return venue.toString();
     }
 
     // If no location ID found, return null
-    print('DEBUG: No location ID found');
     return null;
   }
 
   // Debug method to print appointment structure
   void _debugAppointmentStructure() {
-    print('=== APPOINTMENT DEBUG INFO ===');
-    print('Appointment keys: ${widget.appointment.keys.toList()}');
     
     final createdBy = widget.appointment['createdBy'];
     if (createdBy is Map<String, dynamic>) {
-      print('CreatedBy keys: ${createdBy.keys.toList()}');
-      print('CreatedBy phone: ${createdBy['phone']}');
-      print('CreatedBy designation: ${createdBy['designation']}');
-      print('CreatedBy company: ${createdBy['company']}');
     } else {
-      print('CreatedBy is not a Map: $createdBy');
     }
     
-    print('Direct phone: ${widget.appointment['phone']}');
-    print('Direct designation: ${widget.appointment['designation']}');
-    print('Direct company: ${widget.appointment['company']}');
     
     // Debug accompanyUsers
     final accompanyUsers = widget.appointment['accompanyUsers'];
-    print('AccompanyUsers: $accompanyUsers');
     if (accompanyUsers is Map<String, dynamic>) {
-      print('AccompanyUsers keys: ${accompanyUsers.keys.toList()}');
-      print('AccompanyUsers numberOfUsers: ${accompanyUsers['numberOfUsers']}');
-      print('AccompanyUsers users: ${accompanyUsers['users']}');
     }
     
     // Debug all appointment data
-    print('Full appointment data: ${widget.appointment}');
     
-    print('=== END DEBUG INFO ===');
   }
 
   Future<void> _handleSubmit() async {
@@ -2090,6 +2024,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest full name is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2099,6 +2034,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest email is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2107,8 +2043,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_guestEmailController.text.trim())) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please enter a valid guest email address'),
+            content: Text('Please enter a valid email address'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2118,6 +2055,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest phone number is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2127,6 +2065,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest designation is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2136,6 +2075,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest company is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
@@ -2145,9 +2085,100 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           const SnackBar(
             content: Text('Guest location is required'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         return;
+      }
+    }
+
+    // Validate accompany users
+    final accompanyUsersData = _getAccompanyUsersData();
+    if (accompanyUsersData != null) {
+      final users = accompanyUsersData['users'] as List<Map<String, dynamic>>;
+      for (int i = 0; i < users.length; i++) {
+        final user = users[i];
+        final userIndex = i + 1;
+        
+        // Validate required fields
+        if (user['fullName'] == null || user['fullName'].toString().trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('User $userIndex: Full name is required'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+        
+        final age = int.tryParse(user['age']?.toString() ?? '0') ?? 0;
+        if (age < 1 || age > 120) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('User $userIndex: Age must be between 1 and 120'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+        
+        // Check if user has unique phone code
+        final hasUniquePhoneCode = user['alternativePhone'] != null && 
+            user['alternativePhone'].toString().trim().isNotEmpty;
+        
+        // Phone number validation based on age and unique phone code
+        if (age < 12 || age > 60) {
+          // For age < 12 or age > 60, either phone number OR unique phone code is required
+          if (!hasUniquePhoneCode) {
+            // Check if phone number is provided
+            final hasPhoneNumber = user['phoneNumber'] != null && 
+                user['phoneNumber']['number']?.toString().trim().isNotEmpty == true;
+            
+            if (!hasPhoneNumber) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('User $userIndex: Either phone number or unique phone code is required for ages under 12 or over 60'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              return;
+            }
+          }
+        } else {
+          // For other ages: Phone number is always required
+          final hasPhoneNumber = user['phoneNumber'] != null && 
+              user['phoneNumber']['number']?.toString().trim().isNotEmpty == true;
+          
+          if (!hasPhoneNumber) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('User $userIndex: Phone number is required'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+        }
+        
+        // Validate unique phone code format if provided
+        if (hasUniquePhoneCode) {
+          final uniquePhoneCode = user['alternativePhone'].toString().trim();
+          final uniquePhoneCodeRegex = RegExp(r'^[A-Za-z0-9]{3,20}$');
+          if (!uniquePhoneCodeRegex.hasMatch(uniquePhoneCode)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('User $userIndex: Invalid unique phone code format (3-20 alphanumeric characters)'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+        }
       }
     }
 
@@ -2210,24 +2241,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         };
       }
 
-      // Show debug info in SnackBar
-      if (_selectedFile != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Uploading file: ${_selectedFile!.name} (${(_selectedFile!.size / 1024 / 1024).toStringAsFixed(2)}MB)'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No file selected for upload'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // File upload in progress
 
       // Call the API to update appointment
       final result = await ActionService.updateAppointmentEnhanced(
@@ -2243,9 +2257,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${result['message'] ?? 'Appointment updated successfully!'} (Status: ${result['statusCode']})'),
+              content: Text(result['message'] ?? 'Appointment updated successfully!'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
+              duration: const Duration(seconds: 3),
             ),
           );
           
@@ -2262,9 +2276,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$errorMessage (Status: ${result['statusCode']})'),
+              content: Text(errorMessage),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -2275,7 +2289,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           SnackBar(
             content: Text('Error updating appointment: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -2289,8 +2303,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Map<String, dynamic>? _getAccompanyUsersData() {
-    if (_guestControllers.isEmpty) {
+    // Get the total number of users from the controller
+    final totalUsers = int.tryParse(_numberOfPeopleController.text) ?? 1;
+    final accompanyingUsers = totalUsers - 1; // Subtract 1 for main user
+    
+    // If no accompanying users, return null
+    if (accompanyingUsers <= 0) {
       return null;
+    }
+    
+    // Ensure we have the right number of controllers
+    if (_guestControllers.length != accompanyingUsers) {
+      // Update controllers to match the required number
+      _updateGuestControllers();
     }
     
     // Build users data from controllers
@@ -2303,37 +2328,46 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Get phone number with country code
       final phoneNumber = controllers['phone']?.text ?? '';
       final countryCode = _guestCountries[guestNumber] ?? '+91';
-      
-      // Format phone number
-      String formattedPhone = '';
-      if (phoneNumber.isNotEmpty) {
-        formattedPhone = '$countryCode $phoneNumber';
-      }
+      final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
+      final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
+      final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
       
       // Get photo URL from guest images
       final photoUrl = _guestImages[guestNumber] ?? '';
       
       final userData = {
         'fullName': controllers['name']?.text ?? '',
-        'age': controllers['age']?.text ?? '',
-        'phoneNumber': {
+        'age': age,
+      };
+
+      // Only include phone number if we have one OR if we don't have unique phone code (for ages 12-60)
+      if (phoneNumber.isNotEmpty || !hasUniquePhoneCode) {
+        userData['phoneNumber'] = {
           'countryCode': countryCode,
           'number': phoneNumber,
-        },
+        };
+      }
+
+      // Add unique phone code as alternativePhone if provided
+      if (hasUniquePhoneCode) {
+        userData['alternativePhone'] = uniquePhoneCode;
+      }
+
+      userData.addAll({
         'profilePhotoUrl': photoUrl,
-        'userId': null, // Will be assigned by backend
+        'userId': '', // Will be assigned by backend
         'admissionStatus': 'pending',
-        'admittedBy': null,
-        'relationshipToApplicant': null,
-        'admittedAt': null,
-      };
+        'admittedBy': '',
+        'relationshipToApplicant': '',
+        'admittedAt': '',
+      });
       
       users.add(userData);
     }
     
     final result = {
       'numberOfUsers': _guestControllers.length,
-      'users': users,
+      'users': _guestControllers.length > 9 ? [] : users, // Send empty array for >9 accompanying users
     };
     
     return result;
@@ -2360,6 +2394,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ),
       ),
       body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
         child: Column(
           children: [
             // Header Section
@@ -2498,8 +2533,39 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       const SizedBox(height: 16),
                       
                       // Guest Information Section
-                      if ((int.tryParse(_numberOfPeopleController.text) ?? 1) > 1) ...[
+                      // Show guest details only for 2-10 users, show message for >10 users
+                      if ((int.tryParse(_numberOfPeopleController.text) ?? 1) > 1 && 
+                          (int.tryParse(_numberOfPeopleController.text) ?? 1) <= 10) ...[
                         _buildGuestInformationSection(),
+                        const SizedBox(height: 16),
+                      ] else if ((int.tryParse(_numberOfPeopleController.text) ?? 1) > 10) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.orange.shade600,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'For appointments with more than 10 people, individual details for additional accompanying people are not required.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.orange.shade600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 16),
                       ],
                       
@@ -2718,6 +2784,69 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  Widget _buildEditableAgeField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 3,
+          onChanged: (value) {
+            setState(() {}); // Rebuild to show/hide unique phone code field
+          },
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFF97316), width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+            hintText: 'Enter age (1-120)',
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+            ),
+            counterText: '', // Hide character counter
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[800],
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Age is required';
+            }
+            final age = int.tryParse(value);
+            if (age == null || age < 1 || age > 120) {
+              return 'Please enter age between 1-120';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildLocationField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2812,6 +2941,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 200),
                     child: ListView.builder(
+                      physics: const ClampingScrollPhysics(),
                       shrinkWrap: true,
                       padding: EdgeInsets.zero,
                       itemCount: _locationSuggestions.length,
@@ -3177,16 +3307,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             GestureDetector(
               onTap: () {
                 int currentCount = int.tryParse(controller.text) ?? 1;
-                print('DEBUG MINUS: Button clicked. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                 if (currentCount > 1) { // Minimum 1 total user (main user)
-                  print('DEBUG MINUS: Removing guest. Current count: $currentCount, Guest controllers: ${_guestControllers.length}');
                   setState(() {
                     controller.text = (currentCount - 1).toString();
                   });
                   _updateGuestControllers();
-                  print('DEBUG MINUS: After removal. New count: ${controller.text}, Guest controllers: ${_guestControllers.length}');
                 } else {
-                  print('DEBUG MINUS: Cannot reduce below 1 (minimum total users)');
                 }
               },
               child: Container(
@@ -3548,6 +3674,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 ),
                               )
                             : ListView.builder(
+                                physics: const ClampingScrollPhysics(),
                                 controller: scrollController,
                                 padding: const EdgeInsets.symmetric(horizontal: 20),
                                 itemCount: _availableLocations.length,
@@ -3571,7 +3698,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                     ),
                                     child: ListTile(
                                       onTap: () {
-                                        print('DEBUG: Location selected: ${location['id']} - ${location['name']}');
                                         setState(() {
                                           _selectedLocation = location['id']?.toString();
                                           // Clear secretary selection when location changes
@@ -3579,7 +3705,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         });
                                         Navigator.pop(context);
                                         // Reload secretaries for the new location
-                                        print('DEBUG: Reloading secretaries for location: $_selectedLocation');
                                         _loadSecretaries();
                                       },
                                       leading: CircleAvatar(
@@ -3742,6 +3867,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                 ),
                               )
                             : SingleChildScrollView(
+                                physics: const ClampingScrollPhysics(),
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
@@ -3764,7 +3890,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                       ),
                                       child: InkWell(
                                         onTap: () {
-                                          print('DEBUG: Tapped location: ${location['name']} with ID: ${location['id']}');
                                           setState(() {
                                             _selectedLocation = location['id']?.toString();
                                           });
@@ -3875,7 +4000,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       : Builder(
                           builder: (context) {
                             final secretaryName = _getSelectedSecretaryName();
-                            print('DEBUG: Secretary field - selectedLocation: $_selectedLocation, availableAssignees: ${_availableAssignees.length}, secretaryName: $secretaryName');
                             return Text(
                               secretaryName ?? 'Select a secretary',
                               style: TextStyle(
@@ -4032,6 +4156,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                           )
                         : ListView.builder(
+                            physics: const ClampingScrollPhysics(),
                             controller: scrollController,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: _availableAssignees.length + 1, // +1 for "None" option
@@ -4218,14 +4343,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     setState(() {
       _selectedSecretary = secretaryId;
     });
-    print('DEBUG: Updated _selectedSecretary to: $_selectedSecretary');
   }
 
   void _updateSelectedLocation(String? locationId) {
     setState(() {
       _selectedLocation = locationId;
     });
-    print('DEBUG: Updated _selectedLocation to: $_selectedLocation');
   }
 
   Future<void> _pickFile() async {
@@ -4261,19 +4384,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           _selectedFile = file;
         });
         
-        print('DEBUG: File selected and set: ${file.name}');
-        print('DEBUG: File path: ${file.path}');
-        print('DEBUG: File size: ${file.size}');
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('File selected: ${file.name}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // File selected successfully
       }
     } catch (e) {
       if (context.mounted) {
@@ -4391,13 +4503,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                             ),
                           )
                         : SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: _availableAssignees.map((assignee) {
                                 final isAssigned = assignee['isAssigned'] == true;
                                 final isSelected = assignee['id']?.toString() == _selectedSecretary;
-                                print('DEBUG: Secretary ${assignee['name']} - ID: ${assignee['id']}, Selected: $isSelected, Assigned: $isAssigned');
                                 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -4419,7 +4531,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                   ),
                                   child: InkWell(
                                     onTap: () {
-                                      print('DEBUG: Tapped secretary: ${assignee['name']} with ID: ${assignee['id']}');
                                       setState(() {
                                         _selectedSecretary = assignee['id']?.toString();
                                       });
@@ -4667,13 +4778,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 setState(() {
                   _selectedFile = null;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('File removed'),
-                    backgroundColor: Colors.orange,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                // File removed
               },
               icon: Icon(
                 Icons.close,
@@ -4855,7 +4960,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           SnackBar(
             content: Text('Error opening attachment: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -5070,7 +5175,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   Widget _buildGuestInformationSection() {
     // Safety check - ensure controllers are initialized
     if (_guests.isNotEmpty && _guestControllers.isEmpty) {
-      print('WARNING: Guests exist but controllers not initialized. Initializing now...');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _initializeGuestControllers();
       });
@@ -5092,7 +5196,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ...List.generate(_guests.length, (index) {
           // Only generate cards if we have corresponding controllers
           if (index >= _guestControllers.length) {
-            print('WARNING: Skipping guest card $index - no controller available');
             return const SizedBox.shrink();
           }
           return Column(
@@ -5109,7 +5212,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   Widget _buildGuestCard(int index) {
     // Safety check to prevent index out of bounds
     if (index >= _guests.length || index >= _guestControllers.length) {
-      print('ERROR: Index $index is out of bounds. _guests.length: ${_guests.length}, _guestControllers.length: ${_guestControllers.length}');
       return const SizedBox.shrink();
     }
     
@@ -5120,6 +5222,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Check if photo is required (age >= 12)
     final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age >= 12;
+    
+    // Debug: Print age and unique phone code visibility
+    print('Guest $guestNumber - Age: $age, Should show unique phone code: ${age < 12 || age > 60}');
+    print('  - Age text: ${controllers['age']?.text}');
+    print('  - Unique phone code text: ${controllers['uniquePhoneCode']?.text}');
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -5149,7 +5256,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              'Accompanying Guest - $guestNumber - Details',
+              'Detail of Person ${guestNumber +1 }',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -5163,12 +5270,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           Column(
             children: [
               // Name
-              _buildEditableGuestField('Name', controllers['name']!),
+              _buildEditableGuestField('Full Name', controllers['name']!),
               const SizedBox(height: 12),
               
               // Age
-              _buildEditableGuestField('Age', controllers['age']!),
+              _buildEditableAgeField('Age *', controllers['age']!),
               const SizedBox(height: 12),
+
+              // Unique Phone Code (only show if age < 12 or age > 60)
+              if (age < 12 || age > 60) ...[
+                _buildEditableGuestField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
+                const SizedBox(height: 4),
+                Text(
+                  'If you provide a unique phone code, the phone number field becomes optional',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               
               // Phone
               _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!),
@@ -5198,7 +5319,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Photo of the Guest Required for Age 12 years and Above',
+                  'Photo of the person Required for Age 12 years and Above',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 12),
@@ -5417,7 +5538,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                                         ),
                                         const SizedBox(height: 2),
                                         const Text(
-                                          'Guest photo is ready',
+                                          'Person photo is ready',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey,
@@ -5596,11 +5717,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Phone field for accompanying users with country code
   Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
+    // Find the guest data to check age and unique phone code
+    final guestIndex = guestNumber - 1;
+    final age = guestIndex < _guestControllers.length 
+        ? int.tryParse(_guestControllers[guestIndex]['age']?.text ?? '0') ?? 0
+        : 0;
+    final hasUniquePhoneCode = guestIndex < _guestControllers.length 
+        ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
+        : false;
+    
+    // Determine if phone is required
+    final isPhoneRequired = !(age < 12 || age > 60) || !hasUniquePhoneCode;
+    final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Phone *',
+          phoneLabel,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -6032,11 +6166,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final appointmentId = _getAppointmentId();
       
       if (appointmentId.isEmpty) {
-        print('⚠️ Appointment ID not found, skipping notification');
         return;
       }
 
-      print('🔄 Sending appointment update notification for appointment: $appointmentId');
 
       // For admin edit forms, we'll use the userId from the appointment data
       final userId = appointmentData?['userId']?.toString() ?? 
@@ -6085,14 +6217,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       );
 
       if (result['success']) {
-        print('✅ Appointment update notification sent successfully');
-        print('📱 Notification ID: ${result['data']?['notificationId']}');
       } else {
-        print('⚠️ Failed to send appointment update notification: ${result['message']}');
       }
 
     } catch (e) {
-      print('❌ Error sending appointment update notification: $e');
       // Don't block the appointment update flow if notification fails
     }
   }

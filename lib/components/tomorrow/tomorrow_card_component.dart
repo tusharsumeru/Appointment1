@@ -773,7 +773,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
     return RefreshIndicator(
       onRefresh: _fetchTomorrowAppointments,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

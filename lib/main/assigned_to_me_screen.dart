@@ -67,7 +67,6 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
         });
       }
     } catch (e) {
-      print('Error loading current user: $e');
     }
   }
 
@@ -156,21 +155,16 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
   }
 
   Future<void> _toggleStar(String appointmentId) async {
-    print('🔍 Toggle Star - appointmentId: $appointmentId');
-    print('🔍 Toggle Star - total appointments: ${_appointments.length}');
     
     // Find the appointment index
     final index = _appointments.indexWhere((appointment) {
       final appId = appointment['appointmentId']?.toString();
       final appMongoId = appointment['_id']?.toString();
-      print('🔍 Toggle Star - checking appointment: appId=$appId, appMongoId=$appMongoId');
       return appId == appointmentId || appMongoId == appointmentId;
     });
     
-    print('🔍 Toggle Star - found index: $index');
     
     if (index == -1) {
-      print('🔍 Toggle Star - appointment not found!');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -184,24 +178,20 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
 
     // Get current starred status
     final currentStarredStatus = _appointments[index]['starred'] == true;
-    print('🔍 Toggle Star - current starred status: $currentStarredStatus');
     
     // Optimistically update UI first
     setState(() {
       _appointments[index]['starred'] = !currentStarredStatus;
     });
-    print('🔍 Toggle Star - optimistically updated to: ${!currentStarredStatus}');
 
     try {
       // Call the API to update starred status
       final desiredStarredStatus = !currentStarredStatus;
       final result = await ActionService.updateStarred(appointmentId, starred: desiredStarredStatus);
-      print('🔍 Toggle Star - API result: $result');
       
       if (result['success']) {
         // Update with the actual response from API
         final newStarredStatus = result['data']?['starred'] ?? !currentStarredStatus;
-        print('🔍 Toggle Star - new starred status from API: $newStarredStatus');
         
         // Check if the API response matches our expected toggle
         // If API returns the same status as before, it means the toggle didn't work as expected
@@ -209,7 +199,6 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
         final expectedNewStatus = !currentStarredStatus;
         final finalStatus = (newStarredStatus == expectedNewStatus) ? newStarredStatus : expectedNewStatus;
         
-        print('🔍 Toggle Star - expected status: $expectedNewStatus, final status: $finalStatus');
         
         setState(() {
           // Update the starred status in the list (keep appointment in assigned to me)
@@ -229,7 +218,6 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
         }
       } else {
         // Revert the optimistic update on failure
-        print('🔍 Toggle Star - API failed, reverting to: $currentStarredStatus');
         setState(() {
           _appointments[index]['starred'] = currentStarredStatus;
         });
@@ -245,7 +233,6 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
       }
     } catch (e) {
       // Revert the optimistic update on error
-      print('🔍 Toggle Star - Exception occurred: $e');
       setState(() {
         _appointments[index]['starred'] = currentStarredStatus;
       });
@@ -493,10 +480,8 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
                               appointment: appointment,
                               index: index, // Pass the index for alternating colors
                               onStarToggle: (isStarred) async {
-                                print('🔍 Assigned to Me onStarToggle - received isStarred: $isStarred');
                                 final appointmentId = appointment['appointmentId']?.toString() ?? 
                                                     appointment['_id']?.toString() ?? '';
-                                print('🔍 Assigned to Me onStarToggle - appointmentId: $appointmentId');
                                 await _toggleStar(appointmentId);
                               },
                             );

@@ -151,7 +151,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
         provisional: false,
       );
       
-      print('📱 Notification permission status: ${settings.authorizationStatus}');
       
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         _showError('Notification permissions are required. Please enable notifications in your device settings and try again.');
@@ -169,7 +168,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
         return;
       }
 
-      print('🔥 FCM Token Generated: $token');
       
       // Save token to database
       await _saveTokenToDatabase(token);
@@ -185,7 +183,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
         _isLoading = false;
       });
       _showError('Error enabling notifications: $e');
-      print('❌ Error generating FCM token: $e');
     }
   }
 
@@ -194,12 +191,9 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
       final result = await ActionService.addFCMToken(token: token);
       
       if (result['success']) {
-        print('✅ FCM token saved to database successfully');
       } else {
-        print('❌ Failed to save FCM token to database: ${result['message']}');
       }
     } catch (e) {
-      print('❌ Error saving FCM token to database: $e');
     }
   }
 
@@ -250,7 +244,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
                       'User';
       
       if (userId == null) {
-        print('⚠️ User ID not found, skipping notification');
         return;
       }
 
@@ -287,7 +280,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
       await _sendRoleSpecificNotification(userRole, userName);
       
     } catch (e) {
-      print('❌ Error sending welcome notification: $e');
     }
   }
 
@@ -350,7 +342,6 @@ class _NotificationSetupScreenState extends State<NotificationSetupScreen> {
       );
 
     } catch (e) {
-      print('❌ Error sending role-specific notification: $e');
     }
   }
 

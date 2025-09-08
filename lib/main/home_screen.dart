@@ -29,7 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     } catch (error) {
-      print('Error loading user data: $error');
       setState(() {
         _isLoading = false;
       });

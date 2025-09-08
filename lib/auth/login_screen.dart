@@ -77,14 +77,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
 
                 if (notificationResult['success']) {
-                  print('✅ Login notification sent successfully');
                 } else {
-                  print(
-                    '⚠️ Failed to send login notification: ${notificationResult['message']}',
-                  );
                 }
               } catch (e) {
-                print('❌ Error sending login notification: $e');
               }
             }
 

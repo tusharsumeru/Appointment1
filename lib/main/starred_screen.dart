@@ -126,8 +126,6 @@ class _StarredScreenState extends State<StarredScreen> {
   }
 
   Future<void> _toggleStar(String appointmentId) async {
-    print('🔍 _toggleStar called with appointmentId: $appointmentId');
-    print('🔍 Current appointments count: ${_appointments.length}');
     
     // Find the appointment index before making the API call
     final index = _appointments.indexWhere((appointment) => 
@@ -135,10 +133,8 @@ class _StarredScreenState extends State<StarredScreen> {
       appointment['appointmentId'] == appointmentId
     );
     
-    print('🔍 Found appointment at index: $index');
     
     if (index == -1) {
-      print('❌ Appointment not found in starred list: $appointmentId');
       return;
     }
 
@@ -149,30 +145,25 @@ class _StarredScreenState extends State<StarredScreen> {
 
     // Get current starred status
     final currentStarredStatus = _appointments[index]['starred'] ?? false;
-    print('🔍 Current starred status: $currentStarredStatus');
     
     // Optimistically update UI first (like inbox screen)
     setState(() {
       _appointments[index]['starred'] = !currentStarredStatus;
     });
-    print('🔍 Optimistically updated to: ${!currentStarredStatus}');
 
     try {
       // Call the API to update starred status
       final desiredStarredStatus = !currentStarredStatus;
       final result = await ActionService.updateStarred(appointmentId, starred: desiredStarredStatus);
-      print('🔍 API result: $result');
       
       if (result['success']) {
         // Update with the actual response from API
         final newStarredStatus = result['data']?['starred'] ?? !currentStarredStatus;
-        print('🔍 New starred status from API: $newStarredStatus');
         
         // Check if the API response matches our expected toggle
         final expectedNewStatus = !currentStarredStatus;
         final finalStatus = (newStarredStatus == expectedNewStatus) ? newStarredStatus : expectedNewStatus;
         
-        print('🔍 Expected status: $expectedNewStatus, final status: $finalStatus');
         
         setState(() {
           // Update the starred status in the list
@@ -182,7 +173,6 @@ class _StarredScreenState extends State<StarredScreen> {
           
           // If unstarred, remove from starred screen
           if (!finalStatus) {
-            print('🔍 Removing unstarred appointment from starred screen');
             _appointments.removeAt(index);
           }
         });
@@ -199,7 +189,6 @@ class _StarredScreenState extends State<StarredScreen> {
         }
       } else {
         // Revert the optimistic update on failure
-        print('🔍 API failed, reverting to: $currentStarredStatus');
         setState(() {
           _appointments[index]['starred'] = currentStarredStatus;
         });
@@ -216,7 +205,6 @@ class _StarredScreenState extends State<StarredScreen> {
       }
     } catch (e) {
       // Revert the optimistic update on error
-      print('🔍 Exception occurred: $e');
       setState(() {
         _appointments[index]['starred'] = currentStarredStatus;
       });
@@ -244,7 +232,6 @@ class _StarredScreenState extends State<StarredScreen> {
   }
 
   Future<void> _fetchSecretaries() async {
-    print('🔍 _fetchSecretaries() called');
     setState(() {
       _isLoadingSecretaries = true;
     });
@@ -255,58 +242,42 @@ class _StarredScreenState extends State<StarredScreen> {
         isActive: true,
       );
 
-      print('🔍 Secretaries API result: $result');
 
       if (result['success']) {
         final data = result['data'];
-        print('🔍 Secretaries data: $data');
         
         if (data != null && data['secretaries'] != null) {
           final List<dynamic> secretariesData = data['secretaries'];
-          print('🔍 Secretaries list: $secretariesData');
           
           setState(() {
             _secretaries = secretariesData.cast<Map<String, dynamic>>();
           });
           
-          print('🔍 Final secretaries list: $_secretaries');
-          print('🔍 Secretaries count: ${_secretaries.length}');
         } else {
-          print('🔍 No secretaries data found in response');
         }
       } else {
-        print('🔍 Secretaries API call failed: ${result['message']}');
       }
     } catch (e) {
-      print('❌ Error fetching secretaries: $e');
     } finally {
       setState(() {
         _isLoadingSecretaries = false;
       });
-      print('🔍 _isLoadingSecretaries set to false');
     }
   }
 
   void _showFilterBottomSheet() {
-    print('🔍 _showFilterBottomSheet() called');
-    print('🔍 Current secretaries count: ${_secretaries.length}');
-    print('🔍 Current secretaries: $_secretaries');
-    print('🔍 _isLoadingSecretaries: $_isLoadingSecretaries');
     
     // Pre-load secretaries if not already loaded
     if (_secretaries.isEmpty && !_isLoadingSecretaries) {
-      print('🔍 Fetching secretaries before showing bottom sheet');
       _fetchSecretaries();
     }
 
-    print('🔍 Showing bottom sheet with secretaries: $_secretaries');
     
     showFilterBottomSheetForStarred(
       context: context,
       secretaries: _secretaries,
       selectedFilter: _selectedFilter,
       onFilterSelected: (String filter) {
-        print('🔍 Filter selected: $filter');
         setState(() {
           _selectedFilter = filter;
           _currentPage = 1;
@@ -709,8 +680,6 @@ class _StarredScreenState extends State<StarredScreen> {
                             appointment: appointment,
                             index: index, // Pass the index for alternating colors
                             onStarToggle: isStarToggleLoading ? null : (isStarred) async {
-                              print('🔍 AppointmentCard onStarToggle called with isStarred: $isStarred');
-                              print('🔍 Appointment ID: $appointmentId');
                               await _toggleStar(appointmentId);
                             },
                           );

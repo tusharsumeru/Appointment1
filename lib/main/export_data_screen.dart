@@ -17,7 +17,6 @@ class _ExportDataScreenState extends State<ExportDataScreen> {
       _currentSearchQuery = query;
     });
     // Handle search logic here
-    print('Search query: $query');
   }
 
   void _onFiltersApplied(Map<String, dynamic> filters) {
@@ -25,7 +24,6 @@ class _ExportDataScreenState extends State<ExportDataScreen> {
       _currentFilters = filters;
     });
     // Handle filter logic here
-    print('Filters applied: $filters');
   }
 
   @override
