@@ -3,6 +3,7 @@ import '../components/sidebar/sidebar_component.dart';
 import '../components/reference-from/reference_card.dart';
 import '../components/reference-from/reference_detail_screen.dart';
 import '../components/reference-from/filter.dart';
+import '../components/reference-from/bulk_email_bottom_sheet.dart';
 import '../action/action.dart';
 
 class ReferenceFromListScreen extends StatefulWidget {
@@ -27,6 +28,14 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
   String _selectedStatus = 'all';
   DateTime? _startDate;
   DateTime? _endDate;
+  
+  // Pagination variables
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  int _itemsPerPage = 20;
+  bool _hasNextPage = false;
+  bool _hasPreviousPage = false;
 
 
   @override
@@ -105,6 +114,33 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
     _applyFilters();
   }
 
+  // Pagination navigation methods
+  void _goToNextPage() {
+    if (_hasNextPage && !_isLoading) {
+      _loadReferenceDataWithFilters(page: _currentPage + 1);
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (_hasPreviousPage && !_isLoading) {
+      _loadReferenceDataWithFilters(page: _currentPage - 1);
+    }
+  }
+
+  void _goToPage(int page) {
+    if (page >= 1 && page <= _totalPages && page != _currentPage && !_isLoading) {
+      _loadReferenceDataWithFilters(page: page);
+    }
+  }
+
+  // Get count of approved forms only
+  int _getApprovedFormsCount() {
+    return _filteredReferenceData.where((form) {
+      final status = (form['status'] ?? '').toString().toLowerCase();
+      return status == 'approved';
+    }).length;
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -123,11 +159,18 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
     await _loadReferenceDataWithFilters();
   }
 
-  Future<void> _loadReferenceDataWithFilters({bool isRefresh = false}) async {
+  Future<void> _loadReferenceDataWithFilters({bool isRefresh = false, int? page}) async {
     try {
       // Check if widget is still mounted before proceeding
       if (!mounted) {
         return;
+      }
+
+      // Reset to page 1 on refresh or when applying new filters
+      if (isRefresh || page == null) {
+        _currentPage = 1;
+      } else {
+        _currentPage = page;
       }
 
       // Clear data on refresh
@@ -171,6 +214,8 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         search: searchFilter,
         startDate: startDateFilter,
         endDate: endDateFilter,
+        page: _currentPage,
+        limit: _itemsPerPage,
       );
       
       // Check if widget is still mounted after API call
@@ -183,6 +228,15 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         final data = result['data'];
         if (data != null && data['forms'] != null) {
           final forms = List<Map<String, dynamic>>.from(data['forms']);
+          
+          // Parse pagination information
+          final pagination = data['pagination'];
+          if (pagination != null) {
+            _totalPages = pagination['totalPages'] ?? 1;
+            _totalItems = pagination['totalItems'] ?? 0;
+            _hasNextPage = pagination['hasNextPage'] ?? false;
+            _hasPreviousPage = pagination['hasPreviousPage'] ?? false;
+          }
           
           setState(() {
             _referenceData = forms;
@@ -561,7 +615,44 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           ),
         ),
         
-        const SizedBox(height: 0),
+        // Bulk Email Button
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  _showBulkEmailBottomSheet();
+                },
+                icon: const Icon(
+                  Icons.mail,
+                  size: 16,
+                  color: Colors.blue,
+                ),
+                label: Text(
+                  'Bulk Email (${_getApprovedFormsCount()})',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blue,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.blue.shade200),
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 32),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
         
         // Reference List with Pull-to-Refresh
         Expanded(
@@ -662,9 +753,14 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
 
     return ListView.builder(
       physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _filteredReferenceData.length,
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      itemCount: _filteredReferenceData.length + (_totalPages > 1 ? 1 : 0), // Add 1 for pagination if needed
       itemBuilder: (context, index) {
+        // Show pagination controls after all cards
+        if (index == _filteredReferenceData.length && _totalPages > 1) {
+          return _buildPaginationControls();
+        }
+        
         final reference = _filteredReferenceData[index];
         return ReferenceCard(
           referenceData: reference,
@@ -678,6 +774,255 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showBulkEmailBottomSheet() {
+    // Filter to show only approved forms
+    final approvedForms = _filteredReferenceData.where((form) {
+      final status = (form['status'] ?? '').toString().toLowerCase();
+      return status == 'approved';
+    }).toList();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BulkEmailBottomSheet(
+        referenceForms: approvedForms,
+        onSendBulkEmail: (selectedForms, message) async {
+          print('📧 onSendBulkEmail callback started with ${selectedForms.length} forms');
+          print('📧 Selected forms data: $selectedForms');
+          try {
+            // Extract selected forms with valid emails (matching JavaScript logic)
+            final selectedFormsData = selectedForms
+                .map((form) => {
+                      'appointmentId': form['id'] ?? form['_id'] ?? 'reference-form-${form['id']}',
+                      'email': form['email'],
+                      'name': form['name'],
+                    })
+                .where((form) => form['email'] != null)
+                .toList();
+
+            if (selectedFormsData.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("No valid email addresses found in selected forms."),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+
+            print('📧 Prepared ${selectedFormsData.length} recipients for API call');
+            print('📧 Recipients: $selectedFormsData');
+            
+            // Debug each recipient individually
+            for (int i = 0; i < selectedFormsData.length; i++) {
+              final recipient = selectedFormsData[i];
+              print('📧 Recipient $i: email=${recipient['email']}, name=${recipient['name']}, appointmentId=${recipient['appointmentId']}');
+            }
+
+            // Use the specific reference form approved template
+            const templateId = '68bed8fc7b0353b2a4db5776';
+            print('📧 Using Reference Form Approved template ID: $templateId');
+            print('📧 Note: This template may not populate all variables correctly for reference forms');
+
+            // Call the bulk email API with tags (matching JavaScript logic)
+            print('📧 Calling ActionService.sendBulkEmail...');
+            print('📧 Note: Template variables may be empty since reference forms don\'t have appointment data');
+            final result = await ActionService.sendBulkEmail(
+              templateId: templateId,
+              recipients: selectedFormsData,
+              tags: ["reference-forms", "bulk"],
+              message: message ?? "",
+            );
+            print('📧 API call completed with result: $result');
+
+            // Show result message (matching JavaScript logic)
+            if (result['success'] == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Bulk email sent to ${selectedFormsData.length} approved applicants successfully!',
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result['message'] ?? 'Failed to send bulk email'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error sending bulk email: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border(
+          top: BorderSide(color: Colors.grey[300]!),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Page info
+          Text(
+            'Page $_currentPage of $_totalPages (${_totalItems} total items)',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Pagination buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Previous button
+              ElevatedButton.icon(
+                onPressed: _hasPreviousPage && !_isLoading ? _goToPreviousPage : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('Previous'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _hasPreviousPage && !_isLoading ? Colors.deepOrange : Colors.grey[300],
+                  foregroundColor: _hasPreviousPage && !_isLoading ? Colors.white : Colors.grey[600],
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Page numbers (show up to 5 pages)
+              ..._buildPageNumbers(),
+              
+              const SizedBox(width: 16),
+              
+              // Next button
+              ElevatedButton.icon(
+                onPressed: _hasNextPage && !_isLoading ? _goToNextPage : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('Next'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _hasNextPage && !_isLoading ? Colors.deepOrange : Colors.grey[300],
+                  foregroundColor: _hasNextPage && !_isLoading ? Colors.white : Colors.grey[600],
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers() {
+    List<Widget> pageNumbers = [];
+    
+    // Calculate which pages to show
+    int startPage = (_currentPage - 2).clamp(1, _totalPages);
+    int endPage = (_currentPage + 2).clamp(1, _totalPages);
+    
+    // Adjust if we're near the beginning or end
+    if (endPage - startPage < 4) {
+      if (startPage == 1) {
+        endPage = (startPage + 4).clamp(1, _totalPages);
+      } else {
+        startPage = (endPage - 4).clamp(1, _totalPages);
+      }
+    }
+    
+    // Add first page and ellipsis if needed
+    if (startPage > 1) {
+      pageNumbers.add(_buildPageButton(1));
+      if (startPage > 2) {
+        pageNumbers.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text('...', style: TextStyle(color: Colors.grey[600])),
+          ),
+        );
+      }
+    }
+    
+    // Add page numbers
+    for (int i = startPage; i <= endPage; i++) {
+      pageNumbers.add(_buildPageButton(i));
+    }
+    
+    // Add ellipsis and last page if needed
+    if (endPage < _totalPages) {
+      if (endPage < _totalPages - 1) {
+        pageNumbers.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text('...', style: TextStyle(color: Colors.grey[600])),
+          ),
+        );
+      }
+      pageNumbers.add(_buildPageButton(_totalPages));
+    }
+    
+    return pageNumbers;
+  }
+
+  Widget _buildPageButton(int page) {
+    final isCurrentPage = page == _currentPage;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      child: ElevatedButton(
+        onPressed: !_isLoading ? () => _goToPage(page) : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isCurrentPage ? Colors.deepOrange : Colors.white,
+          foregroundColor: isCurrentPage ? Colors.white : Colors.grey[700],
+          elevation: isCurrentPage ? 2 : 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+            side: BorderSide(
+              color: isCurrentPage ? Colors.deepOrange : Colors.grey[300]!,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          minimumSize: const Size(40, 36),
+        ),
+        child: Text(
+          page.toString(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: isCurrentPage ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }

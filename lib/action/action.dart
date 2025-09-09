@@ -3641,15 +3641,58 @@ class ActionService {
     required String templateId,
     required List<Map<String, dynamic>> recipients,
     List<String>? tags,
-    String? subject,
-    String? content,
+    String? rescheduleDate,
+    String? rescheduleTime,
+    String? rescheduleVenue,
+    String? rescheduleVenueName,
+    String? message,
   }) async {
+    print('🚀 sendBulkEmail function called with templateId: $templateId, recipients: ${recipients.length}');
     final Uri url = Uri.parse('$baseUrl/email-templates/bulk');
+    print('🌐 Full API URL: $url');
+
+    // Validate required fields
+    if (templateId.isEmpty || recipients.isEmpty) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'Template ID and recipients are required',
+        'error': 'Missing required parameters',
+      };
+    }
+
+    // Validate recipients array
+    if (recipients.isEmpty) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'Recipients must be a non-empty array',
+        'error': 'Invalid recipients format',
+      };
+    }
+
+    // Validate each recipient
+    for (int i = 0; i < recipients.length; i++) {
+      final recipient = recipients[i];
+      if (recipient['email'] == null || recipient['appointmentId'] == null) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Recipient at index $i must have email and appointmentId',
+          'error': 'Invalid recipient data',
+        };
+      }
+    }
 
     final Map<String, dynamic> requestBody = {
       'templateId': templateId,
       'recipients': recipients,
-      'tags': tags ?? ['bulk-email', 'appointment'],
+      if (tags != null) 'tags': tags,
+      if (rescheduleDate != null) 'rescheduleDate': rescheduleDate,
+      if (rescheduleTime != null) 'rescheduleTime': rescheduleTime,
+      if (rescheduleVenue != null) 'rescheduleVenue': rescheduleVenue,
+      if (rescheduleVenueName != null) 'rescheduleVenueName': rescheduleVenueName,
+      if (message != null) 'message': message,
     };
 
     try {
@@ -3657,11 +3700,16 @@ class ActionService {
       final token = await StorageService.getToken();
 
       if (token == null) {
-        throw Exception('No authentication token found. Please login again.');
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Authentication token not found',
+          'error': 'Please login again',
+        };
       }
 
-      print('🌐 Making bulk email API call to: $url');
-      print('📤 Request body: ${jsonEncode(requestBody)}');
+      print('📧 Calling sendBulkEmail API: $url');
+      print('📧 Request body: ${jsonEncode(requestBody)}');
 
       final response = await http.post(
         url,
@@ -3672,46 +3720,38 @@ class ActionService {
         body: jsonEncode(requestBody),
       );
 
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response headers: ${response.headers}');
-      print('📥 Response body: ${response.body}');
+      print('📧 sendBulkEmail API response status: ${response.statusCode}');
+      print('📧 sendBulkEmail API response body: ${response.body}');
 
-      // Check if response is JSON
-      if (response.headers['content-type']?.contains('application/json') ==
-          true) {
-        final data = jsonDecode(response.body);
-        if (response.statusCode == 200 &&
-            (data['success'] == true || data['error'] == null)) {
-          print('✅ Bulk email sent successfully: ${data["data"]}');
-          return {
-            'success': true,
-            'message': data['message'] ?? 'Bulk email sent successfully',
-            'data': data['data'],
-          };
-        } else {
-          print('❌ Bulk email failed: ${data['message']}');
-          return {
-            'success': false,
-            'message': data['message'] ?? 'Failed to send bulk email',
-          };
-        }
-      } else {
-        // Response is not JSON (probably HTML error page)
-        print(
-          '❌ Response is not JSON. Status: ${response.statusCode}, Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...',
-        );
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse sendBulkEmail response as JSON: $e');
         return {
           'success': false,
-          'message':
-              'Server returned invalid response. Status: ${response.statusCode}',
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
         };
       }
-    } catch (e) {
-      print('❌ Error sending bulk email: $e');
+
       return {
+        'status': response.statusCode,
+        'data': responseData['data'],
+        'message': responseData['message'],
+        'success': responseData['success'] ?? (response.statusCode == 200),
+        'error': responseData['error'],
+      };
+    } catch (error) {
+      print('❌ sendBulkEmail error: $error');
+      return {
+        'status': 500,
+        'data': null,
+        'message': 'Failed to send bulk emails',
         'success': false,
-        'message':
-            'Something went wrong while sending bulk email. Please try again.',
+        'error': error.toString(),
       };
     }
   }
@@ -4798,6 +4838,7 @@ static Future<Map<String, dynamic>> registerUser({
     String? teachercode,
     String? teacheremail,
     String? mobilenumber,
+    List<String>? programTypesCanTeach,
     required File profilePhotoFile,
   }) async {
     try {
@@ -4872,6 +4913,7 @@ static Future<Map<String, dynamic>> registerUser({
         'teachercode': teachercode,
         'teacheremail': teacheremail,
         'mobilenumber': mobilenumber,
+        'programTypesCanTeach': programTypesCanTeach,
       };
       // :white_check_mark: 6. Create multipart request for file upload
       final request = http.MultipartRequest(
@@ -8261,6 +8303,172 @@ static Future<Map<String, dynamic>> registerUser({
       }
     } catch (e) {
       print('Create desk user error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Send OTP email to AOL teacher for verification
+  /// 
+  /// Parameters:
+  /// - email: Teacher's email address
+  /// - fullName: Teacher's full name (optional)
+  /// - purpose: Purpose of OTP (default: "verification")
+  ///
+  /// Returns:
+  /// - Map containing OTP send result and status
+  static Future<Map<String, dynamic>> sendAolTeacherOtpEmail({
+    required String email,
+    String? fullName,
+    String purpose = "verification",
+  }) async {
+    try {
+      // ✅ 1. Validate required fields
+      if (email.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Email is required',
+        };
+      }
+
+      // ✅ 2. Validate email format
+      final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+      if (!emailRegex.hasMatch(email)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please provide a valid email address',
+        };
+      }
+
+      // ✅ 3. Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+        'fullName': fullName?.trim(),
+        'purpose': purpose,
+      };
+
+      // ✅ 4. Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/aol-teacher/otp-email'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // ✅ 5. Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // ✅ 6. OTP sent successfully
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'OTP sent successfully to AOL teacher email',
+        };
+      } else {
+        // ✅ 7. Failed to send OTP
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to send OTP',
+        };
+      }
+    } catch (e) {
+      // ✅ 8. Handle network/parsing errors
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Verify AOL teacher OTP
+  /// 
+  /// Parameters:
+  /// - email: Teacher's email address
+  /// - code: OTP code to verify
+  /// - purpose: Purpose of OTP (default: "verification")
+  ///
+  /// Returns:
+  /// - Map containing OTP verification result and status
+  static Future<Map<String, dynamic>> verifyAolTeacherOtp({
+    required String email,
+    required String code,
+    String purpose = "verification",
+  }) async {
+    try {
+      // ✅ 1. Validate required fields
+      if (email.isEmpty || code.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Email and code are required',
+        };
+      }
+
+      // ✅ 2. Validate email format
+      final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+      if (!emailRegex.hasMatch(email)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please provide a valid email address',
+        };
+      }
+
+      // ✅ 3. Validate OTP format (6 digits)
+      final otpRegex = RegExp(r'^\d{6}$');
+      if (!otpRegex.hasMatch(code)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'OTP must be a 6-digit number',
+        };
+      }
+
+      // ✅ 4. Prepare request body
+      final Map<String, dynamic> requestBody = {
+        'email': email.toLowerCase().trim(),
+        'code': code.trim(),
+        'purpose': purpose,
+      };
+
+      // ✅ 5. Make API call
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/aol-teacher/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      // ✅ 6. Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // ✅ 7. OTP verified successfully
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'OTP verified successfully',
+        };
+      } else {
+        // ✅ 8. OTP verification failed
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'OTP verification failed',
+        };
+      }
+    } catch (e) {
+      // ✅ 9. Handle network/parsing errors
       return {
         'success': false,
         'statusCode': 500,

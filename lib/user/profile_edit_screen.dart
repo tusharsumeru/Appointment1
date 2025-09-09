@@ -1829,9 +1829,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     // Check if user is an AOL teacher
     final aolTeacherData = widget.userData?['aol_teacher'];
     final atolValidationData = aolTeacherData?['atolValidationData'];
+    final aolTeacher = aolTeacherData?['aolTeacher'];
 
     // Check if teacher verification is successful
-    final bool isTeacherVerified = atolValidationData?['verified'] == true;
+    // For Indian Teachers: check atolValidationData.verified
+    // For International Teachers: check aolTeacher.isTeacher
+    final bool isTeacherVerified = atolValidationData?['verified'] == true || 
+                                  aolTeacher?['isTeacher'] == true;
 
     if (!isTeacherVerified) {
       // Show "Not an AOL Teacher" message
@@ -1906,10 +1910,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
     // Get teacher details from API response
     final teacherDetails = atolValidationData?['data']?['teacherdetails'];
-    final teacherCode = aolTeacherData?['aolTeacher']?['teacherCode'] ?? 'N/A';
-    final teacherEmail =
-        aolTeacherData?['aolTeacher']?['teacherEmail'] ?? 'N/A';
+    final teacherCode = aolTeacher?['teacherCode'] ?? 'N/A';
+    final teacherEmail = aolTeacher?['teacherEmail'] ?? 'N/A';
     final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
+    
+    // Get phone number for International Teachers
+    final teacherPhoneNumber = aolTeacher?['teacherPhoneNumber'];
+    final phoneNumber = teacherPhoneNumber != null 
+        ? '${teacherPhoneNumber['countryCode']} ${teacherPhoneNumber['number']}'
+        : 'N/A';
+    
+    // Get courses/programs for International Teachers
+    final coursesTeaching = aolTeacher?['coursesTeaching'] as List<dynamic>?;
+    final programs = coursesTeaching?.isNotEmpty == true 
+        ? coursesTeaching!.join(', ')
+        : 'N/A';
 
     return Container(
       width: double.infinity,
@@ -1988,7 +2003,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 const SizedBox(height: 16),
 
                 // Teacher Details
-                _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
+                // Show name for Indian Teachers, or use fullName for International Teachers
+                _buildTeacherDetail('Name', teacherDetails?['name'] ?? widget.userData?['fullName'] ?? 'N/A'),
                 const SizedBox(height: 8),
                 _buildTeacherDetail('Type', teacherType),
                 const SizedBox(height: 8),
@@ -1996,9 +2012,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 const SizedBox(height: 8),
                 _buildTeacherDetail('Teacher Email', teacherEmail),
                 const SizedBox(height: 8),
+                // Show phone number for International Teachers
+                if (phoneNumber != 'N/A') ...[
+                  _buildTeacherDetail('Phone Number', phoneNumber),
+                  const SizedBox(height: 8),
+                ],
                 _buildTeacherDetail(
                   'Programs',
-                  teacherDetails?['program_types_can_teach'] ?? 'N/A',
+                  // For Indian Teachers: use teacherDetails, for International Teachers: use coursesTeaching
+                  teacherDetails?['program_types_can_teach'] ?? programs,
                 ),
               ],
             ),

@@ -161,7 +161,7 @@ class ReferenceDetailScreen extends StatelessWidget {
   Widget _buildGridLayout(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isLargeScreen = constraints.maxWidth > 1024;
+        bool isLargeScreen = constraints.maxWidth > 768; // Lowered from 1024 to 768
         
         return isLargeScreen 
             ? _buildDesktopGrid(context)
@@ -174,7 +174,7 @@ class ReferenceDetailScreen extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left Column - Profile Picture and Action Buttons
+        // Left Column - Profile Picture
         Expanded(
           flex: 1,
           child: Column(
@@ -236,50 +236,11 @@ class ReferenceDetailScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Status Badge
-              Center(child: _buildStatusBadge(status)),
-              const SizedBox(height: 16), // Reduced from 24 to 16
-              // Action Buttons
-              if (status.toLowerCase() == 'pending') ...[
-                SizedBox(
-                  width: 192, // max-w-48 = 192px
-                  child: Column(
-                    children: [
-                      _buildActionButton(
-                        'Approve',
-                        Icons.check_circle,
-                        const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)], // from-green-500 to-emerald-600
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        () {
-                          // Handle approve action
-                        },
-                      ),
-                      const SizedBox(height: 12), // gap-3
-                      _buildActionButton(
-                        'Reject',
-                        Icons.cancel,
-                        const LinearGradient(
-                          colors: [Color(0xFFEF4444), Color(0xFFE11D48)], // from-red-500 to-rose-600
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        () {
-                          // Handle reject action
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),
         const SizedBox(width: 32), // gap-6 lg:gap-8
-        // Right Column - Name and Personal Info Cards
+        // Right Column - Name, Status, and Personal Info Cards
         Expanded(
           flex: 1,
           child: Column(
@@ -311,6 +272,50 @@ class ReferenceDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              // Status Badge and Action Buttons
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status Badge
+                  _buildStatusBadge(status),
+                  const SizedBox(width: 16),
+                  // Action Buttons (if pending)
+                  if (status.toLowerCase() == 'pending') ...[
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildActionButton(
+                            'Approve',
+                            Icons.check_circle,
+                            const LinearGradient(
+                              colors: [Color(0xFF10B981), Color(0xFF059669)], // from-green-500 to-emerald-600
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            () {
+                              // Handle approve action
+                            },
+                          ),
+                          const SizedBox(height: 12), // gap-3
+                          _buildActionButton(
+                            'Reject',
+                            Icons.cancel,
+                            const LinearGradient(
+                              colors: [Color(0xFFEF4444), Color(0xFFE11D48)], // from-red-500 to-rose-600
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            () {
+                              // Handle reject action
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 24),
               // Personal Information Cards
               _buildPersonalInfoCards(),
             ],
@@ -323,103 +328,110 @@ class ReferenceDetailScreen extends StatelessWidget {
   Widget _buildMobileGrid(BuildContext context) {
     return Column(
       children: [
-        // Profile Picture
-        GestureDetector(
-          onTap: profilePic != null && profilePic!.isNotEmpty 
-              ? () => _showProfilePhoto(context, profilePic!) 
-              : null,
-          child: Container(
-            width: 192, // w-48 = 192px
-            height: 192,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white, width: 4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 25,
-                  offset: const Offset(0, 8),
+        // Top Row with Profile Picture and Status
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Picture (Left)
+            GestureDetector(
+              onTap: profilePic != null && profilePic!.isNotEmpty 
+                  ? () => _showProfilePhoto(context, profilePic!) 
+                  : null,
+              child: Container(
+                width: 120, // Smaller for mobile
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 25,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: profilePic != null && profilePic!.isNotEmpty
-                  ? Image.network(
-                      profilePic!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: profilePic != null && profilePic!.isNotEmpty
+                      ? Image.network(
+                          profilePic!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[100],
+                              child: Center(
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : Container(
                           color: Colors.grey[100],
                           child: Center(
                             child: Text(
                               name.isNotEmpty ? name[0].toUpperCase() : '?',
                               style: const TextStyle(
-                                fontSize: 48,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.grey,
                               ),
                             ),
                           ),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[100],
-                      child: Center(
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
                         ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Status Badge and Action Buttons (Right)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status Badge
+                  _buildStatusBadge(status),
+                  const SizedBox(height: 12),
+                  // Action Buttons (if pending)
+                  if (status.toLowerCase() == 'pending') ...[
+                    _buildActionButton(
+                      'Approve',
+                      Icons.check_circle,
+                      const LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      () {
+                        // Handle approve action
+                      },
                     ),
+                    const SizedBox(height: 8),
+                    _buildActionButton(
+                      'Reject',
+                      Icons.cancel,
+                      const LinearGradient(
+                        colors: [Color(0xFFEF4444), Color(0xFFE11D48)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      () {
+                        // Handle reject action
+                      },
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 16),
-        // Status Badge
-        Center(child: _buildStatusBadge(status)),
-        const SizedBox(height: 16), // Reduced from 24 to 16
-        // Action Buttons
-        if (status.toLowerCase() == 'pending') ...[
-          SizedBox(
-            width: 192,
-            child: Column(
-              children: [
-                _buildActionButton(
-                  'Approve',
-                  Icons.check_circle,
-                  const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  () {
-                    // Handle approve action
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildActionButton(
-                  'Reject',
-                  Icons.cancel,
-                  const LinearGradient(
-                    colors: [Color(0xFFEF4444), Color(0xFFE11D48)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  () {
-                    // Handle reject action
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 24), // Reduced from 32 to 24
+        const SizedBox(height: 24),
         // Name and Date Section
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,7 +439,7 @@ class ReferenceDetailScreen extends StatelessWidget {
             Text(
               name,
               style: const TextStyle(
-                fontSize: 32,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF18181B),
               ),
@@ -436,7 +448,7 @@ class ReferenceDetailScreen extends StatelessWidget {
             Text(
               'Submitted on $createdAt',
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 color: Color(0xFF71717A),
                 fontWeight: FontWeight.w500,
               ),
