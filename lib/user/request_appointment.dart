@@ -38,6 +38,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
   String? _teacherType; // Add teacher type field
   bool _isFormValid = false;
   bool _isLoading = true; // Add loading state
+  String? _teacherCode; // Extracted teacher code to display
 
   @override
   void initState() {
@@ -158,25 +159,50 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
       // Handle teacher status - check atolValidationData.verified field inside aol_teacher (same as profile screen)
       bool isTeacher = false;
       String? teacherType;
+      String? teacherCode;
 
       // Debug prints to show what values are coming in
 
-      if (userData?['aol_teacher'] != null &&
-          userData!['aol_teacher'] is Map<String, dynamic> &&
-          userData!['aol_teacher']['atolValidationData'] != null &&
-          userData!['aol_teacher']['atolValidationData']['verified'] == true) {
-        isTeacher = true;
-        // Extract teacher type
-        teacherType = userData!['aol_teacher']['teacher_type'] ?? 'N/A';
-        print(
-          '👨‍🏫 Teacher status: YES (aol_teacher.atolValidationData.verified = true)',
-        );
-        print('👨‍🏫 Teacher type: $teacherType');
+      final aolTeacherData = userData?['aol_teacher'];
+      if (aolTeacherData is Map<String, dynamic>) {
+        final atolValidationData = aolTeacherData['atolValidationData'];
+        final aolTeacherInner = aolTeacherData['aolTeacher'];
+        final teacherTypeStr = aolTeacherData['teacher_type']?.toString();
+        // Extract teacher code if present
+        if (aolTeacherInner is Map<String, dynamic>) {
+          final code = aolTeacherInner['teacherCode']?.toString();
+          if (code != null && code.isNotEmpty) {
+            teacherCode = code;
+          }
+        }
+
+        // Determine international teacher
+        bool isInternationalTeacher = (aolTeacherData['isInternational'] == true) ||
+            (teacherTypeStr != null && teacherTypeStr.toLowerCase().contains('taol'));
+
+        // Verified Indian teacher
+        final isVerifiedIndian = (atolValidationData is Map<String, dynamic>) &&
+            (atolValidationData['verified'] == true);
+
+        // AOL teacher flag from inner object
+        final isAolTeacherInner = (aolTeacherInner is Map<String, dynamic>) &&
+            (aolTeacherInner['isTeacher'] == true);
+
+        if (isInternationalTeacher) {
+          isTeacher = true; // Show Yes for international teacher
+          teacherType = teacherTypeStr ?? 'TAOL Teacher';
+          print('👨‍🏫 Teacher status: YES (International teacher)');
+        } else if (isVerifiedIndian || isAolTeacherInner) {
+          isTeacher = true; // Show Yes for verified or explicit AOL teacher
+          teacherType = teacherTypeStr ?? 'Teacher';
+          print('👨‍🏫 Teacher status: YES (Verified/Inner AOL teacher)');
+        } else {
+          isTeacher = false;
+          print('👨‍🏫 Teacher status: NO (Not verified and not international)');
+        }
       } else {
         isTeacher = false;
-        print(
-          '👨‍🏫 Teacher status: NO (aol_teacher.atolValidationData.verified != true or field not found)',
-        );
+        print('👨‍🏫 Teacher status: NO (aol_teacher not found)');
       }
 
       print('📝 Form field values set:');
@@ -196,6 +222,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
         _isTeacher = isTeacher;
         _teacherType = teacherType;
         _isLoading = false; // Set loading to false after data is loaded
+        _teacherCode = teacherCode;
       });
 
       print(
@@ -467,8 +494,8 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                           ],
                         ),
 
-                        // Show teacher type if user is a teacher
-                        if (_isTeacher && _teacherType != null) ...[
+                        // Show teacher code if user is a teacher
+                        if (_isTeacher && _teacherCode != null && _teacherCode!.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -493,19 +520,11 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Teacher Type: $_teacherType',
+                                        'Teacher Code: ${_teacherCode!}',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.green.shade700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Verified AOL Teacher',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.green.shade600,
                                         ),
                                       ),
                                     ],

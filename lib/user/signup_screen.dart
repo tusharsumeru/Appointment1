@@ -2338,11 +2338,14 @@ class _SignupScreenState extends State<SignupScreen> {
           full_address: _locationController.text.trim(),
           userTags: _selectedRoles.toList(),
           aol_teacher: _selectedTeacherType == 'yes',
-          teacher_type: _selectedTeacherType == 'yes' ? 'Teacher' : null,
+          teacher_type: _selectedTeacherType == 'yes'
+              ? (_selectedTeacherRegion == 'international' ? 'TAOL Teacher' : 'Teacher')
+              : null,
           teachercode: teacherCode,
           teacheremail: teacherEmail,
           mobilenumber: teacherMobile,
           programTypesCanTeach: programTypesCanTeach,
+          isInternational: _selectedTeacherType == 'yes' && _selectedTeacherRegion == 'international',
           profilePhotoFile: _selectedImageFile!,
         );
 
@@ -2994,10 +2997,15 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ],
                 ),
+                constraints: const BoxConstraints(
+                  maxHeight: 120, // Limit height to show max 3 items
+                ),
                 child: ListView.builder(
                   shrinkWrap: true,
                   padding: EdgeInsets.zero,
-                  itemCount: _locationSuggestions.length,
+                  itemCount: _locationSuggestions.length > 3 
+                      ? 3 
+                      : _locationSuggestions.length,
                   itemBuilder: (context, index) {
                     return ListTile(
                       dense: true,
@@ -3273,7 +3281,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Teacher Verified',
+                        'Not Verified',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -3300,7 +3308,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 _buildTeacherDetailRow('Teacher Code:', data['teacherCode'] ?? 'N/A'),
                 _buildTeacherDetailRow('Email:', data['email'] ?? 'N/A'),
                 _buildTeacherDetailRow('Phone:', data['phone'] ?? 'N/A'),
-                _buildTeacherDetailRow('Type:', 'TOAL Teacher'),
+                _buildTeacherDetailRow('Type:', 'Teacher'),
                 _buildTeacherDetailRow('Programs:', data['teach'] ?? 'N/A'),
               ],
             ),

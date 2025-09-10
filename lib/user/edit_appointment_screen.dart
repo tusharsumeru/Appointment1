@@ -734,6 +734,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
             _mainGuestPhotoFile!,
             submitType: 'accompanyuser',
+
           );
 
           // Check if duplicates were found (similar to web version logic)
@@ -4606,4 +4607,5 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 }
+
 

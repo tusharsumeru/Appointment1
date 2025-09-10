@@ -186,7 +186,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   GestureDetector(
                     onTap: () => _selectDate(context),
                     child: Container(
-                      width: 192, // w-48 equivalent (48 * 4 = 192)
+                      width: 200, // w-48 equivalent (48 * 4 = 192)
                       height: 44, // h-11 equivalent (11 * 4 = 44)
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(

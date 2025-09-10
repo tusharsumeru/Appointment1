@@ -1964,20 +1964,43 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     if (createdBy is Map<String, dynamic>) {
       final aolTeacherNested = createdBy['aol_teacher'];
       if (aolTeacherNested is Map<String, dynamic>) {
+        // Determine international teacher
+        bool isInternationalTeacher = false;
+        if (aolTeacherNested['isInternational'] == true) {
+          isInternationalTeacher = true;
+        }
+        final tType = aolTeacherNested['teacher_type']?.toString().toLowerCase();
+        if (tType != null && tType.contains('taol')) {
+          isInternationalTeacher = true;
+        }
+
         final atolValidationData = aolTeacherNested['atolValidationData'];
         if (atolValidationData is Map<String, dynamic>) {
-          final data = atolValidationData['data'];
-          if (data is Map<String, dynamic>) {
-            final teacherDetails = data['teacherdetails'];
-            if (teacherDetails is Map<String, dynamic>) {
-              return teacherDetails['program_types_can_teach']?.toString() ?? 'Happiness Program';
+          // Support both shapes: direct or inside data
+          final rawTeacherdetails = (atolValidationData['teacherdetails']) ??
+              (atolValidationData['data'] is Map<String, dynamic>
+                  ? (atolValidationData['data']['teacherdetails'])
+                  : null);
+          if (rawTeacherdetails is Map<String, dynamic>) {
+            final programsRaw = rawTeacherdetails['program_types_can_teach'];
+            if (programsRaw is List && programsRaw.isNotEmpty) {
+              return programsRaw.map((e) => e.toString()).join(', ');
+            }
+            if (programsRaw != null) {
+              return programsRaw.toString();
             }
           }
         }
+
+        // If not found in validation data and international, do not fallback to Indian defaults
+        if (isInternationalTeacher) {
+          return 'N/A';
+        }
+
+        // Non-international fallback (nothing found)
       }
     }
-    
-    return 'Happiness Program';
+    return 'N/A';
   }
 
   String _getProgramDateRange() {
@@ -3444,6 +3467,22 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   Widget _buildTeacherVerificationSection() {
     final teacherCode = _getTeacherCode();
     
+    // Detect international teacher from createdBy.aol_teacher
+    bool isInternationalTeacher = false;
+    final createdBy = widget.appointment['createdBy'];
+    if (createdBy is Map<String, dynamic>) {
+      final aolTeacherNested = createdBy['aol_teacher'];
+      if (aolTeacherNested is Map<String, dynamic>) {
+        if (aolTeacherNested['isInternational'] == true) {
+          isInternationalTeacher = true;
+        }
+        final tType = aolTeacherNested['teacher_type']?.toString().toLowerCase();
+        if (tType != null && tType.contains('taol')) {
+          isInternationalTeacher = true;
+        }
+      }
+    }
+    
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -3462,77 +3501,142 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Teacher Verification',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          // Header label similar to provided design
+          Row(
+            children: [
+              Icon(Icons.check_circle, size: 14, color: Colors.grey[500]),
+              const SizedBox(width: 6),
+              Text(
+                'Art Of Living Teacher Status',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Teacher verification status for this appointment.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Teacher Profile Card
+
+          // Status Card
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green[50],
+              color: const Color(0xFFF8FAFC), // slate-50
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green[200]!),
+              border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _getTeacherName(),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
+                // Code + Verified/Pending chip
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(
-                      Icons.verified,
-                      color: Colors.green,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Verified By TAOL',
-                        style: TextStyle(
+                    if (teacherCode.isNotEmpty)
+                      Text(
+                        teacherCode,
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.green[700],
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569), // slate-600
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isInternationalTeacher ? const Color(0xFFFFFBEB) /* amber-50 */ : const Color(0xFFF0FDF4) /* green-50 */,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: isInternationalTeacher ? const Color(0xFFFDE68A) /* amber-300 */ : const Color(0xFFBBF7D0) /* green-200 */,
+                        ),
+                      ),
+                      child: Text(
+                        isInternationalTeacher ? 'Pending' : 'Verified By Art Of Living',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isInternationalTeacher ? const Color(0xFF92400E) /* amber-900 */ : const Color(0xFF15803D) /* green-700 */,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                if (teacherCode.isNotEmpty) ...[
-                  _buildTeacherDetail('Teacher Code', teacherCode),
-                  _buildTeacherDetail('Teacher Type', _getTeacherType()),
-                  _buildTeacherDetail('Programs eligible to teach', _getTeacherPrograms()),
-                ],
+
+                const SizedBox(height: 12),
+                Divider(color: const Color(0xFFE2E8F0)),
+                const SizedBox(height: 12),
+
+                // Teacher label
+                const Text(
+                  'Art Of Living Teacher',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827), // gray-900
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                Divider(color: const Color(0xFFE2E8F0)),
+                const SizedBox(height: 12),
+
+                // Programs list
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Programs:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569), // slate-600
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Builder(
+                      builder: (context) {
+                        final programsString = _getTeacherPrograms();
+                        final List<String> programs = programsString
+                            .split(',')
+                            .map((e) => e.trim())
+                            .where((e) => e.isNotEmpty)
+                            .toList();
+                        if (programs.isEmpty) {
+                          return const Text(
+                            'N/A',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: programs
+                              .map((p) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('• ', style: TextStyle(fontSize: 13, color: Color(0xFF374151))),
+                                        Expanded(
+                                          child: Text(
+                                            p,
+                                            style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          
           const SizedBox(height: 16),
-          
-          // Purpose and Tags only (hide tags for guest appointments)
-          _buildDetailRow('Purpose', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
           if (!_isGuestAppointment()) _buildUserTagsRow(),
         ],
       ),

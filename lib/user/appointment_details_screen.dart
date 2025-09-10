@@ -96,6 +96,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   // Guest images state - Map to store S3 URLs for each guest
   Map<int, String> _guestImages = {};
+  // Guest temporary files - Map to store File objects for duplicate checking
+  Map<int, File> _guestTempFiles = {};
   // Guest upload states - Map to track upload status for each guest
   Map<int, bool> _guestUploading = {};
 
@@ -359,6 +361,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
       _guestControllers.clear();
       _guestImages.clear();
+      _guestTempFiles.clear();
       _guestUploading.clear();
       _guestCountries.clear();
 
@@ -379,6 +382,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // Also remove associated data
         int guestNumber = i + 1;
         _guestImages.remove(guestNumber);
+        _guestTempFiles.remove(guestNumber);
         _guestUploading.remove(guestNumber);
         _guestCountries.remove(guestNumber);
       }
@@ -640,80 +644,174 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       });
 
       try {
-        // First check for duplicate photos with submit_type=accompanyuser
-        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
-          File(pickedFile.path),
-          submitType: 'accompanyuser',
-        );
-
-        // Check if duplicates were found (similar to web version logic)
-        final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
-        
-        if (!duplicatesFound) {
-          // No duplicates found, proceed with upload and validation
-          final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
-            File(pickedFile.path),
+        // First check for duplicate photos
+        if (widget.personalInfo['appointmentType'] == 'guest') {
+          // For guest appointments, check against accompany users' photos
+          final accompanyUserUrls = _guestImages.values.whereType<String>().toList();
+          
+          final duplicateCheckResult = await ActionService.validateDuplicatePhotos(
+            photoFiles: [File(pickedFile.path)],
+            referencePhotoUrls: accompanyUserUrls,
+            submitType: 'accompanyuser',
           );
-
-          if (uploadResult['success']) {
-            final s3Url = uploadResult['s3Url'];
-            
-            // Photo uploaded and validated successfully
-            setState(() {
-              _mainGuestPhotoUrl = s3Url;
-              _isMainGuestPhotoUploading = false;
-            });
-
-            // Update form validation
-            _validateForm();
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Main guest photo duplicate check passed, uploaded, and validated successfully!',
-                ),
-                backgroundColor: Colors.green,
-              ),
+          
+          // Check if duplicates were found
+          final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+          
+          if (!duplicatesFound) {
+            // No duplicates found, proceed with upload and validation
+            final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+              File(pickedFile.path),
             );
-          } else {
-            setState(() {
-              _isMainGuestPhotoUploading = false;
-            });
 
-            // Update form validation
-            _validateForm();
-
-            // Show backend error message in dialog
-            final errorMessage =
-                uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
-            _showPhotoValidationErrorDialog(errorMessage, () {
-              // Clear any previous state and allow user to pick again
+            if (uploadResult['success']) {
+              final s3Url = uploadResult['s3Url'];
+              
+              // Photo uploaded and validated successfully
               setState(() {
-                _selectedImage = null;
-                _mainGuestPhotoUrl = null;
+                _mainGuestPhotoUrl = s3Url;
                 _isMainGuestPhotoUploading = false;
               });
-            });
-          }
-        } else {
-          // Duplicates found - show error and clear photo
-          setState(() {
-            _isMainGuestPhotoUploading = false;
-          });
 
-          // Update form validation
-          _validateForm();
+              // Update form validation
+              _validateForm();
 
-          // Show duplicate photo error message (similar to web version)
-          final errorMessage = "Duplicate photo detected — This image matches an existing photo.";
-          _showPhotoValidationErrorDialog(errorMessage, () {
-            // Clear any previous state and allow user to pick again
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Main guest photo duplicate check passed, uploaded, and validated successfully!',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              setState(() {
+                _isMainGuestPhotoUploading = false;
+              });
+
+              // Update form validation
+              _validateForm();
+
+              // Show backend error message in dialog
+              final errorMessage =
+                  uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+              _showPhotoValidationErrorDialog(
+                'Main guest: $errorMessage',
+                () {
+                  // Clear any previous state and allow user to pick again
+                  setState(() {
+                    _selectedImage = null;
+                    _mainGuestPhotoUrl = null;
+                    _isMainGuestPhotoUploading = false;
+                  });
+                },
+              );
+            }
+          } else {
+            // Duplicates found - show error and clear photo
             setState(() {
-              _selectedImage = null;
-              _mainGuestPhotoUrl = null;
               _isMainGuestPhotoUploading = false;
             });
-          });
+
+            // Update form validation
+            _validateForm();
+
+            // Show duplicate photo error message
+            final errorMessage = "Main guest: Duplicate photo detected — This image matches an accompany user's photo.";
+            _showPhotoValidationErrorDialog(
+              errorMessage,
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _selectedImage = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
+          }
+        } else {
+          // For regular appointments, check against main user's existing profile photo
+          final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
+            File(pickedFile.path),
+            submitType: 'subuser',
+          );
+          
+          // Check if duplicates were found
+          final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
+          
+          if (!duplicatesFound) {
+            // No duplicates found, proceed with upload and validation
+            final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+              File(pickedFile.path),
+            );
+
+            if (uploadResult['success']) {
+              final s3Url = uploadResult['s3Url'];
+              
+              // Photo uploaded and validated successfully
+              setState(() {
+                _mainGuestPhotoUrl = s3Url;
+                _isMainGuestPhotoUploading = false;
+              });
+
+              // Update form validation
+              _validateForm();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Main guest photo duplicate check passed, uploaded, and validated successfully!',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              setState(() {
+                _isMainGuestPhotoUploading = false;
+              });
+
+              // Update form validation
+              _validateForm();
+
+              // Show backend error message in dialog
+              final errorMessage =
+                  uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+              _showPhotoValidationErrorDialog(
+                'Main guest: $errorMessage',
+                () {
+                  // Clear any previous state and allow user to pick again
+                  setState(() {
+                    _selectedImage = null;
+                    _mainGuestPhotoUrl = null;
+                    _isMainGuestPhotoUploading = false;
+                  });
+                },
+              );
+            }
+          } else {
+            // Duplicates found - show error and clear photo
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+
+            // Update form validation
+            _validateForm();
+
+            // Show duplicate photo error message
+            final errorMessage = "Main guest: Duplicate photo detected — This image matches your existing profile photo.";
+            _showPhotoValidationErrorDialog(
+              errorMessage,
+              () {
+                // Clear any previous state and allow user to pick again
+                setState(() {
+                  _selectedImage = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
+          }
         }
       } catch (e) {
         setState(() {
@@ -830,8 +928,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
       try {
         // First check for duplicate photos with submit_type=accompanyuser
-        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
-          File(pickedFile.path),
+        // Ensure this guest's photo does not match main user or any other accompany user's photo
+        final currentFile = File(pickedFile.path);
+        final otherGuestUrls = _guestImages.entries
+            .where((e) => e.key != guestNumber)
+            .map((e) => e.value)
+            .whereType<String>()
+            .toList();
+
+        // Include main user's profile photo if available
+        final allUrlsToCheck = <String>[];
+        if (_mainGuestPhotoUrl != null && _mainGuestPhotoUrl!.isNotEmpty) {
+          allUrlsToCheck.add(_mainGuestPhotoUrl!);
+        }
+        allUrlsToCheck.addAll(otherGuestUrls);
+
+        final duplicateCheckResult = await ActionService.validateDuplicatePhotos(
+          photoFiles: [currentFile], // only the current photo being checked
+          referencePhotoUrls: allUrlsToCheck, // use reference_photo_url_* format like web
           submitType: 'accompanyuser',
         );
 
@@ -850,6 +964,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             // Photo uploaded and validated successfully
             setState(() {
               _guestImages[guestNumber] = s3Url;
+              _guestTempFiles[guestNumber] = currentFile; // store temp file for future duplicate checks
               _guestUploading[guestNumber] = false;
             });
 
@@ -875,6 +990,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 // Clear any previous state and allow user to pick again
                 setState(() {
                   _guestImages.remove(guestNumber);
+                  _guestTempFiles.remove(guestNumber);
                   _guestUploading[guestNumber] = false;
                 });
               },
@@ -894,6 +1010,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               // Clear any previous state and allow user to pick again
               setState(() {
                 _guestImages.remove(guestNumber);
+                _guestTempFiles.remove(guestNumber);
                 _guestUploading[guestNumber] = false;
               });
             },
@@ -911,6 +1028,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             // Clear any previous state and allow user to pick again
             setState(() {
               _guestImages.remove(guestNumber);
+              _guestTempFiles.remove(guestNumber);
               _guestUploading[guestNumber] = false;
             });
           },
@@ -922,6 +1040,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   void _removeGuestImage(int guestNumber) {
     setState(() {
       _guestImages.remove(guestNumber);
+      _guestTempFiles.remove(guestNumber);
       _guestUploading.remove(guestNumber);
     });
 
@@ -5299,4 +5418,3 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 }
-

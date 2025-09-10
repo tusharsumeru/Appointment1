@@ -4820,11 +4820,12 @@ class ActionService {
   /// - teachercode: AOL teacher code
   /// - teacheremail: AOL teacher email
   /// - mobilenumber: AOL teacher mobile number
+  /// - isInternational: Whether the AOL teacher is international
   /// - profilePhotoFile: File object from camera or device upload
   ///
   /// Returns:
   /// - Map containing success status, message, and user data
-static Future<Map<String, dynamic>> registerUser({
+  static Future<Map<String, dynamic>> registerUser({
     required String fullName,
     required String email,
     required String password,
@@ -4839,6 +4840,7 @@ static Future<Map<String, dynamic>> registerUser({
     String? teacheremail,
     String? mobilenumber,
     List<String>? programTypesCanTeach,
+    bool isInternational = false,
     required File profilePhotoFile,
   }) async {
     try {
@@ -4914,6 +4916,7 @@ static Future<Map<String, dynamic>> registerUser({
         'teacheremail': teacheremail,
         'mobilenumber': mobilenumber,
         'programTypesCanTeach': programTypesCanTeach,
+        'isInternational': isInternational,
       };
       // :white_check_mark: 6. Create multipart request for file upload
       final request = http.MultipartRequest(
@@ -5018,13 +5021,6 @@ static Future<Map<String, dynamic>> registerUser({
       };
     }
   }
-
-
-
-
-
-
-
 
   /// Validate AOL teacher credentials
   /// This function validates teacher code, email, and phone number with the ATOL API
@@ -6221,8 +6217,22 @@ static Future<Map<String, dynamic>> registerUser({
     File photoFile, {
     String submitType = 'subuser', // Default to subuser type
   }) async {
+    // Delegate to multi-file variant for consistency
+    return validateDuplicatePhotos(
+      photoFiles: [photoFile],
+      submitType: submitType,
+    );
+  }
+
+  // Validate duplicate photos (multiple files and optional URL array support)
+  static Future<Map<String, dynamic>> validateDuplicatePhotos({
+    required List<File> photoFiles,
+    List<String>? imageUrls,
+    List<String>? referencePhotoUrls,
+    String submitType = 'subuser',
+  }) async {
     try {
-      print('🔍 Starting duplicate photo validation for: ${photoFile.path} with submit_type: $submitType');
+      print('🔍 Starting duplicate photo validation for ${photoFiles.length} file(s) with submit_type: $submitType');
 
       final token = await StorageService.getToken();
       if (token == null) {
@@ -6232,76 +6242,133 @@ static Future<Map<String, dynamic>> registerUser({
         };
       }
 
-      // Check if file exists and has content
-      if (!await photoFile.exists()) {
-        print('⚠️ Photo file does not exist: ${photoFile.path}');
-        return {'success': false, 'message': 'File does not exist'};
+      // Filter existing, non-empty files
+      final validFiles = <File>[];
+      for (final f in photoFiles) {
+        if (await f.exists()) {
+          final size = await f.length();
+          if (size > 0) {
+            validFiles.add(f);
+          } else {
+            print('⚠️ Skipping empty file: ${f.path}');
+          }
+        } else {
+          print('⚠️ Skipping missing file: ${f.path}');
+        }
       }
 
-      final fileSize = await photoFile.length();
-      if (fileSize == 0) {
-        print('⚠️ Photo file is empty: ${photoFile.path}');
-        return {'success': false, 'message': 'File is empty'};
+      if (validFiles.isEmpty && (imageUrls == null || imageUrls.isEmpty)) {
+        return {'success': false, 'message': 'No files or URLs to validate'};
       }
 
-      print('📸 Photo file size: ${fileSize} bytes');
-
-      // Create FormData like web version
+      // Build FormData with repeated 'files' and 'image_urls'
       final dio = Dio();
-      
-      // Get file extension and determine proper MIME type
-      final fileName = photoFile.path.split('/').last;
-      final fileExtension = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
-      final mimeType = _getMimeType(fileExtension);
-      
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          photoFile.path,
-          filename: fileName,
-          contentType: MediaType.parse(mimeType),
-        ),
-      });
-
-      // Set authorization header
+      dio.options.connectTimeout = const Duration(seconds: 15);
+      dio.options.receiveTimeout = const Duration(seconds: 60);
       dio.options.headers['Authorization'] = 'Bearer $token';
 
-      // Create URL with query parameter
+      final formData = FormData();
+
+      for (final f in validFiles) {
+        final fileName = f.path.split('/').last;
+        final fileExtension = fileName.contains('.')
+            ? fileName.split('.').last.toLowerCase()
+            : 'jpg';
+        final mimeType = _getMimeType(fileExtension);
+        formData.files.add(
+          MapEntry(
+            'files',
+            await MultipartFile.fromFile(
+              f.path,
+              filename: fileName,
+              contentType: MediaType.parse(mimeType),
+            ),
+          ),
+        );
+      }
+
+      // Deduplicate and append image URLs if provided
+      if (imageUrls != null && imageUrls.isNotEmpty) {
+        final seen = <String>{};
+        for (final url in imageUrls) {
+          if (url is String && url.trim().isNotEmpty) {
+            final u = url.trim();
+            if (seen.add(u)) {
+              formData.fields.add(MapEntry('image_urls', u));
+            }
+          }
+        }
+      }
+
+      // Handle reference photo URLs in reference_photo_url_* format (like web version)
+      if (referencePhotoUrls != null && referencePhotoUrls.isNotEmpty) {
+        final seen = <String>{};
+        int index = 0;
+        for (final url in referencePhotoUrls) {
+          if (url is String && url.trim().isNotEmpty) {
+            final u = url.trim();
+            if (seen.add(u)) {
+              formData.fields.add(MapEntry('reference_photo_url_$index', u));
+              index++;
+            }
+          }
+        }
+        // Send the count for backend processing
+        formData.fields.add(MapEntry('reference_photos_count', index.toString()));
+      }
+
       final url = '$baseUrl/auth/validate-duplicate-photo?submit_type=$submitType';
 
       print('📤 Sending duplicate photo validation request to: $url');
-      print('📤 Request headers: ${dio.options.headers}');
-      print('📤 FormData fields: ${formData.fields}');
-      print('📤 FormData files: ${formData.files.map((f) => '${f.key}: ${f.value.filename}').join(', ')}');
-      print('📤 File MIME type: $mimeType');
-      print('📤 File extension: $fileExtension');
+      print('📤 Files count: ${formData.files.where((e) => e.key == 'files').length}');
+      print('📤 URL fields count: ${formData.fields.where((e) => e.key == 'image_urls').length}');
+      print('📤 Reference photo fields count: ${formData.fields.where((e) => e.key.startsWith('reference_photo_url_')).length}');
 
-      // Send the request using Dio (like web FormData)
       final response = await dio.post(url, data: formData);
 
       print('📥 Duplicate photo validation response status: ${response.statusCode}');
       print('📥 Duplicate photo validation response body: ${response.data}');
 
-      // Parse response
       if (response.statusCode == 200) {
         final responseData = response.data;
-        print('✅ Duplicate photo validation completed successfully!');
-        print('🔍 Validation result: ${responseData['data']}');
-
         return {
           'success': true,
           'data': responseData['data'],
           'message': responseData['message'] ?? 'Duplicate photo validation completed',
         };
       } else {
-        print('❌ Duplicate photo validation failed: ${response.statusMessage}');
+        final responseData = response.data;
+        String message = response.statusMessage ?? 'Failed to validate duplicate photos';
+        dynamic errorBody;
+        if (responseData is Map) {
+          message = (responseData['message'] as String?) ?? message;
+          errorBody = responseData['error'];
+        }
         return {
           'success': false,
-          'message': response.statusMessage ?? 'Failed to validate duplicate photos',
+          'message': message,
           'statusCode': response.statusCode,
+          'error': errorBody,
+          'data': responseData,
         };
       }
     } catch (e) {
-      print('❌ Error in validateDuplicatePhoto: $e');
+      print('❌ Error in validateDuplicatePhotos: $e');
+      if (e is DioException) {
+        final res = e.response;
+        final data = res?.data;
+        String message = e.message ?? 'Network error';
+        if (data is Map && data['message'] is String) {
+          message = data['message'] as String;
+        }
+        return {
+          'success': false,
+          'message': message,
+          'statusCode': res?.statusCode,
+          'error': data is Map ? data['error'] : e.toString(),
+          'data': data,
+        };
+      }
       return {
         'success': false,
         'message': 'Network error: $e',

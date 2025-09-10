@@ -765,7 +765,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                           // Subtitle
                           Text(
-                            'Your Art of Living teacher status',
+                            'Your Art of Living teacher status (non-editable)',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
@@ -806,6 +806,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                           // Teacher Verification Box
                           _buildTeacherVerificationBox(),
+                          const SizedBox(height: 16),
+                          _buildSupportBox(),
                         ],
                       ),
                     ),
@@ -1831,14 +1833,117 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final atolValidationData = aolTeacherData?['atolValidationData'];
     final aolTeacher = aolTeacherData?['aolTeacher'];
 
-    // Check if teacher verification is successful
-    // For Indian Teachers: check atolValidationData.verified
-    // For International Teachers: check aolTeacher.isTeacher
-    final bool isTeacherVerified = atolValidationData?['verified'] == true || 
-                                  aolTeacher?['isTeacher'] == true;
+    // Determine international teacher status
+    final bool isInternationalTeacher = (aolTeacherData?['isInternational'] == true) ||
+        (aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('taol') == true);
+
+    // Check if teacher verification is successful (only for non-international)
+    final bool isTeacherVerified = !isInternationalTeacher &&
+        (atolValidationData?['verified'] == true || aolTeacher?['isTeacher'] == true);
+
+    // Get teacher details (common)
+    final rawTeacherdetails = (atolValidationData?['teacherdetails']) ??
+        (atolValidationData?['data']?['teacherdetails']);
+    final Map<String, dynamic>? teacherDetails =
+        rawTeacherdetails is Map<String, dynamic> ? rawTeacherdetails : null;
+    final teacherCode = aolTeacher?['teacherCode'] ?? 'N/A';
+    final teacherEmail = aolTeacher?['teacherEmail'] ?? 'N/A';
+    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
+    final teacherPhoneNumber = aolTeacher?['teacherPhoneNumber'];
+    final phoneNumber = teacherPhoneNumber != null
+        ? '${teacherPhoneNumber['countryCode']} ${teacherPhoneNumber['number']}'
+        : 'N/A';
+    final coursesTeaching = aolTeacher?['coursesTeaching'] as List<dynamic>?;
+    final programsRaw = (coursesTeaching != null && coursesTeaching.isNotEmpty)
+        ? coursesTeaching
+        : teacherDetails?['program_types_can_teach'];
+    final String programs = programsRaw is List
+        ? programsRaw.map((e) => e.toString()).join(', ')
+        : (programsRaw?.toString() ?? 'N/A');
+
+    // If international teacher: show details but with Not Verified heading
+    if (isInternationalTeacher) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header (title + subtitle)
+            Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.info,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Teacher Information Available',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        'Teacher details found but not verified',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Details (hide name and phone for international)
+            _buildTeacherDetail('Teacher Code', teacherCode),
+            const SizedBox(height: 8),
+            _buildTeacherDetail('Teacher Email', teacherEmail),
+            const SizedBox(height: 8),
+            _buildTeacherDetail('Type', teacherType),
+            const SizedBox(height: 8),
+            _buildTeacherDetail('Programs', programs),
+            const SizedBox(height: 12),
+            Divider(color: Colors.grey.shade300, height: 1),
+            const SizedBox(height: 12),
+            Text(
+              'Teacher information needs verification. Edit your profile to verify.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (!isTeacherVerified) {
-      // Show "Not an AOL Teacher" message
+      // Show basic not verified message for non-international unverified users
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -1891,7 +1996,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'No',
+                        'Teacher not Verified',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1908,24 +2013,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
     }
 
-    // Get teacher details from API response
-    final teacherDetails = atolValidationData?['data']?['teacherdetails'];
-    final teacherCode = aolTeacher?['teacherCode'] ?? 'N/A';
-    final teacherEmail = aolTeacher?['teacherEmail'] ?? 'N/A';
-    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
-    
-    // Get phone number for International Teachers
-    final teacherPhoneNumber = aolTeacher?['teacherPhoneNumber'];
-    final phoneNumber = teacherPhoneNumber != null 
-        ? '${teacherPhoneNumber['countryCode']} ${teacherPhoneNumber['number']}'
-        : 'N/A';
-    
-    // Get courses/programs for International Teachers
-    final coursesTeaching = aolTeacher?['coursesTeaching'] as List<dynamic>?;
-    final programs = coursesTeaching?.isNotEmpty == true 
-        ? coursesTeaching!.join(', ')
-        : 'N/A';
-
+    // Verified (non-international): show verified header and details
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -2002,8 +2090,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Teacher Details
-                // Show name for Indian Teachers, or use fullName for International Teachers
+                // Teacher Details (include name/phone for non-international)
                 _buildTeacherDetail('Name', teacherDetails?['name'] ?? widget.userData?['fullName'] ?? 'N/A'),
                 const SizedBox(height: 8),
                 _buildTeacherDetail('Type', teacherType),
@@ -2012,17 +2099,68 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 const SizedBox(height: 8),
                 _buildTeacherDetail('Teacher Email', teacherEmail),
                 const SizedBox(height: 8),
-                // Show phone number for International Teachers
                 if (phoneNumber != 'N/A') ...[
                   _buildTeacherDetail('Phone Number', phoneNumber),
                   const SizedBox(height: 8),
                 ],
                 _buildTeacherDetail(
                   'Programs',
-                  // For Indian Teachers: use teacherDetails, for International Teachers: use coursesTeaching
-                  teacherDetails?['program_types_can_teach'] ?? programs,
+                  programs,
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportBox() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: Colors.blue.shade200, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'If you want to edit this information Please contact support.',
+            style: TextStyle(
+              color: Colors.blue.shade800,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Divider(color: Colors.blue.shade200, height: 1),
+          const SizedBox(height: 12),
+          Text(
+            'Contact Support:',
+            style: TextStyle(
+              color: Colors.blue.shade700,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '📧 Email: support@sumerudigital.com',
+            style: TextStyle(
+              color: Colors.blue.shade600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Reach out to us and we'll help you update your teacher status and information.",
+            style: TextStyle(
+              color: Colors.blue.shade500,
+              fontSize: 11,
             ),
           ),
         ],
