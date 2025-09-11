@@ -962,7 +962,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade600,
+                              color: Colors.deepPurple,
                               shape: BoxShape.circle,
                             ),
                             child: Center(
@@ -1532,33 +1532,7 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
       final appointmentId = appointment['appointmentId']?.toString();
       if (appointmentId != null && appointmentId.isNotEmpty) {
         try {
-          // Show loading indicator
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                content: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: const Text(
-                        'Loading quick appointment details...',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-
           final result = await ActionService.getQuickAppointmentById(appointmentId);
-          
-          // Close loading dialog
-          Navigator.of(context).pop();
 
           if (result['success'] && result['data'] != null) {
             // Navigate to appointment detail page with the fetched data
@@ -1568,6 +1542,8 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                 builder: (context) => AppointmentDetailPage(
                   appointment: result['data'],
                   isFromScheduleScreens: true,
+                  secretaryName: _getSecretaryName(appointment), // Pass secretary name
+                  isTeacher: appointment['isTeacher'] ?? false, // Pass teacher status
                 ),
               ),
             );
@@ -1605,6 +1581,8 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
           builder: (context) => AppointmentDetailPage(
             appointment: appointment,
             isFromScheduleScreens: true,
+            secretaryName: _getSecretaryName(appointment), // Pass secretary name
+            isTeacher: appointment['isTeacher'] ?? false, // Pass teacher status
           ),
         ),
       );

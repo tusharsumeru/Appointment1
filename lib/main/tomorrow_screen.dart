@@ -180,7 +180,7 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
                   GestureDetector(
                     onTap: () => _selectDate(context),
                     child: Container(
-                      width: 192, // w-48 equivalent (48 * 4 = 192)
+                      width: 200, // w-48 equivalent (48 * 4 = 192)
                       height: 44, // h-11 equivalent (11 * 4 = 44)
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
@@ -226,13 +226,17 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.blue[600],
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                            color: const Color(0xFF3B82F6).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),

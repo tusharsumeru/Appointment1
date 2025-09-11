@@ -9,6 +9,7 @@ import 'package:country_picker/country_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../action/action.dart';
 import '../components/user/photo_validation_bottom_sheet.dart';
+import '../utils/phone_validation.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -26,6 +27,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _designationController = TextEditingController();
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+  
+  // Scroll controller for auto-scrolling to missing fields
+  final ScrollController _scrollController = ScrollController();
+  
+  // GlobalKeys for form fields to enable scrolling to them
+  final GlobalKey _phoneFieldKey = GlobalKey();
+  final GlobalKey _fullNameFieldKey = GlobalKey();
+  final GlobalKey _locationFieldKey = GlobalKey();
+  final GlobalKey _designationFieldKey = GlobalKey();
+  final GlobalKey _companyFieldKey = GlobalKey();
+  
+  // Error messages for each field
+  String? _phoneError;
+  String? _fullNameError;
+  String? _locationError;
+  String? _designationError;
+  String? _companyError;
 
   // Photo upload state
   File? _selectedImageFile;
@@ -37,6 +55,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   // Phone number state (same as signup screen)
   String _selectedCountryCode = '+91';
   String _selectedCountryFlag = '🇮🇳';
+  Country _selectedCountry = Country(
+    phoneCode: '91',
+    countryCode: 'IN',
+    e164Sc: 0,
+    geographic: true,
+    level: 1,
+    name: 'India',
+    example: '9876543210',
+    displayName: 'India (IN) [+91]',
+    displayNameNoCountryCode: 'India (IN)',
+    e164Key: '91-IN-0',
+  );
 
   // Location search state (replicated from signup screen)
   List<String> _locationSuggestions = [];
@@ -68,6 +98,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _companyController.dispose();
     _locationController.dispose();
     _locationDebounceTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -290,6 +321,91 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
   }
 
+  void _validatePhone(String phoneNumber) {
+    final expectedLength = PhoneValidation.getPhoneLengthForCountryObject(_selectedCountry);
+    
+    if (expectedLength == 0) {
+      // No example available, no validation
+      setState(() {
+        _phoneError = null;
+      });
+      return;
+    }
+    
+    if (phoneNumber.isEmpty) {
+      setState(() {
+        _phoneError = null; // Don't show error for empty field
+      });
+    } else if (phoneNumber.length < expectedLength) {
+      setState(() {
+        _phoneError = 'Phone number is too short. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else if (phoneNumber.length > expectedLength) {
+      setState(() {
+        _phoneError = 'Phone number is too long. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else {
+      setState(() {
+        _phoneError = null; // Valid length
+      });
+    }
+  }
+
+  // Helper method to scroll to a specific field and set error message
+  void _scrollToField(GlobalKey fieldKey, String errorMessage, String fieldType) {
+    final RenderBox? renderBox = fieldKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null) {
+      final position = renderBox.localToGlobal(Offset.zero);
+      final scrollOffset = _scrollController.offset + position.dy - 100; // 100px padding from top
+      _scrollController.animateTo(
+        scrollOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+      
+      // Set error message for the specific field
+      setState(() {
+        switch (fieldType) {
+          case 'phone':
+            _phoneError = errorMessage;
+            _fullNameError = null;
+            _locationError = null;
+            _designationError = null;
+            _companyError = null;
+            break;
+          case 'fullName':
+            _phoneError = null;
+            _fullNameError = errorMessage;
+            _locationError = null;
+            _designationError = null;
+            _companyError = null;
+            break;
+          case 'location':
+            _phoneError = null;
+            _fullNameError = null;
+            _locationError = errorMessage;
+            _designationError = null;
+            _companyError = null;
+            break;
+          case 'designation':
+            _phoneError = null;
+            _fullNameError = null;
+            _locationError = null;
+            _designationError = errorMessage;
+            _companyError = null;
+            break;
+          case 'company':
+            _phoneError = null;
+            _fullNameError = null;
+            _locationError = null;
+            _designationError = null;
+            _companyError = errorMessage;
+            break;
+        }
+      });
+    }
+  }
+
   // Photo upload functions with validation first
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
@@ -406,6 +522,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
@@ -863,7 +981,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           const SizedBox(height: 20),
 
                           // Form Fields
-                          _buildFormField('Full Name', _fullNameController),
+                          _buildFormField('Full Name', _fullNameController, key: _fullNameFieldKey, isRequired: true, errorText: _fullNameError),
                           const SizedBox(height: 16),
 
                           // Email field (read-only)
@@ -922,7 +1040,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          _buildPhoneNumberField(),
+                          _buildPhoneNumberField(key: _phoneFieldKey),
                         ],
                       ),
                     ),
@@ -981,12 +1099,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           _buildFormField(
                             'Designation',
                             _designationController,
+                            key: _designationFieldKey,
+                            isRequired: true,
+                            errorText: _designationError,
                           ),
                           const SizedBox(height: 16),
 
                           _buildFormField(
                             'Company/Organization',
                             _companyController,
+                            key: _companyFieldKey,
+                            isRequired: true,
+                            errorText: _companyError,
                           ),
                         ],
                       ),
@@ -1045,8 +1169,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           // Form Field
                           // Searchable location field with suggestions (same as signup screen)
                           Column(
+                            key: _locationFieldKey,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Location',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Text(
+                                    ' *',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _locationController,
                                 decoration: InputDecoration(
@@ -1141,6 +1286,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                 ),
                             ],
                           ),
+                        if (_locationError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _locationError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                         ],
                       ),
                     ),
@@ -1315,17 +1470,30 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  Widget _buildFormField(String label, TextEditingController controller) {
+  Widget _buildFormField(String label, TextEditingController controller, {GlobalKey? key, bool isRequired = false, String? errorText}) {
     return Column(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (isRequired)
+              const Text(
+                ' *',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 14,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -1335,20 +1503,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             fillColor: Colors.grey.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: errorText != null ? Colors.red : Colors.grey.shade300),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: errorText != null ? Colors.red : Colors.grey.shade300),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFF97316)),
+              borderSide: BorderSide(color: errorText != null ? Colors.red : const Color(0xFFF97316)),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
             ),
+            errorText: errorText,
           ),
           style: const TextStyle(
             fontSize: 16,
@@ -1421,17 +1598,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   // Phone number field with country picker (same as signup screen)
-  Widget _buildPhoneNumberField() {
+  Widget _buildPhoneNumberField({GlobalKey? key}) {
     return Column(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Phone Number',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          children: [
+            Text(
+              'Phone Number',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Text(
+              ' *',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         Row(
@@ -1467,10 +1656,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                   onSelect: (Country country) {
                     setState(() {
+                      _selectedCountry = country;
                       _selectedCountryCode = '+${country.phoneCode}';
                       _selectedCountryFlag = country.flagEmoji;
                       // Clear the phone number field when country changes
                       _phoneController.clear();
+                      // Clear phone validation error
+                      _phoneError = null;
                     });
                   },
                 );
@@ -1519,8 +1711,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               child: TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.number,
-                maxLength: 10,
+                maxLength: PhoneValidation.getPhoneLengthForCountryObject(_selectedCountry),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) {
+                  _validatePhone(value);
+                },
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.grey.shade50,
@@ -1552,11 +1747,56 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
           ],
         ),
+        if (_phoneError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _phoneError!,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }
 
   void _saveChanges() async {
+    // Clear all previous errors
+    setState(() {
+      _phoneError = null;
+      _fullNameError = null;
+      _locationError = null;
+      _designationError = null;
+      _companyError = null;
+    });
+    
+    // Validate required fields and scroll to missing field with specific messages
+    if (_phoneController.text.trim().isEmpty) {
+      _scrollToField(_phoneFieldKey, 'Please enter your phone number', 'phone');
+      return;
+    }
+    
+    if (_fullNameController.text.trim().isEmpty) {
+      _scrollToField(_fullNameFieldKey, 'Please enter your full name', 'fullName');
+      return;
+    }
+    
+    if (_locationController.text.trim().isEmpty) {
+      _scrollToField(_locationFieldKey, 'Please enter your location', 'location');
+      return;
+    }
+    
+    if (_designationController.text.trim().isEmpty) {
+      _scrollToField(_designationFieldKey, 'Please enter your designation', 'designation');
+      return;
+    }
+    
+    if (_companyController.text.trim().isEmpty) {
+      _scrollToField(_companyFieldKey, 'Please enter your company/organization name', 'company');
+      return;
+    }
+
     // Show loading
     setState(() {
       _isLoading = true;
@@ -1848,7 +2088,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         rawTeacherdetails is Map<String, dynamic> ? rawTeacherdetails : null;
     final teacherCode = aolTeacher?['teacherCode'] ?? 'N/A';
     final teacherEmail = aolTeacher?['teacherEmail'] ?? 'N/A';
-    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
+    // For international teachers, show simplified type
+    final String teacherType = isInternationalTeacher 
+        ? (aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('total') == true 
+            ? 'Total Teacher' 
+            : 'Teacher')
+        : (aolTeacherData?['teacher_type'] ?? 'N/A');
     final teacherPhoneNumber = aolTeacher?['teacherPhoneNumber'];
     final phoneNumber = teacherPhoneNumber != null
         ? '${teacherPhoneNumber['countryCode']} ${teacherPhoneNumber['number']}'

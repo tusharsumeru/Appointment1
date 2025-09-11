@@ -113,138 +113,168 @@ class _UserSidebarState extends State<UserSidebar> {
   Widget build(BuildContext context) {
     return Drawer(
       width: 280, // Fixed width to prevent stretching
-      child: ListView(
-        padding: EdgeInsets.zero,
-        physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching from top
+      child: Column(
         children: [
-          // Header
-          Container(
-            decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFFF97316), // Orange
-              Color(0xFFEAB308), // Yellow
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-            padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              physics: const ClampingScrollPhysics(), // Prevent overscroll/stretching from top
               children: [
-                // User Avatar
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.white,
-                  backgroundImage: _userData?['profilePhoto'] != null && _userData!['profilePhoto'].toString().isNotEmpty
-                      ? NetworkImage(_userData!['profilePhoto'])
-                      : null,
-                  child: _userData?['profilePhoto'] == null || _userData!['profilePhoto'].toString().isEmpty
-                      ? const Icon(
-                          Icons.person,
-                          size: 30,
-                          color: const Color(0xFFF97316),
-                        )
-                      : null,
+                // Header
+                Container(
+                  decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFFF97316), // Orange
+                    Color(0xFFEAB308), // Yellow
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                const SizedBox(height: 8),
-                // User Name
-                Flexible(
-                  child: Text(
-                    _isLoading
-                        ? 'Loading...'
-                        : _userData?['fullName'] ?? _userData?['name'] ?? 'User',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              ),
+                  padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // User Avatar
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.white,
+                        backgroundImage: _userData?['profilePhoto'] != null && _userData!['profilePhoto'].toString().isNotEmpty
+                            ? NetworkImage(_userData!['profilePhoto'])
+                            : null,
+                        child: _userData?['profilePhoto'] == null || _userData!['profilePhoto'].toString().isEmpty
+                            ? const Icon(
+                                Icons.person,
+                                size: 30,
+                                color: const Color(0xFFF97316),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      // User Name
+                      Flexible(
+                        child: Text(
+                          _isLoading
+                              ? 'Loading...'
+                              : _userData?['fullName'] ?? _userData?['name'] ?? 'User',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // User Email
+                      Flexible(
+                        child: Text(
+                          _isLoading
+                              ? 'Loading...'
+                              : _userData?['email'] ?? 'user@example.com',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                // User Email
-                Flexible(
-                  child: Text(
-                    _isLoading
-                        ? 'Loading...'
-                        : _userData?['email'] ?? 'user@example.com',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+
+                // Navigation Items
+                ListTile(
+                                  leading: const Icon(Icons.add_circle_outline, color: Color(0xFFF97316)),
+                  title: const Text('Request Appointment'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AppointmentTypeSelectionScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                                  leading: const Icon(Icons.history, color: Color(0xFFF97316)),
+                  title: const Text('My History'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                                  leading: const Icon(Icons.photo_library, color: Color(0xFFF97316)),
+                  title: const Text('My Divine Picture'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyDivinePictureScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                                  leading: const Icon(Icons.person_outline, color: Color(0xFFF97316)),
+                  title: const Text('Profile'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                const Divider(),
+
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title: const Text('Logout'),
+                  onTap: _handleLogout,
                 ),
               ],
             ),
           ),
 
-          // Navigation Items
-          ListTile(
-                            leading: const Icon(Icons.add_circle_outline, color: Color(0xFFF97316)),
-            title: const Text('Request Appointment'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AppointmentTypeSelectionScreen(),
+          // Build Number - Fixed at bottom
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Colors.grey[600],
                 ),
-              );
-            },
-          ),
-
-          ListTile(
-                            leading: const Icon(Icons.history, color: Color(0xFFF97316)),
-            title: const Text('My History'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UserHistoryScreen(),
+                const SizedBox(width: 8),
+                Text(
+                  'Build 1.0.0+1',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              );
-            },
-          ),
-
-          ListTile(
-                            leading: const Icon(Icons.photo_library, color: Color(0xFFF97316)),
-            title: const Text('My Divine Picture'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MyDivinePictureScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-                            leading: const Icon(Icons.person_outline, color: Color(0xFFF97316)),
-            title: const Text('Profile'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfileScreen(),
-                ),
-              );
-            },
-          ),
-
-          const Divider(),
-
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout'),
-            onTap: _handleLogout,
+              ],
+            ),
           ),
         ],
       ),

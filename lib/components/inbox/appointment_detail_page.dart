@@ -17,12 +17,16 @@ class AppointmentDetailPage extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final bool isFromDeletedAppointments;
   final bool isFromScheduleScreens; // New parameter to control sections
+  final String? secretaryName; // Secretary name passed from schedule screens
+  final bool? isTeacher; // Teacher status passed from schedule screens
 
   const AppointmentDetailPage({
     super.key,
     required this.appointment,
     this.isFromDeletedAppointments = false,
     this.isFromScheduleScreens = false, // Default to false
+    this.secretaryName, // Secretary name from schedule screens
+    this.isTeacher, // Teacher status from schedule screens
   });
 
   @override
@@ -2225,11 +2229,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getTeacherStatus() {
-    // Check if user is a verified teacher
-    if (_isTeacher()) {
-      return 'Yes, ${_getTeacherType()}';
+    // First, check if teacher status was passed from schedule screens
+    if (widget.isTeacher != null) {
+      return widget.isTeacher == true ? 'Yes' : 'No';
     }
-    return 'No';
+    
+    // Fallback to existing logic
+    return _isTeacher() ? 'Yes' : 'No';
   }
 
   String _getMeetingType() {
@@ -2262,6 +2268,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getAssignedSecretary() {
+    // First, check if secretary name was passed from schedule screens
+    if (widget.secretaryName != null && widget.secretaryName!.isNotEmpty) {
+      return widget.secretaryName!;
+    }
+    
     // Debug: Print the assigned secretary data structure
     final assignedSecretary = widget.appointment['assignedSecretary'];
     
@@ -2300,7 +2311,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     if (assignedSecretary is String && assignedSecretary.isNotEmpty) {
       // Check if it looks like a MongoDB ObjectId (24 hex characters)
       if (RegExp(r'^[a-f\d]{24}$').hasMatch(assignedSecretary)) {
-        return 'Secretary ID: ${assignedSecretary.substring(0, 8)}...'; // Show partial ID for debugging
+        return 'Secretary Assigned'; // Show generic message instead of ID
       }
     }
     
@@ -2339,7 +2350,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             
             // Show all sections for all screens (including schedule screens)
             // Accompanying Users Section - Only show if 10 or fewer users and not from deleted appointments
-            if (_getAttendeeCount() <= 10 && !widget.isFromDeletedAppointments) ...[
+            // Hide for quick appointments when coming from schedule screens
+            if (_getAttendeeCount() <= 10 && 
+                !widget.isFromDeletedAppointments && 
+                !(widget.isFromScheduleScreens && _isQuickAppointment())) ...[
               _buildAccompanyingUsersSection(),
             ],
             
@@ -2914,6 +2928,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
             _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
+            _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.person),
             _buildMainCardDetailRow('Program Date', _getProgramDateRange(), Icons.event),
             // Show attachment if exists
             if (_getAttachmentUrl().isNotEmpty) ...[

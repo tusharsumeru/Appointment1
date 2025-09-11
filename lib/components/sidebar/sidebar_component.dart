@@ -762,6 +762,22 @@ class _SidebarComponentState extends State<SidebarComponent> {
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
             onTap: _handleLogout,
           ),
+
+          // Build Number
+          ListTile(
+            leading: Icon(Icons.info_outline, color: Colors.grey[600]),
+            title: Text(
+              'Build 1.0.0+1',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            onTap: () {
+              // Optional: Add any action when build number is tapped
+            },
+          ),
                 ],
               ),
             ),

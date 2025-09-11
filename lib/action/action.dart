@@ -4033,6 +4033,48 @@ class ActionService {
     }
   }
 
+  // Helper function to detect file type from buffer (like JavaScript version)
+  static String _detectFileTypeFromBuffer(Uint8List buffer) {
+    if (buffer.length < 4) {
+      return 'application/octet-stream';
+    }
+
+    final header = buffer.sublist(0, 4);
+    
+    // PNG: 89 50 4E 47
+    if (header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
+      print('🔍 Detected: PNG file');
+      return 'image/png';
+    }
+    
+    // JPEG: FF D8 FF
+    if (header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF) {
+      print('🔍 Detected: JPEG file');
+      return 'image/jpeg';
+    }
+    
+    // GIF: 47 49 46 38
+    if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x38) {
+      print('🔍 Detected: GIF file');
+      return 'image/gif';
+    }
+    
+    // WebP: 52 49 46 46 (RIFF header, but we need to check further for WebP)
+    if (header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46) {
+      // Check for WebP signature at offset 8-11: "WEBP"
+      if (buffer.length >= 12) {
+        final webpHeader = buffer.sublist(8, 12);
+        if (webpHeader[0] == 0x57 && webpHeader[1] == 0x45 && webpHeader[2] == 0x42 && webpHeader[3] == 0x50) {
+          print('🔍 Detected: WebP file');
+          return 'image/webp';
+        }
+      }
+    }
+    
+    print('🔍 Unknown file type');
+    return 'application/octet-stream';
+  }
+
   // Get ashram locations
   static Future<Map<String, dynamic>> getAshramLocations({
     int page = 1,
@@ -6229,6 +6271,7 @@ class ActionService {
     required List<File> photoFiles,
     List<String>? imageUrls,
     List<String>? referencePhotoUrls,
+    List<String>? imagesArray, // New parameter for imagesarray from FormData
     String submitType = 'subuser',
   }) async {
     try {
@@ -6242,13 +6285,26 @@ class ActionService {
         };
       }
 
-      // Filter existing, non-empty files
+      // Filter existing, non-empty files and validate file types
       final validFiles = <File>[];
       for (final f in photoFiles) {
         if (await f.exists()) {
           final size = await f.length();
           if (size > 0) {
+            // Check file type from buffer to detect WebP files
+            final fileBytes = await f.readAsBytes();
+            final actualMimeType = _detectFileTypeFromBuffer(fileBytes);
+            
+            if (actualMimeType == 'image/webp') {
+              return {
+                'success': false,
+                'message': 'WebP files are not supported. Please upload a PNG or JPEG file instead.',
+                'error': 'The uploaded file appears to be in WebP format, which is not supported by the face detection API.',
+              };
+            }
+            
             validFiles.add(f);
+            print('✅ Valid file: ${f.path} (detected type: $actualMimeType)');
           } else {
             print('⚠️ Skipping empty file: ${f.path}');
           }
@@ -6257,7 +6313,9 @@ class ActionService {
         }
       }
 
-      if (validFiles.isEmpty && (imageUrls == null || imageUrls.isEmpty)) {
+      if (validFiles.isEmpty && 
+          (imageUrls == null || imageUrls.isEmpty) && 
+          (imagesArray == null || imagesArray.isEmpty)) {
         return {'success': false, 'message': 'No files or URLs to validate'};
       }
 
@@ -6269,22 +6327,36 @@ class ActionService {
 
       final formData = FormData();
 
+      // Add files with proper MIME type detection
       for (final f in validFiles) {
         final fileName = f.path.split('/').last;
-        final fileExtension = fileName.contains('.')
-            ? fileName.split('.').last.toLowerCase()
-            : 'jpg';
-        final mimeType = _getMimeType(fileExtension);
+        final fileBytes = await f.readAsBytes();
+        final actualMimeType = _detectFileTypeFromBuffer(fileBytes);
+        
         formData.files.add(
           MapEntry(
             'files',
             await MultipartFile.fromFile(
               f.path,
               filename: fileName,
-              contentType: MediaType.parse(mimeType),
+              contentType: MediaType.parse(actualMimeType),
             ),
           ),
         );
+      }
+
+      // Handle imagesarray from FormData (array of image URLs)
+      if (imagesArray != null && imagesArray.isNotEmpty) {
+        print('📸 Processing imagesarray with ${imagesArray.length} URLs');
+        final seen = <String>{};
+        for (final url in imagesArray) {
+          if (url is String && url.trim().isNotEmpty) {
+            final u = url.trim();
+            if (seen.add(u)) {
+              formData.fields.add(MapEntry('image_urls', u));
+            }
+          }
+        }
       }
 
       // Deduplicate and append image URLs if provided
@@ -6320,17 +6392,42 @@ class ActionService {
       final url = '$baseUrl/auth/validate-duplicate-photo?submit_type=$submitType';
 
       print('📤 Sending duplicate photo validation request to: $url');
+      print('📤 Submit type: $submitType');
       print('📤 Files count: ${formData.files.where((e) => e.key == 'files').length}');
       print('📤 URL fields count: ${formData.fields.where((e) => e.key == 'image_urls').length}');
       print('📤 Reference photo fields count: ${formData.fields.where((e) => e.key.startsWith('reference_photo_url_')).length}');
+      
+      // Debug: Print reference photo URLs
+      final referencePhotoFields = formData.fields.where((e) => e.key.startsWith('reference_photo_url_')).toList();
+      for (final field in referencePhotoFields) {
+        print('📤 Reference photo: ${field.key} = ${field.value}');
+      }
 
       final response = await dio.post(url, data: formData);
 
       print('📥 Duplicate photo validation response status: ${response.statusCode}');
       print('📥 Duplicate photo validation response body: ${response.data}');
+      
+      // Debug: Print the structure of the response data
+      if (response.data is Map) {
+        final responseData = response.data as Map;
+        print('📥 Response data keys: ${responseData.keys.toList()}');
+        if (responseData.containsKey('data')) {
+          final data = responseData['data'];
+          if (data is Map) {
+            print('📥 Data keys: ${(data as Map).keys.toList()}');
+            if ((data as Map).containsKey('duplicates_found')) {
+              print('📥 duplicates_found value: ${(data as Map)['duplicates_found']}');
+            }
+          }
+        }
+      }
 
       if (response.statusCode == 200) {
         final responseData = response.data;
+        
+        // The JavaScript backend spreads the API response data directly into the response.data
+        // So duplicates_found should be directly accessible in responseData['data']
         return {
           'success': true,
           'data': responseData['data'],

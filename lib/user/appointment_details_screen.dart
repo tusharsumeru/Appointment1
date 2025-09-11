@@ -13,6 +13,7 @@ import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import '../components/user/photo_validation_bottom_sheet.dart';
+import '../utils/phone_validation.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> personalInfo;
@@ -37,6 +38,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   final FocusNode _guestCompanyFocus = FocusNode();
   final FocusNode _guestLocationFocus = FocusNode();
   final FocusNode _numberOfUsersFocus = FocusNode();
+  
+  // Focus nodes for date fields (to prevent focus issues)
+  final FocusNode _fromDateFocus = FocusNode();
+  final FocusNode _toDateFocus = FocusNode();
+  final FocusNode _programFromDateFocus = FocusNode();
+  final FocusNode _programToDateFocus = FocusNode();
   
   // Focus nodes for guest fields
   final Map<int, Map<String, FocusNode>> _guestFocusNodes = {};
@@ -90,6 +97,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   
   // Appointment purpose validation
   String? _appointmentPurposeError;
+  
+  // Flag to prevent unnecessary scrolling during focus transitions
+  bool _isTransitioningFocus = false;
 
   // Guest information state
   List<Map<String, TextEditingController>> _guestControllers = [];
@@ -124,6 +134,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   // Email validation error
   String? _guestEmailError;
+
+  // Phone validation errors
+  String? _guestPhoneError;
+  Map<int, String?> _guestPhoneErrors = {};
 
   // Date validation errors
   String? _dateRangeError;
@@ -176,6 +190,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     _guestCompanyFocus.dispose();
     _guestLocationFocus.dispose();
     _numberOfUsersFocus.dispose();
+    _fromDateFocus.dispose();
+    _toDateFocus.dispose();
+    _programFromDateFocus.dispose();
+    _programToDateFocus.dispose();
     
     // Dispose guest focus nodes
     for (var guestFocuses in _guestFocusNodes.values) {
@@ -268,30 +286,36 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Auto-scroll to focused field
   void _scrollToField(FocusNode focusNode) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (focusNode.hasFocus && _scrollController.hasClients) {
-        // Get the render object of the focused widget
-        final RenderObject? renderObject = focusNode.context?.findRenderObject();
-        if (renderObject != null) {
-          final RenderBox renderBox = renderObject as RenderBox;
-          final position = renderBox.localToGlobal(Offset.zero);
-          
-          // Calculate the scroll offset to bring the field into view
-          final screenHeight = MediaQuery.of(context).size.height;
-          final fieldHeight = renderBox.size.height;
-          final currentScrollOffset = _scrollController.offset;
-          
-          // Calculate target scroll position
-          double targetOffset = currentScrollOffset;
-          
-          // If field is below the visible area
-          if (position.dy > screenHeight * 0.7) {
-            targetOffset = currentScrollOffset + (position.dy - screenHeight * 0.6);
-          }
-          // If field is above the visible area
-          else if (position.dy < screenHeight * 0.3) {
-            targetOffset = currentScrollOffset - (screenHeight * 0.4 - position.dy);
-          }
-          
+      // Don't scroll if we're transitioning focus or if field doesn't have focus
+      if (_isTransitioningFocus || !focusNode.hasFocus || !_scrollController.hasClients) {
+        return;
+      }
+      
+      // Get the render object of the focused widget
+      final RenderObject? renderObject = focusNode.context?.findRenderObject();
+      if (renderObject != null) {
+        final RenderBox renderBox = renderObject as RenderBox;
+        final position = renderBox.localToGlobal(Offset.zero);
+        
+        // Calculate the scroll offset to bring the field into view
+        final screenHeight = MediaQuery.of(context).size.height;
+        final fieldHeight = renderBox.size.height;
+        final currentScrollOffset = _scrollController.offset;
+        
+        // Calculate target scroll position
+        double targetOffset = currentScrollOffset;
+        
+        // If field is below the visible area
+        if (position.dy > screenHeight * 0.7) {
+          targetOffset = currentScrollOffset + (position.dy - screenHeight * 0.6);
+        }
+        // If field is above the visible area
+        else if (position.dy < screenHeight * 0.3) {
+          targetOffset = currentScrollOffset - (screenHeight * 0.4 - position.dy);
+        }
+        
+        // Only scroll if there's a significant change needed
+        if ((targetOffset - currentScrollOffset).abs() > 50) {
           // Ensure scroll offset is within bounds
           targetOffset = targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent);
           
@@ -309,8 +333,25 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Move focus to next field
   void _moveToNextField(FocusNode currentFocus, FocusNode? nextFocus) {
     if (nextFocus != null) {
+      // Set flag to prevent scrolling during transition
+      _isTransitioningFocus = true;
+      
+      // Unfocus current field first
       currentFocus.unfocus();
-      FocusScope.of(context).requestFocus(nextFocus);
+      
+      // Use a small delay to ensure proper focus transition
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(nextFocus);
+          // Reset flag after focus transition
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _isTransitioningFocus = false;
+          });
+        }
+      });
+    } else {
+      // If no next focus, just unfocus current field
+      currentFocus.unfocus();
     }
   }
 
@@ -493,6 +534,67 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return isValid;
   }
 
+  void _validateGuestPhone(String phoneNumber) {
+    final expectedLength = PhoneValidation.getPhoneLengthForCountryObject(_selectedCountry);
+    
+    if (expectedLength == 0) {
+      // No example available, no validation
+      setState(() {
+        _guestPhoneError = null;
+      });
+      return;
+    }
+    
+    if (phoneNumber.isEmpty) {
+      setState(() {
+        _guestPhoneError = null; // Don't show error for empty field
+      });
+    } else if (phoneNumber.length < expectedLength) {
+      setState(() {
+        _guestPhoneError = 'Phone number is too short. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else if (phoneNumber.length > expectedLength) {
+      setState(() {
+        _guestPhoneError = 'Phone number is too long. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else {
+      setState(() {
+        _guestPhoneError = null; // Valid length
+      });
+    }
+  }
+
+  void _validateAdditionalGuestPhone(int guestNumber, String phoneNumber) {
+    final country = _guestCountries[guestNumber] ?? _selectedCountry;
+    final expectedLength = PhoneValidation.getPhoneLengthForCountryObject(country);
+    
+    if (expectedLength == 0) {
+      // No example available, no validation
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null;
+      });
+      return;
+    }
+    
+    if (phoneNumber.isEmpty) {
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null; // Don't show error for empty field
+      });
+    } else if (phoneNumber.length < expectedLength) {
+      setState(() {
+        _guestPhoneErrors[guestNumber] = 'Phone number is too short. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else if (phoneNumber.length > expectedLength) {
+      setState(() {
+        _guestPhoneErrors[guestNumber] = 'Phone number is too long. Expected $expectedLength digits, got ${phoneNumber.length}';
+      });
+    } else {
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null; // Valid length
+      });
+    }
+  }
+
   void _validateForm() {
     // Validate appointment purpose
     String purposeText = _appointmentPurposeController.text.trim();
@@ -619,17 +721,28 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     BuildContext context,
     TextEditingController controller,
   ) async {
+    // Unfocus any currently focused field before opening date picker
+    FocusScope.of(context).unfocus();
+    
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
+    
     if (picked != null) {
       controller.text =
           "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
       _validateForm();
     }
+    
+    // Ensure no field is focused after date picker closes
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        FocusScope.of(context).unfocus();
+      }
+    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -971,7 +1084,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Guest $guestNumber photo duplicate check passed, uploaded, and validated successfully!',
+                  'Guest ${guestNumber + 1} photo duplicate check passed, uploaded, and validated successfully!',
                 ),
                 backgroundColor: Colors.green,
               ),
@@ -985,7 +1098,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             final errorMessage =
                 uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
             _showPhotoValidationErrorDialog(
-              'Guest $guestNumber: $errorMessage',
+              'Guest ${guestNumber + 1}: $errorMessage',
               () {
                 // Clear any previous state and allow user to pick again
                 setState(() {
@@ -1003,7 +1116,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           });
 
           // Show duplicate photo error message (similar to web version)
-          final errorMessage = "Guest $guestNumber: Duplicate photo detected — This image matches an existing photo.";
+          final errorMessage = "Guest ${guestNumber + 1}: Duplicate photo detected — This image matches an existing photo.";
           _showPhotoValidationErrorDialog(
             errorMessage,
             () {
@@ -1023,7 +1136,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
         // Show error message in dialog
         _showPhotoValidationErrorDialog(
-          'Guest $guestNumber: Error processing photo: ${e.toString()}',
+          'Guest ${guestNumber + 1}: Error processing photo: ${e.toString()}',
           () {
             // Clear any previous state and allow user to pick again
             setState(() {
@@ -1046,7 +1159,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Guest $guestNumber photo removed'),
+        content: Text('Guest ${guestNumber + 1} photo removed'),
         backgroundColor: Colors.orange,
       ),
     );
@@ -1553,11 +1666,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  // Method to unfocus all fields when tapping outside
+  void _unfocusAllFields() {
+    FocusScope.of(context).unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white, // Set background color to white
-      appBar: AppBar(
+    return GestureDetector(
+      onTap: _unfocusAllFields,
+      child: Scaffold(
+        backgroundColor: Colors.white, // Set background color to white
+        appBar: AppBar(
         title: const Text('Appointment Details'),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -1712,7 +1832,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                     // Guest Full Name
                     _buildReferenceField(
-                      label: 'Full Name of the Guest *',
+                      label: 'Full Name of the Guest',
+                      isRequired: true,
                       controller: _guestNameController,
                       placeholder: 'Enter guest\'s full name',
                       focusNode: _guestNameFocus,
@@ -1725,7 +1846,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                     // Guest Email
                     _buildEmailField(
-                      label: 'Email ID of the Guest *',
+                      label: 'Email ID of the Guest',
+                      isRequired: true,
                       controller: _guestEmailController,
                       placeholder: 'guest@email.com',
                       focusNode: _guestEmailFocus,
@@ -1742,7 +1864,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                     // Guest Designation
                     _buildReferenceField(
-                      label: 'Designation *',
+                      label: 'Designation',
+                      isRequired: true,
                       controller: _guestDesignationController,
                       placeholder: 'Guest\'s professional title',
                       focusNode: _guestDesignationFocus,
@@ -1755,7 +1878,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
                     // Guest Company/Organization
                     _buildReferenceField(
-                      label: 'Company/Organization *',
+                      label: 'Company/Organization',
+                      isRequired: true,
                       controller: _guestCompanyController,
                       placeholder: 'Guest\'s organization name',
                       focusNode: _guestCompanyFocus,
@@ -1779,12 +1903,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Guest Photo *',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                        RichText(
+                          text: const TextSpan(
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                            children: [
+                              TextSpan(text: 'Guest Photo '),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -2506,12 +2641,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ],
 
                   // Date Range Section
-                  const Text(
-                    'Select your preferred date range *',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                      children: [
+                        TextSpan(text: 'Select your preferred date range '),
+                        TextSpan(
+                          text: '*',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -2523,8 +2669,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     onTap: () =>
                         _selectDate(context, _preferredFromDateController),
                     errorMessage: _dateRangeError,
+                    focusNode: _fromDateFocus,
+                    isProgramDate: false,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // To Date
                   _buildDateField(
@@ -2533,6 +2681,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     onTap: () =>
                         _selectDate(context, _preferredToDateController),
                     errorMessage: _dateRangeError,
+                    focusNode: _toDateFocus,
+                    isProgramDate: false,
                   ),
                   const SizedBox(height: 20),
 
@@ -2687,129 +2837,33 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     Column(
                       children: [
                         // Program Start Date
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Program Start',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFFF97316),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            GestureDetector(
-                              onTap: () => _selectDate(
-                                context,
-                                _programFromDateController,
-                              ),
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: const Color(0xFFF97316),
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: TextField(
-                                  controller: _programFromDateController,
-                                  enabled: false,
-                                  decoration: InputDecoration(
-                                    hintText: 'dd-mm-yyyy',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.calendar_today,
-                                      color: const Color(0xFFF97316),
-                                    ),
-                                    suffixIcon: Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        _buildDateField(
+                          label: 'Program Start',
+                          controller: _programFromDateController,
+                          onTap: () => _selectDate(
+                            context,
+                            _programFromDateController,
+                          ),
+                          errorMessage: null,
+                          focusNode: _programFromDateFocus,
+                          isProgramDate: true,
                         ),
 
                         const SizedBox(height: 16),
 
                         // Program End Date
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Program End',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFFF97316),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            GestureDetector(
-                              onTap: () => _selectDate(
-                                context,
-                                _programToDateController,
-                              ),
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: _programDateRangeError != null
-                                        ? Colors.red
-                                        : const Color(0xFFF97316),
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: TextField(
-                                  controller: _programToDateController,
-                                  enabled: false,
-                                  decoration: InputDecoration(
-                                    hintText: 'dd-mm-yyyy',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.calendar_today,
-                                      color: const Color(0xFFF97316),
-                                    ),
-                                    suffixIcon: Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_programDateRangeError != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'End date must be after or equal to start date',
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ],
+                        _buildDateField(
+                          label: 'Program End',
+                          controller: _programToDateController,
+                          onTap: () => _selectDate(
+                            context,
+                            _programToDateController,
+                          ),
+                          errorMessage: _programDateRangeError != null 
+                            ? 'End date must be after or equal to start date'
+                            : null,
+                          focusNode: _programToDateFocus,
+                          isProgramDate: true,
                         ),
                       ],
                     ),
@@ -2856,7 +2910,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         ),
       ),
+      )
     );
+    
   }
 
   Widget _buildTextField({
@@ -2870,12 +2926,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: '$label '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -2967,12 +3034,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: '$label '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -3035,51 +3113,126 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required TextEditingController controller,
     required VoidCallback onTap,
     String? errorMessage,
+    FocusNode? focusNode,
+    bool isProgramDate = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
+        Row(
+          children: [
+            Icon(
+              isProgramDate ? Icons.event_available : Icons.calendar_today,
+              size: 18,
+              color: Colors.grey[600],
+            ),
+            const SizedBox(width: 8),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                children: [
+                  TextSpan(text: '$label '),
+                  const TextSpan(
+                    text: '*',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            // Unfocus any current field before opening date picker
+            FocusScope.of(context).unfocus();
+            onTap();
+          },
           child: Container(
             decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.grey[50]!, Colors.grey[100]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               border: Border.all(
                 color: errorMessage != null ? Colors.red : Colors.grey[300]!,
+                width: errorMessage != null ? 2 : 1.5,
               ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextField(
-              controller: controller,
-              enabled: false,
-              decoration: InputDecoration(
-                hintText: 'dd-mm-yyyy',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[50],
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 16,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: (errorMessage != null ? Colors.red : Colors.grey).withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                suffixIcon: Icon(Icons.calendar_today, color: Colors.grey[600]),
+              ],
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      controller.text.isEmpty ? 'Select $label' : controller.text,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: controller.text.isEmpty 
+                          ? Colors.grey[500] 
+                          : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.calendar_month,
+                      color: Colors.grey[600],
+                      size: 18,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
         if (errorMessage != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            errorMessage,
-            style: const TextStyle(color: Colors.red, fontSize: 12),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    errorMessage,
+                    style: const TextStyle(
+                      color: Colors.red, 
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ],
@@ -3099,6 +3252,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3136,6 +3290,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               placeholder: "Enter person full name",
               onChanged: (value) => _validateForm(),
               focusNode: guestFocusNodes['name'],
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Name is required';
+                }
+                if (value.trim().length < 2) {
+                  return 'Name must be at least 2 characters';
+                }
+                return null;
+              },
               onSubmitted: () {
                 // Move to next field (age) when submitted
                 _moveToNextField(guestFocusNodes['name']!, guestFocusNodes['age']);
@@ -3161,7 +3324,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 }
                 final age = int.tryParse(value);
                 if (age == null || age < 1 || age > 120) {
-                  return 'Please enter 1-120';
+                  return 'Age must be between 1 and 120';
                 }
                 return null;
               },
@@ -3224,12 +3387,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Photo *',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                      children: [
+                        TextSpan(text: 'Photo '),
+                        TextSpan(
+                          text: '*',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -3617,12 +3791,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: '$label '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 6),
@@ -3680,12 +3865,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: '$label '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 6),
@@ -3760,18 +3956,33 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required String placeholder,
     TextInputType? keyboardType,
     bool isReadOnly = false,
+    bool isRequired = false,
     FocusNode? focusNode,
     VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: label),
+              if (isRequired) ...[
+                const TextSpan(text: ' '),
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -3817,18 +4028,33 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     required String label,
     required TextEditingController controller,
     required String placeholder,
+    bool isRequired = false,
     FocusNode? focusNode,
     VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: label),
+              if (isRequired) ...[
+                const TextSpan(text: ' '),
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -3921,11 +4147,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         ),
         const SizedBox(height: 8),
         // Phone Number Field (without country code)
+        // Note: Reference phone field uses default length since no country picker is available
         TextField(
           controller: controller,
           focusNode: focusNode,
           keyboardType: TextInputType.number,
-          maxLength: 10,
+          maxLength: 15, // Increased to accommodate international numbers
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           enabled: !isReadOnly,
           onSubmitted: (_) => onSubmitted?.call(),
@@ -3964,12 +4191,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Appointment Location *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: 'Appointment Location '),
+              TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -4191,10 +4429,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 ),
               ),
               items: [
-                // Add "Select a secretary" option
+                // Add "None" option
                 const DropdownMenuItem<String>(
                   value: null,
-                  child: Text('Select a secretary'),
+                  child: Text('None - I am not in touch with any secretary'),
                 ),
                 // Add secretary options
                 ..._secretaries.map((secretary) {
@@ -4259,8 +4497,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               border: Border.all(
                 color:
                     _getSelectedSecretaryName() != null &&
-                        _getSelectedSecretaryName() !=
-                            'None - I am not in touch with any secretary'
+                        _getSelectedSecretaryName() != 'None'
                     ? const Color(0xFFF97316)
                     : Colors.grey[300]!,
               ),
@@ -4313,12 +4550,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           style: TextStyle(color: Colors.grey[600]),
                         )
                       : Text(
-                          _getSelectedSecretaryName() ?? 'Select a secretary',
+                          _getSelectedSecretaryName() ?? 'None',
                           style: TextStyle(
                             color:
                                 _getSelectedSecretaryName() != null &&
-                                    _getSelectedSecretaryName() !=
-                                        'None - I am not in touch with any secretary'
+                                    _getSelectedSecretaryName() != 'None'
                                 ? Colors.black87
                                 : Colors.grey[600],
                             fontSize: 16,
@@ -4337,7 +4573,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Get selected secretary name
   String? _getSelectedSecretaryName() {
     if (_selectedSecretary == null)
-      return 'None - I am not in touch with any secretary';
+      return 'None';
     final selectedSecretary = _secretaries.firstWhere(
       (secretary) => secretary['id'] == _selectedSecretary,
       orElse: () => {},
@@ -4526,12 +4762,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Mobile No. of the Guest *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: 'Mobile No. of the Guest '),
+              TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -4571,6 +4818,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       _selectedCountry = country;
                       // Clear the phone number field when country changes
                       _guestPhoneController.clear();
+                      // Clear phone validation error
+                      _guestPhoneError = null;
                     });
                   },
                 );
@@ -4618,8 +4867,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 controller: _guestPhoneController,
                 focusNode: _guestPhoneFocus,
                 keyboardType: TextInputType.number,
-                maxLength: 10,
+                maxLength: PhoneValidation.getPhoneLengthForCountryObject(_selectedCountry),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) {
+                  _validateGuestPhone(value);
+                  _validateForm();
+                },
                 onSubmitted: (_) {
                   // Move to next field when submitted
                   _moveToNextField(_guestPhoneFocus, _guestDesignationFocus);
@@ -4657,6 +4910,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           ],
         ),
+        // Phone validation error
+        if (_guestPhoneError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _guestPhoneError!,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -4681,12 +4945,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: isPhoneRequired ? 'Contact Number ' : 'Contact Number (Optional)'),
+              if (isPhoneRequired)
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 6),
@@ -4726,6 +5002,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       _guestCountries[guestNumber] = selectedCountry;
                       // Clear the phone number field when country changes
                       controller.clear();
+                      // Clear phone validation error for this guest
+                      _guestPhoneErrors[guestNumber] = null;
                     });
                   },
                 );
@@ -4773,9 +5051,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 controller: controller,
                 focusNode: guestFocusNodes['phone'],
                 keyboardType: TextInputType.number,
-                maxLength: 10,
+                maxLength: PhoneValidation.getPhoneLengthForCountryObject(country),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: (value) {
+                  _validateAdditionalGuestPhone(guestNumber, value);
                   _validateForm();
                 },
                 onSubmitted: (_) {
@@ -4823,6 +5102,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           ],
         ),
+        // Phone validation error for additional guests
+        if (_guestPhoneErrors[guestNumber] != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _guestPhoneErrors[guestNumber]!,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -4995,12 +5285,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Location *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(text: 'Location '),
+              TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),

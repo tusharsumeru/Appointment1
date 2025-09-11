@@ -67,16 +67,6 @@ class _AppointmentCardState extends State<AppointmentCard> {
         onTap:
             widget.onTap ??
             () async {
-              // Show loading indicator
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Loading appointment details...'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
-
               // Get appointment ID
               final appointmentId = widget.appointment['appointmentId']?.toString() ?? 
                                   widget.appointment['_id']?.toString() ?? '';
@@ -347,23 +337,11 @@ class _AppointmentCardState extends State<AppointmentCard> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: widget.index % 2 == 0 
-            ? null // Use gradient for even cards
-            : Colors.white, // Use white background for odd cards
-        gradient: widget.index % 2 == 0 
-            ? LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Colors.amber[50]!.withOpacity(0.6),
-                  Colors.orange[50]!.withOpacity(0.6),
-                ],
-              )
-            : null, // No gradient for odd cards
+            ? Colors.white // Use white background for even cards (same as card)
+            : Color(0xFFFFF3E0), // Use same orange background for odd cards (same as card)
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: widget.index % 2 == 0 
-              ? Colors.amber[200]!.withOpacity(0.4)
-              : Colors.grey[300]!.withOpacity(0.6),
+          color: Colors.grey[300]!.withOpacity(0.6),
           width: 1,
         ),
       ),

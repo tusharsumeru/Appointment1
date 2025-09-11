@@ -438,7 +438,52 @@ class UserAppointmentCard extends StatelessWidget {
                                     ),
                                   ),
                                   const Spacer(),
-                                  if (attendeePhotos != null && attendeePhotos!.isNotEmpty)
+                                  if (attendeesCount <= 10)
+                                    Container(
+                                      width: (attendeesCount * 16.0) + 8.0,
+                                      height: 24,
+                                      child: Stack(
+                                        children: List.generate(attendeesCount, (index) {
+                                          final attendeeName = _getAttendeeName(index);
+                                          final hasPhoto = attendeePhotos != null && 
+                                                          index < attendeePhotos!.length && 
+                                                          attendeePhotos![index].isNotEmpty;
+                                          final photoUrl = hasPhoto ? attendeePhotos![index] : null;
+                                          
+                                          return Positioned(
+                                            left: index * 16.0,
+                                              child: GestureDetector(
+                                                onTap: () => hasPhoto 
+                                                    ? _showImageModal(context, photoUrl!, attendeeName)
+                                                    : _showPlaceholderModal(context, attendeeName),
+                                                child: Container(
+                                                  width: 24,
+                                                  height: 24,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: Colors.white,
+                                                      width: 2,
+                                                    ),
+                                                  ),
+                                                  child: hasPhoto
+                                                      ? ClipOval(
+                                                          child: Image.network(
+                                                            photoUrl!,
+                                                            fit: BoxFit.cover,
+                                                            errorBuilder: (context, error, stackTrace) {
+                                                              return _buildPlaceholderCircle(name: attendeeName);
+                                                            },
+                                                          ),
+                                                        )
+                                                      : _buildPlaceholderCircle(name: attendeeName),
+                                                ),
+                                              ),
+                                          );
+                                        }),
+                                      ),
+                                    )
+                                  else if (attendeePhotos != null && attendeePhotos!.isNotEmpty)
                                     Container(
                                       width: (attendeePhotos!.length * 16.0) + 8.0,
                                       height: 24,
@@ -467,14 +512,7 @@ class UserAppointmentCard extends StatelessWidget {
                                                     photoUrl,
                                                     fit: BoxFit.cover,
                                                     errorBuilder: (context, error, stackTrace) {
-                                                      return Container(
-                                                        color: Colors.grey.shade200,
-                                                        child: const Icon(
-                                                          Icons.person,
-                                                          size: 12,
-                                                          color: Colors.grey,
-                                                        ),
-                                                      );
+                                                      return _buildPlaceholderCircle(name: attendeeName);
                                                     },
                                                   ),
                                                 ),
@@ -490,17 +528,12 @@ class UserAppointmentCard extends StatelessWidget {
                                       height: 24,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: Colors.grey.shade200,
                                         border: Border.all(
-                                          color: Colors.grey.shade300,
-                                          width: 1,
+                                          color: Colors.white,
+                                          width: 2,
                                         ),
                                       ),
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 12,
-                                        color: Colors.grey,
-                                      ),
+                                      child: _buildPlaceholderCircle(name: 'User'),
                                     ),
                                 ],
                               ),
@@ -945,6 +978,137 @@ class UserAppointmentCard extends StatelessWidget {
     }
   }
 
+  // Build placeholder circle for missing attendee photos
+  Widget _buildPlaceholderCircle({String? name}) {
+    String displayText = '';
+    if (name != null && name.isNotEmpty) {
+      // Get first letter of the name, handling multiple words
+      final words = name.trim().split(' ');
+      if (words.isNotEmpty) {
+        displayText = words.first[0].toUpperCase();
+      }
+    }
+    
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF97316), // Orange color
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          displayText,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            height: 1.0, // Reduce line height to prevent overflow
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  // Show placeholder modal for attendees without photos
+  void _showPlaceholderModal(BuildContext context, String name) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Placeholder Circle
+                  Container(
+                    width: 128,
+                    height: 128,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFF97316), // Orange color
+                      border: Border.all(
+                        color: Colors.grey.shade200,
+                        width: 4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Name
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Close Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // Show image modal
   void _showImageModal(BuildContext context, String imageUrl, String name) {
     showDialog(
@@ -1049,4 +1213,4 @@ class UserAppointmentCard extends StatelessWidget {
       },
     );
   }
-} 
+}

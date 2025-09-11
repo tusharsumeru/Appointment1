@@ -979,7 +979,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         rawTeacherdetails is Map<String, dynamic> ? rawTeacherdetails : null;
     final teacherCode = aolTeacher?['teacherCode'] ?? 'N/A';
     final teacherEmail = aolTeacher?['teacherEmail'] ?? 'N/A';
-    final teacherType = aolTeacherData?['teacher_type'] ?? 'N/A';
+    // For international teachers, show simplified type
+    final String teacherType = isInternationalTeacher 
+        ? (aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('total') == true 
+            ? 'Total Teacher' 
+            : 'Teacher')
+        : (aolTeacherData?['teacher_type'] ?? 'N/A');
     final teacherPhoneNumber = aolTeacher?['teacherPhoneNumber'];
     final phoneNumber = teacherPhoneNumber != null
         ? '${teacherPhoneNumber['countryCode']} ${teacherPhoneNumber['number']}'

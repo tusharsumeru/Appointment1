@@ -1262,7 +1262,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade600,
+                              color: Colors.deepPurple,
                               shape: BoxShape.circle,
                             ),
                             child: Center(
@@ -1593,6 +1593,8 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
         builder: (context) => AppointmentDetailPage(
           appointment: appointment,
           isFromScheduleScreens: true,
+          secretaryName: _getSecretaryName(appointment), // Pass secretary name
+          isTeacher: appointment['isTeacher'] ?? false, // Pass teacher status
         ),
       ),
     );
