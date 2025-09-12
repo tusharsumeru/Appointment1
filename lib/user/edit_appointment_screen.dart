@@ -499,7 +499,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             text: user['age']?.toString() ?? '',
           );
           final uniquePhoneCodeController = TextEditingController(
-            text: user['alternatePhoneNumber']?.toString() ?? '',
+            text: user['alternatePhoneNumber']?.toString() ?? 
+                  user['uniquePhoneCode']?.toString() ?? 
+                  user['alternativePhone']?.toString() ?? 
+                  user['alternatePhone']?.toString() ?? '',
           );
 
           // Parse phone number
@@ -2821,6 +2824,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Check if photo is required (age >= 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age >= 12;
+    
+    // Check if unique phone code field should be shown
+    final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
+    final shouldShowUniquePhoneCode = age < 12 || age > 60 || hasUniquePhoneCode;
+    
+    // Debug print
+    print('🔍 Guest $guestNumber - Age: $age, hasUniquePhoneCode: $hasUniquePhoneCode, shouldShowUniquePhoneCode: $shouldShowUniquePhoneCode');
 
     return Card(
       elevation: 2,
@@ -2880,7 +2890,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             _buildReferenceField(
               label: 'Age',
               controller: guest['age']!,
-              placeholder: 'Enter age (1-120)',
+              placeholder: 'Enter age',
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               maxLength: 3,
@@ -2906,13 +2916,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             _buildAccompanyingUserPhoneField(guestNumber, guest['phone']!),
             const SizedBox(height: 16),
 
-            // Unique Phone Code (only show if age < 12 or age > 60)
-            if (age < 12 || age > 60) ...[
+            // Unique Phone Code (show if age < 12 or age > 60 OR if there's existing unique phone code data)
+            if (shouldShowUniquePhoneCode) ...[
               const SizedBox(height: 16),
               _buildReferenceField(
                 label: 'Unique Phone Code (Optional)',
                 controller: guest['uniquePhoneCode']!,
-                placeholder: 'Enter unique phone code if available (makes phone number optional)',
+                placeholder: 'Enter 3-digit unique phone code',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 3,
                 onChanged: (value) {
                   _validateForm();
                   setState(() {}); // Rebuild to update phone field label

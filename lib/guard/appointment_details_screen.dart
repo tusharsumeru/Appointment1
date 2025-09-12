@@ -815,101 +815,166 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Second line: Profile Image
-          GestureDetector(
-            onTap: () {
-              if (profilePhotoUrl != null) {
-                _showImageModal(profilePhotoUrl, fullName);
-              }
-            },
+          // Second line: Profile Image - Instagram Style
+          AspectRatio(
+            aspectRatio: 1.0, // Square aspect ratio like Instagram
             child: Container(
               width: double.infinity,
-              height: 250,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFFF97316).withOpacity(0.3),
-                  width: 2,
-                ),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.black,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 child: profilePhotoUrl != null
-                    ? Image.network(
-                        profilePhotoUrl,
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                        width: double.infinity,
-                        height: 250,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF97316).withOpacity(0.1),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded / 
-                                      loadingProgress.expectedTotalBytes!
-                                    : null,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
-                              ),
+                    ? Stack(
+                        children: [
+                          // Main image container
+                          Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            color: Colors.grey[900],
+                            child: Image.network(
+                              profilePhotoUrl,
+                              fit: BoxFit.cover, // Cover the entire square area
+                              width: double.infinity,
+                              height: double.infinity,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: Colors.grey[900],
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 40,
+                                          height: 40,
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded / 
+                                                  loadingProgress.expectedTotalBytes!
+                                                : null,
+                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                            strokeWidth: 3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'Loading...',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.white.withOpacity(0.8),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[900],
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.person,
+                                        size: 80,
+                                        color: Colors.white.withOpacity(0.6),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Image unavailable',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white.withOpacity(0.8),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Tap to retry',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white.withOpacity(0.5),
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: const Color(0xFFF97316).withOpacity(0.1),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.person,
-                                  size: 100,
-                                  color: Color(0xFFF97316),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Image not available',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: const Color(0xFFF97316).withOpacity(0.7),
-                                    fontWeight: FontWeight.w500,
+                          ),
+                          // Instagram-style zoom button
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: GestureDetector(
+                              onTap: () => _showImageModal(profilePhotoUrl, fullName),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1,
                                   ),
                                 ),
-                              ],
+                                child: const Icon(
+                                  Icons.zoom_in,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       )
                     : Container(
-                        color: const Color(0xFFF97316).withOpacity(0.1),
+                        color: Colors.grey[900],
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.person,
-                              size: 100,
-                              color: Color(0xFFF97316),
+                              size: 80,
+                              color: Colors.white.withOpacity(0.6),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             Text(
                               isAccompanyingUserWithoutPhoto 
                                 ? 'Photo not required\nfor groups > 10'
                                 : 'No profile photo',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 14,
-                                color: const Color(0xFFF97316).withOpacity(0.7),
-                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                                color: Colors.white.withOpacity(0.8),
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                            if (!isAccompanyingUserWithoutPhoto) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Photo required for verification',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

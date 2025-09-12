@@ -467,6 +467,32 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             _buildMenuItem(
+              routeName: 'addNew',
+              icon: Icons.add_circle_outline,
+              title: 'Add New',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddNewScreen()),
+                );
+              },
+            ),
+
+            _buildMenuItem(
+              routeName: 'globalSearch',
+              icon: Icons.search,
+              title: 'Global Search',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GlobalSearchScreen()),
+                );
+              },
+            ),
+
+            _buildMenuItem(
               routeName: 'assignedToMe',
               icon: Icons.assignment_ind,
               title: 'Assigned to Me',
@@ -531,19 +557,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ),
 
             _buildMenuItem(
-              routeName: 'addNew',
-              icon: Icons.add_circle_outline,
-              title: 'Add New',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddNewScreen()),
-                );
-              },
-            ),
-
-            _buildMenuItem(
               routeName: 'referenceFormList',
               icon: Icons.list_alt,
               title: 'Reference Form List',
@@ -552,19 +565,6 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const ReferenceFromListScreen()),
-                );
-              },
-            ),
-
-            _buildMenuItem(
-              routeName: 'globalSearch',
-              icon: Icons.search,
-              title: 'Global Search',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const GlobalSearchScreen()),
                 );
               },
             ),

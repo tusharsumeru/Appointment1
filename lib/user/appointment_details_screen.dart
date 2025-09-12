@@ -1439,17 +1439,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
-          // Only add phoneNumber if we have a phone number OR if we don't have unique phone code
-          if (fullPhoneNumber != null || !hasUniquePhoneCode) {
+          // If unique phone code is provided, use it instead of regular phone number
+          if (hasUniquePhoneCode) {
+            // When unique phone code is provided, don't send country code
+            guestData['alternativePhone'] = uniquePhoneCode;
+          } else if (fullPhoneNumber != null) {
+            // Only add phoneNumber if we have a phone number and no unique phone code
             guestData['phoneNumber'] = {
               'countryCode': countryCode,
               'number': phoneNumber, // save only local number
             };
-          }
-
-          // Add unique phone code as alternativePhone if provided
-          if (hasUniquePhoneCode) {
-            guestData['alternativePhone'] = uniquePhoneCode;
           }
 
           // Add photo if available for this guest
@@ -2105,13 +2104,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              'S3 URL: ${_mainGuestPhotoUrl!.substring(0, 50)}...',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
+                                            // Text(
+                                            //   'S3 URL: ${_mainGuestPhotoUrl!.substring(0, 50)}...',
+                                            //   style: TextStyle(
+                                            //     fontSize: 12,
+                                            //     color: Colors.grey[600],
+                                            //   ),
+                                            // ),
                                           ] else ...[
                                             const Text(
                                               'Photo Not uploaded,Retry Upload',
@@ -3310,7 +3309,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             _buildGuestTextField(
               label: 'Age',
               controller: guest['age']!,
-              placeholder: 'Enter age (1-120)',
+              placeholder: 'Enter age',
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               maxLength: 3,
@@ -3346,7 +3345,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               _buildGuestTextField(
                 label: 'Unique Phone Code (Optional)',
                 controller: guest['uniquePhoneCode']!,
-                placeholder: 'Enter unique phone code if available (makes phone number optional)',
+                placeholder: 'Enter 3-digit unique phone code',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 3,
                 onChanged: (value) {
                   _validateForm();
                   setState(() {}); // Rebuild to update phone field label
@@ -3625,13 +3627,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 2),
-                                    Text(
-                                      'S3 URL: ${_guestImages[guestNumber]!.substring(0, 30)}...',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
+                                    // Text(
+                                    //   'S3 URL: ${_guestImages[guestNumber]!.substring(0, 30)}...',
+                                    //   style: TextStyle(
+                                    //     fontSize: 10,
+                                    //     color: Colors.grey[600],
+                                    //   ),
+                                    // ),
                                   ],
                                 ),
                               ),

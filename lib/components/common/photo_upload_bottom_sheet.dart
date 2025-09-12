@@ -71,7 +71,6 @@ class _PhotoUploadBottomSheetState extends State<PhotoUploadBottomSheet> {
           try {
             final duplicateResult = await ActionService.validateDuplicatePhoto(
               selectedImage!,
-              submitType: 'subuser',
             );
             
             setState(() {

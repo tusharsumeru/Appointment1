@@ -2524,9 +2524,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     
                                           // Total Number of Users
                       _buildNumberField(
-                        'Total Number of Users',
+                        'Number of People',
                         _numberOfPeopleController,
-                        'Total number of people including you',
+                        'Number of people (including you) for the appointment?',
                         isRequired: true,
                       ),
                       
@@ -2784,6 +2784,56 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     );
   }
 
+  Widget _buildUniquePhoneCodeField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 3,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.orange[400]!),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Enter 3-digit unique phone code',
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+            ),
+            counterText: '', // Hide the character counter
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[800],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildEditableAgeField(String label, TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2821,7 +2871,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             ),
             filled: true,
             fillColor: Colors.grey[50],
-            hintText: 'Enter age (1-120)',
+            hintText: 'Enter age',
             hintStyle: TextStyle(
               color: Colors.grey[400],
               fontSize: 14,
@@ -3393,7 +3443,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         
         const SizedBox(height: 4),
         Text(
-          'Total number of people including you',
+          'Number of people (including you) for the appointment?',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
@@ -5184,15 +5234,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Details of Additional People',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-        const SizedBox(height: 16),
+        // Text(
+        //   'Details of Additional People',
+        //   style: TextStyle(
+        //     fontSize: 18,
+        //     fontWeight: FontWeight.bold,
+        //     color: Colors.grey[800],
+        //   ),
+        // ),
+        // const SizedBox(height: 16),
         ...List.generate(_guests.length, (index) {
           // Only generate cards if we have corresponding controllers
           if (index >= _guestControllers.length) {
@@ -5279,7 +5329,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
               // Unique Phone Code (only show if age < 12 or age > 60)
               if (age < 12 || age > 60) ...[
-                _buildEditableGuestField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
+                _buildUniquePhoneCodeField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
                 const SizedBox(height: 4),
                 Text(
                   'If you provide a unique phone code, the phone number field becomes optional',

@@ -2267,6 +2267,84 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     return 'In-person'; // Default
   }
 
+  String _getAccompanyingUsersNamesWithCount() {
+    try {
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final users = accompanyUsers['users'] as List<dynamic>?;
+        if (users != null && users.isNotEmpty) {
+          final List<String> names = [];
+          for (final user in users) {
+            if (user is Map<String, dynamic>) {
+              final fullName = user['fullName']?.toString();
+              if (fullName != null && fullName.isNotEmpty) {
+                names.add(fullName);
+              }
+            }
+          }
+          if (names.isNotEmpty) {
+            return '${names.join(', ')}';
+          }
+        }
+      }
+    } catch (e) {
+      print('Error parsing accompanying users: $e');
+    }
+    return 'No accompanying users';
+  }
+
+  int _getAccompanyingUsersCount() {
+    try {
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        return accompanyUsers['numberOfUsers'] ?? 0;
+      }
+    } catch (e) {
+      print('Error getting accompanying users count: $e');
+    }
+    return 0;
+  }
+
+  Widget _buildAccompanyingUsersNamesRow() {
+    final count = _getAccompanyingUsersCount();
+    final names = _getAccompanyingUsersNamesWithCount();
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.people, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Names of people ($count) accompanying the appointee: ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  TextSpan(
+                    text: names,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getAssignedSecretary() {
     // First, check if secretary name was passed from schedule screens
     if (widget.secretaryName != null && widget.secretaryName!.isNotEmpty) {
@@ -2355,6 +2433,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 !widget.isFromDeletedAppointments && 
                 !(widget.isFromScheduleScreens && _isQuickAppointment())) ...[
               _buildAccompanyingUsersSection(),
+            ],
+            
+            // Accompanying User Information Card - Only show when NOT from schedule screens
+            if (!widget.isFromScheduleScreens) ...[
+              _buildAccompanyingUserInfoCard(),
             ],
             
             // Teacher Verification Section - Only show if user is verified and NOT a guest appointment
@@ -2926,8 +3009,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRowWithCopy('Appointment ID', _getAppointmentId(), Icons.tag),
             // Show Purpose, Teacher status, Meeting type, and Assigned Secretary for schedule screens
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
-            _buildMainCardDetailRow('Are you an Art Of Living teacher', _getTeacherStatus(), Icons.school),
+            _buildMainCardDetailRow('Are you an Art of Living Teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
+            // Show accompanying users names before Assigned Secretary
+            _buildAccompanyingUsersNamesRow(),
             _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.person),
             _buildMainCardDetailRow('Program Date', _getProgramDateRange(), Icons.event),
             // Show attachment if exists
@@ -3140,6 +3225,82 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildAccompanyingUserInfoCard() {
+    final eligibleUsers = _getEligibleAccompanyingUsers();
+    final namesText = eligibleUsers.isNotEmpty 
+        ? eligibleUsers.join(', ')
+        : 'Not provided';
+    
+    return Container(
+      margin: const EdgeInsets.all(16), // Match Basic Information section
+      padding: const EdgeInsets.all(20), // Match Basic Information section
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16), // Match Basic Information section
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+            height: 1.4,
+          ),
+          children: [
+            const TextSpan(
+              text: 'Name of people accompanying the appointee under age 12 and above 60 : ',
+            ),
+            TextSpan(
+              text: namesText,
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<String> _getEligibleAccompanyingUsers() {
+    final List<String> eligibleNames = [];
+    
+    try {
+      final accompanyUsers = widget.appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final users = accompanyUsers['users'] as List<dynamic>?;
+        if (users != null) {
+          for (final user in users) {
+            if (user is Map<String, dynamic>) {
+              final fullName = user['fullName']?.toString();
+              final ageStr = user['age']?.toString();
+              
+              if (fullName != null && fullName.isNotEmpty && ageStr != null && ageStr.isNotEmpty) {
+                final age = int.tryParse(ageStr);
+                if (age != null && (age < 12 || age > 60)) {
+                  eligibleNames.add(fullName);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Handle any parsing errors gracefully
+      print('Error parsing accompanying users: $e');
+    }
+    
+    return eligibleNames;
   }
 
   Widget _buildUserCard(String name, String label, int matches, bool isMainUser, int userIndex) {
@@ -3764,21 +3925,21 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Notes and remarks for this appointment.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 20),
+          // Text(
+          //   'Notes and remarks for this appointment.',
+          //   style: TextStyle(
+          //     fontSize: 14,
+          //     color: Colors.grey[600],
+          //   ),
+          // ),
+          // const SizedBox(height: 20),
           
           // Notes Field
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isQuickAppointment() ? 'Purpose' : 'Notes',
+                _isQuickAppointment() ? 'Notes for Secretary' : 'Notes for Secretary',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -3790,7 +3951,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 enabled: true,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: _isQuickAppointment() ? 'Purpose of the appointment...' : 'Enter notes here...',
+                  hintText: _isQuickAppointment() ? 'Add your notes here...' : 'Add your notes here...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.grey[300]!),
@@ -3815,7 +3976,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isQuickAppointment() ? 'Gurudev Remarks' : 'Remarks',
+                _isQuickAppointment() ? 'Remarks for Gurudev' : 'Remarks for Gurudev',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -3827,7 +3988,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 enabled: true,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: _isQuickAppointment() ? 'Remarks for Gurudev...' : 'Enter remarks here...',
+                  hintText: _isQuickAppointment() ? 'Add your remarks here...' : 'Add your remarks here...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.grey[300]!),

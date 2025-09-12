@@ -454,7 +454,7 @@ class _RequestAppointmentScreenState extends State<RequestAppointmentScreen> {
 
                         // Teacher Question
                         const Text(
-                          'Are you an Art Of Living teacher?',
+                          'Are you an Art of Living teacher?',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,

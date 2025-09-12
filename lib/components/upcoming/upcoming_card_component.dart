@@ -428,14 +428,41 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   }
 
   String _formatTime(String? timeString) {
-    if (timeString == null) return 'No time';
+    if (timeString == null || timeString.isEmpty) return 'No time';
 
     try {
-      final time = DateTime.parse(timeString);
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+      // Check if it's just a time string like "14:30" or "14:30:00"
+      if (timeString.contains(':') && !timeString.contains('T') && !timeString.contains(' ')) {
+        // It's just a time string, parse it directly
+        final parts = timeString.split(':');
+        if (parts.length >= 2) {
+          final hour = int.parse(parts[0]);
+          final minute = int.parse(parts[1]);
+          
+          // Convert to 12-hour format with AM/PM
+          final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+          final period = hour < 12 ? 'AM' : 'PM';
+          
+          return '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+        }
+      } else {
+        // It's a full DateTime string, parse it normally
+        final time = DateTime.parse(timeString);
+        final hour = time.hour;
+        final minute = time.minute;
+        
+        // Convert to 12-hour format with AM/PM
+        final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        final period = hour < 12 ? 'AM' : 'PM';
+        
+        return '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+      }
     } catch (e) {
-      return 'Invalid time';
+      // If parsing fails, return the original string
+      return timeString;
     }
+    
+    return 'Invalid time';
   }
 
   String _getAppointmentTime(Map<String, dynamic> appointment) {
@@ -869,7 +896,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade600,
+                                  color: _getStatusColor(_getMainStatus(appointment)),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -923,7 +950,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                           ),
                           Expanded(
                             child: Text(
-                              _getAppointmentTime(appointment),
+                              _formatTime(_getAppointmentTime(appointment)),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -937,11 +964,11 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
 
                       const SizedBox(height: 12),
 
-                      // Accompany
+                      // Appointees
                       Row(
                         children: [
                           Text(
-                            'Accompany User: ',
+                            'Appointees: ',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
@@ -950,7 +977,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                           ),
                           Expanded(
                             child: Text(
-                              '${_getAccompanyUsersCount(appointment)}',
+                              '${_getTotalAppointeesCount(appointment)}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -1332,7 +1359,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
       case 'checked_in':
         return Colors.green; // Green for Admitted
       case 'not_arrived':
-        return Colors.grey; // Grey for Not Arrived
+        return Colors.red; // Red for Not Arrived
       case 'checked_in_partial':
         return Colors.orange; // Orange for Admitted Partial
       case 'scheduled':
@@ -1364,12 +1391,27 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     }
   }
 
-  int _getAccompanyUsersCount(Map<String, dynamic> appointment) {
+  int _getTotalAppointeesCount(Map<String, dynamic> appointment) {
+    final appointmentType = appointment['appointmentType']?.toString().toLowerCase();
+    int accompanyCount = 0;
+    
+    // Get accompanying users count
     final accompanyUsers = appointment['accompanyUsers'];
     if (accompanyUsers is Map<String, dynamic>) {
-      return accompanyUsers['numberOfUsers'] ?? 0;
+      accompanyCount = accompanyUsers['numberOfUsers'] ?? 0;
     }
-    return 0;
+    
+    // Add 1 for main user/guest based on appointment type
+    if (appointmentType == 'myself') {
+      // For myself appointments, add 1 for the main user
+      return accompanyCount + 1;
+    } else if (appointmentType == 'guest') {
+      // For guest appointments, add 1 for the main guest
+      return accompanyCount + 1;
+    } else {
+      // For other appointment types, add 1 for the main appointee
+      return accompanyCount + 1;
+    }
   }
 
   Future<void> _handleMarkAsDone(Map<String, dynamic> appointment) async {
