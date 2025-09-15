@@ -51,6 +51,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     
     // Loading state
   bool _isSubmitting = false;
+  // Reference-as-accompany state
+  bool _referenceAsAccompanyUser = false;
   
   // Form state
   String? _selectedLocation;
@@ -90,9 +92,39 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     super.initState();
     _debugAppointmentStructure(); // Debug the appointment structure
     _initializeControllers();
+    // Detect reference-as-accompany from existing appointment, if present
+    try {
+      final refFlag = widget.appointment['referenceAsAccompanyUser'];
+      if (refFlag is bool) {
+        _referenceAsAccompanyUser = refFlag;
+      } else if (refFlag is String) {
+        _referenceAsAccompanyUser = refFlag.toLowerCase() == 'true';
+      }
+    } catch (_) {}
     _loadCurrentUser();
     _loadSecretaries();
     _loadLocations();
+  }
+
+  // Toggle total people when user marks themselves as accompany
+  void _updatePeopleCountForAccompanyUser() {
+    int currentCount = int.tryParse(_numberOfPeopleController.text) ?? 1;
+    if (_referenceAsAccompanyUser) {
+      if (currentCount < 10) {
+        _numberOfPeopleController.text = (currentCount + 1).toString();
+      }
+    } else {
+      final minAllowed = 1;
+      if (currentCount > minAllowed) {
+        _numberOfPeopleController.text = (currentCount - 1).toString();
+      }
+    }
+    _updateGuestControllers();
+  }
+
+  int _getDisplayPersonNumber(int guestNumber) {
+    // guestNumber is 1-based for accompany list
+    return _referenceAsAccompanyUser ? (guestNumber + 2) : (guestNumber + 1);
   }
 
   void _initializeControllers() {
@@ -573,7 +605,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final users = accompanyUsers['users'];
       
       if (users is List) {
-        _guests = users.map((user) {
+        // Detect reference-as-accompany from data if present
+        try {
+          if (users.any((u) => (u is Map && (u['referenceAsAccompanyUser'] == true || u['referenceAsAccompanyUser'] == 'true')))) {
+            _referenceAsAccompanyUser = true;
+          }
+        } catch (_) {}
+
+        // Build guests, excluding the main user if they are marked as reference-accompany
+        _guests = users.where((user) {
+          if (_referenceAsAccompanyUser && user is Map) {
+            final flag = user['referenceAsAccompanyUser'];
+            if (flag == true || flag == 'true') return false; // exclude main user from accompany cards
+          }
+          return true;
+        }).map((user) {
           final phoneNumber = user['phoneNumber'];
           
           String fullPhone = '';
@@ -699,7 +745,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   // Update guest controllers based on total number of users
   void _updateGuestControllers() {
     final totalUsers = int.tryParse(_numberOfPeopleController.text) ?? 1;
-    final accompanyingUsers = totalUsers - 1; // Subtract 1 for main user
+    int accompanyingUsers = _referenceAsAccompanyUser ? (totalUsers - 2) : (totalUsers - 1);
+    if (accompanyingUsers < 0) accompanyingUsers = 0;
     final currentControllersCount = _guestControllers.length;
     
     // Skip if this is the initial setup (guests are being initialized from existing data)
@@ -1406,7 +1453,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             padding: const EdgeInsets.all(24),
             child: isUploading 
                 ? _buildGuestPhotoDisplayUploading() 
-                : (hasPhoto ? _buildGuestPhotoDisplayUploaded(photoUrl) : _buildGuestPhotoDisplayNotUploaded()),
+                : (hasPhoto 
+                    ? _buildGuestPhotoDisplayUploaded(photoUrl) 
+                    : Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.shade200),
+                            ),
+                            child: Text(
+                              'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildGuestPhotoDisplayNotUploaded()
+                        ],
+                      )),
           ),
         ],
       ),
@@ -1661,6 +1732,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         Text(
           'Photo of the Person Required for Age 12 years and Above',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 12),
+        
+        // Important Photo Upload Notice
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Text(
+            'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.orange.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         
@@ -2128,34 +2219,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final hasUniquePhoneCode = user['alternativePhone'] != null && 
             user['alternativePhone'].toString().trim().isNotEmpty;
         
-        // Phone number validation based on age and unique phone code
-        if (age < 12 || age > 60) {
-          // For age < 12 or age > 60, either phone number OR unique phone code is required
-          if (!hasUniquePhoneCode) {
-            // Check if phone number is provided
-            final hasPhoneNumber = user['phoneNumber'] != null && 
-                user['phoneNumber']['number']?.toString().trim().isNotEmpty == true;
-            
-            if (!hasPhoneNumber) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('User $userIndex: Either phone number or unique phone code is required for ages under 12 or over 60'),
-                  backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-              return;
-            }
-          }
-        } else {
-          // For other ages: Phone number is always required
+        // Validation per rules:
+        // - Age < 12 or > 59: no phone/unique code required
+        // - Age 12..59: phone required unless unique code provided
+        if (age >= 12 && age <= 59) {
           final hasPhoneNumber = user['phoneNumber'] != null && 
               user['phoneNumber']['number']?.toString().trim().isNotEmpty == true;
-          
-          if (!hasPhoneNumber) {
+          if (!hasUniquePhoneCode && !hasPhoneNumber) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('User $userIndex: Phone number is required'),
+                content: Text('User $userIndex: Phone number is required for age $age unless a unique code is provided'),
                 backgroundColor: Colors.red,
                 duration: const Duration(seconds: 3),
               ),
@@ -2221,6 +2294,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'fromDate': _fromDateController.text,
           'toDate': _toDateController.text,
         },
+        'referenceAsAccompanyUser': _referenceAsAccompanyUser,
       };
 
       // Add guestInformation if appointment type is 'guest'
@@ -2327,7 +2401,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       
       // Get phone number with country code
       final phoneNumber = controllers['phone']?.text ?? '';
-      final countryCode = _guestCountries[guestNumber] ?? '+91';
+      final rawCountryCode = _guestCountries[guestNumber] ?? '+91';
+      final countryCode = rawCountryCode.startsWith('+') ? rawCountryCode : '+$rawCountryCode';
       final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
       final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
       final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
@@ -2340,8 +2415,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'age': age,
       };
 
-      // Only include phone number if we have one OR if we don't have unique phone code (for ages 12-60)
-      if (phoneNumber.isNotEmpty || !hasUniquePhoneCode) {
+      // Only include phone number if we have one
+      if (phoneNumber.isNotEmpty) {
         userData['phoneNumber'] = {
           'countryCode': countryCode,
           'number': phoneNumber,
@@ -2485,7 +2560,68 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                       _buildSectionHeader('Reference Information', 'Reference details of the person requesting the appointment'),
                       const SizedBox(height: 20),
                       _buildReferenceInformationSection(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
+                      // Accompany User section
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Accompany User',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Are you also attending the appointment as an accompany user?',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _referenceAsAccompanyUser,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _referenceAsAccompanyUser = val ?? false;
+                                    });
+                                    _updatePeopleCountForAccompanyUser();
+                                  },
+                                  activeColor: const Color(0xFFF97316),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Are you an accompany user?',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Builder(
+                              builder: (context) {
+                                final total = int.tryParse(_numberOfPeopleController.text) ?? 1;
+                                final base = _referenceAsAccompanyUser ? 2 : 1;
+                                final additional = (total - base).clamp(0, 10);
+                                return Text(
+                                  'ℹ️ Guest (1) + You as accompany user (${_referenceAsAccompanyUser ? 1 : 0}) = $base base people. Additional accompany users: $additional.',
+                                  style: const TextStyle(fontSize: 12, color: Colors.blue),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       
                       // Guest Information Section
                       _buildSectionHeader('Guest Information', 'Enter the details of the person you are requesting the appointment for'),
@@ -3357,7 +3493,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             GestureDetector(
               onTap: () {
                 int currentCount = int.tryParse(controller.text) ?? 1;
-                if (currentCount > 1) { // Minimum 1 total user (main user)
+                final minAllowed = _referenceAsAccompanyUser ? 2 : 1;
+                if (currentCount > minAllowed) {
                   setState(() {
                     controller.text = (currentCount - 1).toString();
                   });
@@ -3416,10 +3553,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             GestureDetector(
               onTap: () {
                 int currentCount = int.tryParse(controller.text) ?? 1;
-                setState(() {
-                  controller.text = (currentCount + 1).toString();
-                });
-                _updateGuestControllers();
+                if (currentCount < 10) {
+                  setState(() {
+                    controller.text = (currentCount + 1).toString();
+                  });
+                  _updateGuestControllers();
+                }
               },
               child: Container(
                 width: 48,
@@ -5274,7 +5413,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final isPhotoRequired = age >= 12;
     
     // Debug: Print age and unique phone code visibility
-    print('Guest $guestNumber - Age: $age, Should show unique phone code: ${age < 12 || age > 60}');
+    print('Guest $guestNumber - Age: $age, Should show unique phone code: ${age >= 12 && age <= 59}');
     print('  - Age text: ${controllers['age']?.text}');
     print('  - Unique phone code text: ${controllers['uniquePhoneCode']?.text}');
     
@@ -5306,7 +5445,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              'Detail of Person ${guestNumber +1 }',
+              'Detail of Person ${_getDisplayPersonNumber(guestNumber)}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -5327,12 +5466,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _buildEditableAgeField('Age *', controllers['age']!),
               const SizedBox(height: 12),
 
-              // Unique Phone Code (only show if age < 12 or age > 60)
-              if (age < 12 || age > 60) ...[
+              // Unique Phone Code (show only for age 12..59)
+              if (age >= 12 && age <= 59) ...[
                 _buildUniquePhoneCodeField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
                 const SizedBox(height: 4),
                 Text(
-                  'If you provide a unique phone code, the phone number field becomes optional',
+                  'If you don’t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -5371,6 +5510,26 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 Text(
                   'Photo of the person Required for Age 12 years and Above',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
+                
+                // Important Photo Upload Notice
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Text(
+                    'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 
@@ -5776,8 +5935,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
         : false;
     
-    // Determine if phone is required
-    final isPhoneRequired = !(age < 12 || age > 60) || !hasUniquePhoneCode;
+    // Determine if phone is required per rules:
+    // - Age < 12 or > 59: phone optional
+    // - Age 12..59: phone required unless unique code present
+    final isPhoneRequired = (age >= 12 && age <= 59) && !hasUniquePhoneCode;
     final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
 
     return Column(

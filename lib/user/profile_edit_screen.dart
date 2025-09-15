@@ -672,6 +672,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           // Photo Upload Options
                           Column(
                             children: [
+                              // Important notice
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.orange.shade200),
+                                ),
+                                child: Text(
+                                  'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               // Upload from Device Card
                               GestureDetector(
                                 onTap: () => _pickImage(ImageSource.gallery),
@@ -2394,6 +2413,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           const SizedBox(height: 6),
           Text(
             '📧 Email: support@sumerudigital.com',
+            style: TextStyle(
+              color: Colors.blue.shade600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '📞 Phone: +91-8971227735',
             style: TextStyle(
               color: Colors.blue.shade600,
               fontSize: 13,

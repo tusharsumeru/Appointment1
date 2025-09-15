@@ -811,6 +811,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '📞 Phone: +91-8971227735',
+            style: TextStyle(
+              color: Colors.blue.shade600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             "Reach out to us and we'll help you update your teacher status and information.",

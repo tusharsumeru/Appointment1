@@ -5779,41 +5779,26 @@ class ActionService {
       final hasUniquePhoneCode = user['alternativePhone'] != null && 
           user['alternativePhone'].toString().trim().isNotEmpty;
       
-      // Phone number validation based on age and unique phone code
-      if (age < 12 || age > 60) {
-        // For age < 12 or age > 60, either phone number OR unique phone code is required
-        if (!hasUniquePhoneCode) {
-          bool hasPhoneNumber = false;
-          if (user['phoneNumber'] != null) {
-            if (user['phoneNumber'] is Map) {
-              final phoneObj = user['phoneNumber'] as Map<String, dynamic>;
-              hasPhoneNumber = phoneObj['number'] != null && 
-                  phoneObj['number'].toString().trim().isNotEmpty;
-            } else if (user['phoneNumber'] is String) {
-              hasPhoneNumber = user['phoneNumber'].toString().trim().isNotEmpty;
-            }
-          }
-          
-          if (!hasPhoneNumber) {
-            errors.add('User $userIndex: Either phone number or unique phone code is required for age $age');
-          }
-        }
-      } else {
-        // For other ages, phone number is always required
+      // Phone/unique code validation based on age rules
+      // - Age < 12 or > 59: neither phone nor unique code required
+      // - Age 12..59: phone is required unless unique code provided
+      if (age >= 12 && age <= 59) {
         bool hasPhoneNumber = false;
         if (user['phoneNumber'] != null) {
           if (user['phoneNumber'] is Map) {
             final phoneObj = user['phoneNumber'] as Map<String, dynamic>;
-            hasPhoneNumber = phoneObj['number'] != null && 
+            hasPhoneNumber = phoneObj['number'] != null &&
                 phoneObj['number'].toString().trim().isNotEmpty;
           } else if (user['phoneNumber'] is String) {
             hasPhoneNumber = user['phoneNumber'].toString().trim().isNotEmpty;
           }
         }
-        
-        if (!hasPhoneNumber) {
-          errors.add('User $userIndex: Phone number is required for age $age');
+
+        if (!hasUniquePhoneCode && !hasPhoneNumber) {
+          errors.add('User $userIndex: Phone number is required for age $age unless a unique code is provided');
         }
+      } else {
+        // Age < 12 or > 59: optional, no requirement
       }
       
       // Validate unique phone code format if provided
@@ -5856,6 +5841,54 @@ class ActionService {
       if (attachmentFile != null) {
         print('📎 Attachment file: ${attachmentFile.path}');
       }
+
+      // Normalize referenceAsAccompanyUser and accompanyUsers before any validation
+      try {
+        // Mirror referenceAsAccompanyUser from referenceInformation if not present at top-level
+        if (appointmentData['referenceAsAccompanyUser'] == null &&
+            appointmentData['referenceInformation'] is Map) {
+          final refInfo = appointmentData['referenceInformation'] as Map;
+          if (refInfo.containsKey('referenceAsAccompanyUser')) {
+            appointmentData['referenceAsAccompanyUser'] = refInfo['referenceAsAccompanyUser'];
+          }
+        }
+
+        // Normalize accompanyUsers shape consistently
+        final au = appointmentData['accompanyUsers'];
+        if (au is List) {
+          appointmentData['accompanyUsers'] = {
+            'numberOfUsers': au.length,
+            'users': au,
+          };
+        } else if (au is Map) {
+          final numUsersRaw = au['numberOfUsers'];
+          final usersRaw = au['users'];
+          final numUsers = numUsersRaw is int
+              ? numUsersRaw
+              : int.tryParse(numUsersRaw?.toString() ?? '0') ?? 0;
+          final users = usersRaw is List ? usersRaw : <dynamic>[];
+          appointmentData['accompanyUsers'] = {
+            'numberOfUsers': numUsers,
+            'users': users,
+          };
+        } else if (au == null) {
+          appointmentData['accompanyUsers'] = {
+            'numberOfUsers': 0,
+            'users': <dynamic>[],
+          };
+        }
+
+        // If more than 10, keep users empty (no per-user details sent)
+        if (appointmentData['accompanyUsers'] is Map) {
+          final auMap = appointmentData['accompanyUsers'] as Map;
+          final numUsers = auMap['numberOfUsers'] is int
+              ? auMap['numberOfUsers'] as int
+              : int.tryParse(auMap['numberOfUsers']?.toString() ?? '0') ?? 0;
+          if (numUsers > 10) {
+            auMap['users'] = <dynamic>[];
+          }
+        }
+      } catch (_) {}
 
       // Validate accompany users if present
       if (appointmentData['accompanyUsers'] != null) {

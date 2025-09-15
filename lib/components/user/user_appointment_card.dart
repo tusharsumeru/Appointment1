@@ -268,23 +268,26 @@ class UserAppointmentCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           if (isGuestAppointment) ...[
-                            if (guestInfo['designation'] != null && guestInfo['designation']!.isNotEmpty)
-                              Text(
-                                guestInfo['designation']!,
+                            (() {
+                              final des = guestInfo['designation'] ?? '';
+                              final comp = guestInfo['company'] ?? '';
+                              final hasDes = des.isNotEmpty;
+                              final hasComp = comp.isNotEmpty;
+                              final line = hasDes && hasComp
+                                  ? '$des at $comp'
+                                  : (hasDes ? des : (hasComp ? comp : ''));
+                              if (line.isEmpty) return const SizedBox.shrink();
+                              return Text(
+                                line,
+                                maxLines: 2,
+                                softWrap: true,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey.shade600,
                                   fontWeight: FontWeight.w500,
                                 ),
-                              ),
-                            if (guestInfo['company'] != null && guestInfo['company']!.isNotEmpty)
-                              Text(
-                                guestInfo['company']!,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
+                              );
+                            })(),
                             if (guestInfo['email'] != null && guestInfo['email']!.isNotEmpty)
                               Text(
                                 guestInfo['email']!,
@@ -294,21 +297,25 @@ class UserAppointmentCard extends StatelessWidget {
                                 ),
                               ),
                           ] else ...[
-                            Text(
-                              userTitle,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              company,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
+                            (() {
+                              final des = userTitle;
+                              final comp = company;
+                              final hasDes = des.isNotEmpty;
+                              final hasComp = comp.isNotEmpty;
+                              final line = hasDes && hasComp
+                                  ? '$des at $comp'
+                                  : (hasDes ? des : (hasComp ? comp : ''));
+                              return Text(
+                                line,
+                                maxLines: 2,
+                                softWrap: true,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              );
+                            })(),
                           ],
                         ],
                       ),

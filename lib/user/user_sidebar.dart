@@ -6,6 +6,7 @@ import 'user_history_screen.dart';
 import 'profile_screen.dart';
 import 'appointment_type_selection_screen.dart';
 import 'my_divine_picture_screen.dart';
+import 'help_support_screen.dart';
 
 class UserSidebar extends StatefulWidget {
   const UserSidebar({super.key});
@@ -242,6 +243,20 @@ class _UserSidebarState extends State<UserSidebar> {
                   },
                 ),
 
+                ListTile(
+                  leading: const Icon(Icons.help_outline, color: Color(0xFFF97316)),
+                  title: const Text('Help & Support'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HelpSupportScreen(),
+                      ),
+                    );
+                  },
+                ),
+
                 const Divider(),
 
                 ListTile(
@@ -266,7 +281,7 @@ class _UserSidebarState extends State<UserSidebar> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Build 1.0.0+1',
+                  'Build 3.0.0',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

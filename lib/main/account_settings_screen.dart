@@ -861,6 +861,25 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                                                    ),
                                                  ),
                                                  const SizedBox(height: 24),
+                                                 // Important notice
+                                                 Container(
+                                                   width: double.infinity,
+                                                   padding: const EdgeInsets.all(12),
+                                                   decoration: BoxDecoration(
+                                                     color: Colors.orange.shade50,
+                                                     borderRadius: BorderRadius.circular(8),
+                                                     border: Border.all(color: Colors.orange.shade200),
+                                                   ),
+                                                   child: Text(
+                                                     'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+                                                     style: TextStyle(
+                                                       fontSize: 12,
+                                                       color: Colors.orange.shade700,
+                                                       fontWeight: FontWeight.w500,
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 const SizedBox(height: 12),
                                                  // Photo Action Buttons
                                                  // First line: Upload Different Photo (full width)
                                                  SizedBox(
