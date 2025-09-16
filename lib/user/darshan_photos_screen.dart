@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../action/action.dart';
 import 'user_sidebar.dart';
 import 'user_darshan_photos_screen.dart';
@@ -505,6 +506,7 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
     final filteredPhotos = _getFilteredDarshanPhotos();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Darshan Photos with Gurudev'),
         backgroundColor: Colors.white,
@@ -531,35 +533,153 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              const Text(
-                'Darshan Photos with Gurudev',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                      spreadRadius: 0,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 40,
+                      offset: const Offset(0, 16),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.grey.shade100,
+                    width: 1,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Click on a person above to view their darshan photos',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Gradient title: Darshan Photos with Gurudev
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [
+                          Color(0xFFEA580C), // from-orange-600
+                          Color(0xFF9A3412), // to-orange-800
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+                      blendMode: BlendMode.srcIn,
+                      child: const Text(
+                        'Darshan Photos with Gurudev',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20, // Reduced size to fit in one line
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Discover and view your precious darshan moments with Gurudev',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Powered by line with pulsing dot and link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.3, end: 1.0),
+                          duration: const Duration(milliseconds: 1000),
+                          builder: (context, value, child) {
+                            return Opacity(
+                              opacity: value,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF97316),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            );
+                          },
+                          onEnd: () {
+                            setState(() {});
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFF97316),
+                            ),
+                            children: [
+                              const TextSpan(text: 'DivinePicAI Powered By '),
+                              WidgetSpan(
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    final Uri url = Uri.parse('https://sumerudigital.com/');
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    }
+                                  },
+                                  child: Text(
+                                    'Sumeru Digital Solutions',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),
 
               // Reference Photos Section
               if (apiData != null && referencePhotos.isNotEmpty) ...[
-                const Text(
-                  'Your Reference Photos',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Reference Photos',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Select a profile to view their darshan photos',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Wrap(
                   spacing: 24,
                   runSpacing: 16,

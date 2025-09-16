@@ -5,6 +5,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import '../components/common/loading_dialog.dart';
 
 class UserDarshanPhotosScreen extends StatefulWidget {
   final String personName;
@@ -44,6 +46,77 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Helper: extract epoch millis from image name and format date as YYYY-MON-DD
+  String _formatEpochToApiDate(int millis) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    final mon = months[dt.month - 1];
+    final day = dt.day.toString().padLeft(2, '0');
+    return '${dt.year}-$mon-$day';
+  }
+
+  String? _extractDateFromImageName(String imageName) {
+    try {
+      // Find 13-digit number (epoch millis) in the filename
+      final match = RegExp(r'(?<!\d)(\d{13})(?!\d)').firstMatch(imageName);
+      if (match != null) {
+        final millisStr = match.group(1);
+        if (millisStr != null) {
+          final millis = int.parse(millisStr);
+          return _formatEpochToApiDate(millis);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _formatDateForDisplay(String dateStr) {
+    try {
+      // Expecting YYYY-MON-DD format
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        final year = parts[0];
+        final month = parts[1];
+        final day = parts[2];
+        
+        const monthNames = {
+          'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr',
+          'MAY': 'May', 'JUN': 'Jun', 'JUL': 'Jul', 'AUG': 'Aug',
+          'SEP': 'Sep', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
+        };
+        
+        final monthName = monthNames[month] ?? month;
+        final dayNum = int.tryParse(day) ?? 0;
+        
+        if (dayNum > 0) {
+          return '$monthName $dayNum, $year';
+        }
+      }
+    } catch (_) {}
+    return dateStr; // Return original if parsing fails
+  }
+
+  String _getDisplayDate(Map<String, dynamic> photo) {
+    String date = photo['date']?.toString() ?? '';
+    final imageUrl = photo['imageUrl']?.toString() ?? '';
+    
+    // If date is unknown/empty, try to derive it from image name
+    final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
+    if (isUnknown && imageUrl.isNotEmpty) {
+      final derived = _extractDateFromImageName(imageUrl);
+      if (derived != null) {
+        return _formatDateForDisplay(derived);
+      }
+    }
+    
+    // If we have a valid date, format it for display
+    if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
+      return _formatDateForDisplay(date);
+    }
+    
+    return 'Unknown';
   }
 
   void _loadInitialPhotos() {
@@ -92,32 +165,115 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
 
   Future<void> _downloadImage(String imageUrl, int photoNumber) async {
     try {
-      final Uri url = Uri.parse(imageUrl);
-      
-      // Try to open in browser directly
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        // If canLaunchUrl returns false, try anyway with external application
-        try {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        } catch (e) {
-          // If that fails, try platform default
-          try {
-            await launchUrl(url, mode: LaunchMode.platformDefault);
-          } catch (e) {
-            // Final fallback: in-app web view
-            await launchUrl(url, mode: LaunchMode.inAppWebView);
-          }
+      // Show consistent loading dialog
+      if (context.mounted) {
+        LoadingDialog.show(context, message: 'Your image is preparing to download...');
+      }
+
+      // Download image to temporary directory
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        final tempDir = await getTemporaryDirectory();
+        final fileName = 'darshan_${photoNumber}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+
+        if (context.mounted) {
+          LoadingDialog.hide(context);
         }
+
+        // Use share_plus to let user save/share the image
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Your pics detected by DivinePicAI by Sumeru Digital',
+          subject: 'Divine Pictures - 1 image',
+        );
+
+        // Cleanup after a short delay
+        Future.delayed(const Duration(seconds: 5), () async {
+          try {
+            if (await file.exists()) {
+              await file.delete();
+            }
+          } catch (_) {}
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image ready to save!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to download image');
       }
     } catch (e) {
       if (context.mounted) {
+        LoadingDialog.hide(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error opening image: $e'),
+            content: Text('Error downloading image: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareImage(String imageUrl, int photoNumber) async {
+    try {
+      // Show consistent loading dialog
+      if (context.mounted) {
+        LoadingDialog.show(context, message: 'Your image is preparing to share...');
+      }
+
+      // Download image to temporary file for sharing
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        final tempDir = await getTemporaryDirectory();
+        final fileName = 'darshan_share_${photoNumber}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+
+        if (context.mounted) {
+          LoadingDialog.hide(context);
+        }
+
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Your pics detected by DivinePicAI by Sumeru Digital',
+          subject: 'Divine Pictures - 1 image',
+        );
+
+        // Cleanup after share
+        try {
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (_) {}
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image shared successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to download image for sharing');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        LoadingDialog.hide(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing image: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -127,6 +283,7 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${widget.personName}\'s Darshan Photos'),
         backgroundColor: Colors.white,
@@ -217,6 +374,7 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
+                    physics: const ClampingScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: displayedPhotos.length + 1, // +1 for the bottom widget
                     itemBuilder: (context, index) {
@@ -378,32 +536,54 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Date: ${photo['date'] ?? 'Unknown'}',
+                              'Date: ${_getDisplayDate(photo)}',
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Download button
-                      ElevatedButton.icon(
-                        onPressed: () => _downloadImage(photo['imageUrl'], photoNumber),
-                        icon: const Icon(Icons.download, size: 16),
-                        label: const Text('Download'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                      // Download and Share buttons
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _downloadImage(photo['imageUrl'], photoNumber),
+                            icon: const Icon(Icons.download, size: 16),
+                            label: const Text('Download'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          textStyle: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => _shareImage(photo['imageUrl'], photoNumber),
+                            icon: const Icon(Icons.share, size: 16),
+                            label: const Text('Share'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

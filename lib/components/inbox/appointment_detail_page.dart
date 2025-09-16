@@ -48,6 +48,50 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   // Filter state
   String _selectedFilter = '90_days'; // Default to 90 days
   bool _isRefreshing = false;
+  // Helper: extract epoch millis from image name and format date as YYYY-MON-DD
+  String _formatEpochToApiDate(int millis) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    final mon = months[dt.month - 1];
+    final day = dt.day.toString().padLeft(2, '0');
+    return '${dt.year}-$mon-$day';
+  }
+
+  String? _extractDateFromImageName(String imageName) {
+    try {
+      // Find 13-digit number (epoch millis) in the filename
+      final match = RegExp(r'(?<!\d)(\d{13})(?!\d)').firstMatch(imageName);
+      if (match != null) {
+        final millisStr = match.group(1);
+        if (millisStr != null) {
+          final millis = int.parse(millisStr);
+          return _formatEpochToApiDate(millis);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _computeDaysAgoFromDateString(String dateStr) {
+    try {
+      // Expecting YYYY-MON-DD
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        final year = int.parse(parts[0]);
+        final monStr = parts[1].toUpperCase();
+        final day = int.parse(parts[2]);
+        const monthMap = {
+          'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+          'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12
+        };
+        final month = monthMap[monStr] ?? 1;
+        final dt = DateTime(year, month, day);
+        final now = DateTime.now();
+        return now.difference(dt).inDays.toString();
+      }
+    } catch (_) {}
+    return '0';
+  }
   
   // Appointments overview state
   List<Map<String, dynamic>> _upcomingAppointments = [];
@@ -293,12 +337,13 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from the selected time period only
-        final matches = apiResult[_selectedFilter]?['matches'] as List<dynamic>? ?? [];
+        // Aggregate matches across all periods (30/60/90) so we don't miss any
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        final allMatches = [...matches30, ...matches60, ...matches90];
         
-        // Debug: Print match count for this user with selected filter
-        
-        return matches.length;
+        return allMatches.length;
       } else {
         // apiResult is null - no face match data for this user
         return 0;
@@ -347,25 +392,34 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
-        
-        // Get matches from the selected time period
-        final matches = apiResult[_selectedFilter]?['matches'] as List<dynamic>? ?? [];
-        
-        // Group matches by album
+        // Combine matches from all time periods and include items regardless of date value
+        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+        final matches = [...matches30, ...matches60, ...matches90];
+
+        // Group matches by album (do not exclude unknown dates)
         Map<String, List<Map<String, dynamic>>> albumGroups = {};
         
         for (final match in matches) {
           if (match is Map<String, dynamic>) {
             final albumId = match['album_id']?.toString() ?? '';
-            final date = match['date']?.toString() ?? '';
-            final daysAgo = match['days_ago']?.toString() ?? '';
+            String date = match['date']?.toString() ?? '';
+            String daysAgo = match['days_ago']?.toString() ?? '';
             final imageUrl = match['image_name']?.toString() ?? '';
+
+            // If date is unknown/empty, try to derive it from image name
+            final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
+            if (isUnknown && imageUrl.isNotEmpty) {
+              final derived = _extractDateFromImageName(imageUrl);
+              if (derived != null) {
+                date = derived;
+                daysAgo = _computeDaysAgoFromDateString(derived);
+              }
+            }
             
-            // Only include matches with valid album ID and date
-            if (albumId.isNotEmpty && 
-                date.isNotEmpty && 
-                date.toLowerCase() != 'unknown' && 
-                date != 'null') {
+            // Only require a valid album ID; include unknown dates
+            if (albumId.isNotEmpty) {
               if (!albumGroups.containsKey(albumId)) {
                 albumGroups[albumId] = [];
               }
@@ -383,10 +437,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         List<Map<String, dynamic>> albumMeetings = [];
         albumGroups.forEach((albumId, matches) {
           if (matches.isNotEmpty) {
-            // Sort matches by date to get the most recent
+            // Sort matches by date to get the most recent, pushing 'unknown' to the end
             matches.sort((a, b) {
               final dateA = a['date']?.toString() ?? '';
               final dateB = b['date']?.toString() ?? '';
+              final isUnknownA = dateA.isEmpty || dateA.toLowerCase() == 'unknown' || dateA == 'null';
+              final isUnknownB = dateB.isEmpty || dateB.toLowerCase() == 'unknown' || dateB == 'null';
+              if (isUnknownA && isUnknownB) return 0;
+              if (isUnknownA) return 1; // A goes after B
+              if (isUnknownB) return -1; // B goes after A
               return dateB.compareTo(dateA);
             });
             
@@ -402,10 +461,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           }
         });
         
-        // Sort albums by date (most recent first)
+        // Sort albums by date (most recent first), keeping unknowns at the end
         albumMeetings.sort((a, b) {
           final dateA = a['date']?.toString() ?? '';
           final dateB = b['date']?.toString() ?? '';
+          final isUnknownA = dateA.isEmpty || dateA.toLowerCase() == 'unknown' || dateA == 'null';
+          final isUnknownB = dateB.isEmpty || dateB.toLowerCase() == 'unknown' || dateB == 'null';
+          if (isUnknownA && isUnknownB) return 0;
+          if (isUnknownA) return 1;
+          if (isUnknownB) return -1;
           return dateB.compareTo(dateA);
         });
         
@@ -451,8 +515,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         } catch (e) {
         }
       }
+      // If date is unknown
+      return 'Unknown';
     }
-    return 'No meetings in ${_selectedFilter.replaceAll('_', ' ')}';
+    return 'No meetings found';
   }
 
   // Get last meeting days ago
@@ -3508,7 +3574,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
                         ),
                         child: Text(
-                          'TOTAL ALBUMS',
+                          'TOTAL MEETINGS',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
@@ -3530,7 +3596,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'albums in last ${_selectedFilter.replaceAll('_', ' ')}',
+                            'All time',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,

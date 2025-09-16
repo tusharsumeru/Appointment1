@@ -665,6 +665,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             'admittedBy': user['admittedBy'],
             'relationshipToApplicant': user['relationshipToApplicant'],
             'admittedAt': user['admittedAt'],
+            'alternatePhoneNumber': user['alternatePhoneNumber']?.toString() ?? '',
             'isUploading': false,
           };
         }).toList();

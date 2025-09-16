@@ -820,6 +820,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '🕒 Support Hours: 9:00 AM - 6:00 PM (Monday to Friday)',
+            style: TextStyle(
+              color: Colors.blue.shade600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             "Reach out to us and we'll help you update your teacher status and information.",

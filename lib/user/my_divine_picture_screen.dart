@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 import '../action/action.dart';
 import '../components/common/add_photo_button.dart';
 import '../components/common/photo_upload_bottom_sheet.dart';
@@ -443,6 +444,7 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('My Divine Picture'),
         flexibleSpace: Container(
@@ -474,25 +476,128 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
           _loadUserData();
         },
         child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              const Text(
-                'My Divine Picture',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                      spreadRadius: 0,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 40,
+                      offset: const Offset(0, 16),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.grey.shade100,
+                    width: 1,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Click on a user to view their details. Use delete mode to remove sub-users.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Gradient title: Divine Pictures
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [
+                          Color(0xFFEA580C), // from-orange-600
+                          Color(0xFF9A3412), // to-orange-800
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+                      blendMode: BlendMode.srcIn,
+                      child: const Text(
+                        'Divine Pictures',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 40, // text-4xl (approx), scales well on mobile
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Discover and share your precious darshan moments with Gurudev',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Powered by line with pulsing dot and link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.3, end: 1.0),
+                          duration: const Duration(milliseconds: 1000),
+                          builder: (context, value, child) {
+                            return Opacity(
+                              opacity: value,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF97316),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            );
+                          },
+                          onEnd: () {
+                            setState(() {});
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFF97316),
+                            ),
+                            children: [
+                              const TextSpan(text: 'DivinePicAI Powered By '),
+                              WidgetSpan(
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    final Uri url = Uri.parse('https://sumerudigital.com/');
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    }
+                                  },
+                                  child: Text(
+                                    'Sumeru Digital Solutions',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),

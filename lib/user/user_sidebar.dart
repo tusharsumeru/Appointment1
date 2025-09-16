@@ -114,6 +114,7 @@ class _UserSidebarState extends State<UserSidebar> {
   Widget build(BuildContext context) {
     return Drawer(
       width: 280, // Fixed width to prevent stretching
+      backgroundColor: Colors.white,
       child: Column(
         children: [
           Expanded(
