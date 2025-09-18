@@ -869,7 +869,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                   ),
                 ),
 
-                // Second line - Status, Time, Accompany, Secretary (Side by Side Layout)
+                // Status section
                 Container(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -934,90 +934,109 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                           ],
                         ),
                       ],
+                    ],
+                  ),
+                ),
 
-                      const SizedBox(height: 12),
-
-                      // Time
+                // Table-like layout for Time, Appointees, Secretary
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header row
                       Row(
                         children: [
-                          Text(
-                            'Time: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: Text(
+                              'Time',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           Expanded(
                             child: Text(
-                              _formatTime(_getAppointmentTime(appointment)),
-                              style: const TextStyle(
-                                fontSize: 16,
+                              'Appointees',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Secretary',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 12),
-
-                      // Appointees
+                      const SizedBox(height: 8),
+                      // Data row
                       Row(
                         children: [
-                          Text(
-                            'Appointees: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: Text(
+                              _formatTime(_getAppointmentTime(appointment)),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Expanded(
                             child: Text(
                               '${_getTotalAppointeesCount(appointment)}',
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Secretary
-                      Row(
-                        children: [
-                          Text(
-                            'Secretary: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.deepPurple,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                _getSecretaryInitials(appointment),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepPurple,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _getSecretaryInitials(appointment),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ],

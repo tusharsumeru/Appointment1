@@ -282,7 +282,7 @@ class _UserSidebarState extends State<UserSidebar> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Build 3.0.0',
+                  'Build 4.0.0',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

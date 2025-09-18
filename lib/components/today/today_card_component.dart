@@ -851,156 +851,143 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
                   ),
                 ),
 
-                // Second line - Status, Time, Accompany, Secretary (Side by Side Layout)
+                // Status section
                 Container(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Main Status (Check-in Status) - Only show for non-completed appointments
-                      if (_getAppointmentStatusForDone(appointment).toLowerCase() != 'completed' && 
-                          _getAppointmentStatusForDone(appointment).toLowerCase() != 'done') ...[
-                        Row(
-                          children: [
-                            Text(
-                              'Appointment Status: ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
+                      // Status
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Status: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                _getStatusText(
-                                  _getMainStatus(appointment),
-                                ).toUpperCase(),
+                              Text(
+                                _getCheckInStatus(appointment).toUpperCase(),
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: _getStatusColor(_getMainStatus(appointment)),
+                                  color: _getCheckInStatusColor(appointment),
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          _buildStatusBreakdown(appointment),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
-                      // Appointment Status - Only show for completed appointments
-                      if (_getAppointmentStatusForDone(appointment).toLowerCase() == 'completed' || 
-                          _getAppointmentStatusForDone(appointment).toLowerCase() == 'done') ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              'Appointment Status: ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                _getStatusText(
-                                  _getAppointmentStatusOnly(appointment),
-                                ).toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      const SizedBox(height: 12),
-
-                      // Time
+                // Table-like layout for Time, Appointees, Secretary
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header row
                       Row(
                         children: [
-                          Text(
-                            'Time: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: Text(
+                              'Time',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           Expanded(
                             child: Text(
-                              _formatTime(_getAppointmentTime(appointment)),
-                              style: const TextStyle(
-                                fontSize: 16,
+                              'Appointees',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Secretary',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 12),
-
-                      // Appointees
+                      const SizedBox(height: 8),
+                      // Data row
                       Row(
                         children: [
-                          Text(
-                            'Appointees: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: Text(
+                              _formatTime(_getAppointmentTime(appointment)),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Expanded(
                             child: Text(
                               '${_getTotalAppointeesCount(appointment)}',
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Secretary
-                      Row(
-                        children: [
-                          Text(
-                            'Secretary: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.deepPurple,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                _getSecretaryInitials(appointment),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepPurple,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _getSecretaryInitials(appointment),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ],
@@ -1709,6 +1696,172 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
         ),
       );
     }
+  }
+
+  String _getCheckInStatus(Map<String, dynamic> appointment) {
+    // Get checkInStatus.mainStatus from the API data
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is Map<String, dynamic>) {
+      final mainStatus = checkInStatus['mainStatus']?.toString();
+      if (mainStatus != null && mainStatus.isNotEmpty) {
+        // Map status to display text
+        switch (mainStatus.toLowerCase()) {
+          case 'checked_in_partial':
+            return 'Admitted partially';
+          case 'checked_in':
+            return 'Admitted';
+          case 'not_arrived':
+            return 'Not Arrived';
+          case 'rejected':
+            return 'Rejected';
+          default:
+            return mainStatus;
+        }
+      }
+    }
+    return 'Unknown';
+  }
+
+  Color _getCheckInStatusColor(Map<String, dynamic> appointment) {
+    // All statuses should be green as requested
+    return Colors.green.shade600;
+  }
+
+  Widget _buildStatusBreakdown(Map<String, dynamic> appointment) {
+    final checkInStatus = appointment['checkInStatus'];
+    if (checkInStatus is! Map<String, dynamic>) {
+      return const SizedBox.shrink();
+    }
+
+    final users = checkInStatus['users'] as List<dynamic>? ?? [];
+    final checkedInUsers = checkInStatus['checkedInUsers'] ?? 0;
+    final totalUsers = checkInStatus['totalUsers'] ?? 0;
+    
+    // Calculate actual total users from the users array
+    final actualTotalUsers = users.length;
+    
+    // If total users from backend is more than 10, use checkedInUsers directly
+    if (totalUsers > 10) {
+      final rejectedCount = totalUsers - checkedInUsers;
+      
+      return Wrap(
+        spacing: 4,
+        runSpacing: 2,
+        children: [
+          if (checkedInUsers > 0) ...[
+            Text(
+              '$checkedInUsers',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue.shade700,
+              ),
+            ),
+            Text(
+              'Admitted',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+          // Always show rejected count (even if 0)
+          Text(
+            '$rejectedCount',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.red.shade600,
+            ),
+          ),
+          Text(
+            'Rejected',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          Text(
+            'Total $totalUsers Appointee${totalUsers != 1 ? 's' : ''}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // For 10 or fewer users, count individual statuses from users array
+    int admittedCount = 0;
+    int rejectedCount = 0;
+    int notArrivedCount = 0;
+
+    for (var user in users) {
+      if (user is Map<String, dynamic>) {
+        final userStatus = user['status']?.toString().toLowerCase() ?? '';
+        switch (userStatus) {
+          case 'checked_in':
+            admittedCount++;
+            break;
+          case 'rejected':
+            rejectedCount++;
+            break;
+          case 'not_arrived':
+            notArrivedCount++;
+            break;
+        }
+      }
+    }
+
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      children: [
+        if (admittedCount > 0) ...[
+          Text(
+            '$admittedCount',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.blue.shade700,
+            ),
+          ),
+          Text(
+            'Admitted',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+        // Always show rejected count (even if 0)
+        Text(
+          '$rejectedCount',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.red.shade600,
+          ),
+        ),
+        Text(
+          'Rejected',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade500,
+          ),
+        ),
+        Text(
+          'Total $actualTotalUsers Appointee${actualTotalUsers != 1 ? 's' : ''}',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
   }
 
 

@@ -143,6 +143,35 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     return '';
   }
 
+  // Helper: extract epoch millis from image name and format date as "Friday, Sep 5, 2025"
+  String _formatEpochToApiDate(int millis) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    final weekday = weekdays[dt.weekday - 1];
+    final month = months[dt.month - 1];
+    final day = dt.day;
+    final year = dt.year;
+    
+    return '$weekday, $month $day, $year';
+  }
+
+  String? _extractDateFromImageName(String imageName) {
+    try {
+      // Find 13-digit number (epoch millis) in the filename
+      final match = RegExp(r'(?<!\d)(\d{13})(?!\d)').firstMatch(imageName);
+      if (match != null) {
+        final millisStr = match.group(1);
+        if (millisStr != null) {
+          final millis = int.parse(millisStr);
+          return _formatEpochToApiDate(millis);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Get image date for a specific image
   String _getImageDate(int index) {
     if (widget.faceMatchData.isNotEmpty) {
@@ -161,15 +190,26 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
         
         if (index < allMatches.length) {
           final match = allMatches[index];
-          final date = match['date']?.toString() ?? '';
-          if (date.isNotEmpty) {
+          String date = match['date']?.toString() ?? '';
+          final imageUrl = match['image_name']?.toString() ?? '';
+          
+          // If date is unknown/empty, try to derive it from image name
+          final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
+          if (isUnknown && imageUrl.isNotEmpty) {
+            final derived = _extractDateFromImageName(imageUrl);
+            if (derived != null) {
+              date = derived;
+            }
+          }
+          
+          if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
             return date;
           }
         }
       }
     }
     
-    return 'Match ${index + 1}';
+    return 'Image ${index + 1}';
   }
 
   @override
@@ -177,7 +217,7 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text('${widget.userName}\'s Images'),
+        title: Text(widget.userName),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -286,125 +326,45 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: _buildMeetingInfo(),
+    );
+  }
+
+  // Build meeting information widget
+  Widget _buildMeetingInfo() {
+    final meetingInfo = _getMeetingInfo();
+    if (meetingInfo.isEmpty) return const SizedBox.shrink();
+    
+    // Extract album ID and meeting details
+    final albumId = _getAlbumId();
+    final meetingDetails = _getMeetingDetails();
+    
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Profile Image
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.red, width: 2),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Image.network(
-                widget.userImageUrl ?? 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.person, size: 30, color: Colors.grey),
-                  );
-                },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  );
-                },
-              ),
+          // Title
+          Text(
+            'Meeting Evidence: $albumId',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(width: 16),
-          
-          // User Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.userName,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.photo_library, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      widget.isAlbumView 
-                        ? '${_getActualImageCount()} images in album'
-                        : '${_getActualImageCount()} images found',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                // Show album information if available
-                if (widget.albums != null && widget.albums!.isNotEmpty && !widget.isAlbumView) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.album, size: 16, color: Colors.green[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.uniqueAlbumCount} albums • ${widget.totalAlbumImages} total images',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                // Show album ID when viewing specific album
-                if (widget.isAlbumView && widget.albumId != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.album, size: 16, color: Colors.orange[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Album ID: ${widget.albumId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (widget.userIndex > 0) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.face, size: 16, color: Colors.blue[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Face match results',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+          const SizedBox(height: 6),
+          // Description
+          Text(
+            meetingDetails,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              height: 1.3,
             ),
           ),
         ],
@@ -412,9 +372,128 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     );
   }
 
+  // Get album ID from the first image
+  String _getAlbumId() {
+    if (widget.faceMatchData.isEmpty) return 'N/A';
+    
+    final result = widget.faceMatchData[0];
+    if (result['apiResult'] == null) return 'N/A';
+    
+    final apiResult = result['apiResult'];
+    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    
+    final allMatches = [...matches30, ...matches60, ...matches90];
+    if (allMatches.isEmpty) return 'N/A';
+    
+    final firstMatch = allMatches[0];
+    return firstMatch['album_id']?.toString() ?? 'N/A';
+  }
+
+  // Get meeting details (photo count and date info)
+  String _getMeetingDetails() {
+    if (widget.faceMatchData.isEmpty) return '';
+    
+    final result = widget.faceMatchData[0];
+    if (result['apiResult'] == null) return '';
+    
+    final apiResult = result['apiResult'];
+    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    
+    final allMatches = [...matches30, ...matches60, ...matches90];
+    if (allMatches.isEmpty) return '';
+    
+    // Get the first match to extract meeting info
+    final firstMatch = allMatches[0];
+    final imageUrl = firstMatch['image_name']?.toString() ?? '';
+    
+    if (imageUrl.isEmpty) return '';
+    
+    // Extract meeting date and time from image URL
+    final meetingDateTime = _extractMeetingDateTime(imageUrl);
+    if (meetingDateTime == null) return '';
+    
+    final photoCount = allMatches.length;
+    final photoText = photoCount == 1 ? 'photo' : 'photos';
+    
+    return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+  }
+
+  // Get meeting information from image data
+  String _getMeetingInfo() {
+    if (widget.faceMatchData.isEmpty) return '';
+    
+    final result = widget.faceMatchData[0];
+    if (result['apiResult'] == null) return '';
+    
+    final apiResult = result['apiResult'];
+    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
+    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
+    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    
+    final allMatches = [...matches30, ...matches60, ...matches90];
+    if (allMatches.isEmpty) return '';
+    
+    // Get the first match to extract meeting info
+    final firstMatch = allMatches[0];
+    final imageUrl = firstMatch['image_name']?.toString() ?? '';
+    
+    if (imageUrl.isEmpty) return '';
+    
+    // Extract meeting date and time from image URL
+    final meetingDateTime = _extractMeetingDateTime(imageUrl);
+    if (meetingDateTime == null) return '';
+    
+    final photoCount = allMatches.length;
+    final photoText = photoCount == 1 ? 'photo' : 'photos';
+    
+    return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+  }
+
+  // Extract meeting date and time from image URL
+  Map<String, String>? _extractMeetingDateTime(String imageUrl) {
+    try {
+      // Find 13-digit timestamp in the URL
+      final timestampMatch = RegExp(r'(\d{13})').firstMatch(imageUrl);
+      if (timestampMatch != null) {
+        final timestamp = int.parse(timestampMatch.group(1)!);
+        final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp, isUtc: true).toLocal();
+        
+        // Format date as DD/MM/YYYY
+        final dateStr = '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
+        
+        // Format full date time
+        const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        final weekday = weekdays[dateTime.weekday - 1];
+        final month = months[dateTime.month - 1];
+        final day = dateTime.day;
+        final year = dateTime.year;
+        final hour = dateTime.hour.toString().padLeft(2, '0');
+        final minute = dateTime.minute.toString().padLeft(2, '0');
+        final second = dateTime.second.toString().padLeft(2, '0');
+        
+        final fullDateTime = '$weekday $month ${day.toString().padLeft(2, '0')} $year $hour:$minute:$second GMT+0530 (India Standard Time)';
+        
+        return {
+          'date': dateStr,
+          'fullDateTime': fullDateTime,
+        };
+      }
+    } catch (e) {
+      // Handle parsing errors
+    }
+    return null;
+  }
+
   Widget _buildImagesGrid() {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
+      physics: const ClampingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -493,37 +572,15 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Match number and confidence
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _getImageDate(index),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${_getMatchConfidence(index).toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Date display
+                  Text(
+                    _getImageDate(index),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   // Album information
                   if (widget.albums != null && widget.albums!.isNotEmpty) ...[

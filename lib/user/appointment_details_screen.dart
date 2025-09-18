@@ -230,7 +230,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
-      guest['uniquePhoneCode']?.dispose();
+      // COMMENTED OUT: Unique phone code controller disposal
+      // guest['uniquePhoneCode']?.dispose();
     }
     super.dispose();
   }
@@ -365,7 +366,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'name': FocusNode(),
         'phone': FocusNode(),
         'age': FocusNode(),
-        'uniquePhoneCode': FocusNode(),
+        // COMMENTED OUT: Unique phone code focus node
+        // 'uniquePhoneCode': FocusNode(),
       };
       
       // Add listeners for auto-scrolling
@@ -418,7 +420,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        guest['uniquePhoneCode']?.dispose();
+        // COMMENTED OUT: Unique phone code controller disposal
+        // guest['uniquePhoneCode']?.dispose();
       }
       _guestControllers.clear();
       _guestImages.clear();
@@ -438,7 +441,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        guest['uniquePhoneCode']?.dispose();
+        // COMMENTED OUT: Unique phone code controller disposal
+        // guest['uniquePhoneCode']?.dispose();
 
         // Also remove associated data
         int guestNumber = i + 1;
@@ -461,7 +465,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'name': TextEditingController(),
         'phone': TextEditingController(),
         'age': TextEditingController(),
-        'uniquePhoneCode': TextEditingController(),
+        // COMMENTED OUT: Unique phone code controller
+        // 'uniquePhoneCode': TextEditingController(),
       };
       _guestControllers.add(controllers);
 
@@ -488,10 +493,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     int currentCount = int.tryParse(_numberOfUsersController.text) ?? 1;
     
     if (_referenceAsAccompanyUser) {
-      // If user is coming as accompany, increase the count by 1 (but not above 10)
-      if (currentCount < 10) {
-        _numberOfUsersController.text = (currentCount + 1).toString();
-      }
+      // If user is coming as accompany, increase the count by 1
+      _numberOfUsersController.text = (currentCount + 1).toString();
     } else {
       // If user is not coming as accompany, decrease the count by 1 (but not below 1)
       if (currentCount > 1) {
@@ -735,7 +738,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-        final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
+        // COMMENTED OUT: Unique phone code logic disabled
+        // final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
+        final hasUniquePhoneCode = false;
 
         // Check required fields
         if (guest['name']?.text.isEmpty == true || guest['age']?.text.isEmpty == true) {
@@ -746,7 +751,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // New rules:
         // - For age < 12 or age > 59: hide unique code, phone optional
         // - For age 12..59: show unique code; if code present -> phone optional; else phone required
-        if (age >= 12 && age <= 59) {
+        if (age > 12 && age <= 59) {
           if ((guest['phone']?.text.isEmpty ?? true) && !hasUniquePhoneCode) {
             guestFormValid = false;
             break;
@@ -760,7 +765,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         }
 
         // Check if photo is required and provided for guests aged 12+
-        if (age >= 12 && !_guestImages.containsKey(guestNumber)) {
+        if (age > 12 && !_guestImages.containsKey(guestNumber)) {
           guestFormValid = false;
           break;
         }
@@ -822,6 +827,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         // First check for duplicate photos
         if (widget.personalInfo['appointmentType'] == 'guest') {
           // For guest appointments, check against accompany users' photos
+          // Note: Main user's profile photo is automatically added by the backend
           final accompanyUserUrls = _guestImages.values.whereType<String>().toList();
           
           final duplicateCheckResult = await ActionService.validateDuplicatePhotos(
@@ -1111,7 +1117,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             .whereType<String>()
             .toList();
 
-        // Include main user's profile photo if available
+        // Include main guest photo and other guest photos
+        // Note: Main user's profile photo is automatically added by the backend
         final allUrlsToCheck = <String>[];
         if (_mainGuestPhotoUrl != null && _mainGuestPhotoUrl!.isNotEmpty) {
           allUrlsToCheck.add(_mainGuestPhotoUrl!);
@@ -1513,8 +1520,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
           final phoneNumber = guest['phone']?.text.trim() ?? '';
           final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null; // keep for display if needed
-          final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
-          final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
+          // COMMENTED OUT: Unique phone code collection disabled
+          // final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
+          // final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
+          final hasUniquePhoneCode = false;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
@@ -1522,10 +1531,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           };
 
           // If unique phone code is provided, use it instead of regular phone number
-          if (hasUniquePhoneCode) {
-            // When unique phone code is provided, don't send country code
-            guestData['alternativePhone'] = uniquePhoneCode;
-          } else if (fullPhoneNumber != null) {
+          // COMMENTED OUT: alternativePhone is disabled
+          // if (hasUniquePhoneCode) {
+          //   // When unique phone code is provided, don't send country code
+          //   guestData['alternativePhone'] = uniquePhoneCode;
+          // } else 
+          if (fullPhoneNumber != null) {
             // Only add phoneNumber if we have a phone number and no unique phone code
             guestData['phoneNumber'] = {
               'countryCode': countryCode,
@@ -2400,63 +2411,161 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: const [
-                                Text(
-                                  'Accompany User',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF0F172A), // slate-800
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Are you also attending the appointment as an accompany user?',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF64748B), // slate-500
-                                  ),
-                                ),
+                                // Text(
+                                //   'Accompany User',
+                                //   style: TextStyle(
+                                //     fontSize: 18,
+                                //     fontWeight: FontWeight.w600,
+                                //     color: Color(0xFF0F172A), // slate-800
+                                //   ),
+                                // ),
+                                // SizedBox(height: 4),
+                                // Text(
+                                //   'Are you also attending the appointment as an accompany user?',
+                                //   style: TextStyle(
+                                //     fontSize: 12,
+                                //     color: Color(0xFF64748B), // slate-500
+                                //   ),
+                                // ),
                               ],
                             ),
                             const SizedBox(height: 12),
                             // Checkbox row
+                            const Text(
+                              'Will you accompany the guest?',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155), // slate-700
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Checkbox(
-                                    value: _referenceAsAccompanyUser,
-                                    onChanged: (bool? value) {
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
                                       setState(() {
-                                        _referenceAsAccompanyUser = value ?? false;
+                                        _referenceAsAccompanyUser = false;
                                         _updatePeopleCountForAccompanyUser();
                                       });
                                     },
-                                    activeColor: const Color(0xFFF97316), // orange-600
-                                    side: BorderSide(color: Colors.grey.shade400),
+                                    child: Container(
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: !_referenceAsAccompanyUser
+                                            ? Colors.orange.shade50
+                                            : Colors.white,
+                                        border: Border.all(
+                                          color: !_referenceAsAccompanyUser
+                                              ? Colors.orange.shade200
+                                              : Colors.grey.shade300!,
+                                          width: !_referenceAsAccompanyUser ? 2 : 1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: !_referenceAsAccompanyUser
+                                                  ? Colors.orange.shade500
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: !_referenceAsAccompanyUser
+                                                    ? Colors.orange.shade500
+                                                    : Colors.grey.shade400,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'No',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: !_referenceAsAccompanyUser
+                                                  ? Colors.orange.shade800
+                                                  : Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Are you an accompany user?',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF334155), // slate-700
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _referenceAsAccompanyUser = true;
+                                        _updatePeopleCountForAccompanyUser();
+                                      });
+                                    },
+                                    child: Container(
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: _referenceAsAccompanyUser
+                                            ? Colors.orange.shade50
+                                            : Colors.white,
+                                        border: Border.all(
+                                          color: _referenceAsAccompanyUser
+                                              ? Colors.orange.shade200
+                                              : Colors.grey.shade300!,
+                                          width: _referenceAsAccompanyUser ? 2 : 1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: _referenceAsAccompanyUser
+                                                  ? Colors.orange.shade500
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: _referenceAsAccompanyUser
+                                                    ? Colors.orange.shade500
+                                                    : Colors.grey.shade400,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Yes',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: _referenceAsAccompanyUser
+                                                  ? Colors.orange.shade800
+                                                  : Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             // Info line
-                            Text(
-                              'ℹ️ Guest (1) + You as accompany user (${_referenceAsAccompanyUser ? 1 : 0}) = $basePeople base people. Additional accompany users: $additionalAccompany.',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF2563EB), // blue-600
-                              ),
-                            ),
+                            // Text(
+                            //   'ℹ️ Guest (1) + You as accompany user (${_referenceAsAccompanyUser ? 1 : 0}) = $basePeople base people. Additional accompany users: $additionalAccompany.',
+                            //   style: const TextStyle(
+                            //     fontSize: 12,
+                            //     color: Color(0xFF2563EB), // blue-600
+                            //   ),
+                            // ),
                           ],
                         ),
                       );
@@ -2720,15 +2829,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               int currentCount =
                                   int.tryParse(_numberOfUsersController.text) ??
                                   1;
-                              // Maximum 10 people total
-                              if (currentCount < 10) {
-                                setState(() {
-                                  _numberOfUsersController.text =
-                                      (currentCount + 1).toString();
-                                });
-                                _updateGuestControllers();
-                                _validateForm();
-                              }
+                              // Allow increasing beyond 10 people
+                              setState(() {
+                                _numberOfUsersController.text =
+                                    (currentCount + 1).toString();
+                              });
+                              _updateGuestControllers();
+                              _validateForm();
                             },
                             child: Container(
                               width: 48,
@@ -2751,7 +2858,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Total number of people including you',
+                       (widget.personalInfo['appointmentType'] == 'guest')
+                            ? 'Number of people (including you, the guest and children if any) for the appointment?'
+                            : 'Number of people (including you and children if any) for the appointment?',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
@@ -3434,9 +3543,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     Map<String, TextEditingController> guest,
     int index,
   ) {
-    // Check if photo is required (age >= 12)
+    // Check if photo is required (age > 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-    final isPhotoRequired = age >= 12;
+    final isPhotoRequired = age > 12;
     final guestFocusNodes = _getGuestFocusNodes(guestNumber);
 
     return Card(
@@ -3466,6 +3575,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.deepPurple,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // Delete button
+                GestureDetector(
+                  onTap: () => _showDeleteConfirmationDialog(guestNumber),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Icon(
+                      Icons.delete_outline,
+                      color: Colors.red.shade600,
+                      size: 20,
                     ),
                   ),
                 ),
@@ -3531,43 +3658,44 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             const SizedBox(height: 16),
 
             // Unique Phone Code (only show for ages 12..59)
-            if (age > 12 && age < 59) ...[
-              const SizedBox(height: 16),
-              _buildGuestTextField(
-                label: 'Unique Phone Code (Optional)',
-                controller: guest['uniquePhoneCode']!,
-                placeholder: 'Enter 3-digit unique phone code',
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 3,
-                onChanged: (value) {
-                  _validateForm();
-                  setState(() {}); // Rebuild to update phone field label
-                },
-                focusNode: guestFocusNodes['uniquePhoneCode'],
-                onSubmitted: () {
-                  // Move to next guest or next section when submitted
-                  if (index < _guestControllers.length - 1) {
-                    // Move to next guest's name field
-                    final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
-                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
-                  } else {
-                    // Move to next section (appointment purpose)
-                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
-                  }
-                },
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'If you don’t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+            // COMMENTED OUT: Unique Phone Code UI disabled
+            // if (age > 12 && age < 59) ...[
+            //   const SizedBox(height: 16),
+            //   _buildGuestTextField(
+            //     label: 'Unique Phone Code (Optional)',
+            //     controller: guest['uniquePhoneCode']!,
+            //     placeholder: 'Enter 3-digit unique phone code',
+            //     keyboardType: TextInputType.number,
+            //     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            //     maxLength: 3,
+            //     onChanged: (value) {
+            //       _validateForm();
+            //       setState(() {}); // Rebuild to update phone field label
+            //     },
+            //     focusNode: guestFocusNodes['uniquePhoneCode'],
+            //     onSubmitted: () {
+            //       // Move to next guest or next section when submitted
+            //       if (index < _guestControllers.length - 1) {
+            //         // Move to next guest's name field
+            //         final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
+            //         _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
+            //       } else {
+            //         // Move to next section (appointment purpose)
+            //         _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
+            //       }
+            //     },
+            //   ),
+            //   const SizedBox(height: 4),
+            //   Text(
+            //     'If you don’t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
+            //     style: TextStyle(
+            //       fontSize: 12,
+            //       color: Colors.grey[600],
+            //     ),
+            //   ),
+            // ],
 
-            // Photo Section (only show if age >= 12)
+            // Photo Section (only show if age > 12)
             if (isPhotoRequired) ...[
               const SizedBox(height: 16),
 
@@ -5146,11 +5274,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
     final guestFocusNodes = _getGuestFocusNodes(guestNumber);
     
-    // Find the guest data to check age and unique phone code
+    // Find the guest data (unique phone code disabled)
     final guestIndex = guestNumber - 1;
     final guest = guestIndex < _guestControllers.length ? _guestControllers[guestIndex] : null;
     final age = guest != null ? int.tryParse(guest['age']?.text ?? '0') ?? 0 : 0;
-    final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
+    // COMMENTED OUT: unique phone code disabled
+    // final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
+    final hasUniquePhoneCode = false;
     
     // Determine if phone is required per new rules
     // - For age < 12 or age > 59: phone optional
@@ -5925,6 +6055,201 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               ),
               child: const Text(
                 'View Photo Guidelines',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performDeleteGuestCard(int guestNumber) {
+    // Convert guestNumber to 0-based index
+    int index = guestNumber - 1;
+
+    if (index >= 0 && index < _guestControllers.length) {
+      setState(() {
+        // Dispose the controllers for this guest
+        var guest = _guestControllers[index];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
+
+        // Remove the guest from the list
+        _guestControllers.removeAt(index);
+
+        // Remove associated data for the specific guest being deleted
+        _guestCountries.remove(guestNumber);
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+        _guestTempFiles.remove(guestNumber);
+
+        // Update guest numbers for remaining guests
+        // Create new maps with updated guest numbers
+        Map<int, Country> newGuestCountries = {};
+        Map<int, String> newGuestImages = {};
+        Map<int, bool> newGuestUploading = {};
+        Map<int, File> newGuestTempFiles = {};
+
+        // Reassign guest numbers for remaining guests
+        for (int i = 0; i < _guestControllers.length; i++) {
+          int newGuestNumber = i + 1;
+          int oldGuestNumber = i + 1;
+          
+          // If we're at or after the deleted index, the old guest number is one higher
+          if (i >= index) {
+            oldGuestNumber = i + 2;
+          }
+          
+          // Copy data with new guest number
+          if (_guestCountries.containsKey(oldGuestNumber)) {
+            newGuestCountries[newGuestNumber] = _guestCountries[oldGuestNumber]!;
+          }
+          if (_guestImages.containsKey(oldGuestNumber)) {
+            newGuestImages[newGuestNumber] = _guestImages[oldGuestNumber]!;
+          }
+          if (_guestUploading.containsKey(oldGuestNumber)) {
+            newGuestUploading[newGuestNumber] = _guestUploading[oldGuestNumber]!;
+          }
+          if (_guestTempFiles.containsKey(oldGuestNumber)) {
+            newGuestTempFiles[newGuestNumber] = _guestTempFiles[oldGuestNumber]!;
+          }
+        }
+
+        // Update the maps with corrected guest numbers
+        _guestCountries = newGuestCountries;
+        _guestImages = newGuestImages;
+        _guestUploading = newGuestUploading;
+        _guestTempFiles = newGuestTempFiles;
+
+        // Update the number of users (accompanying users + main person + reference if coming as accompany)
+        int totalPeople = _guestControllers.length + 1; // accompanying users + main person
+        if (_referenceAsAccompanyUser) {
+          totalPeople += 1; // add reference person if coming as accompany
+        }
+        _numberOfUsersController.text = totalPeople.toString();
+
+        // Update form validation
+        _validateForm();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Person ${guestNumber} has been deleted.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _showDeleteConfirmationDialog(int guestNumber) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Delete Person',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to delete the details of person ${_getDisplayPersonNumber(guestNumber)}?',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_outlined,
+                      color: Colors.red.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action cannot be undone. All data for this person will be permanently removed.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey.shade600,
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performDeleteGuestCard(guestNumber);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Delete',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),

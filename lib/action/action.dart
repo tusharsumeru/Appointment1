@@ -4502,6 +4502,148 @@ class ActionService {
     }
   }
 
+  // Admin update appointment enhanced
+  static Future<Map<String, dynamic>> adminUpdateAppointmentEnhanced({
+    required String appointmentId,
+    required Map<String, dynamic> updateData,
+    PlatformFile? attachmentFile,
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Remove empty fields from updateData
+      final cleanUpdateData = <String, dynamic>{};
+      updateData.forEach((key, value) {
+        if (value != null) {
+          // Special handling for empty strings - only include if they're not empty
+          if (value is String && value.isEmpty) {
+            return; // Skip empty strings
+          }
+          // Special handling for empty maps/objects
+          if (value is Map && value.isEmpty) {
+            return; // Skip empty maps
+          }
+          cleanUpdateData[key] = value;
+        }
+      });
+
+      print('DEBUG API: Admin clean update data: $cleanUpdateData');
+      print('DEBUG API: Has attachment file: ${attachmentFile != null}');
+      print('DEBUG API: Attachment file name: ${attachmentFile?.name}');
+      print('DEBUG API: Attachment file path: ${attachmentFile?.path}');
+      print('DEBUG API: Attachment file size: ${attachmentFile?.size}');
+
+      final uri = Uri.parse('$baseUrl/appointment/$appointmentId/enhanced/admin');
+
+      // If there's an attachment file, use multipart request
+      if (attachmentFile != null && attachmentFile.path != null) {
+        print('DEBUG API: Using multipart request with attachment for admin update');
+
+        // Create multipart request
+        final request = http.MultipartRequest('PUT', uri);
+
+        // Add authorization header
+        request.headers['Authorization'] = 'Bearer $token';
+
+        // Add JSON data fields directly
+        cleanUpdateData.forEach((key, value) {
+          if (value is Map || value is List) {
+            request.fields[key] = jsonEncode(value);
+          } else {
+            request.fields[key] = value.toString();
+          }
+        });
+
+        // Add file - use the field name that multer expects
+        final file = await http.MultipartFile.fromPath(
+          'appointmentAttachment', // This should match the multer field name
+          attachmentFile.path!,
+          filename: attachmentFile.name,
+        );
+        request.files.add(file);
+
+        print(
+          'DEBUG API: Sending admin multipart request with file: ${attachmentFile.name}',
+        );
+        print('DEBUG API: File field name: appointmentAttachment');
+        print('DEBUG API: Form fields: ${request.fields}');
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        print(
+          'DEBUG API: Admin multipart response status code: ${response.statusCode}',
+        );
+        print('DEBUG API: Admin multipart response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return {
+            'success': true,
+            'statusCode': 200,
+            'data': data['data'],
+            'message': data['message'] ?? 'Appointment updated successfully',
+          };
+        } else {
+          final errorData = jsonDecode(response.body);
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'message': errorData['message'] ?? 'Failed to update appointment',
+            'error': errorData['error'],
+          };
+        }
+      } else {
+        // No attachment file, use JSON request
+        print('DEBUG API: Using JSON request without attachment for admin update');
+
+        final response = await http.put(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(cleanUpdateData),
+        );
+
+        print('DEBUG API: Admin JSON response status code: ${response.statusCode}');
+        print('DEBUG API: Admin JSON response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return {
+            'success': true,
+            'statusCode': 200,
+            'data': data['data'],
+            'message': data['message'] ?? 'Appointment updated successfully',
+          };
+        } else {
+          final errorData = jsonDecode(response.body);
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'message': errorData['message'] ?? 'Failed to update appointment',
+            'error': errorData['error'],
+          };
+        }
+      }
+    } catch (error) {
+      print('DEBUG API: Error in adminUpdateAppointmentEnhanced: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
   // Get deleted appointments
   static Future<Map<String, dynamic>> getDeletedAppointments({
     int page = 1,

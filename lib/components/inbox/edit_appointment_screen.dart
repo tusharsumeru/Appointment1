@@ -253,7 +253,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
-      guest['uniquePhoneCode']?.dispose();
+      // COMMENTED OUT: Unique phone code controller disposal
+      // guest['uniquePhoneCode']?.dispose();
+      guest['uniquePhoneCode']?.dispose(); // Still dispose to prevent memory leaks
     }
     
     super.dispose();
@@ -683,7 +685,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
-      guest['uniquePhoneCode']?.dispose();
+      // COMMENTED OUT: Unique phone code controller disposal
+      // guest['uniquePhoneCode']?.dispose();
+      guest['uniquePhoneCode']?.dispose(); // Still dispose to prevent memory leaks
     }
     _guestControllers.clear();
     _guestImages.clear();
@@ -722,10 +726,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'name': TextEditingController(text: guest['fullName'] ?? ''),
         'age': ageController,
         'phone': TextEditingController(text: number),
-        'uniquePhoneCode': TextEditingController(text: guest['alternatePhoneNumber']?.toString() ?? 
-                                                      guest['uniquePhoneCode']?.toString() ?? 
-                                                      guest['alternativePhone']?.toString() ?? 
-                                                      guest['alternatePhone']?.toString() ?? ''),
+        // COMMENTED OUT: Unique phone code controller
+        // 'uniquePhoneCode': TextEditingController(text: guest['alternatePhoneNumber']?.toString() ?? 
+        //                                               guest['uniquePhoneCode']?.toString() ?? 
+        //                                               guest['alternativePhone']?.toString() ?? 
+        //                                               guest['alternatePhone']?.toString() ?? ''),
+        // COMMENTED OUT: Unique phone code controller
+        // 'uniquePhoneCode': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(), // Empty controller since unique code is disabled // Empty controller since unique code is disabled
       });
       
       // Debug: Print all available fields in guest data
@@ -793,7 +801,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'name': TextEditingController(),
           'age': ageController,
           'phone': TextEditingController(),
-          'uniquePhoneCode': TextEditingController(),
+          // COMMENTED OUT: Unique phone code controller
+          // 'uniquePhoneCode': TextEditingController(),
+          // COMMENTED OUT: Unique phone code controller
+        // 'uniquePhoneCode': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(), // Empty controller since unique code is disabled // Empty controller since unique code is disabled
         });
         
         // Initialize associated data
@@ -810,7 +822,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         guest['name']?.dispose();
         guest['phone']?.dispose();
         guest['age']?.dispose();
-        guest['uniquePhoneCode']?.dispose();
+        // COMMENTED OUT: Unique phone code controller disposal
+      // guest['uniquePhoneCode']?.dispose();
+      guest['uniquePhoneCode']?.dispose(); // Still dispose to prevent memory leaks
       }
       
       // Remove from lists (remove from the end)
@@ -833,7 +847,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
-      guest['uniquePhoneCode']?.dispose();
+      // COMMENTED OUT: Unique phone code controller disposal
+      // guest['uniquePhoneCode']?.dispose();
+      guest['uniquePhoneCode']?.dispose(); // Still dispose to prevent memory leaks
     }
     _guestControllers.clear();
     _guestImages.clear();
@@ -873,7 +889,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'name': TextEditingController(),
         'age': ageController,
         'phone': TextEditingController(),
-        'uniquePhoneCode': TextEditingController(),
+        // COMMENTED OUT: Unique phone code controller
+        // 'uniquePhoneCode': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(), // Empty controller since unique code is disabled
       });
       
       // Initialize associated data
@@ -2108,7 +2126,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       return;
     }
 
-    // Validate guest information fields if this is a guest appointment
+    // Validate guest information fields if this is a guest appointment - only name is required
     final appointmentType = widget.appointment['appointmentType']?.toString();
     if (appointmentType == 'guest') {
       if (_guestFullNameController.text.trim().isEmpty) {
@@ -2121,66 +2139,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         );
         return;
       }
-      if (_guestEmailController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Guest email is required'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      // Validate email format
-      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_guestEmailController.text.trim())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter a valid email address'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      if (_guestPhoneController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Guest phone number is required'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      if (_guestDesignationController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Guest designation is required'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      if (_guestCompanyController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Guest company is required'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-      if (_guestLocationController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Guest location is required'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
+      // Validate email format only if email is provided
+      if (_guestEmailController.text.trim().isNotEmpty) {
+        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_guestEmailController.text.trim())) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enter a valid email address'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
       }
     }
 
@@ -2192,7 +2162,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         final user = users[i];
         final userIndex = i + 1;
         
-        // Validate required fields
+        // Validate required fields - only name is required
         if (user['fullName'] == null || user['fullName'].toString().trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2204,32 +2174,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           return;
         }
         
-        final age = int.tryParse(user['age']?.toString() ?? '0') ?? 0;
-        if (age < 1 || age > 120) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('User $userIndex: Age must be between 1 and 120'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          return;
-        }
-        
-        // Check if user has unique phone code
-        final hasUniquePhoneCode = user['alternativePhone'] != null && 
-            user['alternativePhone'].toString().trim().isNotEmpty;
-        
-        // Validation per rules:
-        // - Age < 12 or > 59: no phone/unique code required
-        // - Age 12..59: phone required unless unique code provided
-        if (age >= 12 && age <= 59) {
-          final hasPhoneNumber = user['phoneNumber'] != null && 
-              user['phoneNumber']['number']?.toString().trim().isNotEmpty == true;
-          if (!hasUniquePhoneCode && !hasPhoneNumber) {
+        // Validate age only if provided - must be between 1-120
+        if (user['age'] != null && user['age'].toString().trim().isNotEmpty) {
+          final ageString = user['age'].toString().trim();
+          final age = int.tryParse(ageString);
+          if (age == null) {
+            // Invalid age format - show error
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('User $userIndex: Phone number is required for age $age unless a unique code is provided'),
+                content: Text('User $userIndex: Please enter a valid age'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            return;
+          } else if (age < 1 || age > 120) {
+            // Valid number but out of range
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('User $userIndex: Age must be between 1 and 120'),
                 backgroundColor: Colors.red,
                 duration: const Duration(seconds: 3),
               ),
@@ -2238,21 +2201,22 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           }
         }
         
-        // Validate unique phone code format if provided
-        if (hasUniquePhoneCode) {
-          final uniquePhoneCode = user['alternativePhone'].toString().trim();
-          final uniquePhoneCodeRegex = RegExp(r'^[A-Za-z0-9]{3,20}$');
-          if (!uniquePhoneCodeRegex.hasMatch(uniquePhoneCode)) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('User $userIndex: Invalid unique phone code format (3-20 alphanumeric characters)'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            return;
-          }
-        }
+        // Validate unique phone code format only if provided
+        // COMMENTED OUT: Unique phone code validation
+        // if (user['alternativePhone'] != null && user['alternativePhone'].toString().trim().isNotEmpty) {
+        //   final uniquePhoneCode = user['alternativePhone'].toString().trim();
+        //   final uniquePhoneCodeRegex = RegExp(r'^[A-Za-z0-9]{3,20}$');
+        //   if (!uniquePhoneCodeRegex.hasMatch(uniquePhoneCode)) {
+        //     ScaffoldMessenger.of(context).showSnackBar(
+        //       SnackBar(
+        //         content: Text('User $userIndex: Invalid unique phone code format (3-20 alphanumeric characters)'),
+        //         backgroundColor: Colors.red,
+        //         duration: const Duration(seconds: 3),
+        //       ),
+        //     );
+        //     return;
+        //   }
+        // }
       }
     }
 
@@ -2319,7 +2283,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // File upload in progress
 
       // Call the API to update appointment
-      final result = await ActionService.updateAppointmentEnhanced(
+      final result = await ActionService.adminUpdateAppointmentEnhanced(
         appointmentId: appointmentId,
         updateData: updateData,
         attachmentFile: _selectedFile,
@@ -2404,9 +2368,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final phoneNumber = controllers['phone']?.text ?? '';
       final rawCountryCode = _guestCountries[guestNumber] ?? '+91';
       final countryCode = rawCountryCode.startsWith('+') ? rawCountryCode : '+$rawCountryCode';
-      final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
-      final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
-      final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
+      // Age is optional - can be null or empty
+      final ageText = controllers['age']?.text?.trim() ?? '';
+      final age = ageText.isEmpty ? null : int.tryParse(ageText);
+      // COMMENTED OUT: Unique phone code functionality
+      // final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
+      // final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
+      final hasUniquePhoneCode = false; // Always false since unique code is disabled
       
       // Get photo URL from guest images
       final photoUrl = _guestImages[guestNumber] ?? '';
@@ -2424,10 +2392,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         };
       }
 
-      // Add unique phone code as alternativePhone if provided
-      if (hasUniquePhoneCode) {
-        userData['alternativePhone'] = uniquePhoneCode;
-      }
+      // COMMENTED OUT: Add unique phone code as alternativePhone if provided
+      // if (hasUniquePhoneCode) {
+      //   userData['alternativePhone'] = uniquePhoneCode;
+      // }
 
       userData.addAll({
         'profilePhotoUrl': photoUrl,
@@ -2575,50 +2543,163 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Accompany User',
+                              'Will you accompany the guest?',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Are you also attending the appointment as an accompany user?',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
+                            // Text(
+                            //   'Are you also attending the appointment as an accompany user?',
+                            //   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            // ),
+                            // const SizedBox(height: 12),
+                            // Yes/No selection styled like signup screen (compact cards)
                             Row(
                               children: [
-                                Checkbox(
-                                  value: _referenceAsAccompanyUser,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _referenceAsAccompanyUser = val ?? false;
-                                    });
-                                    _updatePeopleCountForAccompanyUser();
-                                  },
-                                  activeColor: const Color(0xFFF97316),
+                                // No card
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _referenceAsAccompanyUser = false;
+                                      });
+                                      _updatePeopleCountForAccompanyUser();
+                                    },
+                                    child: Container(
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: !_referenceAsAccompanyUser
+                                            ? const Color(0xFFFFEDD5) // orange-100
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: !_referenceAsAccompanyUser
+                                              ? const Color(0xFFF97316)
+                                              : Colors.grey[300]!,
+                                          width: !_referenceAsAccompanyUser ? 2 : 1,
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: !_referenceAsAccompanyUser
+                                                  ? const Color(0xFFF97316)
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: !_referenceAsAccompanyUser
+                                                    ? const Color(0xFFF97316)
+                                                    : Colors.grey[400]!,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'No',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: !_referenceAsAccompanyUser
+                                                    ? const Color(0xFF9A3412) // orange-900
+                                                    : Colors.grey[700],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'Are you an accompany user?',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                // Yes card
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _referenceAsAccompanyUser = true;
+                                      });
+                                      _updatePeopleCountForAccompanyUser();
+                                    },
+                                    child: Container(
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: _referenceAsAccompanyUser
+                                            ? const Color(0xFFFFEDD5)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: _referenceAsAccompanyUser
+                                              ? const Color(0xFFF97316)
+                                              : Colors.grey[300]!,
+                                          width: _referenceAsAccompanyUser ? 2 : 1,
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: _referenceAsAccompanyUser
+                                                  ? const Color(0xFFF97316)
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: _referenceAsAccompanyUser
+                                                    ? const Color(0xFFF97316)
+                                                    : Colors.grey[400]!,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'Yes',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: _referenceAsAccompanyUser
+                                                    ? const Color(0xFF9A3412)
+                                                    : Colors.grey[700],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Builder(
-                              builder: (context) {
-                                final total = int.tryParse(_numberOfPeopleController.text) ?? 1;
-                                final base = _referenceAsAccompanyUser ? 2 : 1;
-                                final additional = (total - base).clamp(0, 10);
-                                return Text(
-                                  'ℹ️ Guest (1) + You as accompany user (${_referenceAsAccompanyUser ? 1 : 0}) = $base base people. Additional accompany users: $additional.',
-                                  style: const TextStyle(fontSize: 12, color: Colors.blue),
-                                );
-                              },
-                            ),
+                            // Builder(
+                            //   builder: (context) {
+                            //     final total = int.tryParse(_numberOfPeopleController.text) ?? 1;
+                            //     final base = _referenceAsAccompanyUser ? 2 : 1;
+                            //     final additional = (total - base).clamp(0, 10);
+                            //     return Text(
+                            //       'ℹ️ Guest (1) + You as accompany user (${_referenceAsAccompanyUser ? 1 : 0}) = $base base people. Additional accompany users: $additional.',
+                            //       style: const TextStyle(fontSize: 12, color: Colors.blue),
+                            //     );
+                            //   },
+                            // ),
                           ],
                         ),
                       ),
@@ -2865,11 +2946,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildEditableGuestField(String label, TextEditingController controller) {
+    // Only name field is required
+    final isNameField = label.toLowerCase().contains('name');
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$label *',
+          isNameField ? '$label *' : label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -2907,11 +2991,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             color: Colors.grey[800],
           ),
           validator: (value) {
-            if (value == null || value.trim().isEmpty) {
+            // Only validate name field as required
+            if (isNameField && (value == null || value.trim().isEmpty)) {
               return '$label is required';
             }
-            // Email validation for email fields
-            if (label.contains('Email') && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+            // Email validation for email fields only if email is provided
+            if (label.contains('Email') && value != null && value.trim().isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
               return 'Please enter a valid email address';
             }
             return null;
@@ -2990,7 +3075,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 3,
           onChanged: (value) {
-            setState(() {}); // Rebuild to show/hide unique phone code field
+            // COMMENTED OUT: Rebuild to show/hide unique phone code field
+            // setState(() {}); // Rebuild to show/hide unique phone code field
+            setState(() {}); // Still rebuild for other UI updates
           },
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -3020,12 +3107,14 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             color: Colors.grey[800],
           ),
           validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Age is required';
-            }
-            final age = int.tryParse(value);
-            if (age == null || age < 1 || age > 120) {
-              return 'Please enter age between 1-120';
+            // Age is optional, but if provided, must be between 1-120
+            if (value != null && value.trim().isNotEmpty) {
+              final age = int.tryParse(value.trim());
+              if (age == null) {
+                return 'Please enter a valid age';
+              } else if (age < 1 || age > 120) {
+                return 'Please enter age between 1-120';
+              }
             }
             return null;
           },
@@ -3038,22 +3127,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
-          children: [
-            Text(
-              'Location',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(width: 4),
-            Text(
-              '*',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ],
+        const Text(
+          'Location',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
         ),
         const SizedBox(height: 8),
         Column(
@@ -3108,9 +3188,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 });
               },
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Location is required';
-                }
+                // Location is optional
                 return null;
               },
             ),
@@ -3426,11 +3504,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   Widget _buildTextAreaField(String label, TextEditingController controller, String placeholder, {bool isRequired = false}) {
+    // Only name fields are required
+    final isNameField = label.toLowerCase().contains('name');
+    final shouldBeRequired = isNameField;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isRequired ? '$label *' : label,
+          shouldBeRequired ? '$label *' : label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -3458,7 +3540,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             filled: true,
             fillColor: Colors.grey[50],
           ),
-          validator: isRequired ? (value) {
+          validator: shouldBeRequired ? (value) {
             if (value == null || value.isEmpty) {
               return 'This field is required';
             }
@@ -3583,7 +3665,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         
         const SizedBox(height: 4),
         Text(
-          'Number of people (including you) for the appointment?',
+          _isGuestAppointment()
+                            ? 'Number of people (including you, the guest and children if any) for the appointment?'
+                            : 'Number of people (including you and children if any) for the appointment?',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
@@ -3663,9 +3747,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             fillColor: Colors.grey[50],
           ),
           validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Required';
-            }
+            // Date fields are optional
             return null;
           },
         ),
@@ -5409,14 +5491,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final guestNumber = index + 1;
     final controllers = _guestControllers[index];
     
-    // Check if photo is required (age >= 12)
-    final age = int.tryParse(controllers['age']?.text ?? '0') ?? 0;
-    final isPhotoRequired = age >= 12;
+    // Check if photo is required (age >= 12) - age is optional
+    final ageText = controllers['age']?.text?.trim() ?? '';
+    final age = ageText.isEmpty ? null : int.tryParse(ageText);
+    final isPhotoRequired = age != null && age >= 12;
     
-    // Debug: Print age and unique phone code visibility
-    print('Guest $guestNumber - Age: $age, Should show unique phone code: ${age >= 12 && age <= 59}');
-    print('  - Age text: ${controllers['age']?.text}');
-    print('  - Unique phone code text: ${controllers['uniquePhoneCode']?.text}');
+    // COMMENTED OUT: Debug: Print age and unique phone code visibility
+    // print('Guest $guestNumber - Age: $age, Should show unique phone code: ${age >= 12 && age <= 59}');
+    // print('  - Age text: ${controllers['age']?.text}');
+    // print('  - Unique phone code text: ${controllers['uniquePhoneCode']?.text}');
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -5436,23 +5519,45 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Guest header
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF97316).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Detail of Person ${_getDisplayPersonNumber(guestNumber)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFF97316),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF97316).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Detail of Person ${_getDisplayPersonNumber(guestNumber)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFF97316),
+                  ),
+                ),
               ),
-            ),
+              const Spacer(),
+              // Delete button
+              GestureDetector(
+                onTap: () => _showDeleteConfirmationDialog(guestNumber),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: Colors.red.shade600,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           
@@ -5464,22 +5569,22 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               const SizedBox(height: 12),
               
               // Age
-              _buildEditableAgeField('Age *', controllers['age']!),
+              _buildEditableAgeField('Age (Optional)', controllers['age']!),
               const SizedBox(height: 12),
 
-              // Unique Phone Code (show only for age 12..59)
-              if (age >= 12 && age <= 59) ...[
-                _buildUniquePhoneCodeField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
-                const SizedBox(height: 4),
-                Text(
-                  'If you don’t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+              // COMMENTED OUT: Unique Phone Code (show only for age 12..59)
+              // if (age >= 12 && age <= 59) ...[
+              //   _buildUniquePhoneCodeField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
+              //   const SizedBox(height: 4),
+              //   Text(
+              //     'If you don't have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
+              //     style: TextStyle(
+              //       fontSize: 12,
+              //       color: Colors.grey[600],
+              //     ),
+              //   ),
+              //   const SizedBox(height: 12),
+              // ],
               
               // Phone
               _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!),
@@ -5498,7 +5603,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Photo *',
+                      'Photo (Optional)',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -5515,24 +5620,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 const SizedBox(height: 12),
                 
                 // Important Photo Upload Notice
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Text(
-                    'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
+                // Container(
+                //   width: double.infinity,
+                //   padding: const EdgeInsets.all(12),
+                //   decoration: BoxDecoration(
+                //     color: Colors.orange.shade50,
+                //     borderRadius: BorderRadius.circular(8),
+                //     border: Border.all(color: Colors.orange.shade200),
+                //   ),
+                //   child: Text(
+                //     'Important: Kindly upload a recent and clearly recognizable passport size photo to help us with identification and smooth entry during your visit. The appointment / darshan, if confirmed, will be non-transferable.',
+                //     style: TextStyle(
+                //       fontSize: 12,
+                //       color: Colors.orange.shade700,
+                //       fontWeight: FontWeight.w500,
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(height: 12),
                 
                 // Photo Upload Options
                 Column(
@@ -5929,18 +6034,25 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
     // Find the guest data to check age and unique phone code
     final guestIndex = guestNumber - 1;
-    final age = guestIndex < _guestControllers.length 
-        ? int.tryParse(_guestControllers[guestIndex]['age']?.text ?? '0') ?? 0
-        : 0;
-    final hasUniquePhoneCode = guestIndex < _guestControllers.length 
-        ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
-        : false;
+    // Age is optional - can be null
+    final ageText = guestIndex < _guestControllers.length 
+        ? _guestControllers[guestIndex]['age']?.text?.trim() ?? ''
+        : '';
+    final age = ageText.isEmpty ? null : int.tryParse(ageText);
+    // COMMENTED OUT: Unique phone code functionality
+    // final hasUniquePhoneCode = guestIndex < _guestControllers.length 
+    //     ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
+    //     : false;
+    final hasUniquePhoneCode = false; // Always false since unique code is disabled
     
     // Determine if phone is required per rules:
     // - Age < 12 or > 59: phone optional
     // - Age 12..59: phone required unless unique code present
-    final isPhoneRequired = (age >= 12 && age <= 59) && !hasUniquePhoneCode;
-    final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
+    // - No age provided: phone optional
+    // COMMENTED OUT: Phone is now always optional since unique code is disabled
+    // final isPhoneRequired = (age != null && age >= 12 && age <= 59) && !hasUniquePhoneCode;
+    // final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
+    final phoneLabel = 'Contact Number (Optional)'; // Always optional now
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -6061,14 +6173,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final guest = _guests[index];
     final hasPhoto = guest['profilePhotoUrl']?.isNotEmpty == true;
     
-    // Check if guest age is above 11
-    final ageString = guest['age']?.toString() ?? '';
-    int? age;
-    try {
-      age = int.tryParse(ageString);
-    } catch (e) {
-      age = null;
-    }
+    // Check if guest age is above 11 - age is optional
+    final ageString = guest['age']?.toString()?.trim() ?? '';
+    int? age = ageString.isEmpty ? null : int.tryParse(ageString);
     
     // Only show photo section if age is above 11
     if (age == null || age <= 11) {
@@ -6632,6 +6739,193 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
               child: const Text(
                 'View Photo Guidelines',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performDeleteGuestCard(int guestNumber) {
+    // Convert guestNumber to 0-based index
+    int index = guestNumber - 1;
+
+    if (index >= 0 && index < _guestControllers.length) {
+      setState(() {
+        // Dispose the controllers for this guest
+        var guest = _guestControllers[index];
+        guest['name']?.dispose();
+        guest['phone']?.dispose();
+        guest['age']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
+
+        // Remove the guest from the list
+        _guestControllers.removeAt(index);
+        _guests.removeAt(index);
+
+        // Remove associated data for the specific guest being deleted
+        _guestCountries.remove(guestNumber);
+        _guestImages.remove(guestNumber);
+        _guestUploading.remove(guestNumber);
+
+        // Update guest numbers for remaining guests
+        // Create new maps with updated guest numbers
+        Map<int, String> newGuestCountries = {};
+        Map<int, String> newGuestImages = {};
+        Map<int, bool> newGuestUploading = {};
+
+        // Reassign guest numbers for remaining guests
+        for (int i = 0; i < _guestControllers.length; i++) {
+          int newGuestNumber = i + 1;
+          int oldGuestNumber = i + 1;
+          
+          // If we're at or after the deleted index, the old guest number is one higher
+          if (i >= index) {
+            oldGuestNumber = i + 2;
+          }
+          
+          // Copy data with new guest number
+          if (_guestCountries.containsKey(oldGuestNumber)) {
+            newGuestCountries[newGuestNumber] = _guestCountries[oldGuestNumber]!;
+          }
+          if (_guestImages.containsKey(oldGuestNumber)) {
+            newGuestImages[newGuestNumber] = _guestImages[oldGuestNumber]!;
+          }
+          if (_guestUploading.containsKey(oldGuestNumber)) {
+            newGuestUploading[newGuestNumber] = _guestUploading[oldGuestNumber]!;
+          }
+        }
+
+        // Update the maps with corrected guest numbers
+        _guestCountries = newGuestCountries;
+        _guestImages = newGuestImages;
+        _guestUploading = newGuestUploading;
+
+        // Update the number of users (accompanying users + main person + reference if coming as accompany)
+        int totalPeople = _guestControllers.length + 1; // accompanying users + main person
+        if (_referenceAsAccompanyUser) {
+          totalPeople += 1; // add reference person if coming as accompany
+        }
+        _numberOfPeopleController.text = totalPeople.toString();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Person ${guestNumber} has been deleted.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _showDeleteConfirmationDialog(int guestNumber) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Delete Person',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to delete the details of person ${_getDisplayPersonNumber(guestNumber)}?',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_outlined,
+                      color: Colors.red.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action cannot be undone. All data for this person will be permanently removed.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey.shade600,
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performDeleteGuestCard(guestNumber);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Delete',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),

@@ -290,17 +290,40 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   int _getTotalUsers() {
-    // Show top-level total users when available (especially for groups > 10)
-    return _getTotalNumberOfUsers();
+    if (appointmentData == null) return 0;
+    
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
+    final actualTotalUsers = usersList.length;
+    final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+    
+    // If total users from backend is more than 10, use backend totalUsers
+    if (totalUsers > 10) {
+      return totalUsers;
+    }
+    
+    // If users are 10 or less, use users array length
+    if (actualTotalUsers <= 10) {
+      return actualTotalUsers;
+    }
+    
+    // Fallback to users array length
+    return actualTotalUsers;
   }
 
   int _getAdmittedUsers() {
-    // Prefer backend-provided aggregate when available
-    if (appointmentData != null && appointmentData!['checkedInUsers'] != null) {
-      return int.tryParse(appointmentData!['checkedInUsers'].toString()) ?? 0;
+    if (appointmentData == null) return 0;
+    
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
+    final actualTotalUsers = usersList.length;
+    final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+    final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    
+    // If total users from backend is more than 10, use checkedInUsers directly
+    if (totalUsers > 10) {
+      return checkedInUsers;
     }
-    if (appointmentData == null || appointmentData!['users'] == null) return 0;
-    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    
+    // For 10 or fewer users, count individual users from users array
     return usersList.where((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();
@@ -310,21 +333,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   int _getRejectedUsers() {
     if (appointmentData == null) return 0;
+    
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
+    final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
-    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? const [];
-    final mainStatus = appointmentData!['mainStatus']?.toString().toLowerCase();
-
-    // Large group aggregate handling
-    if (totalUsers > usersList.length) {
-      if (mainStatus == 'rejected') {
-        // Backend processed all; treat as all rejected
-        return totalUsers;
-      }
-      // Unknown per-user rejections in large group; default to 0
-      return 0;
+    final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    
+    // If total users from backend is more than 10, calculate rejected as total - admitted
+    if (totalUsers > 10) {
+      return totalUsers - checkedInUsers;
     }
-
-    // Small group exact count
+    
+    // For 10 or fewer users, count individual users from users array
     return usersList.where((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();
@@ -334,17 +354,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   int _getNotArrivedUsers() {
     if (appointmentData == null) return 0;
+    
+    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
+    final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
     final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
-    final usersList = (appointmentData!['users'] as List<dynamic>?) ?? const [];
-
-    // Large group: derive not arrived from aggregates
-    if (totalUsers > usersList.length && totalUsers > 0) {
-      final pending = totalUsers - checkedInUsers;
-      return pending >= 0 ? pending : 0;
+    
+    // If total users from backend is more than 10, calculate not arrived as total - admitted
+    if (totalUsers > 10) {
+      return totalUsers - checkedInUsers;
     }
-
-    // Small group: derive from per-user statuses
+    
+    // For 10 or fewer users, count individual users from users array
     return usersList.where((user) {
       final Map<String, dynamic> userMap = user as Map<String, dynamic>;
       final status = userMap['status']?.toString().toLowerCase();

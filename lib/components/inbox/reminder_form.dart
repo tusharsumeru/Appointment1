@@ -42,7 +42,7 @@ class _ReminderFormState extends State<ReminderForm> {
   String _selectedVenueName = 'Select a venue';
   
   // Checkbox states
-  bool _tbsReq = true;
+  bool _tbsReq = true; // Default to true for inbox screen
   bool _dontSendEmailSms = false;
   bool _sendArrivalTime = false;
   bool _scheduleEmailSms = false;
@@ -298,10 +298,19 @@ class _ReminderFormState extends State<ReminderForm> {
         _showArrivalTime = true;
       }
       
-      // Load TBS requirement
-      final existingTbsRequired = scheduledDateTime['tbsRequired'];
-      if (existingTbsRequired != null) {
-        _tbsReq = existingTbsRequired == true;
+      // Load TBS requirement (only override if coming from schedule screens)
+      if (widget.isFromScheduleScreens) {
+        // Check communicationPreferences array for TBS/Req
+        final communicationPreferences = widget.appointment['communicationPreferences'];
+        if (communicationPreferences is List) {
+          _tbsReq = communicationPreferences.contains('TBS/Req');
+        } else {
+          // Fallback to scheduledDateTime.tbsRequired if available
+          final existingTbsRequired = scheduledDateTime['tbsRequired'];
+          if (existingTbsRequired != null) {
+            _tbsReq = existingTbsRequired == true;
+          }
+        }
       }
       
       // Load other options

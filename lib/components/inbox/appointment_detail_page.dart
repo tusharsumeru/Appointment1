@@ -118,6 +118,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     
     // Fetch appointments overview data
     _fetchAppointmentsOverview();
+    
+    // Automatically fetch face match data when screen loads
+    _refreshAccompanyingUsers(showSuccessMessage: false);
   }
 
   @override
@@ -1539,7 +1542,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     );
   }
 
-  Future<void> _refreshAccompanyingUsers() async {
+  Future<void> _refreshAccompanyingUsers({bool showSuccessMessage = true}) async {
     setState(() {
       _isRefreshing = true;
     });
@@ -1557,7 +1560,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
         // This will trigger rebuild with updated face match data
       });
       
-      if (mounted) {
+      if (mounted && showSuccessMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Face match data refreshed successfully!'),
