@@ -140,7 +140,8 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
     // Simulate network delay for better UX
     await Future.delayed(const Duration(milliseconds: 500));
     
-    final startIndex = currentPage * photosPerPage;
+    final newPage = currentPage + 1;
+    final startIndex = (newPage - 1) * photosPerPage;
     final endIndex = startIndex + photosPerPage;
     
     if (startIndex < widget.darshanPhotos.length) {
@@ -150,8 +151,8 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
           .toList();
       
       setState(() {
-        displayedPhotos.addAll(newPhotos);
-        currentPage++;
+        displayedPhotos = newPhotos; // Replace instead of add
+        currentPage = newPage;
         hasMorePhotos = endIndex < widget.darshanPhotos.length;
         isLoadingMore = false;
       });
@@ -161,6 +162,33 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
         isLoadingMore = false;
       });
     }
+  }
+
+  void _loadPreviousPhotos() async {
+    if (isLoadingMore || currentPage <= 1) return;
+    
+    setState(() {
+      isLoadingMore = true;
+    });
+
+    // Simulate network delay for better UX
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final newPage = currentPage - 1;
+    final startIndex = (newPage - 1) * photosPerPage;
+    final endIndex = startIndex + photosPerPage;
+    
+    final newPhotos = widget.darshanPhotos
+        .skip(startIndex)
+        .take(photosPerPage)
+        .toList();
+    
+    setState(() {
+      displayedPhotos = newPhotos;
+      currentPage = newPage;
+      hasMorePhotos = endIndex < widget.darshanPhotos.length;
+      isLoadingMore = false;
+    });
   }
 
   Future<void> _downloadImage(String imageUrl, int photoNumber) async {
@@ -405,35 +433,186 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
                             ),
                           );
                         } else if (hasMorePhotos) {
-                          return Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: ElevatedButton.icon(
-                              onPressed: _loadMorePhotos,
-                              icon: const Icon(Icons.keyboard_arrow_down),
-                              label: Text(
-                                'Load More (${widget.darshanPhotos.length - displayedPhotos.length} remaining)',
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                          return Container(
+                            margin: const EdgeInsets.only(top: 8, left: 8, right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                  spreadRadius: 0,
                                 ),
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 40,
+                                  offset: const Offset(0, 16),
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.grey.shade100,
+                                width: 1,
                               ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Previous button
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: currentPage > 1 ? [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ] : null,
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: currentPage > 1 ? () => _loadPreviousPhotos() : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: currentPage > 1 ? Colors.white : Colors.grey.shade100,
+                                      foregroundColor: currentPage > 1 ? Colors.black87 : Colors.grey.shade400,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: currentPage > 1 
+                                            ? BorderSide(color: Colors.grey.shade200, width: 1)
+                                            : BorderSide.none,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_back_ios_rounded,
+                                          size: 16,
+                                          color: currentPage > 1 ? Colors.black87 : Colors.grey.shade400,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Previous',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: currentPage > 1 ? Colors.black87 : Colors.grey.shade400,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Page info with floating badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.orange.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${currentPage} / ${(widget.darshanPhotos.length / photosPerPage).ceil()}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Next button
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: hasMorePhotos ? [
+                                      BoxShadow(
+                                        color: Colors.orange.withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                        spreadRadius: 0,
+                                      ),
+                                    ] : null,
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: hasMorePhotos ? _loadMorePhotos : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: hasMorePhotos ? Colors.orange : Colors.grey.shade100,
+                                      foregroundColor: hasMorePhotos ? Colors.white : Colors.grey.shade400,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Next',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: hasMorePhotos ? Colors.white : Colors.grey.shade400,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 16,
+                                          color: hasMorePhotos ? Colors.white : Colors.grey.shade400,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         } else if (displayedPhotos.isNotEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.all(20.0),
-                            child: Column(
+                          return Container(
+                            margin: const EdgeInsets.only(top: 8, left: 8, right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                  spreadRadius: 0,
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 40,
+                                  offset: const Offset(0, 16),
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.grey.shade100,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons.check_circle_outline,
-                                  size: 32,
+                                  size: 24,
                                   color: Colors.green.shade600,
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(width: 12),
                                 Text(
                                   'All ${widget.darshanPhotos.length} photos loaded',
                                   style: TextStyle(

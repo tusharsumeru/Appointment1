@@ -66,6 +66,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _teacherVerificationError;
   String _selectedTeacherRegion = 'indian'; // 'indian' or 'international'
   Map<String, dynamic>? _internationalTeacherData; // Store International Teacher data
+  String _selectedTeacherEmploymentType = 'full_time'; // 'full_time' or 'part_time'
   
   // International Teacher fields
   final _internationalTeacherCodeController = TextEditingController();
@@ -502,6 +503,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _teacherVerificationError = null;
           _selectedTeacherRegion = 'indian'; // Reset to default
           _internationalTeacherData = null; // Clear International Teacher data
+          _selectedTeacherEmploymentType = 'full_time'; // Reset to default
           // Clear teacher form data since verification wasn't completed
           _teacherCodeController.clear();
           _teacherEmailController.clear();
@@ -604,6 +606,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             _teacherVerificationError = null;
                             _selectedTeacherRegion = 'indian'; // Reset to default
                             _internationalTeacherData = null; // Clear International Teacher data
+                            _selectedTeacherEmploymentType = 'full_time'; // Reset to default
                             // Clear all teacher form data
                             _teacherCodeController.clear();
                             _teacherEmailController.clear();
@@ -643,6 +646,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
                       // Show form fields only for Indian teachers
                       if (_selectedTeacherRegion == 'indian') ...[
+                        // Employment Type Selection
+                        _buildTeacherEmploymentTypeSelection(setModalState),
+                        const SizedBox(height: 12),
+
                         // Teacher Code
                         _buildTeacherTextField(
                           controller: _teacherCodeController,
@@ -667,6 +674,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         const SizedBox(height: 24),
                       ] else ...[
                         // International Teacher - Form fields
+                        // Employment Type Selection
+                        _buildTeacherEmploymentTypeSelection(setModalState),
+                        const SizedBox(height: 12),
+
                         // Teacher Code
                         _buildTeacherTextField(
                           controller: _internationalTeacherCodeController,
@@ -798,6 +809,48 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  Widget _buildTeacherEmploymentTypeSelection(StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Are you a?',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildTeacherEmploymentTypeOption(
+                value: 'full_time',
+                label: 'Full Time',
+                isSelected: _selectedTeacherEmploymentType == 'full_time',
+                onTap: () {
+                  setModalState(() => _selectedTeacherEmploymentType = 'full_time');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTeacherEmploymentTypeOption(
+                value: 'part_time',
+                label: 'Part Time',
+                isSelected: _selectedTeacherEmploymentType == 'part_time',
+                onTap: () {
+                  setModalState(() => _selectedTeacherEmploymentType = 'part_time');
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTeacherRegionOption({
     required String value,
     required String label,
@@ -844,6 +897,62 @@ class _SignupScreenState extends State<SignupScreen> {
                   fontWeight: FontWeight.w500,
                   color: isSelected
                       ? Colors.orange.shade800
+                      : Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeacherEmploymentTypeOption({
+    required String value,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue.shade50 : Colors.white,
+          border: Border.all(
+            color: isSelected ? Colors.blue.shade200 : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? Colors.blue.shade500 : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.blue.shade500
+                      : Colors.grey.shade300,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 10)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isSelected
+                      ? Colors.blue.shade800
                       : Colors.grey.shade700,
                 ),
               ),
@@ -1831,6 +1940,7 @@ class _SignupScreenState extends State<SignupScreen> {
         'location': _internationalTeacherLocationController.text.trim(),
         'teach': _selectedInternationalPrograms.join(', '), // Convert selected programs to comma-separated string
         'region': 'International',
+        'employmentType': _selectedTeacherEmploymentType == 'full_time' ? 'Full Time' : 'Part Time',
       };
 
       setModalState(() {
@@ -2339,13 +2449,14 @@ class _SignupScreenState extends State<SignupScreen> {
           userTags: _selectedRoles.toList(),
           aol_teacher: _selectedTeacherType == 'yes',
           teacher_type: _selectedTeacherType == 'yes'
-              ? (_selectedTeacherRegion == 'international' ? 'TAOL Teacher' : 'Teacher')
+              ? (_selectedTeacherEmploymentType == 'full_time' ? 'FullTime' : 'PartTime')
               : null,
           teachercode: teacherCode,
           teacheremail: teacherEmail,
           mobilenumber: teacherMobile,
           programTypesCanTeach: programTypesCanTeach,
           isInternational: _selectedTeacherType == 'yes' && _selectedTeacherRegion == 'international',
+          teacherEmploymentType: _selectedTeacherType == 'yes' ? _selectedTeacherEmploymentType : null,
           profilePhotoFile: _selectedImageFile!,
         );
 
@@ -3281,7 +3392,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Not Verified',
+                        'Teacher Not Verified',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -3289,7 +3400,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                       ),
                       Text(
-                        'Teacher',
+                        _selectedTeacherEmploymentType == 'full_time' ? 'Full Time Teacher' : 'Part Time Teacher',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.green.shade600,
@@ -3308,7 +3419,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 _buildTeacherDetailRow('Teacher Code:', data['teacherCode'] ?? 'N/A'),
                 _buildTeacherDetailRow('Email:', data['email'] ?? 'N/A'),
                 _buildTeacherDetailRow('Phone:', data['phone'] ?? 'N/A'),
-                _buildTeacherDetailRow('Type:', 'Teacher'),
                 _buildTeacherDetailRow('Programs:', data['teach'] ?? 'N/A'),
               ],
             ),
@@ -3322,6 +3432,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   _internationalTeacherData = null;
                   _selectedTeacherType = 'no';
                   _selectedTeacherRegion = 'indian'; // Reset to default
+                  _selectedTeacherEmploymentType = 'full_time'; // Reset to default
                   // Clear teacher form data
                   _teacherCodeController.clear();
                   _teacherEmailController.clear();
@@ -3392,7 +3503,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                       ),
                       Text(
-                        teacherType,
+                        _selectedTeacherEmploymentType == 'full_time' ? 'Full Time Teacher' : 'Part Time Teacher',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.green.shade600,
@@ -3430,6 +3541,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   _teacherVerificationData = null;
                   _selectedTeacherType = 'no';
                   _selectedTeacherRegion = 'indian'; // Reset to default
+                  _selectedTeacherEmploymentType = 'full_time'; // Reset to default
                   // Clear teacher form data
                   _teacherCodeController.clear();
                   _teacherEmailController.clear();

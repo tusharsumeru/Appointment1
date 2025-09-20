@@ -5025,6 +5025,7 @@ class ActionService {
     String? mobilenumber,
     List<String>? programTypesCanTeach,
     bool isInternational = false,
+    String? teacherEmploymentType, // 'full_time' or 'part_time'
     required File profilePhotoFile,
   }) async {
     try {
@@ -5101,6 +5102,7 @@ class ActionService {
         'mobilenumber': mobilenumber,
         'programTypesCanTeach': programTypesCanTeach,
         'isInternational': isInternational,
+        'teacherEmploymentType': teacherEmploymentType, // 'full_time' or 'part_time'
       };
       // :white_check_mark: 6. Create multipart request for file upload
       final request = http.MultipartRequest(

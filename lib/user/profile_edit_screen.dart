@@ -900,15 +900,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Subtitle
-                          Text(
-                            'Your Art of Living teacher status (non-editable)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
+                          // // Subtitle
+                          // Text(
+                          //   'Your Art of Living teacher status (non-editable)',
+                          //   style: TextStyle(
+                          //     fontSize: 14,
+                          //     color: Colors.grey.shade600,
+                          //   ),
+                          // ),
+                          // const SizedBox(height: 20),
 
                           // Question
                           Row(
@@ -2168,7 +2168,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         ),
                       ),
                       Text(
-                        'Teacher details found but not verified',
+                        aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('fulltime') == true 
+                            ? 'Full Time Teacher - details found but not verified'
+                            : aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('parttime') == true
+                                ? 'Part Time Teacher - details found but not verified'
+                                : 'Teacher details found but not verified',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -2342,7 +2346,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           ),
                         ),
                         Text(
-                          'AOL Teacher',
+                          aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('fulltime') == true 
+                              ? 'Full Time Teacher'
+                              : aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('parttime') == true
+                                  ? 'Part Time Teacher'
+                                  : 'AOL Teacher',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.green.shade600,

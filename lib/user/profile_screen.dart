@@ -693,15 +693,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 8),
 
-                            // Subtitle
-                            Text(
-                              'Your Art of Living teacher status (non-editable)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
+                            // // Subtitle
+                            // Text(
+                            //   'Your Art of Living teacher status (non-editable)',
+                            //   style: TextStyle(
+                            //     fontSize: 14,
+                            //     color: Colors.grey.shade600,
+                            //   ),
+                            // ),
+                            // const SizedBox(height: 20),
 
                             // Question
                             Row(
@@ -1054,7 +1054,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       Text(
-                        'Teacher details found but not verified',
+                        aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('fulltime') == true 
+                            ? 'Full Time Teacher - details found but not verified'
+                            : aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('parttime') == true
+                                ? 'Part Time Teacher - details found but not verified'
+                                : 'Teacher details found but not verified',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -1161,7 +1165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'TeacherVerified',
+                    'Teacher Verified',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1169,7 +1173,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   Text(
-                    'Teacher',
+                    aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('fulltime') == true 
+                        ? 'Full Time Teacher'
+                        : aolTeacherData?['teacher_type']?.toString().toLowerCase().contains('parttime') == true
+                            ? 'Part Time Teacher'
+                            : 'Teacher',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.green.shade600,
@@ -1184,8 +1192,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // Teacher Details (include name/phone for non-international)
           _buildTeacherDetail('Name', teacherDetails?['name'] ?? 'N/A'),
           const SizedBox(height: 8),
-          _buildTeacherDetail('Type', teacherType),
-          const SizedBox(height: 8),
+          // _buildTeacherDetail('Type', teacherType),
+          // const SizedBox(height: 8),
           _buildTeacherDetail('Teacher Code', teacherCode),
           const SizedBox(height: 8),
           _buildTeacherDetail('Teacher Email', teacherEmail),
@@ -1204,23 +1212,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditForm(BuildContext context) async {
-    // Show loading while fetching fresh user data
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Fetching profile...'),
-            ],
-          ),
-        );
-      },
-    );
-
     Map<String, dynamic>? freshUserData;
     try {
       final apiResult = await ActionService.getCurrentUser();
@@ -1236,7 +1227,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        Navigator.of(context).pop(); // Close loading dialog
         return; // Don't proceed to edit screen
       }
     } catch (e) {
@@ -1246,13 +1236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: Colors.red,
         ),
       );
-      Navigator.of(context).pop(); // Close loading dialog
       return; // Don't proceed to edit screen
-    } finally {
-      // Close the loading dialog
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
     }
 
     final result = await Navigator.push(

@@ -308,9 +308,9 @@ class _SplashScreenState extends State<SplashScreen>
                       child: FadeTransition(
                         opacity: _fadeAnimation,
                         child: const Text(
-                          'AOL Appointment',
+                          'Appointment with Gurudev',
                           style: TextStyle(
-                            fontSize: 32,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1a237e),
                             letterSpacing: 2.0,
