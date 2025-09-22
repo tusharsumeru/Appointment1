@@ -406,6 +406,16 @@ class UserAppointmentCard extends StatelessWidget {
                       'Appointment Date',
                       appointmentDateRange,
                     ),
+                    
+                    // Show TBS/REQ or Venue Label if applicable
+                    if (_shouldShowSpecialLabel()) ...[
+                      const SizedBox(height: 12),
+                      _buildDetailRow(
+                        _getSpecialLabelIcon(),
+                        _getSpecialLabelLabel(),
+                        _getSpecialLabelText(),
+                      ),
+                    ],
                     const SizedBox(height: 12),
 
                     // Appointment Attendees
@@ -861,6 +871,137 @@ class UserAppointmentCard extends StatelessWidget {
     
     return false;
   }
+
+  // Check if we should show special label (TBS/REQ or Venue Label)
+  bool _shouldShowSpecialLabel() {
+    if (appointmentData == null) return false;
+    
+    // Check communication preferences for TBS/REQ
+    final communicationPreferences = appointmentData!['communicationPreferences'];
+    if (communicationPreferences != null && communicationPreferences is List) {
+      for (var pref in communicationPreferences) {
+        final prefString = pref.toString().toLowerCase();
+        if (prefString.contains('tbs') || prefString.contains('req')) {
+          return true;
+        }
+      }
+    }
+    
+    // Check venue label for special venues
+    final scheduledDateTime = appointmentData!['scheduledDateTime'];
+    if (scheduledDateTime != null && scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (venueLabel != null) {
+        final lowerVenueLabel = venueLabel.toLowerCase();
+        if (lowerVenueLabel.contains('satsang backstage') || 
+            lowerVenueLabel.contains('pooja backstage') || 
+            lowerVenueLabel.contains('gurukul')) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  // Get the special label label text (for the left side)
+  String _getSpecialLabelLabel() {
+    if (appointmentData == null) return '';
+    
+    // Check communication preferences for TBS/REQ
+    final communicationPreferences = appointmentData!['communicationPreferences'];
+    if (communicationPreferences != null && communicationPreferences is List) {
+      for (var pref in communicationPreferences) {
+        final prefString = pref.toString().toLowerCase();
+        if (prefString.contains('tbs') || prefString.contains('req')) {
+          return 'Type:';
+        }
+      }
+    }
+    
+    // Check venue label for special venues
+    final scheduledDateTime = appointmentData!['scheduledDateTime'];
+    if (scheduledDateTime != null && scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (venueLabel != null) {
+        final lowerVenueLabel = venueLabel.toLowerCase();
+        if (lowerVenueLabel.contains('satsang backstage') || 
+            lowerVenueLabel.contains('pooja backstage') || 
+            lowerVenueLabel.contains('gurukul')) {
+          return 'Status:';
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get the special label text
+  String _getSpecialLabelText() {
+    if (appointmentData == null) return '';
+    
+    // Check communication preferences for TBS/REQ
+    final communicationPreferences = appointmentData!['communicationPreferences'];
+    if (communicationPreferences != null && communicationPreferences is List) {
+      for (var pref in communicationPreferences) {
+        final prefString = pref.toString().toLowerCase();
+        if (prefString.contains('tbs') || prefString.contains('req')) {
+          return 'TBS/REQ';
+        }
+      }
+    }
+    
+    // Check venue label for special venues
+    final scheduledDateTime = appointmentData!['scheduledDateTime'];
+    if (scheduledDateTime != null && scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (venueLabel != null) {
+        final lowerVenueLabel = venueLabel.toLowerCase();
+        if (lowerVenueLabel.contains('satsang backstage')) {
+          return 'Satsang Backstage';
+        } else if (lowerVenueLabel.contains('pooja backstage')) {
+          return 'Pooja Backstage';
+        } else if (lowerVenueLabel.contains('gurukul')) {
+          return 'Gurukul';
+        }
+      }
+    }
+    
+    return '';
+  }
+
+  // Get the special label icon
+  IconData _getSpecialLabelIcon() {
+    if (appointmentData == null) return Icons.info;
+    
+    // Check communication preferences for TBS/REQ
+    final communicationPreferences = appointmentData!['communicationPreferences'];
+    if (communicationPreferences != null && communicationPreferences is List) {
+      for (var pref in communicationPreferences) {
+        final prefString = pref.toString().toLowerCase();
+        if (prefString.contains('tbs') || prefString.contains('req')) {
+          return Icons.schedule;
+        }
+      }
+    }
+    
+    // Check venue label for special venues
+    final scheduledDateTime = appointmentData!['scheduledDateTime'];
+    if (scheduledDateTime != null && scheduledDateTime is Map<String, dynamic>) {
+      final venueLabel = scheduledDateTime['venueLabel']?.toString();
+      if (venueLabel != null) {
+        final lowerVenueLabel = venueLabel.toLowerCase();
+        if (lowerVenueLabel.contains('satsang backstage') || 
+            lowerVenueLabel.contains('pooja backstage') || 
+            lowerVenueLabel.contains('gurukul')) {
+          return Icons.schedule;
+        }
+      }
+    }
+    
+    return Icons.info;
+  }
+
 
   // Open attachment URL in browser
   Future<void> _openAttachmentUrl(BuildContext context, String url) async {

@@ -314,8 +314,8 @@ class _UserDarshanPhotosScreenState extends State<UserDarshanPhotosScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${widget.personName}\'s Darshan Photos'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFFF97316), // Orange color
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'user_images_screen.dart';
+import 'meeting_history_screen.dart';
 import 'edit_appointment_screen.dart';
 import 'appointment_schedule_form.dart';
 import 'email_form.dart';
@@ -48,6 +49,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   // Filter state
   String _selectedFilter = '90_days'; // Default to 90 days
   bool _isRefreshing = false;
+  
+  // Meeting history expansion state
+  Map<int, bool> _isMeetingHistoryExpanded = {};
   // Helper: extract epoch millis from image name and format date as YYYY-MON-DD
   String _formatEpochToApiDate(int millis) {
     final dt = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
@@ -2471,7 +2475,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Appointment Details'),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF97316), // Orange color
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -3631,15 +3636,65 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                              // Meeting History List
                Column(
                  children: [
-                   ...meetingHistory.take(3).map((meeting) => _buildMeetingHistoryItem(meeting, userIndex)),
+                   ...(_isMeetingHistoryExpanded[userIndex] == true 
+                     ? meetingHistory 
+                     : meetingHistory.take(3)
+                   ).map((meeting) => _buildMeetingHistoryItem(meeting, userIndex)),
                    if (meetingHistory.length > 3) ...[
                      const SizedBox(height: 8),
                      Center(
-                       child: Text(
-                         '+${meetingHistory.length - 3} more meetings',
-                         style: TextStyle(
-                           fontSize: 12,
-                           color: Colors.grey[500],
+                       child: GestureDetector(
+                         onTap: () {
+                           if (_isMeetingHistoryExpanded[userIndex] == true) {
+                             // Collapse if expanded
+                             setState(() {
+                               _isMeetingHistoryExpanded[userIndex] = false;
+                             });
+                           } else {
+                             // Navigate to meeting history screen
+                             Navigator.push(
+                               context,
+                               MaterialPageRoute(
+                                 builder: (context) => MeetingHistoryScreen(
+                                   userName: _getUserName(userIndex),
+                                   meetingHistory: meetingHistory,
+                                   userIndex: userIndex,
+                                   faceMatchData: _faceMatchData[userIndex] ?? [],
+                                 ),
+                               ),
+                             );
+                           }
+                         },
+                         child: Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                           decoration: BoxDecoration(
+                             color: Colors.blue.shade50,
+                             borderRadius: BorderRadius.circular(16),
+                             border: Border.all(color: Colors.blue.shade200),
+                           ),
+                           child: Row(
+                             mainAxisSize: MainAxisSize.min,
+                             children: [
+                               Text(
+                                 _isMeetingHistoryExpanded[userIndex] == true 
+                                   ? 'Show Less' 
+                                   : '+${meetingHistory.length - 3} more meetings',
+                                 style: TextStyle(
+                                   fontSize: 12,
+                                   color: Colors.blue.shade700,
+                                   fontWeight: FontWeight.w500,
+                                 ),
+                               ),
+                               const SizedBox(width: 4),
+                              //  Icon(
+                              //    _isMeetingHistoryExpanded[userIndex] == true 
+                              //      ? Icons.keyboard_arrow_up 
+                              //      : Icons.keyboard_arrow_down,
+                              //    size: 16,
+                              //    color: Colors.blue.shade700,
+                              //  ),
+                             ],
+                           ),
                          ),
                        ),
                      ),

@@ -2423,7 +2423,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Edit Appointment'),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF97316), // Orange color
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

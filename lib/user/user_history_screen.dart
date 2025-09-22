@@ -409,6 +409,34 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
     );
   }
 
+  String _formatTimeTo12Hour(String time24) {
+    try {
+      // Parse the time string (format: "HH:mm")
+      final parts = time24.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = parts[1];
+        
+        String period = 'AM';
+        int hour12 = hour;
+        
+        if (hour == 0) {
+          hour12 = 12;
+        } else if (hour == 12) {
+          period = 'PM';
+        } else if (hour > 12) {
+          hour12 = hour - 12;
+          period = 'PM';
+        }
+        
+        return '$hour12:$minute $period';
+      }
+      return time24; // Return original if parsing fails
+    } catch (e) {
+      return time24; // Return original if any error occurs
+    }
+  }
+
   String _formatDateRange(Map<String, dynamic> appointment) {
     try {
       // Check for scheduled date/time
@@ -422,7 +450,8 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
           final formattedDate = '${date.day}/${date.month}/${date.year}';
           
           if (scheduledTime != null) {
-            return '$formattedDate at $scheduledTime';
+            final formattedTime = _formatTimeTo12Hour(scheduledTime);
+            return '$formattedDate at $formattedTime';
           }
           return formattedDate;
         } else {

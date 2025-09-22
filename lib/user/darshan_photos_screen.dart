@@ -509,8 +509,8 @@ class _DarshanPhotosScreenState extends State<DarshanPhotosScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Darshan Photos with Gurudev'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFFF97316), // Orange color
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(

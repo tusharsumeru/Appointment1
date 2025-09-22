@@ -351,20 +351,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   String _getEntryDate(Map<String, dynamic> appointment) {
-    // Show preferred date range for entry date
-    final preferredDateRange = appointment['preferredDateRange'];
-    if (preferredDateRange is Map<String, dynamic>) {
-      final fromDate = preferredDateRange['fromDate'];
-      final toDate = preferredDateRange['toDate'];
-      
-      if (fromDate != null && toDate != null) {
-        return '${_formatDate(fromDate)} - ${_formatDate(toDate)}';
-      } else if (fromDate != null) {
-        return _formatDate(fromDate);
-      }
-    }
-    
-    // Fallback to createdAt date if no preferred date range
+    // Show created date for entry date
     return _formatDate(appointment['createdAt']);
   }
 
