@@ -83,6 +83,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   Map<int, String> _guestImages = {};
   Map<int, bool> _guestUploading = {};
   Map<int, String> _guestCountries = {};
+  // Unique phone code toggle state per guest
+  Map<int, bool> _guestUniquePhoneCodeEnabled = {};
+  Map<int, bool> _guestUniquePhoneCodeDisabled = {};
   
   // Photo picker for guests
   final ImagePicker _imagePicker = ImagePicker();
@@ -722,18 +725,17 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         });
       });
       
+      final initialUniqueCode = (guest['alternatePhoneNumber']?.toString() ??
+              guest['uniquePhoneCode']?.toString() ??
+              guest['alternativePhone']?.toString() ??
+              guest['alternatePhone']?.toString() ??
+              '')
+          .trim();
       _guestControllers.add({
         'name': TextEditingController(text: guest['fullName'] ?? ''),
         'age': ageController,
         'phone': TextEditingController(text: number),
-        // COMMENTED OUT: Unique phone code controller
-        // 'uniquePhoneCode': TextEditingController(text: guest['alternatePhoneNumber']?.toString() ?? 
-        //                                               guest['uniquePhoneCode']?.toString() ?? 
-        //                                               guest['alternativePhone']?.toString() ?? 
-        //                                               guest['alternatePhone']?.toString() ?? ''),
-        // COMMENTED OUT: Unique phone code controller
-        // 'uniquePhoneCode': TextEditingController(),
-        'uniquePhoneCode': TextEditingController(), // Empty controller since unique code is disabled // Empty controller since unique code is disabled
+        'uniquePhoneCode': TextEditingController(text: initialUniqueCode),
       });
       
       // Debug: Print all available fields in guest data
@@ -746,6 +748,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       _guestImages[i + 1] = guest['profilePhotoUrl'] ?? '';
       _guestUploading[i + 1] = false;
       _guestCountries[i + 1] = countryCode;
+      final guestNumber = i + 1;
+      final hasAlt = initialUniqueCode.isNotEmpty;
+      _guestUniquePhoneCodeEnabled[guestNumber] = hasAlt;
+      _guestUniquePhoneCodeDisabled[guestNumber] = hasAlt;
     }
   }
 
@@ -801,17 +807,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'name': TextEditingController(),
           'age': ageController,
           'phone': TextEditingController(),
-          // COMMENTED OUT: Unique phone code controller
-          // 'uniquePhoneCode': TextEditingController(),
-          // COMMENTED OUT: Unique phone code controller
-        // 'uniquePhoneCode': TextEditingController(),
-        'uniquePhoneCode': TextEditingController(), // Empty controller since unique code is disabled // Empty controller since unique code is disabled
+          'uniquePhoneCode': TextEditingController(),
         });
         
         // Initialize associated data
         _guestImages[guestNumber] = '';
         _guestUploading[guestNumber] = false;
         _guestCountries[guestNumber] = '+91';
+        _guestUniquePhoneCodeEnabled[guestNumber] = false;
+        _guestUniquePhoneCodeDisabled[guestNumber] = false;
       }
     } else if (accompanyingUsers < currentControllersCount) {
       // Remove controllers (remove from the end)
@@ -836,6 +840,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         _guestImages.remove(i);
         _guestUploading.remove(i);
         _guestCountries.remove(i);
+        _guestUniquePhoneCodeEnabled.remove(i);
+        _guestUniquePhoneCodeDisabled.remove(i);
       }
     }
   }
@@ -2371,10 +2377,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Age is optional - can be null or empty
       final ageText = controllers['age']?.text?.trim() ?? '';
       final age = ageText.isEmpty ? null : int.tryParse(ageText);
-      // COMMENTED OUT: Unique phone code functionality
-      // final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
-      // final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
-      final hasUniquePhoneCode = false; // Always false since unique code is disabled
+      final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
+      final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
       
       // Get photo URL from guest images
       final photoUrl = _guestImages[guestNumber] ?? '';
@@ -2384,18 +2388,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'age': age,
       };
 
-      // Only include phone number if we have one
-      if (phoneNumber.isNotEmpty) {
+      // Only include phone number if we have one and unique code not used
+      if (phoneNumber.isNotEmpty && !hasUniquePhoneCode) {
         userData['phoneNumber'] = {
           'countryCode': countryCode,
           'number': phoneNumber,
         };
       }
 
-      // COMMENTED OUT: Add unique phone code as alternativePhone if provided
-      // if (hasUniquePhoneCode) {
-      //   userData['alternativePhone'] = uniquePhoneCode;
-      // }
+      // Add unique phone code as alternativePhone if provided
+      if (hasUniquePhoneCode) {
+        userData['alternativePhone'] = uniquePhoneCode;
+      }
 
       userData.addAll({
         'profilePhotoUrl': photoUrl,
@@ -5573,22 +5577,44 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _buildEditableAgeField('Age (Optional)', controllers['age']!),
               const SizedBox(height: 12),
 
-              // COMMENTED OUT: Unique Phone Code (show only for age 12..59)
-              // if (age >= 12 && age <= 59) ...[
-              //   _buildUniquePhoneCodeField('Unique Phone Code (Optional)', controllers['uniquePhoneCode']!),
-              //   const SizedBox(height: 4),
-              //   Text(
-              //     'If you don't have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-              //     style: TextStyle(
-              //       fontSize: 12,
-              //       color: Colors.grey[600],
-              //     ),
-              //   ),
-              //   const SizedBox(height: 12),
-              // ],
-              
-              // Phone
-              _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!),
+              // Toggle: Use unique code instead of phone
+              Row(
+                children: [
+                  Checkbox(
+                    value: _guestUniquePhoneCodeEnabled[guestNumber] == true,
+                    onChanged: (_guestUniquePhoneCodeDisabled[guestNumber] == true)
+                        ? null
+                        : (val) {
+                            setState(() {
+                              _guestUniquePhoneCodeEnabled[guestNumber] = val == true;
+                            });
+                          },
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'If you don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Conditionally show phone or unique code based on toggle and age
+              if (!(_guestUniquePhoneCodeEnabled[guestNumber] == true))
+                _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!)
+              else if (age != null && age >= 12 && age <= 59) ...[
+                _buildUniquePhoneCodeField('Unique Phone Code (3 digits)', controllers['uniquePhoneCode']!),
+                // const SizedBox(height: 4),
+                // Text(
+                //   'If you don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
+                //   style: TextStyle(
+                //     fontSize: 12,
+                //     color: Colors.grey[600],
+                //   ),
+                // ),
+                // const SizedBox(height: 12),
+              ],
               
               // Photo Section (only show if age >= 12)
               if (isPhotoRequired) ...[
@@ -6776,6 +6802,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         Map<int, String> newGuestCountries = {};
         Map<int, String> newGuestImages = {};
         Map<int, bool> newGuestUploading = {};
+        Map<int, bool> newUniqueEnabled = {};
+        Map<int, bool> newUniqueDisabled = {};
 
         // Reassign guest numbers for remaining guests
         for (int i = 0; i < _guestControllers.length; i++) {
@@ -6797,12 +6825,20 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           if (_guestUploading.containsKey(oldGuestNumber)) {
             newGuestUploading[newGuestNumber] = _guestUploading[oldGuestNumber]!;
           }
+          if (_guestUniquePhoneCodeEnabled.containsKey(oldGuestNumber)) {
+            newUniqueEnabled[newGuestNumber] = _guestUniquePhoneCodeEnabled[oldGuestNumber]!;
+          }
+          if (_guestUniquePhoneCodeDisabled.containsKey(oldGuestNumber)) {
+            newUniqueDisabled[newGuestNumber] = _guestUniquePhoneCodeDisabled[oldGuestNumber]!;
+          }
         }
 
         // Update the maps with corrected guest numbers
         _guestCountries = newGuestCountries;
         _guestImages = newGuestImages;
         _guestUploading = newGuestUploading;
+        _guestUniquePhoneCodeEnabled = newUniqueEnabled;
+        _guestUniquePhoneCodeDisabled = newUniqueDisabled;
 
         // Update the number of users (accompanying users + main person + reference if coming as accompany)
         int totalPeople = _guestControllers.length + 1; // accompanying users + main person

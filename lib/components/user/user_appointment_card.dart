@@ -330,75 +330,75 @@ class UserAppointmentCard extends StatelessWidget {
                 child: Column(
                   children: [
                     // View Darshan Photos Section
-                    Container(
-                      width: double.infinity,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.blue.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            if (appointmentData != null) {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => DarshanPhotosScreen(
-                                    appointmentId: appointmentId,
-                                    appointmentData: appointmentData!,
-                                  ),
-                                ),
-                              );
-                            } else {
-                              // Fallback if appointmentData is not available
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => DarshanPhotosScreen(
-                                    appointmentId: appointmentId,
-                                    appointmentData: {
-                                      'profilePhoto': profilePhoto,
-                                      'createdBy': {'fullName': userName},
-                                      'accompanyUsers': {
-                                        'users': attendeePhotos?.map((photo) => {
-                                          'profilePhotoUrl': photo,
-                                          'fullName': 'User',
-                                        }).toList() ?? [],
-                                      },
-                                    },
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.camera_alt,
-                                size: 20,
-                                color: Colors.blue.shade600,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'View Darshan Photos with Gurudev',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.blue.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    // Container(
+                    //   width: double.infinity,
+                    //   height: 48,
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.blue.shade50,
+                    //     borderRadius: BorderRadius.circular(8),
+                    //     border: Border.all(
+                    //       color: Colors.blue.shade200,
+                    //       width: 1,
+                    //     ),
+                    //   ),
+                    //   child: Material(
+                    //     color: Colors.transparent,
+                    //     child: InkWell(
+                    //       borderRadius: BorderRadius.circular(8),
+                    //       onTap: () {
+                    //         if (appointmentData != null) {
+                    //           Navigator.of(context).push(
+                    //             MaterialPageRoute(
+                    //               builder: (context) => DarshanPhotosScreen(
+                    //                 appointmentId: appointmentId,
+                    //                 appointmentData: appointmentData!,
+                    //               ),
+                    //             ),
+                    //           );
+                    //         } else {
+                    //           // Fallback if appointmentData is not available
+                    //           Navigator.of(context).push(
+                    //             MaterialPageRoute(
+                    //               builder: (context) => DarshanPhotosScreen(
+                    //                 appointmentId: appointmentId,
+                    //                 appointmentData: {
+                    //                   'profilePhoto': profilePhoto,
+                    //                   'createdBy': {'fullName': userName},
+                    //                   'accompanyUsers': {
+                    //                     'users': attendeePhotos?.map((photo) => {
+                    //                       'profilePhotoUrl': photo,
+                    //                       'fullName': 'User',
+                    //                     }).toList() ?? [],
+                    //                   },
+                    //                 },
+                    //               ),
+                    //             ),
+                    //           );
+                    //         }
+                    //       },
+                    //       child: Row(
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         children: [
+                    //           Icon(
+                    //             Icons.camera_alt,
+                    //             size: 20,
+                    //             color: Colors.blue.shade600,
+                    //           ),
+                    //           const SizedBox(width: 8),
+                    //           Text(
+                    //             'View Darshan Photos with Gurudev',
+                    //             style: TextStyle(
+                    //               fontSize: 14,
+                    //               fontWeight: FontWeight.w500,
+                    //               color: Colors.blue.shade600,
+                    //             ),
+                    //           ),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+                    // const SizedBox(height: 16),
 
                     // Appointment Date
                     _buildDetailRow(

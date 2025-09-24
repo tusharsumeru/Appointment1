@@ -78,23 +78,48 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   String _computeDaysAgoFromDateString(String dateStr) {
     try {
-      // Expecting YYYY-MON-DD
-      final parts = dateStr.split('-');
+      final dt = _parseApiDate(dateStr);
+      if (dt != null) {
+        final now = DateTime.now();
+        final diff = now.difference(DateTime(dt.year, dt.month, dt.day)).inDays;
+        return (diff < 0 ? 0 : diff).toString();
+      }
+    } catch (_) {}
+    return '0';
+  }
+  
+  // Parse API date strings that can be either YYYY-MM-DD or YYYY-MON-DD
+  DateTime? _parseApiDate(String raw) {
+    try {
+      if (raw.isEmpty || raw.toLowerCase() == 'unknown' || raw == 'null') return null;
+      // Try ISO first (YYYY-MM-DD)
+      final iso = DateTime.tryParse(raw);
+      if (iso != null) return iso;
+      // Try YYYY-MON-DD
+      final parts = raw.split('-');
       if (parts.length == 3) {
-        final year = int.parse(parts[0]);
+        final year = int.tryParse(parts[0]);
         final monStr = parts[1].toUpperCase();
-        final day = int.parse(parts[2]);
+        final day = int.tryParse(parts[2]);
         const monthMap = {
           'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
           'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12
         };
-        final month = monthMap[monStr] ?? 1;
-        final dt = DateTime(year, month, day);
-        final now = DateTime.now();
-        return now.difference(dt).inDays.toString();
+        final month = monthMap[monStr];
+        if (year != null && month != null && day != null) {
+          return DateTime(year, month, day);
+        }
       }
     } catch (_) {}
-    return '0';
+    return null;
+  }
+
+  // Format API date string (supports YYYY-MM-DD or YYYY-MON-DD) to "Mon d, yyyy"
+  String _formatApiDateReadable(String raw) {
+    final dt = _parseApiDate(raw);
+    if (dt == null) return 'Unknown';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
   
   // Appointments overview state
@@ -344,16 +369,14 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Aggregate matches across all periods (30/60/90) so we don't miss any
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        return allMatches.length;
-      } else {
-        // apiResult is null - no face match data for this user
-        return 0;
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['count'] != null) {
+            return allTimeData['count'] as int? ?? 0;
+          }
+        }
       }
     }
     
@@ -363,19 +386,35 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   // Get album information for a user (only albums with valid dates)
   Map<String, int> _getUserAlbums(int index) {
-    // Use meeting history to get only albums with valid dates
-    final meetingHistory = _getMeetingHistory(index);
-    Map<String, int> albumMap = {};
+    final faceMatchResults = _faceMatchData[index] ?? [];
     
-    for (final meeting in meetingHistory) {
-      final albumId = meeting['albumId']?.toString() ?? '';
-      if (albumId.isNotEmpty) {
-        // Count images in this album (we already filtered out invalid dates in _getMeetingHistory)
-        albumMap[albumId] = (albumMap[albumId] ?? 0) + 1;
+    if (faceMatchResults.isNotEmpty) {
+      final result = faceMatchResults[0];
+      
+      if (result['apiResult'] != null) {
+        final apiResult = result['apiResult'];
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['albums'] != null) {
+            // Use the albums data directly from all_time structure
+            final albumsData = allTimeData['albums'] as Map<String, dynamic>? ?? {};
+            Map<String, int> albumMap = {};
+            
+            albumsData.forEach((albumId, count) {
+              if (albumId.isNotEmpty && count is int) {
+                albumMap[albumId] = count;
+              }
+            });
+            
+            return albumMap;
+          }
+        }
       }
     }
     
-    return albumMap;
+    return {};
   }
 
   // Get total album count for a user
@@ -399,88 +438,86 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
-        // Combine matches from all time periods and include items regardless of date value
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        final matches = [...matches30, ...matches60, ...matches90];
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
 
-        // Group matches by album (do not exclude unknown dates)
-        Map<String, List<Map<String, dynamic>>> albumGroups = {};
-        
-        for (final match in matches) {
-          if (match is Map<String, dynamic>) {
-            final albumId = match['album_id']?.toString() ?? '';
-            String date = match['date']?.toString() ?? '';
-            String daysAgo = match['days_ago']?.toString() ?? '';
-            final imageUrl = match['image_name']?.toString() ?? '';
+          // Group matches by album (do not exclude unknown dates)
+          Map<String, List<Map<String, dynamic>>> albumGroups = {};
+          
+          for (final match in matches) {
+            if (match is Map<String, dynamic>) {
+              final albumId = match['album_id']?.toString() ?? '';
+              String date = match['date']?.toString() ?? '';
+              // Prefer API days_ago; compute only if missing and date is known
+              String daysAgo = match['days_ago']?.toString() ?? '';
+              final imageUrl = match['image_name']?.toString() ?? '';
 
-            // If date is unknown/empty, try to derive it from image name
-            final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
-            if (isUnknown && imageUrl.isNotEmpty) {
-              final derived = _extractDateFromImageName(imageUrl);
-              if (derived != null) {
-                date = derived;
-                daysAgo = _computeDaysAgoFromDateString(derived);
+              if ((daysAgo.isEmpty || daysAgo == 'null') && date.isNotEmpty && date.toLowerCase() != 'unknown') {
+                daysAgo = _computeDaysAgoFromDateString(date);
+              }
+
+              // Only require a valid album ID; include unknown dates
+              if (albumId.isNotEmpty) {
+                if (!albumGroups.containsKey(albumId)) {
+                  albumGroups[albumId] = [];
+                }
+                albumGroups[albumId]!.add({
+                  'imageUrl': imageUrl,
+                  'date': date,
+                  'daysAgo': daysAgo,
+                  'albumId': albumId,
+                });
               }
             }
-            
-            // Only require a valid album ID; include unknown dates
-            if (albumId.isNotEmpty) {
-              if (!albumGroups.containsKey(albumId)) {
-                albumGroups[albumId] = [];
-              }
-              albumGroups[albumId]!.add({
-                'imageUrl': imageUrl,
-                'date': date,
-                'daysAgo': daysAgo,
+          }
+        
+          // Convert to list of album meetings (one per album)
+          List<Map<String, dynamic>> albumMeetings = [];
+          albumGroups.forEach((albumId, matches) {
+            if (matches.isNotEmpty) {
+              // Sort matches by real date to get the most recent, pushing 'unknown' to the end
+              matches.sort((a, b) {
+                final dateAStr = a['date']?.toString() ?? '';
+                final dateBStr = b['date']?.toString() ?? '';
+                final aParsed = _parseApiDate(dateAStr);
+                final bParsed = _parseApiDate(dateBStr);
+                if (aParsed == null && bParsed == null) return 0;
+                if (aParsed == null) return 1; // unknown at end
+                if (bParsed == null) return -1; // unknown at end
+                return bParsed.compareTo(aParsed);
+              });
+              
+              // Take the first (most recent) match from this album
+              final firstMatch = matches.first;
+              albumMeetings.add({
+                'imageUrl': firstMatch['imageUrl'],
+                'date': firstMatch['date'],
+                'daysAgo': firstMatch['daysAgo'],
                 'albumId': albumId,
+                'totalImages': matches.length, // Number of images in this album
               });
             }
-          }
-        }
-        
-        // Convert to list of album meetings (one per album)
-        List<Map<String, dynamic>> albumMeetings = [];
-        albumGroups.forEach((albumId, matches) {
-          if (matches.isNotEmpty) {
-            // Sort matches by date to get the most recent, pushing 'unknown' to the end
-            matches.sort((a, b) {
-              final dateA = a['date']?.toString() ?? '';
-              final dateB = b['date']?.toString() ?? '';
-              final isUnknownA = dateA.isEmpty || dateA.toLowerCase() == 'unknown' || dateA == 'null';
-              final isUnknownB = dateB.isEmpty || dateB.toLowerCase() == 'unknown' || dateB == 'null';
-              if (isUnknownA && isUnknownB) return 0;
-              if (isUnknownA) return 1; // A goes after B
-              if (isUnknownB) return -1; // B goes after A
-              return dateB.compareTo(dateA);
-            });
-            
-            // Take the first (most recent) match from this album
-            final firstMatch = matches.first;
-            albumMeetings.add({
-              'imageUrl': firstMatch['imageUrl'],
-              'date': firstMatch['date'],
-              'daysAgo': firstMatch['daysAgo'],
-              'albumId': albumId,
-              'totalImages': matches.length, // Number of images in this album
-            });
-          }
-        });
-        
+          });
+          
         // Sort albums by date (most recent first), keeping unknowns at the end
         albumMeetings.sort((a, b) {
-          final dateA = a['date']?.toString() ?? '';
-          final dateB = b['date']?.toString() ?? '';
-          final isUnknownA = dateA.isEmpty || dateA.toLowerCase() == 'unknown' || dateA == 'null';
-          final isUnknownB = dateB.isEmpty || dateB.toLowerCase() == 'unknown' || dateB == 'null';
-          if (isUnknownA && isUnknownB) return 0;
-          if (isUnknownA) return 1;
-          if (isUnknownB) return -1;
-          return dateB.compareTo(dateA);
+          final dateAStr = a['date']?.toString() ?? '';
+          final dateBStr = b['date']?.toString() ?? '';
+          final aParsed = _parseApiDate(dateAStr);
+          final bParsed = _parseApiDate(dateBStr);
+          if (aParsed == null && bParsed == null) return 0;
+          if (aParsed == null) return 1;
+          if (bParsed == null) return -1;
+          return bParsed.compareTo(aParsed);
         });
-        
-        return albumMeetings;
+          
+          return albumMeetings;
+          }
+        }
       }
     }
     
@@ -489,51 +526,70 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
 
   // Get last meeting date
   String _getLastMeetingDate(int index) {
-    final meetings = _getMeetingHistory(index);
-    if (meetings.isNotEmpty) {
-      final date = meetings.first['date']?.toString() ?? '';
-      if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
-        // Convert "2025-JUN-09" to "Jun 9, 2025"
-        try {
-          final parts = date.split('-');
-          if (parts.length == 3) {
-            final year = parts[0];
-            final month = parts[1];
-            final day = parts[2];
-            
-            // Validate that all parts are valid
-            if (year.isNotEmpty && month.isNotEmpty && day.isNotEmpty && 
-                year != 'null' && month != 'null' && day != 'null') {
-              
-              final monthNames = {
-                'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr',
-                'MAY': 'May', 'JUN': 'Jun', 'JUL': 'Jul', 'AUG': 'Aug',
-                'SEP': 'Sep', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
-              };
-              
-              final monthName = monthNames[month] ?? month;
-              final dayNum = int.tryParse(day) ?? 0;
-              
-              if (dayNum > 0) {
-                return '$monthName $dayNum, $year';
+    try {
+      final faceMatchResults = _faceMatchData[index] ?? [];
+      if (faceMatchResults.isNotEmpty) {
+        final result = faceMatchResults[0];
+        final apiResult = result['apiResult'];
+        if (apiResult != null) {
+          final timeCategories = apiResult['time_categories'];
+          final allTimeData = timeCategories != null ? timeCategories['all_time'] : null;
+          final matches = allTimeData != null ? allTimeData['top_matches'] as List<dynamic>? : null;
+          if (matches != null && matches.isNotEmpty) {
+            // Pick the latest known date (ignore unknown/null)
+            String? bestDateStr;
+            DateTime? bestDate;
+            for (final m in matches) {
+              if (m is Map<String, dynamic>) {
+                final d = m['date']?.toString() ?? '';
+                final parsed = _parseApiDate(d);
+                if (parsed != null && (bestDate == null || parsed.isAfter(bestDate!))) {
+                  bestDate = parsed;
+                  bestDateStr = d;
+                }
               }
             }
+            if (bestDateStr != null) {
+              return _formatApiDateReadable(bestDateStr);
+            }
           }
-        } catch (e) {
         }
       }
-      // If date is unknown
-      return 'Unknown';
-    }
+    } catch (_) {}
     return 'No meetings found';
   }
 
   // Get last meeting days ago
   String _getLastMeetingDaysAgo(int index) {
-    final meetings = _getMeetingHistory(index);
-    if (meetings.isNotEmpty) {
-      return meetings.first['daysAgo']?.toString() ?? '0';
-    }
+    try {
+      final faceMatchResults = _faceMatchData[index] ?? [];
+      if (faceMatchResults.isNotEmpty) {
+        final result = faceMatchResults[0];
+        final apiResult = result['apiResult'];
+        if (apiResult != null) {
+          final timeCategories = apiResult['time_categories'];
+          final allTimeData = timeCategories != null ? timeCategories['all_time'] : null;
+          final matches = allTimeData != null ? allTimeData['top_matches'] as List<dynamic>? : null;
+          if (matches != null && matches.isNotEmpty) {
+            Map<String, dynamic>? best;
+            DateTime? bestDate;
+            for (final m in matches) {
+              if (m is Map<String, dynamic>) {
+                final d = m['date']?.toString() ?? '';
+                final parsed = _parseApiDate(d);
+                if (parsed != null && (bestDate == null || parsed.isAfter(bestDate!))) {
+                  bestDate = parsed;
+                  best = m;
+                }
+              }
+            }
+            if (best != null) {
+              return best['days_ago']?.toString() ?? '0';
+            }
+          }
+        }
+      }
+    } catch (_) {}
     return '0';
   }
 
@@ -551,29 +607,8 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
     final albumId = meeting['albumId']?.toString() ?? '';
     final totalImages = meeting['totalImages']?.toString() ?? '0';
     
-    // Convert date format
-    String formattedDate = date;
-    try {
-      final parts = date.split('-');
-      if (parts.length == 3) {
-        final year = parts[0];
-        final month = parts[1];
-        final day = parts[2];
-        
-        final monthNames = {
-          'JAN': 'Jan', 'FEB': 'Feb', 'MAR': 'Mar', 'APR': 'Apr',
-          'MAY': 'May', 'JUN': 'Jun', 'JUL': 'Jul', 'AUG': 'Aug',
-          'SEP': 'Sep', 'OCT': 'Oct', 'NOV': 'Nov', 'DEC': 'Dec'
-        };
-        
-        final monthName = monthNames[month] ?? month;
-        final dayNum = int.tryParse(day) ?? 0;
-        
-        formattedDate = '$monthName $dayNum, $year';
-      }
-    } catch (e) {
-      // Keep original format if conversion fails
-    }
+    // Convert date format accurately
+    String formattedDate = _formatApiDateReadable(date);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -688,35 +723,39 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods and filter by album
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Filter matches by album ID
-        List<Map<String, dynamic>> filteredMatches = [];
-        
-        for (final match in [...matches30, ...matches60, ...matches90]) {
-          if (match is Map<String, dynamic> && 
-              match['album_id']?.toString() == albumId) {
-            filteredMatches.add(match);
-          }
-        }
-        
-        // Create filtered result
-        if (filteredMatches.isNotEmpty) {
-          filteredFaceMatchData = [{
-            ...result,
-            'apiResult': {
-              ...apiResult,
-              '30_days': {'matches': filteredMatches.where((m) => 
-                apiResult['30_days']?['matches']?.contains(m) ?? false).toList()},
-              '60_days': {'matches': filteredMatches.where((m) => 
-                apiResult['60_days']?['matches']?.contains(m) ?? false).toList()},
-              '90_days': {'matches': filteredMatches.where((m) => 
-                apiResult['90_days']?['matches']?.contains(m) ?? false).toList()},
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            // Filter matches by album ID
+            List<Map<String, dynamic>> filteredMatches = [];
+            
+            for (final match in matches) {
+              if (match is Map<String, dynamic> && 
+                  match['album_id']?.toString() == albumId) {
+                filteredMatches.add(match);
+              }
             }
-          }];
+            
+            // Create filtered result
+            if (filteredMatches.isNotEmpty) {
+              filteredFaceMatchData = [{
+                ...result,
+                'apiResult': {
+                  'time_categories': {
+                    'all_time': {
+                      'count': filteredMatches.length,
+                      'albums': {albumId: filteredMatches.length},
+                      'top_matches': filteredMatches,
+                    }
+                  }
+                }
+              }];
+            }
+          }
         }
       }
     }
@@ -747,18 +786,15 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        int count = 0;
-        for (final match in [...matches30, ...matches60, ...matches90]) {
-          if (match is Map<String, dynamic> && 
-              match['album_id']?.toString() == albumId) {
-            count++;
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['albums'] != null) {
+            final albumsData = allTimeData['albums'] as Map<String, dynamic>? ?? {};
+            return albumsData[albumId] as int? ?? 0;
           }
         }
-        return count;
       }
     }
     return 0;
@@ -3537,34 +3573,34 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                                              Row(
-                          children: [
+                      Row(
+                        children: [
+                          Text(
+                            lastMeetingDate,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[900],
+                            ),
+                          ),
+                          if (lastMeetingDaysAgo != '0') ...[
+                            const SizedBox(width: 8),
                             Text(
-                              lastMeetingDate,
+                              '$lastMeetingDaysAgo days ago',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey[900],
+                                color: Colors.grey[500],
                               ),
                             ),
-                            if (lastMeetingDaysAgo != '0') ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '$lastMeetingDaysAgo days ago',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
                           ],
-                        ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Total Albums Card
+                // Total Meetings Card
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
@@ -3595,7 +3631,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                       Row(
                         children: [
                           Text(
-                            '$uniqueAlbumCount',
+                            '$totalMeetings',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -3616,15 +3652,68 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                // // Total Albums Card
+                // Container(
+                //   width: double.infinity,
+                //   padding: const EdgeInsets.all(12),
+                //   decoration: BoxDecoration(
+                //     color: Colors.white,
+                //     borderRadius: BorderRadius.circular(12),
+                //     border: Border.all(color: Colors.grey[200]!),
+                //   ),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Container(
+                //         padding: const EdgeInsets.only(bottom: 6),
+                //         decoration: BoxDecoration(
+                //           border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                //         ),
+                //         child: Text(
+                //           'TOTAL ALBUMS',
+                //           style: TextStyle(
+                //             fontSize: 10,
+                //             fontWeight: FontWeight.w500,
+                //             color: Colors.grey[600],
+                //             letterSpacing: 0.5,
+                //           ),
+                //         ),
+                //       ),
+                //       const SizedBox(height: 6),
+                //       Row(
+                //         children: [
+                //           Text(
+                //             '$uniqueAlbumCount',
+                //             style: TextStyle(
+                //               fontSize: 24,
+                //               fontWeight: FontWeight.bold,
+                //               color: Colors.grey[900],
+                //             ),
+                //           ),
+                //           const SizedBox(width: 8),
+                //           Text(
+                //             'All time',
+                //             style: TextStyle(
+                //               fontSize: 14,
+                //               fontWeight: FontWeight.w600,
+                //               color: Colors.grey[500],
+                //             ),
+                //           ),
+                //         ],
+                //       ),
+                //     ],
+                //   ),
+                // ),
               ],
             ),
             
-            const SizedBox(height: 24),
+            // const SizedBox(height: 24),
             
             // Meeting History Section
             if (meetingHistory.isNotEmpty) ...[
               Text(
-                'Meeting History',
+                'All Albums',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -3633,74 +3722,74 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
               const SizedBox(height: 12),
               
-                             // Meeting History List
-               Column(
-                 children: [
-                   ...(_isMeetingHistoryExpanded[userIndex] == true 
-                     ? meetingHistory 
-                     : meetingHistory.take(3)
-                   ).map((meeting) => _buildMeetingHistoryItem(meeting, userIndex)),
-                   if (meetingHistory.length > 3) ...[
-                     const SizedBox(height: 8),
-                     Center(
-                       child: GestureDetector(
-                         onTap: () {
-                           if (_isMeetingHistoryExpanded[userIndex] == true) {
-                             // Collapse if expanded
-                             setState(() {
-                               _isMeetingHistoryExpanded[userIndex] = false;
-                             });
-                           } else {
-                             // Navigate to meeting history screen
-                             Navigator.push(
-                               context,
-                               MaterialPageRoute(
-                                 builder: (context) => MeetingHistoryScreen(
-                                   userName: _getUserName(userIndex),
-                                   meetingHistory: meetingHistory,
-                                   userIndex: userIndex,
-                                   faceMatchData: _faceMatchData[userIndex] ?? [],
-                                 ),
-                               ),
-                             );
-                           }
-                         },
-                         child: Container(
-                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                           decoration: BoxDecoration(
-                             color: Colors.blue.shade50,
-                             borderRadius: BorderRadius.circular(16),
-                             border: Border.all(color: Colors.blue.shade200),
-                           ),
-                           child: Row(
-                             mainAxisSize: MainAxisSize.min,
-                             children: [
-                               Text(
-                                 _isMeetingHistoryExpanded[userIndex] == true 
-                                   ? 'Show Less' 
-                                   : '+${meetingHistory.length - 3} more meetings',
-                                 style: TextStyle(
-                                   fontSize: 12,
-                                   color: Colors.blue.shade700,
-                                   fontWeight: FontWeight.w500,
-                                 ),
-                               ),
-                               const SizedBox(width: 4),
-                              //  Icon(
-                              //    _isMeetingHistoryExpanded[userIndex] == true 
-                              //      ? Icons.keyboard_arrow_up 
-                              //      : Icons.keyboard_arrow_down,
-                              //    size: 16,
-                              //    color: Colors.blue.shade700,
-                              //  ),
-                             ],
-                           ),
-                         ),
-                       ),
-                     ),
-                   ],
-                 ],
-               ),
+              // Albums List
+              Column(
+                children: [
+                  ...(_isMeetingHistoryExpanded[userIndex] == true 
+                    ? meetingHistory 
+                    : meetingHistory.take(3)
+                  ).map((meeting) => _buildMeetingHistoryItem(meeting, userIndex)),
+                  if (meetingHistory.length > 3) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_isMeetingHistoryExpanded[userIndex] == true) {
+                            // Collapse if expanded
+                            setState(() {
+                              _isMeetingHistoryExpanded[userIndex] = false;
+                            });
+                          } else {
+                            // Navigate to meeting history screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MeetingHistoryScreen(
+                                  userName: _getUserName(userIndex),
+                                  meetingHistory: meetingHistory,
+                                  userIndex: userIndex,
+                                  faceMatchData: _faceMatchData[userIndex] ?? [],
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _isMeetingHistoryExpanded[userIndex] == true 
+                                  ? 'Show Less' 
+                                  : '+${meetingHistory.length - 3} more albums',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                             //  Icon(
+                             //    _isMeetingHistoryExpanded[userIndex] == true 
+                             //      ? Icons.keyboard_arrow_up 
+                             //      : Icons.keyboard_arrow_down,
+                             //    size: 16,
+                             //    color: Colors.blue.shade700,
+                             //  ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ],
         ),

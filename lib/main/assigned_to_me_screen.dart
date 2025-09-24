@@ -78,7 +78,9 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
 
     try {
       // Use the new method that extracts MongoDB ID from JWT token
-      final result = await ActionService.getAssignedToMeAppointments();
+      final result = await ActionService.getAssignedToMeAppointments(
+        status: 'pending',
+      );
       
       if (result['success']) {
         final List<dynamic> appointmentsData = result['data'] ?? [];
@@ -115,6 +117,7 @@ class _AssignedToMeScreenState extends State<AssignedToMeScreen> {
       final result = await ActionService.getAssignedToMeAppointments(
         page: nextPage,
         limit: 10,
+        status: 'pending',
       );
       
       if (result['success']) {

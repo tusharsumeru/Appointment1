@@ -8117,6 +8117,7 @@ class ActionService {
     required String formId,
     required String status,
     String? secretaryRemark,
+    bool? sendEmailNotification,
   }) async {
     try {
       // Get authentication token
@@ -8147,6 +8148,10 @@ class ActionService {
       // Add optional secretary remark if provided
       if (secretaryRemark != null && secretaryRemark.isNotEmpty) {
         requestBody['secretaryRemark'] = secretaryRemark;
+      }
+      // Optional email notification flag
+      if (sendEmailNotification != null) {
+        requestBody['sendEmailNotification'] = sendEmailNotification;
       }
       // Make API call
       final url = '$baseUrl/reference-forms/update-status/$formId';

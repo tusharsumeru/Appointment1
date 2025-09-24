@@ -46,18 +46,19 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Combine all matches
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        if (index < allMatches.length) {
-          final match = allMatches[index];
-          return match['image_name']?.toString() ?? 
-                 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            if (index < matches.length) {
+              final match = matches[index];
+              return match['image_name']?.toString() ?? 
+                     'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+            }
+          }
         }
       }
     }
@@ -76,19 +77,20 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Combine all matches
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        if (index < allMatches.length) {
-          final match = allMatches[index];
-          final score = match['score']?.toDouble() ?? 0.0;
-          // Convert score to percentage (assuming score is 0-1, multiply by 100)
-          return (score * 100).clamp(0.0, 100.0);
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            if (index < matches.length) {
+              final match = matches[index];
+              final score = match['score']?.toDouble() ?? 0.0;
+              // Convert score to percentage (assuming score is 0-1, multiply by 100)
+              return (score * 100).clamp(0.0, 100.0);
+            }
+          }
         }
       }
     }
@@ -104,13 +106,15 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Return total count of all matches (no profile image)
-        return matches30.length + matches60.length + matches90.length;
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            return matches.length;
+          }
+        }
       }
     }
     
@@ -125,17 +129,18 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Combine all matches
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        if (index < allMatches.length) {
-          final match = allMatches[index];
-          return match['album_id']?.toString() ?? '';
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            if (index < matches.length) {
+              final match = matches[index];
+              return match['album_id']?.toString() ?? '';
+            }
+          }
         }
       }
     }
@@ -180,30 +185,31 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
         
-        // Get matches from all time periods
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        
-        // Combine all matches
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        if (index < allMatches.length) {
-          final match = allMatches[index];
-          String date = match['date']?.toString() ?? '';
-          final imageUrl = match['image_name']?.toString() ?? '';
-          
-          // If date is unknown/empty, try to derive it from image name
-          final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
-          if (isUnknown && imageUrl.isNotEmpty) {
-            final derived = _extractDateFromImageName(imageUrl);
-            if (derived != null) {
-              date = derived;
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            if (index < matches.length) {
+              final match = matches[index];
+              String date = match['date']?.toString() ?? '';
+              final imageUrl = match['image_name']?.toString() ?? '';
+              
+              // If date is unknown/empty, try to derive it from image name
+              final isUnknown = date.isEmpty || date.toLowerCase() == 'unknown' || date == 'null';
+              if (isUnknown && imageUrl.isNotEmpty) {
+                final derived = _extractDateFromImageName(imageUrl);
+                if (derived != null) {
+                  date = derived;
+                }
+              }
+              
+              if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
+                return date;
+              }
             }
-          }
-          
-          if (date.isNotEmpty && date.toLowerCase() != 'unknown' && date != 'null') {
-            return date;
           }
         }
       }
@@ -380,15 +386,20 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     if (result['apiResult'] == null) return 'N/A';
     
     final apiResult = result['apiResult'];
-    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    // Use time_categories.all_time structure
+    final timeCategories = apiResult['time_categories'];
+    if (timeCategories != null) {
+      final allTimeData = timeCategories['all_time'];
+      if (allTimeData != null && allTimeData['top_matches'] != null) {
+        final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+        if (matches.isEmpty) return 'N/A';
+        
+        final firstMatch = matches[0];
+        return firstMatch['album_id']?.toString() ?? 'N/A';
+      }
+    }
     
-    final allMatches = [...matches30, ...matches60, ...matches90];
-    if (allMatches.isEmpty) return 'N/A';
-    
-    final firstMatch = allMatches[0];
-    return firstMatch['album_id']?.toString() ?? 'N/A';
+    return 'N/A';
   }
 
   // Get meeting details (photo count and date info)
@@ -399,27 +410,32 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     if (result['apiResult'] == null) return '';
     
     final apiResult = result['apiResult'];
-    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    // Use time_categories.all_time structure
+    final timeCategories = apiResult['time_categories'];
+    if (timeCategories != null) {
+      final allTimeData = timeCategories['all_time'];
+      if (allTimeData != null && allTimeData['top_matches'] != null) {
+        final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+        if (matches.isEmpty) return '';
+        
+        // Get the first match to extract meeting info
+        final firstMatch = matches[0];
+        final imageUrl = firstMatch['image_name']?.toString() ?? '';
+        
+        if (imageUrl.isEmpty) return '';
+        
+        // Extract meeting date and time from image URL
+        final meetingDateTime = _extractMeetingDateTime(imageUrl);
+        if (meetingDateTime == null) return '';
+        
+        final photoCount = matches.length;
+        final photoText = photoCount == 1 ? 'photo' : 'photos';
+        
+        return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+      }
+    }
     
-    final allMatches = [...matches30, ...matches60, ...matches90];
-    if (allMatches.isEmpty) return '';
-    
-    // Get the first match to extract meeting info
-    final firstMatch = allMatches[0];
-    final imageUrl = firstMatch['image_name']?.toString() ?? '';
-    
-    if (imageUrl.isEmpty) return '';
-    
-    // Extract meeting date and time from image URL
-    final meetingDateTime = _extractMeetingDateTime(imageUrl);
-    if (meetingDateTime == null) return '';
-    
-    final photoCount = allMatches.length;
-    final photoText = photoCount == 1 ? 'photo' : 'photos';
-    
-    return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+    return '';
   }
 
   // Get meeting information from image data
@@ -430,27 +446,32 @@ class _UserImagesScreenState extends State<UserImagesScreen> {
     if (result['apiResult'] == null) return '';
     
     final apiResult = result['apiResult'];
-    final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-    final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-    final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
+    // Use time_categories.all_time structure
+    final timeCategories = apiResult['time_categories'];
+    if (timeCategories != null) {
+      final allTimeData = timeCategories['all_time'];
+      if (allTimeData != null && allTimeData['top_matches'] != null) {
+        final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+        if (matches.isEmpty) return '';
+        
+        // Get the first match to extract meeting info
+        final firstMatch = matches[0];
+        final imageUrl = firstMatch['image_name']?.toString() ?? '';
+        
+        if (imageUrl.isEmpty) return '';
+        
+        // Extract meeting date and time from image URL
+        final meetingDateTime = _extractMeetingDateTime(imageUrl);
+        if (meetingDateTime == null) return '';
+        
+        final photoCount = matches.length;
+        final photoText = photoCount == 1 ? 'photo' : 'photos';
+        
+        return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+      }
+    }
     
-    final allMatches = [...matches30, ...matches60, ...matches90];
-    if (allMatches.isEmpty) return '';
-    
-    // Get the first match to extract meeting info
-    final firstMatch = allMatches[0];
-    final imageUrl = firstMatch['image_name']?.toString() ?? '';
-    
-    if (imageUrl.isEmpty) return '';
-    
-    // Extract meeting date and time from image URL
-    final meetingDateTime = _extractMeetingDateTime(imageUrl);
-    if (meetingDateTime == null) return '';
-    
-    final photoCount = allMatches.length;
-    final photoText = photoCount == 1 ? 'photo' : 'photos';
-    
-    return '$photoCount $photoText from this meeting with Gurudev - Meeting on ${meetingDateTime['date']} - Meeting on ${meetingDateTime['fullDateTime']}';
+    return '';
   }
 
   // Extract meeting date and time from image URL

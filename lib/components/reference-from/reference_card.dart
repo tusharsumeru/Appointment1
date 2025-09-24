@@ -25,6 +25,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
   bool _isApproving = false;
   bool _isRejecting = false;
   bool _showRemarkSection = false;
+  bool _sendEmail = true;
   final TextEditingController _remarkController = TextEditingController();
 
   // Helper getters for easy access to data
@@ -96,6 +97,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
         secretaryRemark: _remarkController.text.trim().isNotEmpty 
             ? _remarkController.text.trim() 
             : 'Approved by secretary',
+        sendEmailNotification: _sendEmail,
       );
       
       print('🔄 API Response: $result');
@@ -134,6 +136,7 @@ class _ReferenceCardState extends State<ReferenceCard> {
         secretaryRemark: _remarkController.text.trim().isNotEmpty 
             ? _remarkController.text.trim() 
             : 'Rejected by secretary',
+        sendEmailNotification: _sendEmail,
       );
       
       print('🔄 API Response: $result');
@@ -458,6 +461,43 @@ class _ReferenceCardState extends State<ReferenceCard> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                           maxLines: 2,
+                        ),
+                        const SizedBox(height: 12),
+                        // Send email checkbox (UI)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: _sendEmail,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _sendEmail = val ?? true;
+                                  });
+                                },
+                                activeColor: Colors.blue,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(Icons.mail_outline, size: 18, color: Colors.blue[600]),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Send email notification to applicant',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 12),
                       ],

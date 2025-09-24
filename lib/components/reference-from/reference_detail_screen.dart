@@ -16,6 +16,7 @@ class ReferenceDetailScreen extends StatelessWidget {
   String get status => referenceData['status'] ?? '';
   String? get profilePic => referenceData['photo'] ?? referenceData['profilePic'];
   String get teacherCode => referenceData['teacherCode'] ?? 'No teacher code provided';
+  String get teacherSince => _formatTeacherSinceDate(referenceData['teacherSince'] ?? 'No date');
   String get createdAt => _formatDate(referenceData['createdAt'] ?? 'No date');
   String get secretaryRemark => referenceData['secretaryRemark'] ?? 'No remarks provided';
   String get details => (referenceData['details'] ?? '').isEmpty 
@@ -65,6 +66,36 @@ class ReferenceDetailScreen extends StatelessWidget {
       int displayHour = istDate.hour > 12 ? istDate.hour - 12 : (istDate.hour == 0 ? 12 : istDate.hour);
       
       return '$day $month $year, $displayHour:$minute $amPm';
+    } catch (e) {
+      // If parsing fails, return the original string
+      return dateString;
+    }
+  }
+
+  // Helper method to format teacher since date (simpler format)
+  String _formatTeacherSinceDate(String dateString) {
+    if (dateString == 'No date') return 'No date';
+    
+    try {
+      // Parse the date string (format: YYYY-MM-DD)
+      DateTime date = DateTime.parse(dateString);
+      
+      // Format to user-friendly format: "Monday 15 August 2022"
+      List<String> weekdays = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+      ];
+      
+      List<String> months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      String weekday = weekdays[date.weekday - 1];
+      String day = date.day.toString();
+      String month = months[date.month - 1];
+      String year = date.year.toString();
+      
+      return '$weekday $day $month $year';
     } catch (e) {
       // If parsing fails, return the original string
       return dateString;
@@ -547,6 +578,19 @@ class ReferenceDetailScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _buildInfoCardRow(
+          Icons.calendar_today,
+          'Teacher Since',
+          teacherSince,
+          const LinearGradient(
+            colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)], // from-green-50 to-emerald-50
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          const Color(0xFF16A34A), // text-green-600
+          const Color(0xFFDCFCE7), // bg-green-100
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCardRow(
           Icons.location_on,
           'Ashram Dates',
           datesAtAshram.isNotEmpty ? datesAtAshram : 'N/A',
@@ -841,6 +885,7 @@ class ReferenceDetailScreen extends StatelessWidget {
         Map<String, dynamic> gurudevEntry = entry.value;
         String where = gurudevEntry['where'] ?? '';
         String when = gurudevEntry['when'] ?? '';
+        String whoWasAround = gurudevEntry['whoWasAround'] ?? '';
         
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -931,6 +976,30 @@ class ReferenceDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // WHO WAS AROUND field
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WHO WAS AROUND:',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF71717A),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    whoWasAround.isNotEmpty ? whoWasAround : 'Not specified',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1F2937),
                     ),
                   ),
                 ],

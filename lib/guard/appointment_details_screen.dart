@@ -792,7 +792,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  '${index + 1}. $fullName${userType == 'main' ? ' (Main Appointee)' : ''}',
+                  '${index + 1}. $fullName${index == 0 ? ' (Main Appointee)' : ''}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

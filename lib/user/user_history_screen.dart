@@ -662,14 +662,34 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       // Check for accompanyUsers first (this is the most reliable source)
       final accompanyUsers = appointment['accompanyUsers'];
       if (accompanyUsers is Map<String, dynamic>) {
-        final numberOfUsers = accompanyUsers['numberOfUsers'] ?? 0;
+        // For large groups (>9), users array is empty and count is in numberOfUsers field
+        // For small groups (≤9), users array contains the actual users
+        final users = accompanyUsers['users'];
+        final numberOfUsers = accompanyUsers['numberOfUsers'];
+        
+        int actualAccompanyingUsers = 0;
+        
+        // Check if this is a large group scenario (numberOfUsers > users.length)
+        // This handles cases where users array has some users but numberOfUsers is much larger
+        if (numberOfUsers != null && numberOfUsers > 0 && 
+            (users == null || users.isEmpty || numberOfUsers > users.length)) {
+          // Large groups: use numberOfUsers field
+          actualAccompanyingUsers = (numberOfUsers as num).toInt();
+        } else if (users != null && users is List && users.isNotEmpty) {
+          // Small groups: use actual users array length
+          actualAccompanyingUsers = users.length;
+        } else if (numberOfUsers != null) {
+          // Fallback: use numberOfUsers field
+          actualAccompanyingUsers = (numberOfUsers as num).toInt();
+        }
         
         if (isGuestAppointment) {
-          // For guest appointments: count guest + accompanying users (don't count main user)
-          return numberOfUsers + 1; // +1 for the guest
+          // For guest appointments: count guest + actual accompanying users
+          // The reference-as-accompany user is already included in numberOfUsers field
+          return actualAccompanyingUsers + 1; // +1 for the guest
         } else {
-          // For regular appointments: count main user + accompanying users
-          return numberOfUsers + 1; // +1 for the main user
+          // For regular appointments: count main user + actual accompanying users
+          return actualAccompanyingUsers + 1; // +1 for the main user
         }
       }
       

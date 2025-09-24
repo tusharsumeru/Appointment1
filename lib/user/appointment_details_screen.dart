@@ -110,6 +110,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Map<int, File> _guestTempFiles = {};
   // Guest upload states - Map to track upload status for each guest
   Map<int, bool> _guestUploading = {};
+  // Guest unique phone code checkbox states
+  Map<int, bool> _guestUniquePhoneCodeEnabled = {};
 
   // Location search state
   List<Map<String, dynamic>> _locationSuggestions = [];
@@ -230,8 +232,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       guest['name']?.dispose();
       guest['phone']?.dispose();
       guest['age']?.dispose();
-      // COMMENTED OUT: Unique phone code controller disposal
-      // guest['uniquePhoneCode']?.dispose();
+      guest['uniquePhoneCode']?.dispose();
     }
     super.dispose();
   }
@@ -367,7 +368,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'phone': FocusNode(),
         'age': FocusNode(),
         // COMMENTED OUT: Unique phone code focus node
-        // 'uniquePhoneCode': FocusNode(),
+        'uniquePhoneCode': FocusNode(),
       };
       
       // Add listeners for auto-scrolling
@@ -421,7 +422,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['phone']?.dispose();
         guest['age']?.dispose();
         // COMMENTED OUT: Unique phone code controller disposal
-        // guest['uniquePhoneCode']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
       }
       _guestControllers.clear();
       _guestImages.clear();
@@ -442,7 +443,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         guest['phone']?.dispose();
         guest['age']?.dispose();
         // COMMENTED OUT: Unique phone code controller disposal
-        // guest['uniquePhoneCode']?.dispose();
+        guest['uniquePhoneCode']?.dispose();
 
         // Also remove associated data
         int guestNumber = i + 1;
@@ -466,9 +467,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'phone': TextEditingController(),
         'age': TextEditingController(),
         // COMMENTED OUT: Unique phone code controller
-        // 'uniquePhoneCode': TextEditingController(),
+        'uniquePhoneCode': TextEditingController(),
       };
       _guestControllers.add(controllers);
+
+      // Initialize checkbox state for new guest (default to false)
+      _guestUniquePhoneCodeEnabled[guestNumber] = false;
 
       // Initialize country for new guest
       _guestCountries[guestNumber] = Country(
@@ -738,9 +742,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-        // COMMENTED OUT: Unique phone code logic disabled
-        // final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
-        final hasUniquePhoneCode = false;
+        final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
 
         // Check required fields
         if (guest['name']?.text.isEmpty == true || guest['age']?.text.isEmpty == true) {
@@ -748,13 +750,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           break;
         }
 
-        // New rules:
-        // - For age < 12 or age > 59: hide unique code, phone optional
-        // - For age 12..59: show unique code; if code present -> phone optional; else phone required
+        // New rules based on checkbox state:
+        // - If checkbox is checked: require unique phone code, phone number not required
+        // - If checkbox is not checked: require phone number, unique code not required
         if (age > 12 && age <= 59) {
-          if ((guest['phone']?.text.isEmpty ?? true) && !hasUniquePhoneCode) {
-            guestFormValid = false;
-            break;
+          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
+          if (isCheckboxChecked) {
+            // When checkbox is checked, unique phone code is required
+            if (!hasUniquePhoneCode) {
+              guestFormValid = false;
+              break;
+            }
+          } else {
+            // When checkbox is not checked, phone number is required
+            if (guest['phone']?.text.isEmpty ?? true) {
+              guestFormValid = false;
+              break;
+            }
           }
         }
 
@@ -1520,23 +1532,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
           final phoneNumber = guest['phone']?.text.trim() ?? '';
           final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null; // keep for display if needed
-          // COMMENTED OUT: Unique phone code collection disabled
-          // final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
-          // final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
-          final hasUniquePhoneCode = false;
+          final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
+          final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
-          // If unique phone code is provided, use it instead of regular phone number
-          // COMMENTED OUT: alternativePhone is disabled
-          // if (hasUniquePhoneCode) {
-          //   // When unique phone code is provided, don't send country code
-          //   guestData['alternativePhone'] = uniquePhoneCode;
-          // } else 
-          if (fullPhoneNumber != null) {
+          // Check if checkbox is checked to determine which phone data to use
+          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
+          if (isCheckboxChecked && hasUniquePhoneCode) {
+            // When checkbox is checked and unique phone code is provided, use it
+            guestData['alternativePhone'] = uniquePhoneCode;
+          } else if (!isCheckboxChecked && fullPhoneNumber != null) {
             // Only add phoneNumber if we have a phone number and no unique phone code
             guestData['phoneNumber'] = {
               'countryCode': countryCode,
@@ -1553,15 +1562,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         }
 
         // Structure accompanyUsers as expected by backend
+        // numberOfUsers should always be total selected - 1 (exclude main guest)
+        final selectedTotal = int.tryParse(_numberOfUsersController.text) ?? 1;
+        final accompanyUsersTotal = (selectedTotal - 1).clamp(0, 1000000);
         appointmentData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsers.length,
+          'numberOfUsers': accompanyUsersTotal,
           'users': accompanyUsers,
         };
       } else if (accompanyUsersCount > 9) {
         // For more than 9 accompany users (10+ total people), just send the total count without individual details
+        final selectedTotal = int.tryParse(_numberOfUsersController.text) ?? 1;
+        final accompanyUsersTotal = (selectedTotal - 1).clamp(0, 1000000);
         appointmentData['accompanyUsers'] = {
-          'numberOfUsers':
-              accompanyUsersCount, // Use the accompany users count
+          'numberOfUsers': accompanyUsersTotal, // Include reference-as-accompany
           'users': [], // Empty array since individual details not required
         };
       } else {
@@ -2886,7 +2899,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ..._guestControllers.asMap().entries.map((entry) {
                       int index = entry.key;
                       Map<String, TextEditingController> guest = entry.value;
-                      return _buildGuestCard(index + 1, guest, index);
+                      int guestNumber = index + 1; // This is the actual guest number (1, 2, 3, etc.)
+                      return _buildGuestCard(guestNumber, guest, index);
                     }).toList(),
                     const SizedBox(height: 20),
                   ] else if ((int.tryParse(_numberOfUsersController.text) ??
@@ -3653,47 +3667,70 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Contact Number
-            _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
-            const SizedBox(height: 16),
+            // Contact Number (show only if checkbox is not checked)
+            if (!(_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
+              _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
+              const SizedBox(height: 16),
+            ],
 
-            // Unique Phone Code (only show for ages 12..59)
-            // COMMENTED OUT: Unique Phone Code UI disabled
-            // if (age > 12 && age < 59) ...[
-            //   const SizedBox(height: 16),
-            //   _buildGuestTextField(
-            //     label: 'Unique Phone Code (Optional)',
-            //     controller: guest['uniquePhoneCode']!,
-            //     placeholder: 'Enter 3-digit unique phone code',
-            //     keyboardType: TextInputType.number,
-            //     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            //     maxLength: 3,
-            //     onChanged: (value) {
-            //       _validateForm();
-            //       setState(() {}); // Rebuild to update phone field label
-            //     },
-            //     focusNode: guestFocusNodes['uniquePhoneCode'],
-            //     onSubmitted: () {
-            //       // Move to next guest or next section when submitted
-            //       if (index < _guestControllers.length - 1) {
-            //         // Move to next guest's name field
-            //         final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
-            //         _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
-            //       } else {
-            //         // Move to next section (appointment purpose)
-            //         _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
-            //       }
-            //     },
-            //   ),
-            //   const SizedBox(height: 4),
-            //   Text(
-            //     'If you don’t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-            //     style: TextStyle(
-            //       fontSize: 12,
-            //       color: Colors.grey[600],
-            //     ),
-            //   ),
-            // ],
+            // Checkbox for toggling between phone and unique code (always visible for ages 12-59)
+            if (age > 12 && age < 59) ...[
+              Row(
+                children: [
+                  Checkbox(
+                    value: _guestUniquePhoneCodeEnabled[guestNumber] ?? false,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _guestUniquePhoneCodeEnabled[guestNumber] = value ?? false;
+                      });
+                      _validateForm();
+                    },
+                    activeColor: Colors.blue.shade600,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'I don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Unique Phone Code (only show for ages 12..59 and when checkbox is checked)
+            if (age > 12 && age < 59 && (_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
+              _buildGuestTextField(
+                label: 'Unique Phone Code (Optional)',
+                controller: guest['uniquePhoneCode']!,
+                placeholder: 'Enter 3-digit unique phone code',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 3,
+                onChanged: (value) {
+                  _validateForm();
+                  setState(() {}); // Rebuild to update phone field label
+                },
+                focusNode: guestFocusNodes['uniquePhoneCode'],
+                onSubmitted: () {
+                  // Move to next guest or next section when submitted
+                  if (index < _guestControllers.length - 1) {
+                    // Move to next guest's name field
+                    final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
+                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
+                  } else {
+                    // Move to next section (appointment purpose)
+                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
+                  }
+                },
+              ),
+            ],
 
             // Photo Section (only show if age > 12)
             if (isPhotoRequired) ...[
@@ -5278,14 +5315,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final guestIndex = guestNumber - 1;
     final guest = guestIndex < _guestControllers.length ? _guestControllers[guestIndex] : null;
     final age = guest != null ? int.tryParse(guest['age']?.text ?? '0') ?? 0 : 0;
-    // COMMENTED OUT: unique phone code disabled
-    // final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
-    final hasUniquePhoneCode = false;
+    final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
     
-    // Determine if phone is required per new rules
-    // - For age < 12 or age > 59: phone optional
-    // - For age 12..59: phone required unless unique code present
-    final isPhoneRequired = (age > 12 && age < 59) && !hasUniquePhoneCode;
+    // Determine if phone is required based on checkbox state
+    // - If checkbox is checked: phone not required (unique code will be used instead)
+    // - If checkbox is not checked: phone required for ages 12-59
+    final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
+    final isPhoneRequired = (age > 12 && age < 59) && !isCheckboxChecked;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

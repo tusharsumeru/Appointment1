@@ -488,17 +488,21 @@ class _MeetingHistoryScreenState extends State<MeetingHistoryScreen> {
       
       if (result['apiResult'] != null) {
         final apiResult = result['apiResult'];
-        final matches30 = apiResult['30_days']?['matches'] as List<dynamic>? ?? [];
-        final matches60 = apiResult['60_days']?['matches'] as List<dynamic>? ?? [];
-        final matches90 = apiResult['90_days']?['matches'] as List<dynamic>? ?? [];
-        final allMatches = [...matches30, ...matches60, ...matches90];
-        
-        // Filter matches for ONLY this specific album
-        for (final match in allMatches) {
-          if (match is Map<String, dynamic>) {
-            final matchAlbumId = match['album_id']?.toString() ?? '';
-            if (matchAlbumId == albumId) {
-              albumImages.add(match);
+        // Use time_categories.all_time structure
+        final timeCategories = apiResult['time_categories'];
+        if (timeCategories != null) {
+          final allTimeData = timeCategories['all_time'];
+          if (allTimeData != null && allTimeData['top_matches'] != null) {
+            final matches = allTimeData['top_matches'] as List<dynamic>? ?? [];
+            
+            // Filter matches for ONLY this specific album
+            for (final match in matches) {
+              if (match is Map<String, dynamic>) {
+                final matchAlbumId = match['album_id']?.toString() ?? '';
+                if (matchAlbumId == albumId) {
+                  albumImages.add(match);
+                }
+              }
             }
           }
         }
@@ -525,11 +529,13 @@ class _MeetingHistoryScreenState extends State<MeetingHistoryScreen> {
     final faceMatchData = [
       {
         'apiResult': {
-          '30_days': {
-            'matches': albumImages, // Only images from this album
-          },
-          '60_days': {'matches': []}, // Empty for other time periods
-          '90_days': {'matches': []}, // Empty for other time periods
+          'time_categories': {
+            'all_time': {
+              'count': albumImages.length,
+              'albums': {albumId: albumImages.length},
+              'top_matches': albumImages, // Only images from this album
+            }
+          }
         }
       }
     ];
