@@ -4,6 +4,9 @@
         <domain includeSubdomains="true">f5c9f6886eb2.ngrok-free.app</domain>
     </domain-config>
     <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">359a9bee3d31.ngrok-free.app</domain>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">divinepicrecognition.sumerudigital.com</domain>
     </domain-config>
     <base-config cleartextTrafficPermitted="true">

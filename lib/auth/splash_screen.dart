@@ -9,6 +9,8 @@ import '../action/jwt_utils.dart';
 import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
+import '../user/signup_screen.dart';
+import '../user/verify_otp_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -175,6 +177,31 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const LoginScreen(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 🔒 CRITICAL: Check if user is migrated and block access
+      final isMigratedUser = userData['migratedUser'] == true;
+      if (isMigratedUser) {
+        final userEmail = userData['email'] ?? '';
+        
+        // Migrated users always go through OTP verification
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  VerifyOtpScreen(
+                    email: userEmail,
+                    isMigratedUser: true,
+                  ),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);

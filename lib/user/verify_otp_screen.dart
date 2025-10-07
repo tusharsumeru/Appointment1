@@ -4,11 +4,17 @@ import 'dart:async';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../auth/notification_setup_screen.dart';
+import 'signup_screen.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   final String email;
+  final bool isMigratedUser;
 
-  const VerifyOtpScreen({super.key, required this.email});
+  const VerifyOtpScreen({
+    super.key, 
+    required this.email,
+    this.isMigratedUser = false,
+  });
 
   @override
   State<VerifyOtpScreen> createState() => _VerifyOtpScreenState();
@@ -148,15 +154,24 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
             print('❌ Error sending signup notification: $e');
           }
 
-          // Navigate to FCM setup screen after successful verification
-          // Get user data from storage or use default
-          final userData = await StorageService.getUserData() ?? {};
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) =>
-                  NotificationSetupScreen(isNewUser: true, userData: userData),
-            ),
-          );
+          // Handle navigation based on user type
+          if (widget.isMigratedUser) {
+            // For migrated users, redirect to signup screen to complete profile
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const SignupScreen(isMigratedUser: true),
+              ),
+            );
+          } else {
+            // For new users, navigate to FCM setup screen
+            final userData = await StorageService.getUserData() ?? {};
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) =>
+                    NotificationSetupScreen(isNewUser: true, userData: userData),
+              ),
+            );
+          }
         } else {
           // OTP verification failed
           ScaffoldMessenger.of(context).showSnackBar(

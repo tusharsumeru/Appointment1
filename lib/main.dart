@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'auth/splash_screen.dart';
 import 'main/home_screen.dart';
 import 'action/action.dart';
+import 'action/storage_service.dart';
 import 'main/inbox_screen.dart';
 import 'main/dashboard_screen.dart';
 import 'main/assigned_to_me_screen.dart';
@@ -307,8 +308,50 @@ void _handleNotificationNavigation(BuildContext context) {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.paused || 
+        state == AppLifecycleState.detached) {
+      // App is being closed or minimized - logout migrated users
+      _handleAppClosing();
+    }
+  }
+
+  Future<void> _handleAppClosing() async {
+    try {
+      // Check if current user is a migrated user
+      final userData = await StorageService.getUserData();
+      if (userData != null && userData['migratedUser'] == true) {
+        // Logout migrated user but preserve OTP verification status
+        await StorageService.logoutMigratedUser();
+        print('🔄 Migrated user logged out due to app closing');
+      }
+    } catch (e) {
+      print('Error handling app closing for migrated user: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

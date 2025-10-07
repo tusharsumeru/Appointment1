@@ -335,13 +335,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     if (appointmentData == null) return 0;
     
     final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
-    final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
-    final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
     
-    // If total users from backend is more than 10, calculate rejected as total - admitted
+    // If total users from backend is more than 10, count rejected users from users array only
     if (totalUsers > 10) {
-      return totalUsers - checkedInUsers;
+      return usersList.where((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        final status = userMap['status']?.toString().toLowerCase();
+        return status == 'rejected';
+      }).length;
     }
     
     // For 10 or fewer users, count individual users from users array
@@ -356,13 +358,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     if (appointmentData == null) return 0;
     
     final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
-    final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
     final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
     
-    // If total users from backend is more than 10, calculate not arrived as total - admitted
+    // If total users from backend is more than 10, calculate not arrived as total - admitted - rejected
     if (totalUsers > 10) {
-      return totalUsers - checkedInUsers;
+      final rejectedCount = usersList.where((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        final status = userMap['status']?.toString().toLowerCase();
+        return status == 'rejected';
+      }).length;
+      return totalUsers - checkedInUsers - rejectedCount;
     }
     
     // For 10 or fewer users, count individual users from users array

@@ -7,10 +7,14 @@ import 'dart:async';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../action/action.dart';
+import '../action/storage_service.dart';
+import '../auth/notification_setup_screen.dart';
 import 'verify_otp_screen.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final bool isMigratedUser;
+  
+  const SignupScreen({super.key, this.isMigratedUser = false});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -106,6 +110,11 @@ class _SignupScreenState extends State<SignupScreen> {
     _companyController.addListener(_validateForm);
     _locationController.addListener(_validateForm);
     
+    // If this is a migrated user, pre-fill form data
+    if (widget.isMigratedUser) {
+      _prefillMigratedUserData();
+    }
+    
     // Initial form validation
     _validateForm();
   }
@@ -134,6 +143,97 @@ class _SignupScreenState extends State<SignupScreen> {
     _otpTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Pre-fill form data for migrated users
+  Future<void> _prefillMigratedUserData() async {
+    try {
+      // Get user data from /me API
+      final result = await ActionService.getCurrentUser();
+      
+      if (result['success'] && result['data'] != null) {
+        final userData = result['data'];
+        
+        setState(() {
+          // Pre-fill basic information
+          _fullNameController.text = userData['fullName'] ?? userData['name'] ?? '';
+          _emailController.text = userData['email'] ?? '';
+          
+          // Handle phone number - can be object or string
+          if (userData['phoneNumber'] != null) {
+            if (userData['phoneNumber'] is Map) {
+              // Phone number is an object with countryCode and number
+              final phoneObj = userData['phoneNumber'] as Map<String, dynamic>;
+              final countryCode = phoneObj['countryCode'] ?? '+91';
+              final phoneNumber = phoneObj['number'] ?? '';
+              _selectedCountryCode = countryCode;
+              _phoneController.text = phoneNumber;
+            } else {
+              // Phone number is a string
+              final phoneStr = userData['phoneNumber'].toString();
+              if (phoneStr.startsWith('+')) {
+                // Extract country code and number
+                final match = RegExp(r'^(\+\d{1,3})(.*)$').firstMatch(phoneStr);
+                if (match != null) {
+                  _selectedCountryCode = match.group(1) ?? '+91';
+                  _phoneController.text = match.group(2) ?? '';
+                } else {
+                  _phoneController.text = phoneStr;
+                }
+              } else {
+                _phoneController.text = phoneStr;
+              }
+            }
+          }
+          
+          // Pre-fill designation and company
+          _designationController.text = userData['designation'] ?? '';
+          _companyController.text = userData['company'] ?? userData['organization'] ?? '';
+          
+          // Handle full_address - can be object or string
+          if (userData['full_address'] != null) {
+            if (userData['full_address'] is Map) {
+              // Address is an object, extract street or display_name
+              final addressObj = userData['full_address'] as Map<String, dynamic>;
+              _locationController.text = addressObj['street'] ?? 
+                                      addressObj['display_name'] ?? 
+                                      addressObj['formatted_address'] ?? 
+                                      '';
+            } else {
+              // Address is a string
+              _locationController.text = userData['full_address'].toString();
+            }
+          }
+          
+          // Pre-fill teacher information if available
+          if (userData['aol_teacher'] == true) {
+            _selectedTeacherType = 'yes';
+            _selectedTeacherEmploymentType = userData['teacher_type'] == 'FullTime' ? 'full_time' : 'part_time';
+            
+            // Fill teacher verification fields
+            _teacherCodeController.text = userData['teachercode'] ?? '';
+            _teacherEmailController.text = userData['teacheremail'] ?? '';
+            _teacherPhoneController.text = userData['mobilenumber'] ?? '';
+            
+            // Set teacher as verified if they have teacher data
+            if (userData['teachercode'] != null && userData['teachercode'].toString().isNotEmpty) {
+              _isTeacherVerified = true;
+            }
+          }
+          
+          // Pre-fill roles if available
+          if (userData['userTags'] != null && userData['userTags'] is List) {
+            _selectedRoles = Set<String>.from(userData['userTags']);
+          }
+        });
+        
+        // Validate form after pre-filling
+        _validateForm();
+      }
+    } catch (error) {
+      print('Error pre-filling migrated user data: $error');
+      // Continue with empty form if pre-filling fails
+    }
   }
 
   // Validate form and update button state
@@ -2437,28 +2537,50 @@ class _SignupScreenState extends State<SignupScreen> {
           // For Indian Teachers, programs will be handled by the backend API validation
         }
 
-        // Call registration API
-        final result = await ActionService.registerUser(
-          fullName: _fullNameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          phoneNumber: fullPhoneNumber,
-          designation: _designationController.text.trim(),
-          company: _companyController.text.trim(),
-          full_address: _locationController.text.trim(),
-          userTags: _selectedRoles.toList(),
-          aol_teacher: _selectedTeacherType == 'yes',
-          teacher_type: _selectedTeacherType == 'yes'
-              ? (_selectedTeacherEmploymentType == 'full_time' ? 'FullTime' : 'PartTime')
-              : null,
-          teachercode: teacherCode,
-          teacheremail: teacherEmail,
-          mobilenumber: teacherMobile,
-          programTypesCanTeach: programTypesCanTeach,
-          isInternational: _selectedTeacherType == 'yes' && _selectedTeacherRegion == 'international',
-          teacherEmploymentType: _selectedTeacherType == 'yes' ? _selectedTeacherEmploymentType : null,
-          profilePhotoFile: _selectedImageFile!,
-        );
+        // Call appropriate API based on user type
+        final result = widget.isMigratedUser 
+            ? await ActionService.updateMigratedUserProfile(
+                fullName: _fullNameController.text.trim(),
+                email: _emailController.text.trim(),
+                password: _passwordController.text,
+                phoneNumber: fullPhoneNumber,
+                designation: _designationController.text.trim(),
+                company: _companyController.text.trim(),
+                full_address: _locationController.text.trim(),
+                userTags: _selectedRoles.toList(),
+                aol_teacher: _selectedTeacherType == 'yes',
+                teacher_type: _selectedTeacherType == 'yes'
+                    ? (_selectedTeacherEmploymentType == 'full_time' ? 'FullTime' : 'PartTime')
+                    : null,
+                teachercode: teacherCode,
+                teacheremail: teacherEmail,
+                mobilenumber: teacherMobile,
+                programTypesCanTeach: programTypesCanTeach,
+                isInternational: _selectedTeacherType == 'yes' && _selectedTeacherRegion == 'international',
+                teacherEmploymentType: _selectedTeacherType == 'yes' ? _selectedTeacherEmploymentType : null,
+                profilePhotoFile: _selectedImageFile!,
+              )
+            : await ActionService.registerUser(
+                fullName: _fullNameController.text.trim(),
+                email: _emailController.text.trim(),
+                password: _passwordController.text,
+                phoneNumber: fullPhoneNumber,
+                designation: _designationController.text.trim(),
+                company: _companyController.text.trim(),
+                full_address: _locationController.text.trim(),
+                userTags: _selectedRoles.toList(),
+                aol_teacher: _selectedTeacherType == 'yes',
+                teacher_type: _selectedTeacherType == 'yes'
+                    ? (_selectedTeacherEmploymentType == 'full_time' ? 'FullTime' : 'PartTime')
+                    : null,
+                teachercode: teacherCode,
+                teacheremail: teacherEmail,
+                mobilenumber: teacherMobile,
+                programTypesCanTeach: programTypesCanTeach,
+                isInternational: _selectedTeacherType == 'yes' && _selectedTeacherRegion == 'international',
+                teacherEmploymentType: _selectedTeacherType == 'yes' ? _selectedTeacherEmploymentType : null,
+                profilePhotoFile: _selectedImageFile!,
+              );
 
         setState(() {
           _isLoading = false;
@@ -2466,24 +2588,50 @@ class _SignupScreenState extends State<SignupScreen> {
 
         if (mounted) {
           if (result['success']) {
-            // Registration successful
+            // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
                   result['message'] ??
-                      'Registration successful! Please check your email for OTP verification.',
+                      (widget.isMigratedUser 
+                          ? 'Profile updated successfully! Welcome to the Art of Living community!'
+                          : 'Registration successful! Please check your email for OTP verification.'),
                 ),
                 backgroundColor: Colors.green,
               ),
             );
 
-            // Navigate to OTP verification screen
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) =>
-                    VerifyOtpScreen(email: _emailController.text.trim()),
-              ),
-            );
+            // Navigate based on user type
+            if (widget.isMigratedUser) {
+              // For migrated users, refresh user data to get updated migratedUser status
+              try {
+                final updatedUserResult = await ActionService.getCurrentUser();
+                if (updatedUserResult['success'] && updatedUserResult['data'] != null) {
+                  await StorageService.saveUserData(updatedUserResult['data']);
+                }
+              } catch (e) {
+                print('Error refreshing user data: $e');
+              }
+              
+              // Navigate to notification setup
+              final userData = await StorageService.getUserData() ?? {};
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => NotificationSetupScreen(
+                    isNewUser: false,
+                    userData: userData,
+                  ),
+                ),
+              );
+            } else {
+              // For new users, navigate to OTP verification
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      VerifyOtpScreen(email: _emailController.text.trim()),
+                ),
+              );
+            }
           } else {
             // Registration failed
             ScaffoldMessenger.of(context).showSnackBar(

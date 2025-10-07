@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import '../main/home_screen.dart';
 import '../main/inbox_screen.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
-import '../user/user_screen.dart';
-import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
+import '../user/verify_otp_screen.dart';
 import 'notification_setup_screen.dart';
 import '../user/forgot_password_screen.dart';
 
@@ -55,8 +53,28 @@ class _LoginScreenState extends State<LoginScreen> {
         });
 
         if (result['success']) {
-          // Login successful - save token and user data
+          // Check if this is a migrated user requiring OTP verification
           final data = result['data'];
+          final isMigratedUser = data?['isMigratedUser'] == true || 
+                                 data?['migratedUser'] == true ||
+                                 data?['requiresOtpVerification'] == true;
+          
+          if (isMigratedUser) {
+            // For migrated users, redirect to OTP verification screen
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => VerifyOtpScreen(
+                    email: _emailController.text.trim(),
+                    isMigratedUser: true,
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+          
+          // Regular login flow - save token and user data
           if (data != null && data['token'] != null) {
             await StorageService.saveToken(data['token']);
 
@@ -125,6 +143,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (userResult['success']) {
         userData = userResult['data'];
       }
+    }
+
+    // 🔒 CRITICAL: Check if user is migrated and block access
+    final isMigratedUser = userData?['migratedUser'] == true;
+    if (isMigratedUser) {
+      final userEmail = userData?['email'] ?? '';
+      
+      // Migrated users always go through OTP verification
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => VerifyOtpScreen(
+              email: userEmail,
+              isMigratedUser: true,
+            ),
+          ),
+        );
+      }
+      return;
     }
 
     String? userRole = userData?['role']?.toString().toLowerCase();

@@ -8823,4 +8823,256 @@ class ActionService {
       };
     }
   }
+
+  /// Update migrated user profile with file upload support
+  /// This function handles profile updates for migrated users with file upload (camera or device)
+  ///
+  /// Parameters:
+  /// - fullName: User's full name
+  /// - email: User's email address
+  /// - phoneNumber: User's phone number with country code
+  /// - designation: User's professional designation
+  /// - company: User's company/organization
+  /// - full_address: User's full address
+  /// - userTags: Array of user role tags
+  /// - aol_teacher: Boolean indicating if user is AOL teacher
+  /// - teacher_type: Type of teacher (part-time/full-time)
+  /// - teachercode: AOL teacher code
+  /// - teacheremail: AOL teacher email
+  /// - mobilenumber: AOL teacher mobile number
+  /// - programTypesCanTeach: Array of programs the teacher can teach
+  /// - isInternational: Whether the AOL teacher is international
+  /// - teacherEmploymentType: Employment type for teacher
+  /// - profilePhotoFile: File object from camera or device upload
+  ///
+  /// Returns:
+  /// - Map containing success status, message, and user data
+  static Future<Map<String, dynamic>> updateMigratedUserProfile({
+    required String fullName,
+    required String email,
+    required String password,
+    required String phoneNumber,
+    String? designation,
+    String? company,
+    required String full_address,
+    required List<String> userTags,
+    required bool aol_teacher,
+    String? teacher_type,
+    String? teachercode,
+    String? teacheremail,
+    String? mobilenumber,
+    List<String>? programTypesCanTeach,
+    bool isInternational = false,
+    String? teacherEmploymentType,
+    required File profilePhotoFile,
+  }) async {
+    try {
+      // Get authentication token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate required fields
+      if (fullName.isEmpty || email.isEmpty || phoneNumber.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Missing required fields: fullName, email, or phoneNumber.',
+        };
+      }
+
+      // Validate email format
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      if (!emailRegex.hasMatch(email)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Please enter a valid email address.',
+        };
+      }
+
+      // Validate phone number format
+      if (!phoneNumber.startsWith('+')) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Phone number must be in "+CC NNNNNNNNNN" format.',
+        };
+      }
+
+      // Validate file type and size
+      final fileName = profilePhotoFile.path.split('/').last;
+      final fileExtension = fileName.split('.').last.toLowerCase();
+      final allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+      
+      if (!allowedExtensions.contains(fileExtension)) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Profile photo must be a JPG, JPEG, PNG, or WEBP file.',
+        };
+      }
+
+      final fileSize = await profilePhotoFile.length();
+      if (fileSize > 5 * 1024 * 1024) { // 5MB limit
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Profile photo must be less than 5MB.',
+        };
+      }
+
+      // Create multipart request
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$baseUrl/auth/migrate-users'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Get user ID from stored user data
+      final userData = await StorageService.getUserData();
+      final userId = userData?['userId'] ?? userData?['_id'] ?? userData?['id'] ?? '';
+      
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'User ID not found. Please login again.',
+        };
+      }
+
+      // Add text fields
+      request.fields['userId'] = userId;
+      request.fields['fullName'] = fullName.trim();
+      request.fields['email'] = email.toLowerCase().trim();
+      request.fields['password'] = password;
+      request.fields['phoneNumber'] = phoneNumber;
+      
+      if (designation != null && designation.isNotEmpty) {
+        request.fields['designation'] = designation.trim();
+      }
+      
+      if (company != null && company.isNotEmpty) {
+        request.fields['company'] = company.trim();
+      }
+      
+      request.fields['full_address'] = full_address.trim();
+      request.fields['userTags'] = jsonEncode(userTags);
+      request.fields['aol_teacher'] = aol_teacher.toString();
+      request.fields['isInternational'] = isInternational.toString();
+      
+      if (teacher_type != null && teacher_type.isNotEmpty) {
+        request.fields['teacher_type'] = teacher_type;
+      }
+      
+      if (teachercode != null && teachercode.isNotEmpty) {
+        request.fields['teachercode'] = teachercode.trim().toUpperCase();
+      }
+      
+      if (teacheremail != null && teacheremail.isNotEmpty) {
+        request.fields['teacheremail'] = teacheremail.toLowerCase().trim();
+      }
+      
+      if (mobilenumber != null && mobilenumber.isNotEmpty) {
+        request.fields['mobilenumber'] = mobilenumber;
+      }
+      
+      if (programTypesCanTeach != null && programTypesCanTeach.isNotEmpty) {
+        request.fields['programTypesCanTeach'] = jsonEncode(programTypesCanTeach);
+      }
+      
+      if (teacherEmploymentType != null && teacherEmploymentType.isNotEmpty) {
+        request.fields['teacherEmploymentType'] = teacherEmploymentType;
+      }
+
+      // Add profile photo file (same as registerUser)
+      final fileStream = http.ByteStream(profilePhotoFile.openRead());
+      final fileLength = await profilePhotoFile.length();
+      
+      final multipartFile = http.MultipartFile(
+        'file', // Field name expected by server
+        fileStream,
+        fileLength,
+        filename: fileName,
+        contentType: MediaType('image', fileExtension),
+      );
+      request.files.add(multipartFile);
+      
+      print('📸 Uploading profile photo: $fileName (${fileLength} bytes, image/$fileExtension)');
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Parse response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Update successful
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Profile updated successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Validation error
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Validation failed. Please check your input.',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // User not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'User not found.',
+        };
+      } else if (response.statusCode == 409) {
+        // Conflict (email/phone already exists)
+        return {
+          'success': false,
+          'statusCode': 409,
+          'message': responseData['message'] ?? 'Email or phone number already exists.',
+        };
+      } else {
+        // Other errors
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Profile update failed. Please try again.',
+        };
+      }
+    } catch (error) {
+      print('❌ Update User Profile Error: $error');
+      if (error.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Network error. Please check your connection and try again.',
+        };
+      }
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Profile update failed. Please try again.',
+      };
+    }
+  }
 }

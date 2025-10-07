@@ -1740,9 +1740,15 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     // Calculate actual total users from the users array
     final actualTotalUsers = users.length;
     
-    // If total users from backend is more than 10, use checkedInUsers directly
+    // If total users from backend is more than 10, count rejected users from users array only
     if (totalUsers > 10) {
-      final rejectedCount = totalUsers - checkedInUsers;
+      final rejectedCount = users.where((user) {
+        if (user is Map<String, dynamic>) {
+          final userStatus = user['status']?.toString().toLowerCase() ?? '';
+          return userStatus == 'rejected';
+        }
+        return false;
+      }).length;
       
       return Wrap(
         spacing: 4,
@@ -1765,22 +1771,23 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
               ),
             ),
           ],
-          // Always show rejected count (even if 0)
-          Text(
-            '$rejectedCount',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.red.shade600,
+          if (rejectedCount > 0) ...[
+            Text(
+              '$rejectedCount',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.red.shade600,
+              ),
             ),
-          ),
-          Text(
-            'Rejected',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade500,
+            Text(
+              'Rejected',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade500,
+              ),
             ),
-          ),
+          ],
           Text(
             'Total $totalUsers Appointee${totalUsers != 1 ? 's' : ''}',
             style: TextStyle(
@@ -1796,7 +1803,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
     // For 10 or fewer users, count individual statuses from users array
     int admittedCount = 0;
     int rejectedCount = 0;
-    int notArrivedCount = 0;
 
     for (var user in users) {
       if (user is Map<String, dynamic>) {
@@ -1807,9 +1813,6 @@ class _TodayCardComponentState extends State<TodayCardComponent> {
             break;
           case 'rejected':
             rejectedCount++;
-            break;
-          case 'not_arrived':
-            notArrivedCount++;
             break;
         }
       }

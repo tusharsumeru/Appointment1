@@ -17,6 +17,7 @@ class StorageService {
   static const String _assignedToMeAppointmentsTimestampKey =
       'assigned_to_me_appointments_timestamp';
   static const String _fcmTokenKey = 'fcm_token';
+  static const String _migratedUserOtpVerifiedKey = 'migrated_user_otp_verified';
 
   // Get API URL from ActionService
   static Future<String> getApiUrl() async {
@@ -317,6 +318,54 @@ class StorageService {
     } catch (e) {
       print('❌ Error checking notification status: $e');
       return false;
+    }
+  }
+
+  // Save migrated user OTP verification status
+  static Future<void> setMigratedUserOtpVerified(String userId, bool verified) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('${_migratedUserOtpVerifiedKey}_$userId', verified);
+      print('Migrated user OTP verification status saved: $verified for user $userId');
+    } catch (e) {
+      print('Error saving migrated user OTP verification status: $e');
+      throw Exception('Failed to save migrated user OTP verification status: $e');
+    }
+  }
+
+  // Check if migrated user has already verified OTP
+  static Future<bool> isMigratedUserOtpVerified(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool('${_migratedUserOtpVerifiedKey}_$userId') ?? false;
+    } catch (e) {
+      print('Error checking migrated user OTP verification status: $e');
+      return false;
+    }
+  }
+
+  // Clear migrated user OTP verification status (when user completes profile)
+  static Future<void> clearMigratedUserOtpVerified(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('${_migratedUserOtpVerifiedKey}_$userId');
+      print('Migrated user OTP verification status cleared for user $userId');
+    } catch (e) {
+      print('Error clearing migrated user OTP verification status: $e');
+    }
+  }
+
+  // Logout migrated users (clear session but keep OTP verification status)
+  static Future<void> logoutMigratedUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_refreshTokenKey);
+      await prefs.remove(_userDataKey);
+      await prefs.setBool(_isLoggedInKey, false);
+      print('Migrated user logged out - session cleared but OTP status preserved');
+    } catch (e) {
+      print('Error logging out migrated user: $e');
     }
   }
 }
