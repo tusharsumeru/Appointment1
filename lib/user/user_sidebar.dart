@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../auth/login_screen.dart';
 import '../action/storage_service.dart';
-import 'user_screen.dart';
 import 'user_history_screen.dart';
 import 'profile_screen.dart';
 import 'appointment_type_selection_screen.dart';
 import 'my_divine_picture_screen.dart';
 import 'help_support_screen.dart';
+import 'darshan_pictures_screen.dart';
 
 class UserSidebar extends StatefulWidget {
   const UserSidebar({super.key});
@@ -216,15 +216,30 @@ class _UserSidebarState extends State<UserSidebar> {
                   },
                 ),
 
+                // Commented out My Divine Picture section
+                // ListTile(
+                //   leading: const Icon(Icons.photo_library, color: Color(0xFFF97316)),
+                //   title: const Text('My Divine Picture'),
+                //   onTap: () {
+                //     Navigator.pop(context); // Close drawer
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => const MyDivinePictureScreen(),
+                //       ),
+                //     );
+                //   },
+                // ),
+
                 ListTile(
-                                  leading: const Icon(Icons.photo_library, color: Color(0xFFF97316)),
-                  title: const Text('My Divine Picture'),
+                  leading: const Icon(Icons.camera_alt, color: Color(0xFFF97316)),
+                  title: const Text('Darshan Picture'),
                   onTap: () {
                     Navigator.pop(context); // Close drawer
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MyDivinePictureScreen(),
+                        builder: (context) => const DarshanPicturesScreen(),
                       ),
                     );
                   },
@@ -282,7 +297,7 @@ class _UserSidebarState extends State<UserSidebar> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Build 4.0.0',
+                  'Build 5.0.0',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

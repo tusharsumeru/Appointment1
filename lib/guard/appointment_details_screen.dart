@@ -732,6 +732,57 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  Future<void> _admitPartialUsers(int partialUsersCount) async {
+    if (appointmentData == null) return;
+
+    try {
+      final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+      final totalUsersCount = _getTotalNumberOfUsers();
+
+      // For large groups, update main user and send partialUsersCount
+      final mainUser = usersList.isNotEmpty ? usersList.first as Map<String, dynamic> : <String, dynamic>{};
+      final updatedMainUser = {
+        ...mainUser,
+        'status': 'checked_in_partial',
+        'checkedInAt': DateTime.now().toIso8601String(),
+      };
+
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: appointmentData!['_id'],
+        mainStatus: 'checked_in_partial',
+        users: [updatedMainUser],
+        totalUsers: totalUsersCount,
+        partialUsersCount: partialUsersCount,
+      );
+
+      if (result['success']) {
+        setState(() {
+          appointmentData = result['data'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$partialUsersCount users partially admitted successfully'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to partially admit users'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showImageModal(String imageUrl, String userName) {
     showDialog(
       context: context,
@@ -764,6 +815,67 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
+  void _showPartialAdmissionDialog() {
+    final TextEditingController countController = TextEditingController();
+    final totalUsers = _getTotalNumberOfUsers();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Partial Admission'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'How many users from the total $totalUsers would you like to admit?',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: countController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Number of users to admit',
+                  hintText: 'Enter count',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final count = int.tryParse(countController.text);
+                if (count != null && count > 0 && count <= totalUsers) {
+                  Navigator.of(context).pop();
+                  _admitPartialUsers(count);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter a valid number between 1 and $totalUsers'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Admit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildUserCard(Map<String, dynamic> user, int index) {
     final fullName = user['fullName'] ?? 'Unknown';
     final userType = user['userType'] ?? 'unknown';
@@ -771,6 +883,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final profilePhotoUrl = user['profilePhotoUrl'];
     final totalUsers = _getTotalNumberOfUsers();
     final isAccompanyingUserWithoutPhoto = userType != 'main' && profilePhotoUrl == null && totalUsers > 10;
+    final isNewUser = user['adminStatus'] == true || user['adminStatus'] == 'true';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -806,6 +919,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                 ),
               ),
+              if (isNewUser) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue.withOpacity(0.7),
+                        Colors.blue.withOpacity(0.5),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.5),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'SECRETARY ADDED',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               if (isAccompanyingUserWithoutPhoto) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1433,39 +1583,58 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
                       
-                      // Admit All and Reject All Buttons (only show when there are pending users)
+                      // Action Buttons (only show when there are pending users)
                       if (_hasPendingUsers()) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _admitAllUsers,
-                                icon: const Icon(Icons.check_circle),
-                                label: const Text('Admit All'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                                ),
+                        if (_getTotalNumberOfUsers() > 10) ...[
+                          // For large groups (>10 users), show Partially Admitted button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _showPartialAdmissionDialog,
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: const Text('Partially Admitted'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _rejectAllUsers,
-                                icon: const Icon(Icons.cancel),
-                                label: const Text('Reject All'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                        ] else ...[
+                          // For small groups (≤10 users), show Admit All and Reject All buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _admitAllUsers,
+                                  icon: const Icon(Icons.check_circle),
+                                  label: const Text('Admit All'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _rejectAllUsers,
+                                  icon: const Icon(Icons.cancel),
+                                  label: const Text('Reject All'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 20),
 

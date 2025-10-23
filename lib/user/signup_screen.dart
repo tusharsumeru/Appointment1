@@ -2666,13 +2666,15 @@ class _SignupScreenState extends State<SignupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Create Account',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+        leading: widget.isMigratedUser 
+          ? null 
+          : IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+        title: Text(
+          widget.isMigratedUser ? 'Update Account' : 'Create Account',
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
       ),
       body: SafeArea(
@@ -2728,6 +2730,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         isRequired: true,
+                        enabled: !widget.isMigratedUser,
                       ),
                       const SizedBox(height: 16),
 
@@ -2857,8 +2860,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          _isFormValid ? 'Complete Registration' : 'Fill All Required Fields',
-                                          style: TextStyle(
+                                          _isFormValid 
+                                            ? (widget.isMigratedUser ? 'Update Account' : 'Complete Registration')
+                                            : 'Fill All Required Fields',
+                                          style: const TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w600,
                                             color: Colors.white,
@@ -2929,6 +2934,7 @@ class _SignupScreenState extends State<SignupScreen> {
     TextInputType? keyboardType,
     bool isRequired = false,
     String? helperText,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2966,6 +2972,7 @@ class _SignupScreenState extends State<SignupScreen> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          enabled: enabled,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon, color: Colors.grey.shade600),

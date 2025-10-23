@@ -703,25 +703,16 @@ class _MyDivinePictureScreenState extends State<MyDivinePictureScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    for (int i = 0; i < (subUsers.length + 1); i += 3)
+                    for (int i = 0; i < subUsers.length; i += 3)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            for (int j = 0; j < 3 && (i + j) < (subUsers.length + 1); j++)
-                              if (i + j == 0)
-                                // Add Photo button in first position
-                                AddPhotoButton(
-                                  onPressed: _onAddPhotoTap,
-                                  size: 100, // Match the size of user cards
-                                  ariaLabel: 'Add Photo',
-                                )
-                              else
-                                // User cards (adjust index to account for Add Photo button)
-                                _buildUserCard(subUsers[i + j - 1]),
+                            for (int j = 0; j < 3 && (i + j) < subUsers.length; j++)
+                              _buildUserCard(subUsers[i + j]),
                             // Add empty containers to maintain spacing when less than 3 items
-                            for (int j = 0; j < (3 - ((i + 3) > (subUsers.length + 1) ? (subUsers.length + 1) - i : 3)); j++)
+                            for (int j = 0; j < (3 - ((i + 3) > subUsers.length ? subUsers.length - i : 3)); j++)
                               const SizedBox(width: 100),
                           ],
                         ),

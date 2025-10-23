@@ -113,9 +113,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   void _updatePeopleCountForAccompanyUser() {
     int currentCount = int.tryParse(_numberOfPeopleController.text) ?? 1;
     if (_referenceAsAccompanyUser) {
-      if (currentCount < 10) {
-        _numberOfPeopleController.text = (currentCount + 1).toString();
-      }
+      // Allow incrementing beyond 10 - no limit
+      _numberOfPeopleController.text = (currentCount + 1).toString();
     } else {
       final minAllowed = 1;
       if (currentCount > minAllowed) {
@@ -2163,22 +2162,18 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Validate accompany users
     final accompanyUsersData = _getAccompanyUsersData();
     if (accompanyUsersData != null) {
-      final users = accompanyUsersData['users'] as List<Map<String, dynamic>>;
-      for (int i = 0; i < users.length; i++) {
-        final user = users[i];
-        final userIndex = i + 1;
+      final usersList = accompanyUsersData['users'] as List;
+      // Skip validation if empty list (groups > 10)
+      if (usersList.isEmpty) {
+        print('🔍 DEBUG: Skipping validation - empty users list (group > 10)');
+      } else {
+        final users = usersList.cast<Map<String, dynamic>>();
+        for (int i = 0; i < users.length; i++) {
+          final user = users[i];
+          final userIndex = i + 1;
         
-        // Validate required fields - only name is required
-        if (user['fullName'] == null || user['fullName'].toString().trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('User $userIndex: Full name is required'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          return;
-        }
+        // Full name is now optional for accompany users
+        // No validation required for fullName
         
         // Validate age only if provided - must be between 1-120
         if (user['age'] != null && user['age'].toString().trim().isNotEmpty) {
@@ -2223,6 +2218,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         //     return;
         //   }
         // }
+        }
       }
     }
 
@@ -2240,6 +2236,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       // Get original appointment type for debugging
       final originalAppointmentType = widget.appointment['appointmentType']?.toString() ?? 'myself';
       
+      // Calculate if count increased (for groups > 10)
+      final originalNumberOfUsers = widget.appointment['numberOfUsers'] ?? 1;
+      final currentNumberOfUsers = int.tryParse(_numberOfPeopleController.text) ?? 1;
+      final countIncreased = currentNumberOfUsers > originalNumberOfUsers;
+      
+      print('🔍 DEBUG: Count check - original: $originalNumberOfUsers, current: $currentNumberOfUsers, increased: $countIncreased');
+      
       // Prepare the update data
       final updateData = {
         'userCurrentCompany': _companyController.text.trim(),
@@ -2252,7 +2255,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         },
         'appointmentLocation': _selectedLocation,
         'assignedSecretary': _selectedSecretary,
-        'numberOfUsers': int.tryParse(_numberOfPeopleController.text) ?? 1,
+        'numberOfUsers': currentNumberOfUsers,
         'isTeacher': _teacherStatus,
         // Add required fields that the API expects - preserve original appointment type
         'appointmentFor': widget.appointment['appointmentFor'] ?? {
@@ -2266,7 +2269,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           'toDate': _toDateController.text,
         },
         'referenceAsAccompanyUser': _referenceAsAccompanyUser,
+        // Add countIncreased flag for backend to determine adminStatus
+        if (countIncreased && currentNumberOfUsers > 10) 'countIncreased': true,
       };
+      
+      print('🔍 DEBUG: Update data countIncreased flag: ${updateData['countIncreased']}');
 
       // Add guestInformation if appointment type is 'guest'
       if (originalAppointmentType == 'guest') {
@@ -2357,6 +2364,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       return null;
     }
     
+    // Get the original number of accompany users from the appointment
+    final originalAccompanyUsers = widget.appointment['accompanyUsers'];
+    int originalCount = 0;
+    if (originalAccompanyUsers is Map<String, dynamic>) {
+      originalCount = originalAccompanyUsers['numberOfUsers'] ?? 0;
+    }
+    
+    print('🔍 DEBUG: Original accompany users count: $originalCount');
+    print('🔍 DEBUG: Current accompany users count: $accompanyingUsers');
+    
     // Ensure we have the right number of controllers
     if (_guestControllers.length != accompanyingUsers) {
       // Update controllers to match the required number
@@ -2401,6 +2418,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         userData['alternativePhone'] = uniquePhoneCode;
       }
 
+      // Determine if this is a new user based on count
+      // If current count is more than original count, and this user is beyond the original count
+      // BUT only if total users <= 10 (individual details collected)
+      bool isNewUser = guestNumber > originalCount && accompanyingUsers <= 9;
+      
+      print('🔍 DEBUG: User $guestNumber - isNewUser: $isNewUser (guestNumber: $guestNumber, originalCount: $originalCount, totalUsers: $accompanyingUsers)');
+
       userData.addAll({
         'profilePhotoUrl': photoUrl,
         'userId': '', // Will be assigned by backend
@@ -2408,7 +2432,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'admittedBy': '',
         'relationshipToApplicant': '',
         'admittedAt': '',
+        // Add 'new' flag for users beyond the original count (only for groups <= 10)
+        if (isNewUser) 'new': true,
       });
+      
+      if (isNewUser) {
+        print('  🆕 NEW USER - Adding new: true flag for user $guestNumber');
+      } else if (guestNumber > originalCount && accompanyingUsers > 9) {
+        print('  ⏭️ SKIP - Not adding new flag (group size > 10)');
+      }
       
       users.add(userData);
     }
@@ -2418,6 +2450,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       'users': _guestControllers.length > 9 ? [] : users, // Send empty array for >9 accompanying users
     };
     
+    print('🔍 DEBUG: Final accompany users result: $result');
     return result;
   }
 
@@ -2996,10 +3029,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             color: Colors.grey[800],
           ),
           validator: (value) {
-            // Only validate name field as required
-            if (isNameField && (value == null || value.trim().isEmpty)) {
-              return '$label is required';
-            }
+            // Name field is now optional - no validation required
             // Email validation for email fields only if email is provided
             if (label.contains('Email') && value != null && value.trim().isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
               return 'Please enter a valid email address';
@@ -3641,12 +3671,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             GestureDetector(
               onTap: () {
                 int currentCount = int.tryParse(controller.text) ?? 1;
-                if (currentCount < 10) {
-                  setState(() {
-                    controller.text = (currentCount + 1).toString();
-                  });
-                  _updateGuestControllers();
-                }
+                // Remove the 10 limit - allow incrementing to any number
+                setState(() {
+                  controller.text = (currentCount + 1).toString();
+                });
+                _updateGuestControllers();
               },
               child: Container(
                 width: 48,

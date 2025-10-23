@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../common/profile_photo_dialog.dart'; // Add this import
+import '../../action/action.dart';
 
-class ReferenceDetailScreen extends StatelessWidget {
+class ReferenceDetailScreen extends StatefulWidget {
   final Map<String, dynamic> referenceData;
 
   const ReferenceDetailScreen({
@@ -9,34 +11,47 @@ class ReferenceDetailScreen extends StatelessWidget {
     required this.referenceData,
   });
 
+  @override
+  State<ReferenceDetailScreen> createState() => _ReferenceDetailScreenState();
+}
+
+class _ReferenceDetailScreenState extends State<ReferenceDetailScreen> {
+
+  // State variables for approve/reject functionality
+  bool _isApproving = false;
+  bool _isRejecting = false;
+  final TextEditingController _remarkController = TextEditingController();
+  bool _sendEmail = true;
+
   // Helper getters for cleaner access to data
-  String get name => referenceData['name'] ?? '';
-  String get email => referenceData['email'] ?? '';
-  String get phone => referenceData['phone'] ?? '';
-  String get status => referenceData['status'] ?? '';
-  String? get profilePic => referenceData['photo'] ?? referenceData['profilePic'];
-  String get teacherCode => referenceData['teacherCode'] ?? 'No teacher code provided';
-  String get teacherSince => _formatTeacherSinceDate(referenceData['teacherSince'] ?? 'No date');
-  String get createdAt => _formatDate(referenceData['createdAt'] ?? 'No date');
-  String get secretaryRemark => referenceData['secretaryRemark'] ?? 'No remarks provided';
-  String get details => (referenceData['details'] ?? '').isEmpty 
+  String get name => widget.referenceData['name'] ?? '';
+  String get email => widget.referenceData['email'] ?? '';
+  String get phone => widget.referenceData['phone'] ?? '';
+  String get status => widget.referenceData['status'] ?? '';
+  String? get profilePic => widget.referenceData['photo'] ?? widget.referenceData['profilePic'];
+  String get teacherCode => widget.referenceData['teacherCode'] ?? 'No teacher code provided';
+  String get teacherSince => _formatTeacherSinceDate(widget.referenceData['teacherSince'] ?? 'No date');
+  String get createdAt => _formatDate(widget.referenceData['createdAt'] ?? 'No date');
+  String get secretaryRemark => widget.referenceData['secretaryRemark'] ?? 'No remarks provided';
+  String get details => (widget.referenceData['details'] ?? '').isEmpty 
       ? 'No details provided' 
-      : referenceData['details'];
-  String get remarks => referenceData['remarks'] ?? 'No remarks provided';
-  String get reasonForForm => referenceData['reasonForForm'] ?? 'No reason provided';
-  String get gurudevWhere => referenceData['gurudevWhere'] ?? 'No location provided';
-  String get gurudevWhen => _formatDate(referenceData['gurudevWhen'] ?? 'No date');
-  String get someoneElseWho => referenceData['someoneElseWho'] ?? 'No name provided';
-  String get someoneElseWhere => referenceData['someoneElseWhere'] ?? 'No location provided';
-  String get someoneElseContext => referenceData['someoneElseContext'] ?? 'No context provided';
-  String get datesAtAshram => referenceData['datesAtAshram'] ?? 'No dates provided';
-  String get personalFeelingDetails => referenceData['personalFeelingDetails'] ?? '';
-  List<Map<String, dynamic>> get gurudevEntries => referenceData['gurudevEntries'] != null 
-      ? List<Map<String, dynamic>>.from(referenceData['gurudevEntries'])
+      : widget.referenceData['details'];
+  String get remarks => widget.referenceData['remarks'] ?? 'No remarks provided';
+  String get reasonForForm => widget.referenceData['reasonForForm'] ?? 'No reason provided';
+  String get gurudevWhere => widget.referenceData['gurudevWhere'] ?? 'No location provided';
+  String get gurudevWhen => _formatDate(widget.referenceData['gurudevWhen'] ?? 'No date');
+  String get someoneElseWho => widget.referenceData['someoneElseWho'] ?? 'No name provided';
+  String get someoneElseWhere => widget.referenceData['someoneElseWhere'] ?? 'No location provided';
+  String get someoneElseContext => widget.referenceData['someoneElseContext'] ?? 'No context provided';
+  String get datesAtAshram => widget.referenceData['datesAtAshram'] ?? 'No dates provided';
+  String get personalFeelingDetails => widget.referenceData['personalFeelingDetails'] ?? '';
+  List<Map<String, dynamic>> get gurudevEntries => widget.referenceData['gurudevEntries'] != null 
+      ? List<Map<String, dynamic>>.from(widget.referenceData['gurudevEntries'])
       : [];
-  List<String> get coursesTaught => referenceData['coursesTaught'] != null 
-      ? List<String>.from(referenceData['coursesTaught'])
+  List<String> get coursesTaught => widget.referenceData['coursesTaught'] != null 
+      ? List<String>.from(widget.referenceData['coursesTaught'])
       : [];
+  String get formId => widget.referenceData['_id'] ?? widget.referenceData['id'] ?? '';
 
   // Helper method to format date in IST
   String _formatDate(String dateString) {
@@ -105,7 +120,7 @@ class ReferenceDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Debug logging to see the data structure
-    print('ReferenceDetailScreen - referenceData: $referenceData');
+    print('ReferenceDetailScreen - referenceData: ${widget.referenceData}');
     print('ReferenceDetailScreen - name: $name');
     print('ReferenceDetailScreen - email: $email');
     print('ReferenceDetailScreen - phone: $phone');
@@ -125,8 +140,8 @@ class ReferenceDetailScreen extends StatelessWidget {
     print('ReferenceDetailScreen - gurudevEntries: $gurudevEntries');
     print('ReferenceDetailScreen - gurudevEntries length: ${gurudevEntries.length}');
     print('ReferenceDetailScreen - profilePic: $profilePic');
-    print('ReferenceDetailScreen - photo field: ${referenceData['photo']}');
-    print('ReferenceDetailScreen - profilePic field: ${referenceData['profilePic']}');
+    print('ReferenceDetailScreen - photo field: ${widget.referenceData['photo']}');
+    print('ReferenceDetailScreen - profilePic field: ${widget.referenceData['profilePic']}');
     
     return Scaffold(
       appBar: AppBar(
@@ -323,9 +338,7 @@ class ReferenceDetailScreen extends StatelessWidget {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            () {
-                              // Handle approve action
-                            },
+                            () => _showActionBottomSheet('approve'),
                           ),
                           const SizedBox(height: 12), // gap-3
                           _buildActionButton(
@@ -336,9 +349,7 @@ class ReferenceDetailScreen extends StatelessWidget {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            () {
-                              // Handle reject action
-                            },
+                            () => _showActionBottomSheet('reject'),
                           ),
                         ],
                       ),
@@ -439,9 +450,7 @@ class ReferenceDetailScreen extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      () {
-                        // Handle approve action
-                      },
+                      () => _showActionBottomSheet('approve'),
                     ),
                     const SizedBox(height: 8),
                     _buildActionButton(
@@ -452,9 +461,7 @@ class ReferenceDetailScreen extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      () {
-                        // Handle reject action
-                      },
+                      () => _showActionBottomSheet('reject'),
                     ),
                   ],
                 ],
@@ -1184,5 +1191,317 @@ class ReferenceDetailScreen extends StatelessWidget {
       userName: name,
       description: "$name's profile photo",
     );
+  }
+
+  // Show action bottom sheet for approve/reject
+  void _showActionBottomSheet(String action) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    action == 'approve' ? Icons.check_circle : Icons.cancel,
+                    color: action == 'approve' ? Colors.green : Colors.red,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    action == 'approve' ? 'Approve Reference Form' : 'Reject Reference Form',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Reference form for: $name',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Secretary Remark Text Field
+              const Text(
+                'Secretary Remark (optional):',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _remarkController,
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'^\s')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
+                ],
+                decoration: InputDecoration(
+                  hintText: 'Enter your remark',
+                  hintStyle: TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.grey, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 20),
+              
+              // Send email checkbox
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _sendEmail,
+                      onChanged: (val) {
+                        setState(() {
+                          _sendEmail = val ?? true;
+                        });
+                      },
+                      activeColor: Colors.blue,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.mail_outline, size: 20, color: Colors.blue[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Send email notification to applicant',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey[300]!),
+                        foregroundColor: Colors.grey[600],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: (_isApproving || _isRejecting) ? null : () => _handleAction(action),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: action == 'approve' ? Colors.green : Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_isApproving || _isRejecting) ...[
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ] else ...[
+                            Icon(
+                              action == 'approve' ? Icons.check_circle : Icons.cancel,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            _isApproving 
+                                ? 'Approving...' 
+                                : _isRejecting 
+                                    ? 'Rejecting...' 
+                                    : action == 'approve' 
+                                        ? 'Approve' 
+                                        : 'Reject',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Handle approve/reject action
+  Future<void> _handleAction(String action) async {
+    if (_isApproving || _isRejecting || formId.isEmpty) return;
+    
+    setState(() {
+      if (action == 'approve') {
+        _isApproving = true;
+      } else {
+        _isRejecting = true;
+      }
+    });
+
+    try {
+      print('🔄 Calling updateReferenceFormStatus for formId: $formId');
+      print('🔄 Status: ${action == 'approve' ? 'Approved' : 'Rejected'}');
+      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
+      
+      final result = await ActionService.updateReferenceFormStatus(
+        formId: formId,
+        status: action == 'approve' ? 'Approved' : 'Rejected',
+        secretaryRemark: _remarkController.text.trim().isNotEmpty 
+            ? _remarkController.text.trim() 
+            : action == 'approve' 
+                ? 'Approved by secretary' 
+                : 'Rejected by secretary',
+        sendEmailNotification: _sendEmail,
+      );
+      
+      print('🔄 API Response: $result');
+
+      if (result['success'] == true) {
+        // Close bottom sheet
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Reference form ${action}d successfully'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        
+        // Navigate back to list screen
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } else {
+        _showErrorMessage(result['message'] ?? 'Failed to ${action} reference form');
+      }
+    } catch (e) {
+      _showErrorMessage('Error ${action}ing reference form: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApproving = false;
+          _isRejecting = false;
+        });
+      }
+    }
+  }
+
+  // Show error message
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _remarkController.dispose();
+    super.dispose();
   }
 }

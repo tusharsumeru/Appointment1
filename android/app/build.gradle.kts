@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.appointment_v1"
+    namespace = "com.aolappointment.v2"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -31,11 +31,20 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.appointment_v1"
+        applicationId = "com.aolappointment.v2"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Support for 16KB memory page sizes (required for Android 15+)
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+        
+        // Enable 16KB page size support
+        manifestPlaceholders["android.app.lib_name"] = "flutter"
+        manifestPlaceholders["android.app.lib_name.16kb"] = "flutter"
     }
 
     signingConfigs {

@@ -7,6 +7,7 @@ class ReferenceCard extends StatefulWidget {
   final Map<String, dynamic> referenceData;
   final VoidCallback? onViewDetails;
   final VoidCallback? onStatusUpdated;
+  final VoidCallback? onDelete; // Add delete callback
   final int index; // Add index parameter for alternating colors
 
   const ReferenceCard({
@@ -14,6 +15,7 @@ class ReferenceCard extends StatefulWidget {
     required this.referenceData,
     this.onViewDetails,
     this.onStatusUpdated,
+    this.onDelete, // Add delete callback
     required this.index, // Add index parameter
   });
 
@@ -24,7 +26,6 @@ class ReferenceCard extends StatefulWidget {
 class _ReferenceCardState extends State<ReferenceCard> {
   bool _isApproving = false;
   bool _isRejecting = false;
-  bool _showRemarkSection = false;
   bool _sendEmail = true;
   final TextEditingController _remarkController = TextEditingController();
 
@@ -71,101 +72,299 @@ class _ReferenceCardState extends State<ReferenceCard> {
     }
   }
 
-  // Show remark section
-  void _toggleRemarkSection() {
-    setState(() {
-      _showRemarkSection = true;
-    });
-  }
-
-  // Handle accept action
-  Future<void> _handleAccept() async {
-    if (_isApproving || _isRejecting || formId.isEmpty) return;
-    
-    setState(() {
-      _isApproving = true;
-    });
-
-    try {
-      print('🔄 Calling updateReferenceFormStatus for formId: $formId');
-      print('🔄 Status: Approved');
-      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
-      
-      final result = await ActionService.updateReferenceFormStatus(
-        formId: formId,
-        status: 'Approved',
-        secretaryRemark: _remarkController.text.trim().isNotEmpty 
-            ? _remarkController.text.trim() 
-            : 'Approved by secretary',
-        sendEmailNotification: _sendEmail,
-      );
-      
-      print('🔄 API Response: $result');
-
-      if (result['success'] == true) {
-        // Trigger refresh to fetch updated data immediately
-        widget.onStatusUpdated?.call();
-      } else {
-        _showErrorMessage(result['message'] ?? 'Failed to approve reference form');
-      }
-    } catch (e) {
-      _showErrorMessage('Error accepting reference form: $e');
-    } finally {
-      setState(() {
-        _isApproving = false;
-      });
-    }
-  }
-
-  // Handle reject action
-  Future<void> _handleReject() async {
-    if (_isApproving || _isRejecting || formId.isEmpty) return;
-    
-    setState(() {
-      _isRejecting = true;
-    });
-
-    try {
-      print('🔄 Calling updateReferenceFormStatus for formId: $formId');
-      print('🔄 Status: Rejected');
-      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
-      
-      final result = await ActionService.updateReferenceFormStatus(
-        formId: formId,
-        status: 'Rejected',
-        secretaryRemark: _remarkController.text.trim().isNotEmpty 
-            ? _remarkController.text.trim() 
-            : 'Rejected by secretary',
-        sendEmailNotification: _sendEmail,
-      );
-      
-      print('🔄 API Response: $result');
-
-      if (result['success'] == true) {
-        // Trigger refresh to fetch updated data immediately
-        widget.onStatusUpdated?.call();
-      } else {
-        _showErrorMessage(result['message'] ?? 'Failed to reject reference form');
-      }
-    } catch (e) {
-      _showErrorMessage('Error rejecting reference form: $e');
-    } finally {
-      setState(() {
-        _isRejecting = false;
-      });
-    }
-  }
-
-  // Show success message
-  void _showSuccessMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
+  // Show action bottom sheet for approve/reject
+  void _showActionBottomSheet(String action) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    action == 'approve' ? Icons.check_circle : Icons.cancel,
+                    color: action == 'approve' ? Colors.green : Colors.red,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    action == 'approve' ? 'Approve Reference Form' : 'Reject Reference Form',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Reference form for: $name',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Secretary Remark Text Field
+              const Text(
+                'Secretary Remark (optional):',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _remarkController,
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'^\s')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
+                ],
+                decoration: InputDecoration(
+                  hintText: 'Enter your remark',
+                  hintStyle: TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.grey, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 20),
+              
+              // Send email checkbox
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _sendEmail,
+                      onChanged: (val) {
+                        setState(() {
+                          _sendEmail = val ?? true;
+                        });
+                      },
+                      activeColor: Colors.blue,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.mail_outline, size: 20, color: Colors.blue[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Send email notification to applicant',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey[300]!),
+                        foregroundColor: Colors.grey[600],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: (_isApproving || _isRejecting) ? null : () => _handleAction(action),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: action == 'approve' ? Colors.green : Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_isApproving || _isRejecting) ...[
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ] else ...[
+                            Icon(
+                              action == 'approve' ? Icons.check_circle : Icons.cancel,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            _isApproving 
+                                ? 'Approving...' 
+                                : _isRejecting 
+                                    ? 'Rejecting...' 
+                                    : action == 'approve' 
+                                        ? 'Approve' 
+                                        : 'Reject',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
+
+  // Handle approve/reject action
+  Future<void> _handleAction(String action) async {
+    if (_isApproving || _isRejecting || formId.isEmpty) return;
+    
+    setState(() {
+      if (action == 'approve') {
+        _isApproving = true;
+      } else {
+        _isRejecting = true;
+      }
+    });
+
+    try {
+      print('🔄 Calling updateReferenceFormStatus for formId: $formId');
+      print('🔄 Status: ${action == 'approve' ? 'Approved' : 'Rejected'}');
+      print('🔄 Secretary remark: ${_remarkController.text.trim()}');
+      
+      final result = await ActionService.updateReferenceFormStatus(
+        formId: formId,
+        status: action == 'approve' ? 'Approved' : 'Rejected',
+        secretaryRemark: _remarkController.text.trim().isNotEmpty 
+            ? _remarkController.text.trim() 
+            : action == 'approve' 
+                ? 'Approved by secretary' 
+                : 'Rejected by secretary',
+        sendEmailNotification: _sendEmail,
+      );
+      
+      print('🔄 API Response: $result');
+
+      if (result['success'] == true) {
+        // Close bottom sheet
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Reference form ${action}d successfully'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        
+        // Trigger refresh to fetch updated data immediately
+        widget.onStatusUpdated?.call();
+      } else {
+        _showErrorMessage(result['message'] ?? 'Failed to ${action} reference form');
+      }
+    } catch (e) {
+      _showErrorMessage('Error ${action}ing reference form: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApproving = false;
+          _isRejecting = false;
+        });
+      }
+    }
+  }
+
 
   // Show error message
   void _showErrorMessage(String message) {
@@ -367,202 +566,72 @@ class _ReferenceCardState extends State<ReferenceCard> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Delete Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onDelete,
+                    icon: const Icon(
+                      Icons.delete,
+                      size: 16,
+                    ),
+                    label: const Text('Delete'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.red.shade200),
+                      foregroundColor: Colors.red.shade600,
+                      backgroundColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
                 // Only show Approve/Reject buttons if status is pending
                 if (status.toLowerCase() == 'pending') ...[
                   const SizedBox(height: 12),
-                  
-                  // Show initial Approve/Reject buttons if remark section is not shown
-                  if (!_showRemarkSection) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _toggleRemarkSection,
-                            icon: const Icon(
-                              Icons.check_circle,
-                              size: 16,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showActionBottomSheet('approve'),
+                          icon: const Icon(
+                            Icons.check_circle,
+                            size: 16,
+                          ),
+                          label: const Text('Accept'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade500,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            label: const Text('Accept'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade500,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _toggleRemarkSection,
-                            icon: const Icon(
-                              Icons.cancel,
-                              size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showActionBottomSheet('reject'),
+                          icon: const Icon(
+                            Icons.cancel,
+                            size: 16,
+                          ),
+                          label: const Text('Reject'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade500,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            label: const Text('Reject'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red.shade500,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                  
-                  // Show remark section and final action buttons when _showRemarkSection is true
-                  if (_showRemarkSection) ...[
-                    // Secretary Remark Text Field
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Secretary Remark(optional):',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _remarkController,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.deny(RegExp(r'^\s')),
-                            FilteringTextInputFormatter.allow(RegExp(r'^[a-zA-Z].*')),
-                          ],
-                          decoration: InputDecoration(
-                            hintText: 'Enter your remark',
-                            hintStyle: TextStyle(
-                              fontWeight: FontWeight.normal,
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.grey, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 12),
-                        // Send email checkbox (UI)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: _sendEmail,
-                                onChanged: (val) {
-                                  setState(() {
-                                    _sendEmail = val ?? true;
-                                  });
-                                },
-                                activeColor: Colors.blue,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              const SizedBox(width: 6),
-                              Icon(Icons.mail_outline, size: 18, color: Colors.blue[600]),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Send email notification to applicant',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                    ),
-                    // Final Accept and Reject Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: (_isApproving || _isRejecting) ? null : _handleAccept,
-                            icon: _isApproving 
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.check_circle,
-                                    size: 16,
-                                  ),
-                            label: Text(_isApproving ? 'Approving...' : 'Accept'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade500,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: (_isApproving || _isRejecting) ? null : _handleReject,
-                            icon: _isRejecting 
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.cancel,
-                                    size: 16,
-                                  ),
-                            label: Text(_isRejecting ? 'Rejecting...' : 'Reject'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red.shade500,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ],
               ],
             ),

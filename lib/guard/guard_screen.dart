@@ -442,7 +442,7 @@ class _GuardScreenState extends State<GuardScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Build 4.0.0',
+                  'Build 5.0.0',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

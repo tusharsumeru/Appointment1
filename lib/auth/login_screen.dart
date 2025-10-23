@@ -183,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (context) => const GuardScreen(),
           ),
         );
-      } else if (userRole == 'user' || userRole == 'client') {
+      } else if (userRole == 'user' || userRole == 'client' || userRole == 'vds') {
         // Regular user/client role - always show notification setup for now
         // TODO: Check from backend if user has FCM tokens stored
         Navigator.of(context).pushReplacement(

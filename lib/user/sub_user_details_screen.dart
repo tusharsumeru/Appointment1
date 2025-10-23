@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:cross_file/cross_file.dart';
 
 import '../action/action.dart';
 import '../components/common/loading_dialog.dart';
@@ -50,8 +51,10 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
     });
 
     try {
-      // Request storage permission
-      final status = await Permission.storage.request();
+      // Request appropriate storage permission based on Android version
+      Permission permission = Platform.isAndroid ? Permission.photos : Permission.storage;
+      final status = await permission.request();
+      
       if (!status.isGranted) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -75,20 +78,20 @@ class _SubUserDetailsScreenState extends State<SubUserDetailsScreen> {
         final file = File(filePath);
         await file.writeAsBytes(response.bodyBytes);
 
-        // Save to gallery (platform specific)
-        if (Platform.isAndroid || Platform.isIOS) {
-          // For mobile platforms, we'll use the share functionality
-          await _shareImage(filePath);
-        } else {
-          // For other platforms, just show success message
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Image saved to: $filePath'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+        // Use share functionality to let user save to gallery or share
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          text: 'Divine Picture from Appointment App',
+          subject: 'Divine Picture',
+        );
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image ready to save!'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
       } else {
         throw Exception('Failed to download image');

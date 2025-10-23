@@ -242,8 +242,8 @@ class _SplashScreenState extends State<SplashScreen>
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
-        } else if (userRole == 'user' || userRole == 'client') {
-          // Regular user/client role - navigate to appointment type selection
+        } else if (userRole == 'user' || userRole == 'client' || userRole == 'vds') {
+          // Regular user/client/VDS role - navigate to appointment type selection
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>

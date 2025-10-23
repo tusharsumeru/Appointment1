@@ -20,6 +20,7 @@ import 'main/add_new_screen.dart';
 import 'main/deleted_appointments_screen.dart';
 import 'main/global_search_screen.dart';
 import 'main/account_settings_screen.dart';
+import 'main/analytics_screen.dart';
 import 'user/user_screen.dart';
 import 'auth/notification_setup_screen.dart';
 import 'guard/guard_screen.dart';
@@ -382,6 +383,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           userData: {},
         ),
         '/test-notifications': (context) => const TestNotificationScreen(),
+        '/analytics': (context) => const AnalyticsScreen(),
       },
     );
   }

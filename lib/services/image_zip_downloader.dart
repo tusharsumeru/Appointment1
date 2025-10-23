@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:cross_file/cross_file.dart';
 
 /// Simple progress object you can plug into your UI.
 class ZipProgress {
@@ -183,17 +184,14 @@ class ImageZipDownloader {
       throw UnsupportedError('Direct download to Downloads folder is only supported on Android');
     }
 
-    // Request storage permission with comprehensive handling
+    // Request appropriate storage permissions based on Android version
     List<Permission> permissions = [];
     
-    // For Android 13+ (API 33+), we need different permissions
     if (Platform.isAndroid) {
-      // Try multiple permission types for better compatibility
+      // Use scoped storage permissions instead of MANAGE_EXTERNAL_STORAGE
       permissions = [
-        Permission.storage,
-        Permission.manageExternalStorage,
-        Permission.photos,
-        Permission.videos,
+        Permission.photos, // For Android 13+ (API 33+)
+        Permission.storage, // For Android 10-12 (API 29-32)
       ];
     }
     
@@ -301,36 +299,19 @@ class ImageZipDownloader {
       throw Exception('Failed to create ZIP archive');
     }
 
-    // Try to save to Downloads folder on Android
-    try {
-      final downloadsDir = Directory('/storage/emulated/0/Download');
-      if (await downloadsDir.exists()) {
-        // Test if we can write to the directory
-        final testFile = File('${downloadsDir.path}/test_write_permission.tmp');
-        try {
-          await testFile.writeAsString('test');
-          await testFile.delete();
-          
-          // If we can write, save the ZIP file
-          final zipFile = File('${downloadsDir.path}/$zipName');
-          await zipFile.writeAsBytes(zipped);
-          return zipFile.path;
-        } catch (writeError) {
-          print('Cannot write to Downloads folder: $writeError');
-          throw Exception('Cannot write to Downloads folder. Please check storage permissions.');
-        }
-      } else {
-        print('Downloads folder does not exist');
-      }
-    } catch (e) {
-      print('Failed to access Downloads folder: $e');
-    }
-    
-    // Fallback to app documents directory
+    // Use app documents directory for scoped storage compliance
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final zipFile = File('${appDir.path}/$zipName');
       await zipFile.writeAsBytes(zipped);
+      
+      // Use share functionality to let user save to Downloads or share
+      await Share.shareXFiles(
+        [XFile(zipFile.path)],
+        text: 'Downloaded images from Appointment App',
+        subject: 'Appointment Images - $zipName',
+      );
+      
       return zipFile.path;
     } catch (e) {
       throw Exception('Failed to save ZIP file: $e');

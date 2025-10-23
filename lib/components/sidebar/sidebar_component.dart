@@ -466,6 +466,19 @@ class _SidebarComponentState extends State<SidebarComponent> {
               },
             ),
 
+            // Analytics - Available for Admin and Super Admin
+            if (isAdmin) ...[
+              _buildMenuItem(
+                routeName: 'analytics',
+                icon: Icons.analytics,
+                title: 'Analytics',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacementNamed(context, '/analytics');
+                },
+              ),
+            ],
+
             _buildMenuItem(
               routeName: 'addNew',
               icon: Icons.add_circle_outline,
@@ -573,7 +586,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
 
           // Admin-specific menu items (to be implemented)
-          if (isAdmin && !isSuperAdmin) ...[
+          if (isAdmin) ...[
             _buildMenuItem(
               routeName: 'adminDashboard',
               icon: Icons.admin_panel_settings,
@@ -767,7 +780,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
           ListTile(
             leading: Icon(Icons.info_outline, color: Colors.grey[600]),
             title: Text(
-              'Build 4.0.0',
+              'Build 5.0.0',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],

@@ -18,11 +18,11 @@ class ActionService {
   static Future<void> initializeBaseUrl() async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://apt.sumerudigital.com/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
+        Uri.parse('https://apt.sumerudigital.com/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -64,11 +64,11 @@ class ActionService {
   static Future<String> get _oldBaseUrl async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://aptdev.sumerudigital.com/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: hhttps://apt.sumerudigital.com/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://aptdev.sumerudigital.com/api/v3/baseurl'),
+        Uri.parse('https://apt.sumerudigital.com/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -80,7 +80,7 @@ class ActionService {
           '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
         );
         // Fallback to hardcoded URL if API fails
-        return 'https://aptdev.sumerudigital.com/api/v3';
+        return 'https://apt.sumerudigital.com/api/v3';
       }
 
       final data = jsonDecode(response.body);
@@ -93,7 +93,7 @@ class ActionService {
     } catch (error) {
       print('❌ [ERROR] Failed to fetch base URL: $error');
       // Fallback to hardcoded URL if there's an error
-      return 'https://aptdev.sumerudigital.com/api/v3';
+      return 'https://apt.sumerudigital.com/api/v3';
     }
   }
 
@@ -2186,6 +2186,59 @@ class ActionService {
     }
   }
 
+  static Future<Map<String, dynamic>> getAppointmentByIdWithDarshanPhotos(
+    String appointmentId,
+  ) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/appointment/$appointmentId/darshan-photos'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': data['data'],
+          'message': 'Darshan photos retrieved successfully',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': 'Appointment not found or no darshan photos available',
+        };
+      } else {
+        final errorData = json.decode(response.body);
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': errorData['message'] ?? 'Failed to fetch darshan photos',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
   // Get quick appointment by ID
   static Future<Map<String, dynamic>> getQuickAppointmentById(
     String appointmentId,
@@ -2874,6 +2927,7 @@ class ActionService {
     String? mainStatus,
     List<Map<String, dynamic>>? users,
     int? totalUsers,
+    int? partialUsersCount,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -2896,6 +2950,9 @@ class ActionService {
       }
       if (totalUsers != null) {
         requestBody['totalUsers'] = totalUsers;
+      }
+      if (partialUsersCount != null) {
+        requestBody['partialUsersCount'] = partialUsersCount;
       }
 
       final response = await http.put(
@@ -4008,6 +4065,29 @@ class ActionService {
     }
   }
 
+  // Check if current user has VDS role for bypassing image validation
+  static Future<bool> isVDSUser() async {
+    try {
+      final userData = await StorageService.getUserData();
+      if (userData == null) return false;
+      
+      // Check primary role
+      final role = userData['role']?.toString().toLowerCase();
+      if (role == 'vds') return true;
+      
+      // Check additional roles
+      final additionalRoles = userData['additionalRoles'] ?? userData['userTags'] ?? userData['selectedRoles'];
+      if (additionalRoles is List) {
+        return additionalRoles.any((role) => role.toString().toLowerCase() == 'vds');
+      }
+      
+      return false;
+    } catch (e) {
+      print('❌ Error checking VDS role: $e');
+      return false;
+    }
+  }
+
   // Helper function to get MIME type based on file extension
   static String _getMimeType(String extension) {
     switch (extension.toLowerCase()) {
@@ -4462,6 +4542,13 @@ class ActionService {
         // No attachment file, use JSON request
         print('DEBUG API: Using JSON request without attachment');
 
+        // Check if user has VDS role for bypassing image validation
+        final isVDS = await isVDSUser();
+        if (isVDS) {
+          cleanUpdateData['userrole'] = 'VDS';
+          print('🔓 VDS role detected - image validation will be bypassed');
+        }
+
         final response = await http.put(
           uri,
           headers: {
@@ -4507,6 +4594,7 @@ class ActionService {
     required String appointmentId,
     required Map<String, dynamic> updateData,
     PlatformFile? attachmentFile,
+    String? name,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -4533,6 +4621,14 @@ class ActionService {
           cleanUpdateData[key] = value;
         }
       });
+
+      // Add name field if provided
+      if (name != null && name.isNotEmpty) {
+        cleanUpdateData['name'] = name;
+      }
+
+      // Add new flag for new entries
+      cleanUpdateData['new'] = true;
 
       print('DEBUG API: Admin clean update data: $cleanUpdateData');
       print('DEBUG API: Has attachment file: ${attachmentFile != null}');
@@ -5641,6 +5737,13 @@ class ActionService {
       // Add authorization header
       request.headers['Authorization'] = 'Bearer $token';
 
+      // Check if user has VDS role for bypassing image validation
+      final isVDS = await isVDSUser();
+      if (isVDS) {
+        request.fields['userrole'] = 'VDS';
+        print('🔓 VDS role detected - image validation will be bypassed');
+      }
+
       // Add the image file with proper content type
       final contentType = MediaType(
         'image',
@@ -6200,6 +6303,13 @@ class ActionService {
         // Add authorization header
         request.headers['Authorization'] = 'Bearer $token';
 
+        // Check if user has VDS role for bypassing image validation
+        final isVDS = await isVDSUser();
+        if (isVDS) {
+          request.fields['userrole'] = 'VDS';
+          print('🔓 VDS role detected - image validation will be bypassed');
+        }
+
         // Add all appointment data as fields
         appointmentData.forEach((key, value) {
           if (value != null) {
@@ -6279,6 +6389,13 @@ class ActionService {
       } else {
         // Use regular JSON request if no attachment
         print('📤 Sending JSON request without attachment');
+
+        // Check if user has VDS role for bypassing image validation
+        final isVDS = await isVDSUser();
+        if (isVDS) {
+          appointmentData['userrole'] = 'VDS';
+          print('🔓 VDS role detected - image validation will be bypassed');
+        }
 
         final response = await http.post(
           Uri.parse('$baseUrl/appointment'),
@@ -6775,6 +6892,13 @@ class ActionService {
 
       // Add authorization header
       request.headers['Authorization'] = 'Bearer $token';
+
+      // Check if user has VDS role for bypassing image validation
+      final isVDS = await isVDSUser();
+      if (isVDS) {
+        request.fields['userrole'] = 'VDS';
+        print('🔓 VDS role detected - image validation will be bypassed');
+      }
 
       // Add the photo file
       if (await photoFile.exists()) {
@@ -8217,6 +8341,94 @@ class ActionService {
       }
     } catch (error) {
       print(':x: updateReferenceFormStatus error: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error: $error',
+      };
+    }
+  }
+
+  // Delete reference form by ID
+  static Future<Map<String, dynamic>> deleteReferenceFormById(String formId) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final url = '$baseUrl/reference-forms/delete/$formId';
+      print(':outbox_tray: Calling deleteReferenceFormById API: $url');
+
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print(':outbox_tray: deleteReferenceFormById API response status: ${response.statusCode}');
+      print(':outbox_tray: deleteReferenceFormById API response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print(':x: Failed to parse deleteReferenceFormById response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Invalid response format from server',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Reference form deleted successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid form ID format',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 403) {
+        return {
+          'success': false,
+          'statusCode': 403,
+          'message': responseData['message'] ?? 'Access denied. Insufficient permissions.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Reference form not found',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to delete reference form',
+        };
+      }
+    } catch (error) {
+      print(':x: deleteReferenceFormById error: $error');
       return {
         'success': false,
         'statusCode': 500,

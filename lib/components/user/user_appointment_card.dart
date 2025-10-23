@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
-import '../../user/darshan_photos_screen.dart';
+import '../../user/darshan_photos_results_screen.dart';
+import '../../action/action.dart';
 
 class UserAppointmentCard extends StatelessWidget {
   final String appointmentId;
@@ -330,75 +331,97 @@ class UserAppointmentCard extends StatelessWidget {
                 child: Column(
                   children: [
                     // View Darshan Photos Section
-                    // Container(
-                    //   width: double.infinity,
-                    //   height: 48,
-                    //   decoration: BoxDecoration(
-                    //     color: Colors.blue.shade50,
-                    //     borderRadius: BorderRadius.circular(8),
-                    //     border: Border.all(
-                    //       color: Colors.blue.shade200,
-                    //       width: 1,
-                    //     ),
-                    //   ),
-                    //   child: Material(
-                    //     color: Colors.transparent,
-                    //     child: InkWell(
-                    //       borderRadius: BorderRadius.circular(8),
-                    //       onTap: () {
-                    //         if (appointmentData != null) {
-                    //           Navigator.of(context).push(
-                    //             MaterialPageRoute(
-                    //               builder: (context) => DarshanPhotosScreen(
-                    //                 appointmentId: appointmentId,
-                    //                 appointmentData: appointmentData!,
-                    //               ),
-                    //             ),
-                    //           );
-                    //         } else {
-                    //           // Fallback if appointmentData is not available
-                    //           Navigator.of(context).push(
-                    //             MaterialPageRoute(
-                    //               builder: (context) => DarshanPhotosScreen(
-                    //                 appointmentId: appointmentId,
-                    //                 appointmentData: {
-                    //                   'profilePhoto': profilePhoto,
-                    //                   'createdBy': {'fullName': userName},
-                    //                   'accompanyUsers': {
-                    //                     'users': attendeePhotos?.map((photo) => {
-                    //                       'profilePhotoUrl': photo,
-                    //                       'fullName': 'User',
-                    //                     }).toList() ?? [],
-                    //                   },
-                    //                 },
-                    //               ),
-                    //             ),
-                    //           );
-                    //         }
-                    //       },
-                    //       child: Row(
-                    //         mainAxisAlignment: MainAxisAlignment.center,
-                    //         children: [
-                    //           Icon(
-                    //             Icons.camera_alt,
-                    //             size: 20,
-                    //             color: Colors.blue.shade600,
-                    //           ),
-                    //           const SizedBox(width: 8),
-                    //           Text(
-                    //             'View Darshan Photos with Gurudev',
-                    //             style: TextStyle(
-                    //               fontSize: 14,
-                    //               fontWeight: FontWeight.w500,
-                    //               color: Colors.blue.shade600,
-                    //             ),
-                    //           ),
-                    //         ],
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                    // const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () async {
+                            try {
+                              // Use the same API method as darshan_pictures_component
+                              final result = await ActionService.getAppointmentByIdWithDarshanPhotos(appointmentId);
+                              
+                              if (result['success'] == true && result['data'] != null) {
+                                final data = result['data'];
+                                
+                                // Extract user pictures from divineApiResponse
+                                final divineApiResponse = data['divineApiResponse'] as Map<String, dynamic>?;
+                                final userPictures = divineApiResponse?['userPictures'] as List<dynamic>? ?? [];
+                                
+                                // Navigate to the darshan photos results page with the fetched data
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DarshanPhotosResultsScreen(
+                                      appointmentId: appointmentId,
+                                      albumData: data['album'],
+                                      userPictures: List<Map<String, dynamic>>.from(userPictures),
+                                      divineApiResponse: divineApiResponse,
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                // Even if the API call fails, navigate to results screen to show "No Photos Found"
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DarshanPhotosResultsScreen(
+                                      appointmentId: appointmentId,
+                                      albumData: null,
+                                      userPictures: [],
+                                      divineApiResponse: null,
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (error) {
+                              // Even if there's an error, navigate to results screen to show "No Photos Found"
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DarshanPhotosResultsScreen(
+                                    appointmentId: appointmentId,
+                                    albumData: null,
+                                    userPictures: [],
+                                    divineApiResponse: null,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.camera_alt,
+                                size: 20,
+                                color: Colors.blue.shade600,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'View Darshan Photos with Gurudev',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.blue.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Appointment Date
                     _buildDetailRow(
