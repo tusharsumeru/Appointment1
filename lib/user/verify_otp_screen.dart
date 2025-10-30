@@ -4,6 +4,7 @@ import 'dart:async';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../auth/notification_setup_screen.dart';
+import '../auth/login_screen.dart';
 import 'signup_screen.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
@@ -623,8 +624,12 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                    
                    // Back to Login link (outside the card)
                    const SizedBox(height: 32),
-                   GestureDetector(
-                     onTap: () => Navigator.of(context).pop(),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    ),
                      child: Container(
                        padding: const EdgeInsets.symmetric(
                          horizontal: 24,

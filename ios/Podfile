@@ -43,6 +43,12 @@ post_install do |installer|
     # ✅ Allow non-modular headers inside frameworks (Fix for firebase_messaging include error)
     target.build_configurations.each do |config|
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Fix for DKPhotoGallery asset catalog issue
+      if target.name == 'DKPhotoGallery'
+        config.build_settings['ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS'] = 'NO'
+        config.build_settings['ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOL_EXTENSIONS'] = 'NO'
+      end
     end
   end
 end

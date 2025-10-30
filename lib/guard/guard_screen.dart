@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../action/storage_service.dart';
+import '../action/action.dart';
 import '../auth/login_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'appointment_details_screen.dart';
 
 class GuardScreen extends StatefulWidget {
   const GuardScreen({super.key});
@@ -13,6 +15,7 @@ class GuardScreen extends StatefulWidget {
 class _GuardScreenState extends State<GuardScreen> {
   Map<String, dynamic>? userData;
   bool isLoading = true;
+  final TextEditingController _appointmentIdController = TextEditingController();
 
   @override
   void initState() {
@@ -32,6 +35,12 @@ class _GuardScreenState extends State<GuardScreen> {
         isLoading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _appointmentIdController.dispose();
+    super.dispose();
   }
 
   void _openQRScanner() async {
@@ -280,6 +289,133 @@ class _GuardScreenState extends State<GuardScreen> {
                       ],
                     ),
                   ),
+              const SizedBox(height: 16),
+
+              // Appointment AI Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy_outlined,
+                            color: Color(0xFF10B981),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Appointment ID',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Enter an appointment ID to proceed',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _appointmentIdController,
+                      decoration: InputDecoration(
+                        labelText: 'Appointment ID',
+                        hintText: 'e.g. APT-123456',
+                        prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF97316), Color(0xFFEAB308)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _submitAppointmentId,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: const Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.smart_toy_outlined,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Submit',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
                 ],
               ),
             ),
@@ -530,6 +666,49 @@ class _GuardScreenState extends State<GuardScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _submitAppointmentId() async {
+    final String enteredId = _appointmentIdController.text.trim();
+    if (enteredId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter an Appointment ID'),
+        ),
+      );
+      return;
+    }
+
+    // Optionally show a small loading indicator
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Fetching appointment...'),
+        duration: Duration(milliseconds: 800),
+      ),
+    );
+
+    final result = await ActionService.getAppointmentById(enteredId);
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => AppointmentDetailsScreen(
+            appointmentId: enteredId,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to verify appointment status.'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 } 
