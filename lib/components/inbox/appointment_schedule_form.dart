@@ -27,7 +27,7 @@ class _AppointmentScheduleFormState extends State<AppointmentScheduleForm> {
   final TextEditingController _scheduleTimeController = TextEditingController();
   
   // Form values
-  String _selectedTime = '16:30';
+  String _selectedTime = '18:00';
   String _selectedMeetingType = 'Offline';
   String _selectedVenue = 'Secretariat Office A1, Art of Living International Center, Bangalore.';
   String _selectedArrivalTime = '17:15';

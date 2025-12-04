@@ -637,17 +637,30 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       setState(() {
         _guestPhoneErrors[guestNumber] = null; // Don't show error for empty field
       });
+    } else if (phoneNumber.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneNumber)) {
+      // Valid unique phone code (3 digits)
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null;
+      });
+    } else if (phoneNumber.length < 3) {
+      // Too short for either unique code or phone number
+      setState(() {
+        _guestPhoneErrors[guestNumber] = 'Enter a 3-digit unique code or a valid phone number';
+      });
     } else if (phoneNumber.length < expectedLength) {
+      // Phone number is too short
       setState(() {
         _guestPhoneErrors[guestNumber] = 'Phone number is too short. Expected $expectedLength digits, got ${phoneNumber.length}';
       });
     } else if (phoneNumber.length > expectedLength) {
+      // Phone number is too long
       setState(() {
         _guestPhoneErrors[guestNumber] = 'Phone number is too long. Expected $expectedLength digits, got ${phoneNumber.length}';
       });
     } else {
+      // Valid phone number length
       setState(() {
-        _guestPhoneErrors[guestNumber] = null; // Valid length
+        _guestPhoneErrors[guestNumber] = null;
       });
     }
   }
@@ -742,7 +755,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-        final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
 
         // Check required fields
         if (guest['name']?.text.isEmpty == true || guest['age']?.text.isEmpty == true) {
@@ -750,23 +762,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           break;
         }
 
-        // New rules based on checkbox state:
-        // - If checkbox is checked: require unique phone code, phone number not required
-        // - If checkbox is not checked: require phone number, unique code not required
+        // For ages 12-59, require either phone number or unique phone code (3 digits)
         if (age > 12 && age <= 59) {
-          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-          if (isCheckboxChecked) {
-            // When checkbox is checked, unique phone code is required
-            if (!hasUniquePhoneCode) {
-              guestFormValid = false;
-              break;
-            }
-          } else {
-            // When checkbox is not checked, phone number is required
-            if (guest['phone']?.text.isEmpty ?? true) {
-              guestFormValid = false;
-              break;
-            }
+          final phoneValue = guest['phone']?.text.trim() ?? '';
+          final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+          final isPhoneNumber = phoneValue.length > 3;
+          
+          // Require either a valid phone number or a 3-digit unique code
+          if (phoneValue.isEmpty || (!isUniqueCode && !isPhoneNumber)) {
+            guestFormValid = false;
+            break;
           }
         }
 
@@ -847,6 +852,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             referencePhotoUrls: accompanyUserUrls,
             submitType: 'accompanyuser',
           );
+          
+          // Check if the duplicate check API call was successful
+          if (duplicateCheckResult['success'] != true) {
+            // API call failed - show error and allow retry
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+            _validateForm();
+            final errorMessage = duplicateCheckResult['message'] ?? 'Failed to check for duplicate photos';
+            _showPhotoValidationErrorDialog(
+              'Main guest: $errorMessage',
+              () {
+                setState(() {
+                  _selectedImage = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
+            return;
+          }
           
           // Check if duplicates were found
           final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
@@ -929,6 +955,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             File(pickedFile.path),
             submitType: 'subuser',
           );
+          
+          // Check if the duplicate check API call was successful
+          if (duplicateCheckResult['success'] != true) {
+            // API call failed - show error and allow retry
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+            _validateForm();
+            final errorMessage = duplicateCheckResult['message'] ?? 'Failed to check for duplicate photos';
+            _showPhotoValidationErrorDialog(
+              'Main guest: $errorMessage',
+              () {
+                setState(() {
+                  _selectedImage = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
+            return;
+          }
           
           // Check if duplicates were found
           final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
@@ -1142,6 +1189,26 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           referencePhotoUrls: allUrlsToCheck, // use reference_photo_url_* format like web
           submitType: 'accompanyuser',
         );
+
+        // Check if the duplicate check API call was successful
+        if (duplicateCheckResult['success'] != true) {
+          // API call failed - show error and allow retry
+          setState(() {
+            _guestUploading[guestNumber] = false;
+          });
+          final errorMessage = duplicateCheckResult['message'] ?? 'Failed to check for duplicate photos';
+          _showPhotoValidationErrorDialog(
+            'Guest ${_getDisplayPersonNumber(guestNumber)}: $errorMessage',
+            () {
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestTempFiles.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
+          );
+          return;
+        }
 
         // Check if duplicates were found (similar to web version logic)
         final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
@@ -1530,26 +1597,26 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           // Store phoneNumber as object with countryCode and local number only
           final countryCode =
               '+${_guestCountries[guestNumber]?.phoneCode ?? '91'}';
-          final phoneNumber = guest['phone']?.text.trim() ?? '';
-          final fullPhoneNumber = phoneNumber.isNotEmpty ? '$countryCode$phoneNumber' : null; // keep for display if needed
-          final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim();
-          final hasUniquePhoneCode = uniquePhoneCode != null && uniquePhoneCode.isNotEmpty;
+          final phoneValue = guest['phone']?.text.trim() ?? '';
+          
+          // Check if input is a unique phone code (3 digits) or phone number
+          final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+          final isPhoneNumber = phoneValue.length > 3;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
             'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
-          // Check if checkbox is checked to determine which phone data to use
-          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-          if (isCheckboxChecked && hasUniquePhoneCode) {
-            // When checkbox is checked and unique phone code is provided, use it
-            guestData['alternativePhone'] = uniquePhoneCode;
-          } else if (!isCheckboxChecked && fullPhoneNumber != null) {
-            // Only add phoneNumber if we have a phone number and no unique phone code
+          // Determine which phone data to use based on input
+          if (isUniqueCode) {
+            // When input is 3 digits, treat it as unique phone code
+            guestData['alternativePhone'] = phoneValue;
+          } else if (isPhoneNumber && phoneValue.isNotEmpty) {
+            // When input is longer than 3 digits, treat it as phone number
             guestData['phoneNumber'] = {
               'countryCode': countryCode,
-              'number': phoneNumber, // save only local number
+              'number': phoneValue, // save only local number
             };
           }
 
@@ -3667,70 +3734,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Contact Number (show only if checkbox is not checked)
-            if (!(_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
-              _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
-              const SizedBox(height: 16),
-            ],
-
-            // Checkbox for toggling between phone and unique code (always visible for ages 12-59)
-            if (age > 12 && age < 59) ...[
-              Row(
-                children: [
-                  Checkbox(
-                    value: _guestUniquePhoneCodeEnabled[guestNumber] ?? false,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _guestUniquePhoneCodeEnabled[guestNumber] = value ?? false;
-                      });
-                      _validateForm();
-                    },
-                    activeColor: Colors.blue.shade600,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'I don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Unique Phone Code (only show for ages 12..59 and when checkbox is checked)
-            if (age > 12 && age < 59 && (_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
-              _buildGuestTextField(
-                label: 'Unique Phone Code (Optional)',
-                controller: guest['uniquePhoneCode']!,
-                placeholder: 'Enter 3-digit unique phone code',
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 3,
-                onChanged: (value) {
-                  _validateForm();
-                  setState(() {}); // Rebuild to update phone field label
-                },
-                focusNode: guestFocusNodes['uniquePhoneCode'],
-                onSubmitted: () {
-                  // Move to next guest or next section when submitted
-                  if (index < _guestControllers.length - 1) {
-                    // Move to next guest's name field
-                    final nextGuestFocusNodes = _getGuestFocusNodes(index + 2);
-                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, nextGuestFocusNodes['name']);
-                  } else {
-                    // Move to next section (appointment purpose)
-                    _moveToNextField(guestFocusNodes['uniquePhoneCode']!, _appointmentPurposeFocus);
-                  }
-                },
-              ),
-            ],
+            // Contact Number or Unique Phone Code (accepts either phone number or 3-digit unique code)
+            _buildAdditionalGuestPhoneField(guestNumber, guest['phone']!),
+            const SizedBox(height: 16),
 
             // Photo Section (only show if age > 12)
             if (isPhotoRequired) ...[
@@ -4298,7 +4304,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 keyboardType: TextInputType.phone,
                 onChanged: onChanged,
                 decoration: InputDecoration(
-                  hintText: 'Enter phone number',
+                  hintText: '',
                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                   filled: true,
                   fillColor: Colors.grey[50],
@@ -5311,17 +5317,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
     final guestFocusNodes = _getGuestFocusNodes(guestNumber);
     
-    // Find the guest data (unique phone code disabled)
+    // Find the guest data
     final guestIndex = guestNumber - 1;
     final guest = guestIndex < _guestControllers.length ? _guestControllers[guestIndex] : null;
     final age = guest != null ? int.tryParse(guest['age']?.text ?? '0') ?? 0 : 0;
-    final hasUniquePhoneCode = guest != null ? guest['uniquePhoneCode']?.text.isNotEmpty == true : false;
     
-    // Determine if phone is required based on checkbox state
-    // - If checkbox is checked: phone not required (unique code will be used instead)
-    // - If checkbox is not checked: phone required for ages 12-59
-    final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-    final isPhoneRequired = (age > 12 && age < 59) && !isCheckboxChecked;
+    // Check if input is a unique phone code (3 digits) or phone number
+    final phoneValue = controller.text.trim();
+    final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+    
+    // Phone/unique code is required for ages 12-59
+    final isPhoneRequired = age > 12 && age < 59;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -5334,7 +5340,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               color: Colors.black87,
             ),
             children: [
-              TextSpan(text: isPhoneRequired ? 'Contact Number ' : 'Contact Number (Optional)'),
+              TextSpan(
+                text: isPhoneRequired 
+                    ? 'Contact Number or Special Code' 
+                    : 'Contact Number or Special Code (Optional)'
+              ),
               if (isPhoneRequired)
                 const TextSpan(
                   text: '*',
@@ -5347,10 +5357,31 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         ),
         const SizedBox(height: 6),
+        // Hint text about phone number or special code
+        Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            border: Border.all(
+              color: Colors.blue.shade200,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '💡 Enter a phone number with country code OR a special 3-digit code provided by the secretariat.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.blue.shade700,
+            ),
+          ),
+        ),
         Row(
           children: [
-            // Country Code Button
-            GestureDetector(
+            // Country Code Button (only show when not entering unique code)
+            if (!isUniqueCode)
+              GestureDetector(
               onTap: () {
                 showCountryPicker(
                   context: context,
@@ -5425,18 +5456,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Phone Number Field
+            if (!isUniqueCode) const SizedBox(width: 8),
+            // Phone Number Field (accepts either phone number or 3-digit unique code)
             Expanded(
               child: TextField(
                 controller: controller,
                 focusNode: guestFocusNodes['phone'],
                 keyboardType: TextInputType.number,
+                // Allow up to phone length (which is always >= 3), validation will determine if it's unique code or phone
                 maxLength: PhoneValidation.getPhoneLengthForCountryObject(country),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: (value) {
                   _validateAdditionalGuestPhone(guestNumber, value);
                   _validateForm();
+                  setState(() {}); // Rebuild to update label if needed
                 },
                 onSubmitted: (_) {
                   // Move to next guest or next section when submitted
@@ -5477,14 +5510,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     horizontal: 12,
                     vertical: 12,
                   ),
+                  hintText: '',
                   counterText: '', // Hide the character counter
                 ),
               ),
             ),
           ],
         ),
+        // Success message when unique phone code is detected
+        if (isUniqueCode) ...[
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: Colors.green.shade600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Valid special code detected - no further\ncontact required',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green.shade600,
+                  ),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+        ],
         // Phone validation error for additional guests
-        if (_guestPhoneErrors[guestNumber] != null) ...[
+        if (_guestPhoneErrors[guestNumber] != null && !isUniqueCode) ...[
           const SizedBox(height: 4),
           Text(
             _guestPhoneErrors[guestNumber]!,

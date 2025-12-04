@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../action/storage_service.dart';
 import '../action/action.dart';
 import '../auth/login_screen.dart';
@@ -44,10 +45,44 @@ class _GuardScreenState extends State<GuardScreen> {
   }
 
   void _openQRScanner() async {
+    // Simply open the QR scanner
+    // The scanner itself will trigger the iOS permission dialog when it tries to access the camera
+    print('📷 Opening QR Scanner...');
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const QRScannerScreen(),
       ),
+    );
+  }
+  
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Camera Permission Required'),
+          content: const Text(
+            'Camera permission is required to scan QR codes. Please enable camera access in Settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -578,7 +613,7 @@ class _GuardScreenState extends State<GuardScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Build 5.0.0',
+                  'Build 6.0.0',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

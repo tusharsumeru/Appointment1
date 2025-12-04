@@ -39,12 +39,31 @@ android {
         
         // Support for 16KB memory page sizes (required for Android 15+)
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+    
+    // Configure packaging for 16 KB page size support
+    packaging {
+        jniLibs {
+            // Use uncompressed native libraries for 16 KB alignment
+            // AGP 8.5.1+ handles 16 KB alignment automatically with uncompressed libs
+            useLegacyPackaging = false
+            // Exclude old MLKit native libraries that don't support 16KB page sizes
+            // These are from older MLKit versions (< 17.3.0) that don't support Android 15+
+            excludes += listOf(
+                "**/libimage_processing_util_jni.so"  // Old MLKit library - not compatible with 16KB
+            )
         }
         
-        // Enable 16KB page size support
-        manifestPlaceholders["android.app.lib_name"] = "flutter"
-        manifestPlaceholders["android.app.lib_name.16kb"] = "flutter"
+        resources {
+            // Exclude duplicate MLKit model files if any
+            excludes += listOf(
+                "META-INF/*.kotlin_module",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1"
+            )
+        }
     }
 
     signingConfigs {
@@ -65,16 +84,28 @@ android {
                 signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isShrinkResources = false // Don't shrink resources - can cause issues with MLKit
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
 
 flutter {
     source = "../.."
+    // Explicitly disable deferred components - we don't use Play Store dynamic features
+    // This prevents R8 from looking for Play Core SplitCompat classes
 }
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // ✅ Required for Java 8+ features
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") // ✅ Required for Java 8+ features & flutter_local_notifications 19.x
+    
+    // MLKit barcode scanning for mobile_scanner plugin
+    // Version 17.3.0+ supports 16KB memory page sizes for Android 15+
+    // This bundled dependency includes native libraries (libbarhopper_v3.so) and all internal modules
+    // DO NOT add other MLKit dependencies - they are pulled automatically as transitive dependencies
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 }

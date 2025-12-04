@@ -37,16 +37,43 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         });
         
         // Load detailed appointment data for scheduled date, time, and venue
-        final detailedResult = await ActionService.getAppointmentByIdDetailed(widget.appointmentId);
-        print('DEBUG: Detailed result success: ${detailedResult['success']}');
-        if (detailedResult['success']) {
-          print('DEBUG: Detailed data received: ${detailedResult['data']}');
-          setState(() {
-            detailedAppointmentData = detailedResult['data'];
-            isLoading = false;
-          });
-        } else {
-          print('DEBUG: Detailed result failed: ${detailedResult['message']}');
+        try {
+          final detailedResult = await ActionService.getAppointmentByIdDetailed(widget.appointmentId);
+          print('DEBUG: Detailed result success: ${detailedResult['success']}');
+          print('DEBUG: Detailed result keys: ${detailedResult.keys}');
+          
+          if (detailedResult['success'] && detailedResult['data'] != null) {
+            final data = detailedResult['data'];
+            print('DEBUG: Detailed data type: ${data.runtimeType}');
+            print('DEBUG: Detailed data keys: ${data is Map ? data.keys.toList() : 'Not a Map'}');
+            print('DEBUG: Full detailed data: $data');
+            
+            if (data is Map<String, dynamic>) {
+              print('DEBUG: Has scheduledDateTime: ${data.containsKey('scheduledDateTime')}');
+              print('DEBUG: scheduledDateTime value: ${data['scheduledDateTime']}');
+              print('DEBUG: scheduledDateTime type: ${data['scheduledDateTime']?.runtimeType}');
+              
+              // Print all keys to see what's available
+              print('DEBUG: All available keys in detailed data:');
+              data.keys.forEach((key) {
+                print('  - $key: ${data[key]?.runtimeType}');
+              });
+            }
+            
+            setState(() {
+              detailedAppointmentData = data;
+              isLoading = false;
+            });
+          } else {
+            print('DEBUG: Detailed result failed: ${detailedResult['message']}');
+            print('DEBUG: Detailed result statusCode: ${detailedResult['statusCode']}');
+            setState(() {
+              isLoading = false;
+            });
+          }
+        } catch (detailedError) {
+          print('DEBUG: Error loading detailed data: $detailedError');
+          print('DEBUG: Error stack trace: ${StackTrace.current}');
           setState(() {
             isLoading = false;
           });
@@ -181,6 +208,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     } catch (e) {
+      print('DEBUG: Error formatting scheduled date: $e');
       return 'N/A';
     }
   }
@@ -194,6 +222,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       
       return timeStr ?? 'N/A';
     } catch (e) {
+      print('DEBUG: Error formatting scheduled time: $e');
       return 'N/A';
     }
   }
@@ -207,13 +236,45 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       
       return venueLabel ?? 'N/A';
     } catch (e) {
+      print('DEBUG: Error getting scheduled venue: $e');
       return 'N/A';
     }
   }
 
+  bool _isQuickAppointment() {
+    if (detailedAppointmentData == null) return false;
+    final apptType = detailedAppointmentData!['appt_type']?.toString();
+    final quickApt = detailedAppointmentData!['quick_apt'];
+    return apptType == 'quick' && 
+           quickApt is Map<String, dynamic> && 
+           quickApt['isQuickAppointment'] == true;
+  }
+
   int _getTotalNumberOfUsers() {
-    // Prefer top-level totalUsers when available (used for large groups)
     try {
+      // Check if this is a quick appointment
+      if (_isQuickAppointment() && appointmentData != null) {
+        // For quick appointments, use totalUsers from checkInStatus first
+        if (appointmentData!['totalUsers'] != null) {
+          final total = int.tryParse(appointmentData!['totalUsers'].toString()) ?? 0;
+          if (total > 0) {
+            return total;
+          }
+        }
+        // Fallback to numberOfPeople in quick_apt.optional
+        final quickApt = detailedAppointmentData!['quick_apt'];
+        if (quickApt is Map<String, dynamic>) {
+          final optional = quickApt['optional'];
+          if (optional is Map<String, dynamic> && optional['numberOfPeople'] != null) {
+            final numberOfPeople = int.tryParse(optional['numberOfPeople'].toString()) ?? 0;
+            if (numberOfPeople > 0) {
+              return numberOfPeople;
+            }
+          }
+        }
+      }
+
+      // Prefer top-level totalUsers when available (used for large groups)
       if (appointmentData != null && appointmentData!['totalUsers'] != null) {
         final total = int.tryParse(appointmentData!['totalUsers'].toString()) ?? 0;
         if (total > 0) {
@@ -292,6 +353,28 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   int _getTotalUsers() {
     if (appointmentData == null) return 0;
     
+    // Check if this is a quick appointment
+    if (_isQuickAppointment()) {
+      // For quick appointments, use totalUsers from checkInStatus first
+      final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
+      if (totalUsers > 0) {
+        return totalUsers;
+      }
+      // Fallback to numberOfPeople in quick_apt.optional
+      if (detailedAppointmentData != null) {
+        final quickApt = detailedAppointmentData!['quick_apt'];
+        if (quickApt is Map<String, dynamic>) {
+          final optional = quickApt['optional'];
+          if (optional is Map<String, dynamic> && optional['numberOfPeople'] != null) {
+            final numberOfPeople = int.tryParse(optional['numberOfPeople'].toString()) ?? 0;
+            if (numberOfPeople > 0) {
+              return numberOfPeople;
+            }
+          }
+        }
+      }
+    }
+    
     final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
     final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
@@ -314,9 +397,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     if (appointmentData == null) return 0;
     
     final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
-    final actualTotalUsers = usersList.length;
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
     final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    
+    // For quick appointments, always use checkedInUsers directly
+    // (users array only has main user, so we can't count from array)
+    if (_isQuickAppointment()) {
+      return checkedInUsers;
+    }
     
     // If total users from backend is more than 10, use checkedInUsers directly
     if (totalUsers > 10) {
@@ -360,6 +448,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final usersList = (appointmentData!['users'] as List<dynamic>?) ?? [];
     final totalUsers = int.tryParse(appointmentData!['totalUsers']?.toString() ?? '') ?? 0;
     final checkedInUsers = int.tryParse(appointmentData!['checkedInUsers']?.toString() ?? '') ?? 0;
+    
+    // For quick appointments, calculate not arrived as total - admitted - rejected
+    // (users array only has main user, so we calculate from totals)
+    if (_isQuickAppointment()) {
+      final rejectedCount = usersList.where((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        final status = userMap['status']?.toString().toLowerCase();
+        return status == 'rejected';
+      }).length;
+      return totalUsers - checkedInUsers - rejectedCount;
+    }
     
     // If total users from backend is more than 10, calculate not arrived as total - admitted - rejected
     if (totalUsers > 10) {
@@ -884,6 +983,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final totalUsers = _getTotalNumberOfUsers();
     final isAccompanyingUserWithoutPhoto = userType != 'main' && profilePhotoUrl == null && totalUsers > 10;
     final isNewUser = user['adminStatus'] == true || user['adminStatus'] == 'true';
+    final isVip = user['type']?.toString().toLowerCase() == 'vip';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -917,40 +1017,49 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF333333),
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isNewUser) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.withOpacity(0.7),
-                        Colors.blue.withOpacity(0.5),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.5),
-                      width: 1.5,
+                      color: Colors.blue.shade200,
+                      width: 1,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
-                  child: const Text(
+                  child: Text(
                     'SECRETARY ADDED',
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (isVip) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.purple.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    'VIP',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.purple.shade700,
                     ),
                   ),
                 ),
@@ -1333,6 +1442,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                 )
               : SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1585,7 +1695,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       
                       // Action Buttons (only show when there are pending users)
                       if (_hasPendingUsers()) ...[
-                        if (_getTotalNumberOfUsers() > 10) ...[
+                        // Check if this is a quick appointment
+                        if (_isQuickAppointment()) ...[
+                          // For quick appointments, always show Partially Admit button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _showPartialAdmissionDialog,
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: const Text('Partially Admit'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ] else if (_getTotalNumberOfUsers() > 10) ...[
                           // For large groups (>10 users), show Partially Admitted button
                           SizedBox(
                             width: double.infinity,

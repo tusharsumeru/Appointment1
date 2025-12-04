@@ -1155,16 +1155,44 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     }
 
     final country = _guestCountries[guestNumber] ?? _selectedCountry;
-    String? errorMessage;
-    if (PhoneValidation.isPhoneNumberTooShort(phoneNumber, country)) {
-      errorMessage = PhoneValidation.getDetailedPhoneValidationMessage(phoneNumber, country);
-    } else if (PhoneValidation.isPhoneNumberTooLong(phoneNumber, country)) {
-      errorMessage = PhoneValidation.getDetailedPhoneValidationMessage(phoneNumber, country);
+    final expectedLength = PhoneValidation.getPhoneLengthForCountryObject(country);
+    
+    if (expectedLength == 0) {
+      // No example available, no validation
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null;
+      });
+      return;
     }
-
-    setState(() {
-      _guestPhoneErrors[guestNumber] = errorMessage;
-    });
+    
+    if (phoneNumber.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneNumber)) {
+      // Valid unique phone code (3 digits)
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null;
+      });
+    } else if (phoneNumber.length < 3) {
+      // Too short for either unique code or phone number
+      setState(() {
+        _guestPhoneErrors[guestNumber] = 'Enter a 3-digit unique code or a valid phone number';
+      });
+    } else if (phoneNumber.length < expectedLength) {
+      // Phone number is too short
+      String? errorMessage = PhoneValidation.getDetailedPhoneValidationMessage(phoneNumber, country);
+      setState(() {
+        _guestPhoneErrors[guestNumber] = errorMessage;
+      });
+    } else if (phoneNumber.length > expectedLength) {
+      // Phone number is too long
+      String? errorMessage = PhoneValidation.getDetailedPhoneValidationMessage(phoneNumber, country);
+      setState(() {
+        _guestPhoneErrors[guestNumber] = errorMessage;
+      });
+    } else {
+      // Valid phone number length
+      setState(() {
+        _guestPhoneErrors[guestNumber] = null;
+      });
+    }
   }
 
   void _validateForm() {
@@ -1211,8 +1239,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         var guest = _guestControllers[i];
         int guestNumber = i + 1;
         final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-        final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
-        final hasPhoneNumber = guest['phone']?.text.isNotEmpty == true;
 
         // Check required fields
         if (guest['name']?.text.isEmpty == true || guest['age']?.text.isEmpty == true) {
@@ -1220,23 +1246,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           break;
         }
 
-        // New rules based on checkbox state:
-        // - If checkbox is checked: require unique phone code, phone number not required
-        // - If checkbox is not checked: require phone number, unique code not required
+        // For ages 12-59, require either phone number or unique phone code (3 digits)
         if (age > 12 && age <= 59) {
-          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-          if (isCheckboxChecked) {
-            // When checkbox is checked, unique phone code is required
-            if (!hasUniquePhoneCode) {
-              guestFormValid = false;
-              break;
-            }
-          } else {
-            // When checkbox is not checked, phone number is required
-            if (!hasPhoneNumber) {
-              guestFormValid = false;
-              break;
-            }
+          final phoneValue = guest['phone']?.text.trim() ?? '';
+          final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+          final isPhoneNumber = phoneValue.length > 3;
+          
+          // Require either a valid phone number or a 3-digit unique code
+          if (phoneValue.isEmpty || (!isUniqueCode && !isPhoneNumber)) {
+            guestFormValid = false;
+            break;
           }
         }
 
@@ -1357,42 +1376,29 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           var guest = _guestControllers[i];
           int guestNumber = i + 1;
 
-          final phoneText = guest['phone']?.text.trim() ?? '';
+          // Store phoneNumber as object with countryCode and local number only
           final countryCode = _guestCountries[guestNumber]?.phoneCode ?? '91';
-          final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
-          final uniquePhoneCode = guest['uniquePhoneCode']?.text.trim() ?? '';
-          final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
+          final phoneValue = guest['phone']?.text.trim() ?? '';
           
-          // Include phone number ONLY if user provided one
-          Map<String, dynamic>? phoneNumberObj;
-          if (phoneText.isNotEmpty) {
-            phoneNumberObj = {
-              'countryCode': '+$countryCode',
-              'number': phoneText, // save only local number
-            };
-          }
-
-          if (phoneNumberObj != null) {
-            print(
-              '📞 Saving accompanying user ${guestNumber + 1} phone: ${phoneNumberObj['countryCode']}$phoneText',
-            );
-          } else {
-            print('📞 Saving accompanying user ${guestNumber + 1} phone: <none>');
-          }
+          // Check if input is a unique phone code (3 digits) or phone number
+          final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+          final isPhoneNumber = phoneValue.length > 3;
 
           Map<String, dynamic> guestData = {
             'fullName': guest['name']?.text.trim() ?? '',
-            'age': age,
+            'age': int.tryParse(guest['age']?.text ?? '0') ?? 0,
           };
 
-          // Check if checkbox is checked to determine which phone data to use
-          final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-          if (isCheckboxChecked && hasUniquePhoneCode) {
-            // When checkbox is checked and unique phone code is provided, use it
-            guestData['alternativePhone'] = uniquePhoneCode;
-          } else if (!isCheckboxChecked && phoneNumberObj != null) {
-            // Only add phoneNumber if we have a phone number and no unique phone code
-            guestData['phoneNumber'] = phoneNumberObj;
+          // Determine which phone data to use based on input
+          if (isUniqueCode) {
+            // When input is 3 digits, treat it as unique phone code
+            guestData['alternativePhone'] = phoneValue;
+          } else if (isPhoneNumber && phoneValue.isNotEmpty) {
+            // When input is longer than 3 digits, treat it as phone number
+            guestData['phoneNumber'] = {
+              'countryCode': '+$countryCode',
+              'number': phoneValue, // save only local number
+            };
           }
 
           if (_guestImages.containsKey(guestNumber)) {
@@ -2769,16 +2775,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     final age = guestIndex < _guestControllers.length 
         ? int.tryParse(_guestControllers[guestIndex]['age']?.text ?? '0') ?? 0
         : 0;
-    final hasUniquePhoneCode = guestIndex < _guestControllers.length 
-        ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
-        : false;
     
-    // Determine if phone is required based on checkbox state
-    // - If checkbox is checked: phone not required (unique code will be used instead)
-    // - If checkbox is not checked: phone required for ages 12-59
-    final isCheckboxChecked = _guestUniquePhoneCodeEnabled[guestNumber] ?? false;
-    final isPhoneRequired = (age > 12 && age <= 59) && !isCheckboxChecked;
-    final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
+    // Check if input is a unique phone code (3 digits) or phone number
+    final phoneValue = controller.text.trim();
+    final isUniqueCode = phoneValue.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneValue);
+    
+    // Phone/unique code is required for ages 12-59
+    final isPhoneRequired = age > 12 && age < 59;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2791,31 +2794,48 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               color: Colors.black87,
             ),
             children: [
-              TextSpan(text: phoneLabel.replaceAll(' *', '').replaceAll(' (Optional)', '')),
+              TextSpan(
+                text: isPhoneRequired 
+                    ? 'Contact Number or Special Code ' 
+                    : 'Contact Number or Special Code (Optional)'
+              ),
               if (isPhoneRequired)
                 const TextSpan(
-                  text: ' *',
+                  text: '*',
                   style: TextStyle(
                     color: Colors.red,
                     fontWeight: FontWeight.bold,
-                  ),
-                )
-              else
-                const TextSpan(
-                  text: ' (Optional)',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.normal,
                   ),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        // Hint text about phone number or special code
+        Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            border: Border.all(
+              color: Colors.blue.shade200,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '💡 Enter a phone number with country code OR a special 3-digit code provided by the secretariat.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.blue.shade700,
+            ),
+          ),
+        ),
         Row(
           children: [
-            // Country picker button
-            GestureDetector(
+            // Country Code Button (only show when not entering unique code)
+            if (!isUniqueCode)
+              GestureDetector(
               onTap: () {
                 showCountryPicker(
                   context: context,
@@ -2876,43 +2896,82 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                 ),
               ),
             ),
-            // Phone number field
+            if (!isUniqueCode) const SizedBox(width: 8),
+            // Phone Number Field (accepts either phone number or 3-digit unique code)
             Expanded(
               child: TextFormField(
                 controller: controller,
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.number,
+                // Allow up to phone length (which is always >= 3), validation will determine if it's unique code or phone
                 maxLength: PhoneValidation.getPhoneLengthForCountryObject(country),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) {
+                  _validateAccompanyingUserPhone(guestNumber, value);
+                  _validateForm();
+                  setState(() {}); // Rebuild to update label if needed
+                },
                 decoration: InputDecoration(
-                  hintText: 'Enter phone number',
+                  hintText: '',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    borderSide: BorderSide(color: Colors.deepPurple),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.deepPurple),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[300]!),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.red[500]!),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 12,
                   ),
-                  counterText: '', // Hide character counter
+                  counterText: '', // Hide the character counter
                 ),
-                onChanged: (value) {
-                  _validateAccompanyingUserPhone(guestNumber, value);
-                  _validateForm();
-                },
               ),
             ),
           ],
         ),
+        // Success message when unique phone code is detected
+        if (isUniqueCode) ...[
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: Colors.green.shade600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Valid special code detected - no further\ncontact required',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green.shade600,
+                  ),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+        ],
         // Phone validation error message
-        if (_guestPhoneErrors[guestNumber] != null) ...[
+        if (_guestPhoneErrors[guestNumber] != null && !isUniqueCode) ...[
           const SizedBox(height: 4),
           Text(
             _guestPhoneErrors[guestNumber]!,
@@ -2933,9 +2992,6 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     // Check if photo is required (age > 12)
     final age = int.tryParse(guest['age']?.text ?? '0') ?? 0;
     final isPhotoRequired = age > 12;
-    
-    final hasUniquePhoneCode = guest['uniquePhoneCode']?.text.isNotEmpty == true;
-    final shouldShowUniquePhoneCode = (age > 12 && age <= 59);
     
     // Debug print
     print('🔍 Guest $guestNumber - Age: $age');
@@ -3038,60 +3094,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Contact Number (show only if checkbox is not checked)
-            if (!(_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
-              _buildAccompanyingUserPhoneField(guestNumber, guest['phone'] ?? TextEditingController()),
-              const SizedBox(height: 16),
-            ],
-
-            // Checkbox for toggling between phone and unique code (always visible for ages 12-59)
-            if (age > 12 && age < 59) ...[
-              Row(
-                children: [
-                  Checkbox(
-                    value: _guestUniquePhoneCodeEnabled[guestNumber] ?? false,
-                    onChanged: (_guestUniquePhoneCodeDisabled[guestNumber] ?? false) ? null : (bool? value) {
-                      setState(() {
-                        _guestUniquePhoneCodeEnabled[guestNumber] = value ?? false;
-                      });
-                      _validateForm();
-                    },
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Use unique phone code instead of phone number',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Unique Phone Code (only show for ages 12..59 and when checkbox is checked)
-            if (age > 12 && age < 59 && (_guestUniquePhoneCodeEnabled[guestNumber] ?? false)) ...[
-              _buildReferenceField(
-                label: 'Unique Phone Code (Optional)',
-                controller: guest['uniquePhoneCode'] ?? TextEditingController(),
-                placeholder: 'Enter 3-digit unique phone code',
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 3,
-                onChanged: (value) {
-                  _validateForm();
-                  setState(() {}); // Rebuild to update phone field label
-                },
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'If you don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+            // Contact Number or Unique Phone Code (accepts either phone number or 3-digit unique code)
+            _buildAccompanyingUserPhoneField(guestNumber, guest['phone'] ?? TextEditingController()),
+            const SizedBox(height: 16),
 
             // Photo Section (only show if age > 12)
             if (isPhotoRequired) ...[

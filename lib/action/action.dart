@@ -18,11 +18,11 @@ class ActionService {
   static Future<void> initializeBaseUrl() async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://apt.sumerudigital.com/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://artofliving.io/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://apt.sumerudigital.com/api/v3/baseurl'),
+        Uri.parse('https://artofliving.io/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -64,11 +64,11 @@ class ActionService {
   static Future<String> get _oldBaseUrl async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: hhttps://apt.sumerudigital.com/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://artofliving.io/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://apt.sumerudigital.com/api/v3/baseurl'),
+        Uri.parse('https://artofliving.io/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -80,7 +80,7 @@ class ActionService {
           '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
         );
         // Fallback to hardcoded URL if API fails
-        return 'https://apt.sumerudigital.com/api/v3';
+        return 'https://artofliving.io/api/v3';
       }
 
       final data = jsonDecode(response.body);
@@ -93,7 +93,7 @@ class ActionService {
     } catch (error) {
       print('❌ [ERROR] Failed to fetch base URL: $error');
       // Fallback to hardcoded URL if there's an error
-      return 'https://apt.sumerudigital.com/api/v3';
+      return 'https://artofliving.io/api/v3';
     }
   }
 
@@ -1341,6 +1341,7 @@ class ActionService {
       }
 
       // Validate appointmentId
+      // Note: Backend expects appointmentId (string field), not MongoDB _id (ObjectId)
       if (appointmentId.isEmpty) {
         return {
           'success': false,
@@ -2928,6 +2929,7 @@ class ActionService {
     List<Map<String, dynamic>>? users,
     int? totalUsers,
     int? partialUsersCount,
+    String? type,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -2953,6 +2955,9 @@ class ActionService {
       }
       if (partialUsersCount != null) {
         requestBody['partialUsersCount'] = partialUsersCount;
+      }
+      if (type != null) {
+        requestBody['type'] = type;
       }
 
       final response = await http.put(
@@ -3819,7 +3824,7 @@ class ActionService {
     String? emailId,
     String? phoneNumber,
     required String designation,
-    required String venue,
+    String? venue,
     String? purpose,
     String? remarksForGurudev,
     int numberOfPeople = 1,
@@ -3857,7 +3862,11 @@ class ActionService {
       request.fields['designation'] = designation;
       request.fields['preferredDate'] = preferredDate;
       request.fields['preferredTime'] = preferredTime;
-      request.fields['venue'] = venue;
+      
+      // Add venue only if provided (optional)
+      if (venue != null && venue.trim().isNotEmpty) {
+        request.fields['venue'] = venue.trim();
+      }
 
       // Always send numberOfPeople (even if it's 1) to ensure backend receives it
       request.fields['numberOfPeople'] = numberOfPeople.toString();
@@ -5060,18 +5069,132 @@ class ActionService {
       );
 
       // Parse response
+      final responseBody = response.body;
+      
       if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        return responseData;
+        try {
+          final Map<String, dynamic> responseData = jsonDecode(responseBody);
+          
+          // Transform backend response to match UI expectations
+          // Backend returns: { results: { appointments: {data, total}, events: {data, total} }, pagination: {page, limit} }
+          // UI expects: { data: [...], pagination: {currentPage, totalPages, totalCount, hasNextPage} }
+          
+          if (responseData['success'] == true && responseData['results'] != null) {
+            final results = responseData['results'] as Map<String, dynamic>;
+            final appointments = results['appointments'] as Map<String, dynamic>? ?? {};
+            final events = results['events'] as Map<String, dynamic>? ?? {};
+            
+            // Combine appointments and events
+            final List<dynamic> combinedData = [];
+            
+            // Add appointments with type marker
+            final appointmentsList = appointments['data'] as List<dynamic>? ?? [];
+            for (var apt in appointmentsList) {
+              combinedData.add({
+                ...apt as Map<String, dynamic>,
+                '_resultType': 'appointment',
+              });
+            }
+            
+            // Add events with type marker
+            final eventsList = events['data'] as List<dynamic>? ?? [];
+            for (var event in eventsList) {
+              combinedData.add({
+                ...event as Map<String, dynamic>,
+                '_resultType': 'event',
+              });
+            }
+            
+            // Calculate pagination info
+            final pagination = responseData['pagination'] as Map<String, dynamic>? ?? {};
+            final currentPage = pagination['page'] as int? ?? page;
+            final limitValue = pagination['limit'] as int? ?? limit;
+            final totalAppointments = appointments['total'] as int? ?? 0;
+            final totalEvents = events['total'] as int? ?? 0;
+            final totalCount = totalAppointments + totalEvents;
+            final totalPages = (totalCount / limitValue).ceil();
+            final hasNextPage = currentPage < totalPages;
+            
+            return {
+              'success': true,
+              'query': responseData['query'] ?? query,
+              'data': combinedData,
+              'pagination': {
+                'currentPage': currentPage,
+                'totalPages': totalPages,
+                'totalCount': totalCount,
+                'hasNextPage': hasNextPage,
+                'limit': limitValue,
+              },
+              'results': {
+                'appointments': {
+                  'total': totalAppointments,
+                  'data': appointmentsList,
+                },
+                'events': {
+                  'total': totalEvents,
+                  'data': eventsList,
+                },
+              },
+            };
+          } else {
+            // Handle unexpected response structure
+            throw Exception(
+              responseData['message'] ?? 'Invalid response format from server',
+            );
+          }
+        } catch (e) {
+          if (e is Exception) {
+            rethrow;
+          }
+          throw Exception('Failed to parse server response: ${e.toString()}');
+        }
+      } else if (response.statusCode == 400) {
+        // Bad request - validation error
+        try {
+          final Map<String, dynamic> errorData = jsonDecode(responseBody);
+          throw Exception(
+            errorData['message'] ?? 'Invalid search request. Please check your search query.',
+          );
+        } catch (e) {
+          if (e is Exception) {
+            rethrow;
+          }
+          throw Exception('Invalid search request. Please check your search query.');
+        }
       } else if (response.statusCode == 401) {
         // Token expired or invalid
         await StorageService.logout(); // Clear stored data
         throw Exception('Session expired. Please login again.');
+      } else if (response.statusCode == 403) {
+        // Forbidden
+        throw Exception('You do not have permission to perform this search.');
+      } else if (response.statusCode == 500) {
+        // Server error
+        try {
+          final Map<String, dynamic> errorData = jsonDecode(responseBody);
+          throw Exception(
+            errorData['message'] ?? 'Server error occurred. Please try again later.',
+          );
+        } catch (e) {
+          if (e is Exception) {
+            rethrow;
+          }
+          throw Exception('Server error occurred. Please try again later.');
+        }
       } else {
-        final Map<String, dynamic> errorData = jsonDecode(response.body);
-        throw Exception(
-          errorData['message'] ?? 'Failed to perform global search',
-        );
+        // Other errors
+        try {
+          final Map<String, dynamic> errorData = jsonDecode(responseBody);
+          throw Exception(
+            errorData['message'] ?? 'Failed to perform global search. Status: ${response.statusCode}',
+          );
+        } catch (e) {
+          if (e is Exception) {
+            rethrow;
+          }
+          throw Exception('Failed to perform global search. Status: ${response.statusCode}');
+        }
       }
     } catch (error) {
       if (error is Exception) {
@@ -6441,6 +6564,653 @@ class ActionService {
     }
   }
 
+  // Create event appointment
+  static Future<Map<String, dynamic>> createEvent({
+    required String eventName,
+    required String eventFromDateTime,
+    required String eventToDateTime,
+    required String eventLocation,
+    required String eventDescription,
+    File? eventImageFile,
+    String? eventStatus,
+    int? eventCapacity,
+    String? secretaryNotes,
+  }) async {
+    try {
+      final baseUrl = _baseUrl;
+      if (baseUrl == null) {
+        throw Exception('Base URL not initialized. Please restart the app.');
+      }
+
+      // Get authentication token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+          'error': 'Authentication required',
+        };
+      }
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/events'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      request.fields['eventName'] = eventName;
+      request.fields['eventFromDateTime'] = eventFromDateTime;
+      request.fields['eventToDateTime'] = eventToDateTime;
+      request.fields['eventLocation'] = eventLocation;
+      request.fields['eventDescription'] = eventDescription;
+
+      // Add optional fields if provided
+      if (eventStatus != null) {
+        request.fields['eventStatus'] = eventStatus;
+      }
+      if (eventCapacity != null) {
+        request.fields['eventCapacity'] = eventCapacity.toString();
+      }
+      if (secretaryNotes != null && secretaryNotes.isNotEmpty) {
+        request.fields['secretaryNotes'] = secretaryNotes;
+      }
+
+      // Add the image file only if provided
+      if (eventImageFile != null) {
+        try {
+          // Validate that event image file exists
+          if (!await eventImageFile.exists()) {
+            return {
+              'success': false,
+              'statusCode': 400,
+              'message': 'Event image file not found.',
+              'error': 'File not found',
+            };
+          }
+
+          print('📸 Adding event image file to request: ${eventImageFile.path}');
+          final fileStream = http.ByteStream(eventImageFile.openRead());
+          final fileLength = await eventImageFile.length();
+          
+          // Get file extension and determine content type
+          final fileName = eventImageFile.path.split('/').last;
+          final fileExtension = fileName.contains('.') 
+              ? fileName.split('.').last.toLowerCase() 
+              : 'jpg';
+          final contentType = MediaType(
+            'image',
+            fileExtension == 'jpg' ? 'jpeg' : fileExtension,
+          );
+
+          final multipartFile = http.MultipartFile(
+            'eventImage', // Field name expected by server (multer configuration)
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: contentType,
+          );
+          request.files.add(multipartFile);
+          print('📸 Event image file added successfully');
+          print('📸 File field name: eventImage');
+          print('📸 File name: $fileName');
+          print('📸 File size: $fileLength bytes');
+        } catch (fileError) {
+          print('❌ Error adding event image file: $fileError');
+          return {
+            'success': false,
+            'statusCode': 500,
+            'message': 'Error processing event image file.',
+            'error': fileError.toString(),
+          };
+        }
+      } else {
+        print('📸 No event image file provided - creating event without image');
+      }
+
+      final url = '$baseUrl/events';
+      print('📅 Creating event: $url');
+      print('📤 Event name: $eventName');
+      print('📤 Event from: $eventFromDateTime');
+      print('📤 Event to: $eventToDateTime');
+      print('📤 Event location: $eventLocation');
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Event creation response status: ${response.statusCode}');
+      print('📥 Event creation response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse event creation response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 201) {
+        print('✅ Event created successfully!');
+        return {
+          'success': true,
+          'statusCode': response.statusCode,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Event created successfully.',
+          'error': responseData['error'],
+        };
+      } else {
+        print('❌ Failed to create event: ${responseData['message']}');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Failed to create event. Please try again.',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print('❌ Error creating event: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message': 'Failed to create event. Please try again.',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  // Get event by ID
+  static Future<Map<String, dynamic>> updateEvent({
+    required String eventId,
+    required String eventName,
+    required String eventFromDateTime,
+    required String eventToDateTime,
+    required String eventLocation,
+    required String eventDescription,
+    File? eventImageFile,
+    required int eventCapacity,
+    String? secretaryNotes,
+  }) async {
+    try {
+      final baseUrl = _baseUrl;
+      if (baseUrl == null) {
+        throw Exception('Base URL not initialized. Please restart the app.');
+      }
+
+      // Get authentication token
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+          'error': 'Authentication required',
+        };
+      }
+
+      // Create multipart request for file upload (if image is provided)
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$baseUrl/events/$eventId'),
+      );
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      request.fields['eventName'] = eventName;
+      request.fields['eventFromDateTime'] = eventFromDateTime;
+      request.fields['eventToDateTime'] = eventToDateTime;
+      request.fields['eventLocation'] = eventLocation;
+      request.fields['eventDescription'] = eventDescription;
+
+      // Add optional fields if provided
+      request.fields['eventCapacity'] = eventCapacity.toString();
+      if (secretaryNotes != null && secretaryNotes.isNotEmpty) {
+        request.fields['secretaryNotes'] = secretaryNotes;
+      }
+
+      // Add the image file only if provided
+      if (eventImageFile != null && await eventImageFile.exists()) {
+        try {
+          final fileStream = http.ByteStream(eventImageFile.openRead());
+          final fileLength = await eventImageFile.length();
+          
+          // Get file extension and determine content type
+          final fileName = eventImageFile.path.split('/').last;
+          final fileExtension = fileName.contains('.') 
+              ? fileName.split('.').last.toLowerCase() 
+              : 'jpg';
+          final contentType = MediaType(
+            'image',
+            fileExtension == 'jpg' ? 'jpeg' : fileExtension,
+          );
+
+          final multipartFile = http.MultipartFile(
+            'eventImage',
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: contentType,
+          );
+          request.files.add(multipartFile);
+        } catch (fileError) {
+          print('❌ Error adding event image file: $fileError');
+          return {
+            'success': false,
+            'statusCode': 500,
+            'message': 'Error processing event image file.',
+            'error': fileError.toString(),
+          };
+        }
+      }
+
+      final url = '$baseUrl/events/$eventId';
+      print('📅 Updating event: $url');
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Event update response status: ${response.statusCode}');
+      print('📥 Event update response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Event updated successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to update event',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  // Reschedule event
+  static Future<Map<String, dynamic>> rescheduleEvent({
+    required String eventId,
+    required String status,
+    String? scheduledDate,
+    String? eventLocation,
+  }) async {
+    try {
+      final baseUrl = _baseUrl;
+      if (baseUrl == null) {
+        throw Exception('Base URL not initialized. Please restart the app.');
+      }
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+          'error': 'Authentication required',
+        };
+      }
+
+      final requestBody = <String, dynamic>{
+        'status': status,
+        'eventStatus': status, // Also include eventStatus in case API expects this field
+      };
+
+      // Add optional fields
+      if (scheduledDate != null && scheduledDate.isNotEmpty && scheduledDate != 'null') {
+        requestBody['scheduledDate'] = scheduledDate;
+      }
+      if (eventLocation != null && eventLocation.isNotEmpty && eventLocation != 'null') {
+        requestBody['eventLocation'] = eventLocation;
+      }
+
+      print('📅 Reschedule event request URL: $baseUrl/events/$eventId/reschedule');
+      print('📅 Reschedule event request body: ${jsonEncode(requestBody)}');
+      print('📅 status: "$status"');
+      print('📅 scheduledDate: "$scheduledDate"');
+      print('📅 eventLocation: "$eventLocation"');
+
+      // Try /reschedule endpoint first
+      var response = await http.patch(
+        Uri.parse('$baseUrl/events/$eventId/reschedule'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // If 404, try /status endpoint as fallback
+      if (response.statusCode == 404) {
+        print('📅 /reschedule endpoint not found, trying /status endpoint...');
+        response = await http.patch(
+          Uri.parse('$baseUrl/events/$eventId/status'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(requestBody),
+        );
+      }
+
+      print('📅 Reschedule event response status: ${response.statusCode}');
+      print('📅 Reschedule event response body: ${response.body}');
+
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Event rescheduled successfully',
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid request. Status is required.',
+          'error': responseData['error'],
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Event not found',
+          'error': responseData['error'],
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to reschedule event',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  // Get events with filters
+  static Future<Map<String, dynamic>> getEvents({
+    int page = 1,
+    int limit = 40,
+    String? status,
+    String? startDate,
+    String? endDate,
+    String? scheduledDate,
+    String? search,
+    String? sortBy,
+    String sortOrder = 'asc',
+  }) async {
+    try {
+      final baseUrl = _baseUrl;
+      if (baseUrl == null) {
+        throw Exception('Base URL not initialized. Please restart the app.');
+      }
+
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Build query parameters
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortOrder': sortOrder,
+      };
+
+      // Add optional parameters
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+      if (startDate != null && startDate.isNotEmpty) {
+        queryParams['startDate'] = startDate;
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        queryParams['endDate'] = endDate;
+      }
+      if (scheduledDate != null && scheduledDate.isNotEmpty) {
+        queryParams['scheduledDate'] = scheduledDate;
+      }
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (sortBy != null && sortBy.isNotEmpty) {
+        queryParams['sortBy'] = sortBy;
+      }
+
+      // Build URI with query parameters
+      final uri = Uri.parse('$baseUrl/events').replace(queryParameters: queryParams);
+
+      print('🌐 Getting events: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('📡 Get events response status: ${response.statusCode}');
+      print('📡 Get events response body: ${response.body}');
+
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Events retrieved successfully',
+        };
+      } else if (response.statusCode == 401) {
+        await StorageService.logout();
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve events',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> getEventById(
+    String eventId,
+  ) async {
+    try {
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate eventId
+      if (eventId.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'Event ID is required',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/events/$eventId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Server error: Invalid response format',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Success - return event data
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message':
+              responseData['message'] ??
+              'Event details retrieved successfully',
+        };
+      } else if (response.statusCode == 400) {
+        // Bad request
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Invalid event ID',
+        };
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid
+        await StorageService.logout(); // Clear stored data
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'Session expired. Please login again.',
+        };
+      } else if (response.statusCode == 404) {
+        // Event not found
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Event not found',
+        };
+      } else if (response.statusCode == 500) {
+        // Server error
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message':
+              responseData['message'] ??
+              'Server error. Please try again later.',
+        };
+      } else {
+        // Other error
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message':
+              responseData['message'] ?? 'Failed to fetch event details',
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
+      };
+    }
+  }
+
   // Upload and validate profile photo for accompanying users
   static Future<Map<String, dynamic>> validateProfilePhoto(
     File photoFile,
@@ -6644,7 +7414,7 @@ class ActionService {
         print('📸 Processing imagesarray with ${imagesArray.length} URLs');
         final seen = <String>{};
         for (final url in imagesArray) {
-          if (url is String && url.trim().isNotEmpty) {
+          if (url.trim().isNotEmpty) {
             final u = url.trim();
             if (seen.add(u)) {
               formData.fields.add(MapEntry('image_urls', u));
@@ -6657,7 +7427,7 @@ class ActionService {
       if (imageUrls != null && imageUrls.isNotEmpty) {
         final seen = <String>{};
         for (final url in imageUrls) {
-          if (url is String && url.trim().isNotEmpty) {
+          if (url.trim().isNotEmpty) {
             final u = url.trim();
             if (seen.add(u)) {
               formData.fields.add(MapEntry('image_urls', u));
@@ -6671,7 +7441,7 @@ class ActionService {
         final seen = <String>{};
         int index = 0;
         for (final url in referencePhotoUrls) {
-          if (url is String && url.trim().isNotEmpty) {
+          if (url.trim().isNotEmpty) {
             final u = url.trim();
             if (seen.add(u)) {
               formData.fields.add(MapEntry('reference_photo_url_$index', u));
@@ -6702,16 +7472,23 @@ class ActionService {
       print('📥 Duplicate photo validation response status: ${response.statusCode}');
       print('📥 Duplicate photo validation response body: ${response.data}');
       
-      // Debug: Print the structure of the response data
+        // Debug: Print the structure of the response data
       if (response.data is Map) {
         final responseData = response.data as Map;
         print('📥 Response data keys: ${responseData.keys.toList()}');
         if (responseData.containsKey('data')) {
           final data = responseData['data'];
           if (data is Map) {
-            print('📥 Data keys: ${(data as Map).keys.toList()}');
-            if ((data as Map).containsKey('duplicates_found')) {
-              print('📥 duplicates_found value: ${(data as Map)['duplicates_found']}');
+            print('📥 Data keys: ${data.keys.toList()}');
+            if (data.containsKey('duplicates_found')) {
+              print('📥 duplicates_found value: ${data['duplicates_found']}');
+            }
+            if (data.containsKey('apiResult') && data['apiResult'] is Map) {
+              final apiResult = data['apiResult'] as Map;
+              print('📥 apiResult keys: ${apiResult.keys.toList()}');
+              if (apiResult.containsKey('duplicates_found')) {
+                print('📥 apiResult.duplicates_found value: ${apiResult['duplicates_found']}');
+              }
             }
           }
         }
@@ -6720,11 +7497,35 @@ class ActionService {
       if (response.statusCode == 200) {
         final responseData = response.data;
         
-        // The JavaScript backend spreads the API response data directly into the response.data
-        // So duplicates_found should be directly accessible in responseData['data']
+        // Backend returns different structures based on submit_type:
+        // - For "accompanyuser": data: { ...response.data, duplicates_found: ... }
+        // - For "subuser": data: { apiResult: { duplicates_found: ... }, ... }
+        final data = responseData['data'];
+        bool? duplicatesFound;
+        
+        if (data is Map) {
+          // Check for duplicates_found directly (accompanyuser case)
+          if (data.containsKey('duplicates_found')) {
+            duplicatesFound = data['duplicates_found'] as bool?;
+          }
+          // Check for duplicates_found in apiResult (subuser case)
+          else if (data.containsKey('apiResult') && data['apiResult'] is Map) {
+            final apiResult = data['apiResult'] as Map;
+            if (apiResult.containsKey('duplicates_found')) {
+              duplicatesFound = apiResult['duplicates_found'] as bool?;
+            }
+          }
+        }
+        
+        // Normalize the response structure for consistent handling
+        final normalizedData = <String, dynamic>{
+          if (data is Map) ...data,
+          'duplicates_found': duplicatesFound ?? false,
+        };
+        
         return {
           'success': true,
-          'data': responseData['data'],
+          'data': normalizedData,
           'message': responseData['message'] ?? 'Duplicate photo validation completed',
         };
       } else {
@@ -8216,13 +9017,13 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Reference forms retrieved successfully',
+          'message': responseData['message'] ?? 'Kaalgyani forms retrieved successfully',
         };
       } else {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to retrieve reference forms',
+          'message': responseData['message'] ?? 'Failed to retrieve Kaalgyani forms',
           'error': responseData['error'],
         };
       }
@@ -8309,7 +9110,7 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Reference form status updated successfully',
+          'message': responseData['message'] ?? 'Kaalgyani form status updated successfully',
         };
       } else if (response.statusCode == 400) {
         return {
@@ -8329,13 +9130,13 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 404,
-          'message': responseData['message'] ?? 'Reference form not found',
+          'message': responseData['message'] ?? 'Kaalgyani form not found',
         };
       } else {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to update reference form status',
+          'message': responseData['message'] ?? 'Failed to update Kaalgyani form status',
           'error': responseData['error'],
         };
       }
@@ -8393,7 +9194,7 @@ class ActionService {
           'success': true,
           'statusCode': 200,
           'data': responseData['data'],
-          'message': responseData['message'] ?? 'Reference form deleted successfully',
+          'message': responseData['message'] ?? 'Kaalgyani form deleted successfully',
         };
       } else if (response.statusCode == 400) {
         return {
@@ -8418,13 +9219,13 @@ class ActionService {
         return {
           'success': false,
           'statusCode': 404,
-          'message': responseData['message'] ?? 'Reference form not found',
+          'message': responseData['message'] ?? 'Kaalgyani form not found',
         };
       } else {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'message': responseData['message'] ?? 'Failed to delete reference form',
+          'message': responseData['message'] ?? 'Failed to delete Kaalgyani form',
         };
       }
     } catch (error) {
@@ -9284,6 +10085,282 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Profile update failed. Please try again.',
+      };
+    }
+  }
+
+  // Request access to private album
+  static Future<Map<String, dynamic>> requestAccessToPrivateAlbum({
+    required String accessCode,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      final url = Uri.parse('$baseUrl/albums/request-album');
+      final requestBody = {
+        'access_code': accessCode,
+      };
+
+      print('🔐 Making API call to request access to private album: $url');
+      print('📤 Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': responseData['data'],
+          'message': responseData['message'] ?? 'Access granted successfully.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'statusCode': 404,
+          'message': responseData['message'] ?? 'Invalid access code. Please try again.',
+          'error': responseData['error'],
+        };
+      } else if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': responseData['message'] ?? 'Album is not private',
+          'error': responseData['error'],
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to request access',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print('❌ Error requesting access to private album: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Internal server error',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  // Get private albums for the current user
+  static Future<Map<String, dynamic>> getPrivateAlbums({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Ensure page and limit are at least 1
+      page = page < 1 ? 1 : page;
+      limit = limit < 1 ? 1 : limit;
+
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      if (search != null && search.trim().isNotEmpty) {
+        queryParams['search'] = search.trim();
+      }
+
+      final uri = Uri.parse('$baseUrl/albums/get-all-private-albums').replace(
+        queryParameters: queryParams,
+      );
+
+      print('📸 Making API call to get private albums: $uri');
+      print('📸 Query params: page=$page, limit=$limit, search=$search');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        // Extract data from response structure: { data: { albums, totalAlbums, totalPages, currentPage } }
+        final data = responseData['data'] as Map<String, dynamic>? ?? {};
+        final albums = data['albums'] as List<dynamic>? ?? [];
+        final totalAlbums = data['totalAlbums'] as int? ?? 0;
+        final totalPages = data['totalPages'] as int? ?? 0;
+        final currentPage = data['currentPage'] as int? ?? page;
+
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': List<Map<String, dynamic>>.from(albums),
+          'totalAlbums': totalAlbums,
+          'totalPages': totalPages,
+          'currentPage': currentPage,
+          'message': responseData['message'] ?? 'Private albums retrieved successfully.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve private albums',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print('❌ Error getting private albums: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Internal server error',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  /// Get single album details with paginated images
+  static Future<Map<String, dynamic>> getAlbumDetails({
+    required String albumId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      // Get token from storage
+      final token = await StorageService.getToken();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Ensure page and limit are at least 1
+      page = page < 1 ? 1 : page;
+      limit = limit < 1 ? 1 : limit;
+
+      final Map<String, String> queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      final uri = Uri.parse('$baseUrl/albums/$albumId').replace(
+        queryParameters: queryParams,
+      );
+
+      print('📸 Making API call to get album details: $uri');
+      print('📸 Query params: albumId=$albumId, page=$page, limit=$limit');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        print('❌ Failed to parse response as JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': 'Invalid response format from server',
+          'error': response.body,
+        };
+      }
+
+      if (response.statusCode == 200) {
+        final data = responseData['data'] as Map<String, dynamic>? ?? {};
+        
+        return {
+          'success': true,
+          'statusCode': 200,
+          'data': data,
+          'message': responseData['message'] ?? 'Album details retrieved successfully.',
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Failed to retrieve album details',
+          'error': responseData['error'],
+        };
+      }
+    } catch (error) {
+      print('❌ Error getting album details: $error');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Internal server error',
+        'error': error.toString(),
       };
     }
   }

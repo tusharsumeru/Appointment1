@@ -99,7 +99,7 @@ class _TodayScreenState extends State<TodayScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const TomorrowScreen(),
+            builder: (context) => TomorrowScreen(),
           ),
         );
       } else if (pickedOnly.isAfter(tomorrow)) {
@@ -107,7 +107,7 @@ class _TodayScreenState extends State<TodayScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const UpcomingScreen(),
+            builder: (context) => UpcomingScreen(),
           ),
         );
       } else {
@@ -275,7 +275,10 @@ class _TodayScreenState extends State<TodayScreen> {
             Container(
               height: MediaQuery.of(context).size.height - 200, // Adjust height for scrollable content
               color: Colors.white,
-              child: TodayCardComponent(key: ValueKey(_refreshCounter)),
+              child: TodayCardComponent(
+                key: ValueKey(_refreshCounter),
+                selectedDate: _selectedDate,
+              ),
             ),
           ],
         ),

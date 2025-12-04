@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'user_sidebar.dart';
+import 'components/private_album_component.dart';
 
 class UserScreen extends StatefulWidget {
   const UserScreen({super.key});
@@ -39,67 +40,69 @@ class _UserScreenState extends State<UserScreen> {
         ),
       ),
       drawer: const UserSidebar(),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Welcome Message
-              const Text(
-                'Welcome User!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFF97316),
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Welcome Message
+            const Text(
+              'Welcome User!',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFF97316),
               ),
-              const SizedBox(height: 40),
-              // Welcome message with some spacing
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.home,
-                      size: 48,
-                      color: const Color(0xFFF97316),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Welcome to your Dashboard!',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Use the menu to navigate and request appointments',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            // Welcome message with some spacing
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.home,
+                    size: 48,
+                    color: Color(0xFFF97316),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Welcome to your Dashboard!',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Use the menu to navigate and request appointments',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Private Album Component
+            const PrivateAlbumComponent(),
+          ],
         ),
       ),
     );

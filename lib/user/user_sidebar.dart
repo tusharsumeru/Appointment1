@@ -4,9 +4,9 @@ import '../action/storage_service.dart';
 import 'user_history_screen.dart';
 import 'profile_screen.dart';
 import 'appointment_type_selection_screen.dart';
-import 'my_divine_picture_screen.dart';
 import 'help_support_screen.dart';
 import 'darshan_pictures_screen.dart';
+import 'private_album_screen.dart';
 
 class UserSidebar extends StatefulWidget {
   const UserSidebar({super.key});
@@ -240,6 +240,20 @@ class _UserSidebarState extends State<UserSidebar> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const DarshanPicturesScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.lock_outline, color: Color(0xFFF97316)),
+                  title: const Text('Private Album'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrivateAlbumScreen(),
                       ),
                     );
                   },

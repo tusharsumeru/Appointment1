@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/sidebar/sidebar_component.dart';
 import '../action/action.dart';
-import '../action/storage_service.dart';
 import '../components/inbox/appointment_detail_page.dart';
+import '../components/inbox/event_detail_page.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
   const GlobalSearchScreen({super.key});
@@ -104,35 +104,53 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         limit: 20,
       );
 
-      if (response['success']) {
-        final data = response['data'] as List;
-        final pagination = response['pagination'];
+      if (response['success'] == true) {
+        final data = response['data'] as List? ?? [];
+        final pagination = response['pagination'] as Map<String, dynamic>? ?? {};
 
         if (isLoadMore) {
           setState(() {
             _searchResults.addAll(data.cast<Map<String, dynamic>>());
-            _currentPage = pagination['currentPage'];
-            _totalPages = pagination['totalPages'];
-            _totalCount = pagination['totalCount'];
-            _hasMoreData = pagination['hasNextPage'];
+            _currentPage = pagination['currentPage'] as int? ?? _currentPage;
+            _totalPages = pagination['totalPages'] as int? ?? _totalPages;
+            _totalCount = pagination['totalCount'] as int? ?? _totalCount;
+            _hasMoreData = pagination['hasNextPage'] as bool? ?? false;
           });
         } else {
           setState(() {
             _searchResults = data.cast<Map<String, dynamic>>();
-            _currentPage = pagination['currentPage'];
-            _totalPages = pagination['totalPages'];
-            _totalCount = pagination['totalCount'];
-            _hasMoreData = pagination['hasNextPage'];
+            _currentPage = pagination['currentPage'] as int? ?? 1;
+            _totalPages = pagination['totalPages'] as int? ?? 0;
+            _totalCount = pagination['totalCount'] as int? ?? 0;
+            _hasMoreData = pagination['hasNextPage'] as bool? ?? false;
           });
         }
       } else {
         setState(() {
-          _error = response['message'] ?? 'Search failed';
+          _error = response['message']?.toString() ?? 'Search failed. Please try again.';
         });
       }
     } catch (e) {
+      // Extract user-friendly error message
+      String errorMessage = 'An error occurred while searching.';
+      
+      if (e.toString().contains('Session expired')) {
+        errorMessage = 'Your session has expired. Please login again.';
+      } else if (e.toString().contains('Network error')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (e.toString().contains('Invalid search request')) {
+        errorMessage = 'Invalid search request. Please check your search query.';
+      } else if (e.toString().contains('Server error')) {
+        errorMessage = 'Server error occurred. Please try again later.';
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'You do not have permission to perform this search.';
+      } else if (e.toString().isNotEmpty) {
+        // Remove "Exception: " prefix if present
+        errorMessage = e.toString().replaceFirst('Exception: ', '');
+      }
+      
       setState(() {
-        _error = e.toString();
+        _error = errorMessage;
       });
     } finally {
       setState(() {
@@ -170,7 +188,8 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     if (dateValue == null) return 'N/A';
     
     try {
-      final date = DateTime.parse(dateValue.toString());
+      final dateUtc = DateTime.parse(dateValue.toString());
+      final date = dateUtc.toLocal();
       final months = [
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -181,6 +200,220 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     }
   }
 
+  String _formatEventDateTime(dynamic dateValue) {
+    if (dateValue == null) return 'N/A';
+    
+    try {
+      final dateString = dateValue.toString();
+      DateTime date;
+      
+      // Parse the date string
+      final parsedDate = DateTime.parse(dateString);
+      
+      // For events, the time stored in UTC might actually be the intended local time
+      // (stored incorrectly as UTC). So we use the UTC time directly without conversion
+      // This prevents double conversion issues
+      if (parsedDate.isUtc) {
+        // Use UTC time directly as if it were local time
+        // This handles the case where 9:30 AM was stored as 9:30 AM UTC
+        // instead of being converted to 4:00 AM UTC (which is 9:30 AM IST)
+        date = DateTime(
+          parsedDate.year,
+          parsedDate.month,
+          parsedDate.day,
+          parsedDate.hour,
+          parsedDate.minute,
+          parsedDate.second,
+        );
+      } else {
+        date = parsedDate;
+      }
+      
+      final months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      
+      // Format time in 12-hour format
+      int hour = date.hour;
+      String period = 'AM';
+      if (hour == 0) {
+        hour = 12;
+      } else if (hour == 12) {
+        period = 'PM';
+      } else if (hour > 12) {
+        hour = hour - 12;
+        period = 'PM';
+      }
+      
+      final minute = date.minute.toString().padLeft(2, '0');
+      
+      return '${date.day} ${months[date.month - 1]} ${date.year} (${hour.toString().padLeft(2, '0')}:$minute $period)';
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
+  String _formatEventDateTimeVenue(Map<String, dynamic> result) {
+    final List<String> parts = [];
+    
+    // Date and Time
+    if (result['eventFromDateTime'] != null) {
+      try {
+        final dateString = result['eventFromDateTime'].toString();
+        final parsedDate = DateTime.parse(dateString);
+        DateTime date;
+        
+        // For events, use UTC time directly as if it were local time
+        // This prevents double conversion issues
+        if (parsedDate.isUtc) {
+          date = DateTime(
+            parsedDate.year,
+            parsedDate.month,
+            parsedDate.day,
+            parsedDate.hour,
+            parsedDate.minute,
+            parsedDate.second,
+          );
+        } else {
+          date = parsedDate;
+        }
+        
+        final months = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
+        
+        // Format time in 12-hour format
+        int hour = date.hour;
+        String period = 'AM';
+        if (hour == 0) {
+          hour = 12;
+        } else if (hour == 12) {
+          period = 'PM';
+        } else if (hour > 12) {
+          hour = hour - 12;
+          period = 'PM';
+        }
+        
+        final minute = date.minute.toString().padLeft(2, '0');
+        parts.add('${date.day} ${months[date.month - 1]} ${date.year} (${hour.toString().padLeft(2, '0')}:$minute $period)');
+      } catch (e) {
+        parts.add('Invalid Date');
+      }
+    }
+    
+    // Venue
+    if (result['eventLocation'] != null && result['eventLocation'].toString().isNotEmpty) {
+      parts.add('Venue: ${result['eventLocation']}');
+    }
+    
+    // Guests if available
+    if (result['eventCapacity'] != null || result['numberOfGuests'] != null) {
+      final guests = result['eventCapacity'] ?? result['numberOfGuests'] ?? 0;
+      parts.add('Guests: $guests');
+    }
+    
+    return parts.isEmpty ? 'N/A' : parts.join(' | ');
+  }
+
+  String _formatEventDetailsBlock(Map<String, dynamic> result) {
+    final List<String> lines = [];
+    
+    // Date
+    if (result['eventFromDateTime'] != null) {
+      try {
+        final dateString = result['eventFromDateTime'].toString();
+        final parsedDate = DateTime.parse(dateString);
+        DateTime date;
+        
+        // For events, use UTC time directly as if it were local time
+        if (parsedDate.isUtc) {
+          date = DateTime(
+            parsedDate.year,
+            parsedDate.month,
+            parsedDate.day,
+            parsedDate.hour,
+            parsedDate.minute,
+            parsedDate.second,
+          );
+        } else {
+          date = parsedDate;
+        }
+        
+        final day = date.day;
+        final months = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
+        final month = months[date.month - 1];
+        final year = date.year;
+        
+        // Get ordinal suffix for day
+        String daySuffix = 'th';
+        if (day == 1 || day == 21 || day == 31) daySuffix = 'st';
+        else if (day == 2 || day == 22) daySuffix = 'nd';
+        else if (day == 3 || day == 23) daySuffix = 'rd';
+        
+        lines.add('Date: ${day}$daySuffix $month, $year');
+      } catch (e) {
+        lines.add('Date: Invalid Date');
+      }
+    }
+    
+    // Time
+    if (result['eventFromDateTime'] != null) {
+      try {
+        final dateString = result['eventFromDateTime'].toString();
+        final parsedDate = DateTime.parse(dateString);
+        DateTime date;
+        
+        // For events, use UTC time directly as if it were local time
+        if (parsedDate.isUtc) {
+          date = DateTime(
+            parsedDate.year,
+            parsedDate.month,
+            parsedDate.day,
+            parsedDate.hour,
+            parsedDate.minute,
+            parsedDate.second,
+          );
+        } else {
+          date = parsedDate;
+        }
+        
+        int hour = date.hour;
+        String period = 'AM';
+        if (hour == 0) {
+          hour = 12;
+        } else if (hour == 12) {
+          period = 'PM';
+        } else if (hour > 12) {
+          hour = hour - 12;
+          period = 'PM';
+        }
+        
+        final minute = date.minute.toString().padLeft(2, '0');
+        lines.add('Time: ${hour.toString().padLeft(2, '0')}:$minute $period');
+      } catch (e) {
+        // Skip if error
+      }
+    }
+    
+    // Venue
+    if (result['eventLocation'] != null && result['eventLocation'].toString().isNotEmpty) {
+      lines.add('Venue: ${result['eventLocation']}');
+    }
+    
+    // Guests
+    if (result['eventCapacity'] != null || result['numberOfGuests'] != null) {
+      final guests = result['eventCapacity'] ?? result['numberOfGuests'] ?? 0;
+      lines.add('Guests: $guests');
+    }
+    
+    return lines.join('\n');
+  }
+
   String _getAppointmentStatus(Map<String, dynamic> appointment) {
     final appointmentStatus = appointment['appointmentStatus'];
     if (appointmentStatus is Map<String, dynamic>) {
@@ -189,7 +422,68 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return appointment['mainStatus']?.toString() ?? 'Unknown';
   }
 
+  Widget _getAppointmentPurpose(Map<String, dynamic> appointment) {
+    String? purposeText;
+    
+    // Check if this is a quick appointment
+    final apptType = appointment['appt_type']?.toString();
+    final quickApt = appointment['quick_apt'];
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final details = quickApt['details'];
+      if (details is Map<String, dynamic>) {
+        purposeText = details['purpose']?.toString();
+      }
+    }
+    
+    // For normal appointments, check appointmentPurpose or appointmentSubject
+    if (purposeText == null || purposeText.isEmpty) {
+      purposeText = appointment['appointmentPurpose']?.toString() ?? 
+                    appointment['appointmentSubject']?.toString();
+    }
+    
+    // If still no purpose, show "No purpose provided"
+    if (purposeText == null || purposeText.isEmpty) {
+      return Text(
+        'No purpose provided',
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade600,
+          fontStyle: FontStyle.italic,
+        ),
+        softWrap: true,
+        overflow: TextOverflow.visible,
+      );
+    }
+    
+    return Text(
+      purposeText,
+      style: TextStyle(
+        fontSize: 13,
+        color: Colors.grey.shade700,
+        height: 1.4,
+      ),
+      softWrap: true,
+      overflow: TextOverflow.visible,
+    );
+  }
+
   String _getPersonName(Map<String, dynamic> appointment) {
+    // Check if this is a quick appointment
+    final apptType = appointment['appt_type']?.toString();
+    final quickApt = appointment['quick_apt'];
+    if (apptType == 'quick' && quickApt is Map<String, dynamic>) {
+      final isQuickAppointment = quickApt['isQuickAppointment'] ?? false;
+      if (isQuickAppointment) {
+        final required = quickApt['required'];
+        if (required is Map<String, dynamic>) {
+          final name = required['name']?.toString();
+          if (name != null && name.isNotEmpty) {
+            return name;
+          }
+        }
+      }
+    }
+    
     // Check if this is a guest appointment
     final appointmentType = appointment['appointmentType']?.toString();
     if (appointmentType?.toLowerCase() == 'guest') {
@@ -205,14 +499,20 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     // Try different name fields
     final referencePerson = appointment['referencePerson'];
     if (referencePerson is Map<String, dynamic>) {
-      return referencePerson['name']?.toString() ?? 'No Name';
+      final name = referencePerson['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
     }
     
     final appointmentFor = appointment['appointmentFor'];
     if (appointmentFor is Map<String, dynamic>) {
       final otherPersonDetails = appointmentFor['otherPersonDetails'];
       if (otherPersonDetails is Map<String, dynamic>) {
-        return otherPersonDetails['fullName']?.toString() ?? 'No Name';
+        final fullName = otherPersonDetails['fullName']?.toString();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
       }
     }
     
@@ -350,8 +650,78 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return 'N/A';
   }
 
+  String _formatAppointmentDateTime(Map<String, dynamic> appointment) {
+    final scheduledDateTime = appointment['scheduledDateTime'];
+    if (scheduledDateTime is Map<String, dynamic>) {
+      final date = scheduledDateTime['date'];
+      final time = scheduledDateTime['time']?.toString();
+      
+      if (date != null && date.toString().isNotEmpty) {
+        try {
+          final dateUtc = DateTime.parse(date.toString());
+          final dateLocal = DateTime(
+            dateUtc.year,
+            dateUtc.month,
+            dateUtc.day,
+            dateUtc.hour,
+            dateUtc.minute,
+            dateUtc.second,
+          );
+          
+          final months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ];
+          
+          String dateStr = '${dateLocal.day} ${months[dateLocal.month - 1]} ${dateLocal.year}';
+          
+          // Add time if available
+          if (time != null && time.isNotEmpty) {
+            // Format time in 12-hour format
+            try {
+              final timeParts = time.split(':');
+              if (timeParts.length >= 2) {
+                int hour = int.parse(timeParts[0]);
+                final minute = timeParts[1];
+                String period = 'AM';
+                if (hour == 0) {
+                  hour = 12;
+                } else if (hour == 12) {
+                  period = 'PM';
+                } else if (hour > 12) {
+                  hour = hour - 12;
+                  period = 'PM';
+                }
+                dateStr += ' (${hour.toString().padLeft(2, '0')}:$minute $period)';
+              } else {
+                dateStr += ' ($time)';
+              }
+            } catch (e) {
+              dateStr += ' ($time)';
+            }
+          }
+          
+          return dateStr;
+        } catch (e) {
+          return _formatDate(date);
+        }
+      }
+    }
+    
+    return 'N/A';
+  }
+
   String _getEntryDate(Map<String, dynamic> appointment) {
-    // Show created date for entry date
+    // For normal appointments, show fromDate from preferredDateRange
+    // For quick appointments or if fromDate is not available, show createdAt
+    final preferredDateRange = appointment['preferredDateRange'];
+    if (preferredDateRange is Map<String, dynamic>) {
+      final fromDate = preferredDateRange['fromDate'];
+      if (fromDate != null) {
+        return _formatDate(fromDate);
+      }
+    }
+    // Fallback to createdAt
     return _formatDate(appointment['createdAt']);
   }
 
@@ -393,7 +763,29 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return 'Unknown';
   }
 
-  Widget _buildSearchResultCard(Map<String, dynamic> appointment, int index) {
+  // Check if result is an event
+  bool _isEvent(Map<String, dynamic> result) {
+    return result['_resultType']?.toString() == 'event' || 
+           result['eventId'] != null;
+  }
+
+  Widget _buildSearchResultCard(Map<String, dynamic> result, int index) {
+    final isEvent = _isEvent(result);
+    
+    // Extract appointment venue information for display
+    String? appointmentVenue;
+    bool hasAppointmentDate = false;
+    bool hasAppointmentVenue = false;
+    
+    if (!isEvent) {
+      if (result['scheduledDateTime'] is Map<String, dynamic>) {
+        final scheduledDateTime = result['scheduledDateTime'] as Map<String, dynamic>;
+        appointmentVenue = scheduledDateTime['venueLabel']?.toString();
+        hasAppointmentVenue = appointmentVenue != null && appointmentVenue.isNotEmpty;
+      }
+      hasAppointmentDate = _formatAppointmentDateTime(result) != 'N/A';
+    }
+    
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 3,
@@ -410,128 +802,140 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header Section with ID and Status
-              if (appointment['appointmentId'] != null) ...[
+              if (isEvent) ...[
+                // Event ID and Status in same row
                 Row(
                   children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.tag, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            '# ID: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            result['eventId']?.toString() ?? 'N/A',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status Badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.deepPurple.shade200),
+                        color: _getEventStatusColor(result['eventStatus']?.toString() ?? ''),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.tag, size: 14, color: Colors.deepPurple.shade700),
-                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.check,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            appointment['appointmentId'],
-                            style: TextStyle(
-                              fontSize: 13,
+                            (result['eventStatus']?.toString() ?? 'Unknown').toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.deepPurple.shade700,
+                              color: Colors.white,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(_getAppointmentStatus(appointment)),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _getStatusColor(_getAppointmentStatus(appointment)).withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ] else if (result['appointmentId'] != null) ...[
+                // Appointment ID and Status in same row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.tag, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            '# ID: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            result['appointmentId']?.toString() ?? 'N/A',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
-                      child: Text(
-                        _getAppointmentStatus(appointment).toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
+                    ),
+                    // Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(_getAppointmentStatus(result)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _getAppointmentStatus(result).toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
               ],
               
               // Name Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
+              if (isEvent) ...[
+                _buildDetailRow(
+                  icon: Icons.event,
+                  label: 'Name',
+                  value: result['eventName']?.toString() ?? 'N/A',
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person, size: 18, color: Colors.deepPurple.shade600),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _getPersonName(appointment),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.email, size: 16, color: Colors.grey.shade600),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _getEmail(appointment),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Reference Person for Guest Appointments
-                    if (appointment['appointmentType']?.toString().toLowerCase() == 'guest') ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.person_outline, size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Reference: ${_getReferencePersonName(appointment)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
+                const SizedBox(height: 12),
+              ] else ...[
+                _buildDetailRow(
+                  icon: Icons.person,
+                  label: 'Name',
+                  value: _getPersonName(result),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
+              ],
             
 
               
@@ -546,78 +950,486 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Purpose
-                    if (appointment['appointmentPurpose'] != null) ...[
-                      _buildDetailRow(
-                        icon: Icons.description,
-                        label: 'Purpose',
-                        value: appointment['appointmentPurpose'],
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    
-                    // Meeting Type
-                    _buildDetailRow(
-                      icon: Icons.meeting_room,
-                      label: 'Meeting Type',
-                      value: _getMeetingType(appointment),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Starred Status
+                  children: isEvent ? [
+                    // Subject/Purpose
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.star, size: 16, color: Colors.grey.shade600),
+                        Icon(Icons.description, size: 16, color: Colors.grey.shade600),
                         const SizedBox(width: 8),
-                        Text(
-                          'Starred: ',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade700,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Subject / Purpose:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      result['eventName']?.toString() ?? 'Event',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                      softWrap: true,
+                                      overflow: TextOverflow.visible,
+                                    ),
+                                    if (result['eventDescription'] != null && result['eventDescription'].toString().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        result['eventDescription']?.toString() ?? '',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade700,
+                                          height: 1.4,
+                                        ),
+                                        softWrap: true,
+                                        overflow: TextOverflow.visible,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          appointment['starred'] == true ? 'Starred' : 'Not Starred',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: appointment['starred'] == true ? Colors.amber.shade700 : Colors.grey.shade600,
-                            fontWeight: appointment['starred'] == true ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                        if (appointment['starred'] == true) ...[
-                          const SizedBox(width: 6),
-                          Icon(Icons.star, size: 16, color: Colors.amber),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 12),
                     
-                    // Appointment Date
-                    _buildDetailRow(
-                      icon: Icons.calendar_today,
-                      label: 'Appointment Date',
-                      value: _getScheduledDate(appointment),
+                    // Type
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.category, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                'Type: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange.shade300),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.event, size: 12, color: Colors.orange.shade700),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Event',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     
-                    // Entry Date
+                    // Appointment Date/Time/Venue
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Appointment Date / Time / Venue:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade200),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (result['eventFromDateTime'] != null) ...[
+                                      Row(
+                                        children: [
+                                          Icon(Icons.calendar_today, size: 14, color: Colors.blue.shade700),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _formatEventDateTime(result['eventFromDateTime']),
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.blue.shade900,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+                                    if (result['eventLocation'] != null) ...[
+                                      Row(
+                                        children: [
+                                          Icon(Icons.location_on, size: 14, color: Colors.blue.shade700),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Venue: ${result['eventLocation']?.toString() ?? 'N/A'}',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.blue.shade800,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                    // Guests count if available
+                                    if (result['eventCapacity'] != null || result['numberOfGuests'] != null) ...[
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.people, size: 14, color: Colors.blue.shade700),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Guests: ${result['eventCapacity'] ?? result['numberOfGuests'] ?? 0}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.blue.shade800,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Starred
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.star, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                'Starred: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              Text(
+                                result['starred'] == true ? 'Starred' : 'Not Starred',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: result['starred'] == true ? Colors.amber.shade700 : Colors.grey.shade600,
+                                  fontWeight: result['starred'] == true ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                              if (result['starred'] == true) ...[
+                                const SizedBox(width: 6),
+                                Icon(Icons.star, size: 16, color: Colors.amber),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Created Date
                     _buildDetailRow(
                       icon: Icons.access_time,
-                      label: 'Entry Date',
-                      value: _getEntryDate(appointment),
+                      label: 'Created Date',
+                      value: _formatDate(result['createdAt']),
+                    ),
+                    
+                    // Secretary Notes if available
+                    if (result['secretaryNotes'] != null && result['secretaryNotes'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildDetailRow(
+                        icon: Icons.note,
+                        label: 'Notes',
+                        value: result['secretaryNotes']?.toString() ?? 'N/A',
+                      ),
+                    ],
+                  ] : [
+                    // Appointment Details
+                    // Subject/Purpose
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.description, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Subject / Purpose:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: _getAppointmentPurpose(result),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Type
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.category, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                'Type: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.deepPurple.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.deepPurple.shade300),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.calendar_today, size: 12, color: Colors.deepPurple.shade700),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _getMeetingType(result),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.deepPurple.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Appointment Date/Time/Venue
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Appointment Date / Time / Venue:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade200),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Check if we have any data
+                                    if (hasAppointmentDate || hasAppointmentVenue) ...[
+                                      // Date and Time
+                                      if (hasAppointmentDate) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today, size: 14, color: Colors.blue.shade700),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _formatAppointmentDateTime(result),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.blue.shade900,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (hasAppointmentVenue) const SizedBox(height: 8),
+                                      ],
+                                      // Venue
+                                      if (hasAppointmentVenue) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.location_on, size: 14, color: Colors.blue.shade700),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'Venue: $appointmentVenue',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.blue.shade800,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ] else ...[
+                                      // Show "Not available" if no date, time, or venue
+                                      Text(
+                                        'Not available',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Starred
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.star, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                'Starred: ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              Text(
+                                result['starred'] == true ? 'Starred' : 'Not Starred',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: result['starred'] == true ? Colors.amber.shade700 : Colors.grey.shade600,
+                                  fontWeight: result['starred'] == true ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                              if (result['starred'] == true) ...[
+                                const SizedBox(width: 6),
+                                Icon(Icons.star, size: 16, color: Colors.amber),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Created Date
+                    _buildDetailRow(
+                      icon: Icons.access_time,
+                      label: 'Created Date',
+                      value: _getEntryDate(result),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
               
-              // Action Button
+              // View Details Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _navigateToAppointmentDetail(appointment),
+                  onPressed: isEvent 
+                    ? () => _navigateToEventDetail(result)
+                    : () => _navigateToAppointmentDetail(result),
                   icon: const Icon(Icons.visibility, size: 16),
                   label: const Text('View Details'),
                   style: ElevatedButton.styleFrom(
@@ -651,6 +1463,23 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       case 'cancelled':
         return Colors.red;
       case 'completed':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color _getEventStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+      case 'scheduled':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      case 'completed':
+      case 'finished':
         return Colors.blue;
       default:
         return Colors.grey;
@@ -761,6 +1590,17 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
 
   Future<void> _navigateToAppointmentDetail(Map<String, dynamic> appointment) async {
+    // Don't navigate if this is an event
+    if (_isEvent(appointment)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event details are not available yet'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     // Get appointment ID from the search result
     final appointmentId = appointment['appointmentId']?.toString();
     
@@ -877,7 +1717,82 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     }
   }
 
+  Future<void> _navigateToEventDetail(Map<String, dynamic> event) async {
+    // Get event ID from the search result
+    final eventId = event['eventId']?.toString();
+    
+    if (eventId == null || eventId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Event ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Loading event details...'),
+            ],
+          ),
+        );
+      },
+    );
+
+    try {
+      // Fetch complete event details by ID
+      final result = await ActionService.getEventById(eventId);
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (result['success'] && result['data'] != null) {
+        final eventData = result['data'];
+        
+        // Navigate to event detail page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventDetailPage(
+              event: eventData,
+              onEventUpdated: () {
+                // Refresh search results if needed
+                _performSearch();
+              },
+            ),
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to load event details'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   Widget _buildFiltersModal() {
     return Container(

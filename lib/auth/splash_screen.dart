@@ -11,6 +11,7 @@ import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
 import '../user/verify_otp_screen.dart';
+import '../main/reference_from_list_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -248,6 +249,19 @@ class _SplashScreenState extends State<SplashScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   const AppointmentTypeSelectionScreen(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+        } else if (userRole == 'ntc') {
+          // NTC role - navigate to reference form list screen
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const ReferenceFromListScreen(),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);

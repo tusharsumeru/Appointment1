@@ -256,11 +256,21 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   void _deleteAppointment(String appointmentId) {
+    print('🗑️ _deleteAppointment called with ID: $appointmentId');
+    print('📋 Current appointments count: ${_appointments.length}');
     setState(() {
       _appointments.removeWhere(
-        (appointment) => appointment['_id'] == appointmentId,
+        (appointment) {
+          final id = appointment['_id']?.toString();
+          final matches = id == appointmentId;
+          if (matches) {
+            print('✅ Found and removing appointment with _id: $id');
+          }
+          return matches;
+        },
       );
     });
+    print('📋 After removal, appointments count: ${_appointments.length}');
   }
 
   Future<void> _fetchSecretaries() async {
@@ -774,6 +784,15 @@ class _InboxScreenState extends State<InboxScreen> {
                     onRefresh: () {
                       // Refresh the appointments list when secretary is updated
                       _fetchAppointments();
+                    },
+                    onRemoveFromInbox: () {
+                      // Remove the appointment from inbox after scheduling
+                      final appointmentId =
+                          appointment['_id']?.toString() ??
+                          appointment['appointmentId']?.toString() ??
+                          '';
+                      print('📤 onRemoveFromInbox called with ID: $appointmentId');
+                      _deleteAppointment(appointmentId);
                     },
                   );
                 },

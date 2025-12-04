@@ -251,7 +251,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             setState(() {
               _referenceData = [];
               _filteredReferenceData = [];
-              _errorMessage = 'No reference forms found with current filters';
+              _errorMessage = 'No Kaalgyani forms found with current filters';
               _isLoading = false;
             });
           }
@@ -259,7 +259,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
       } else {
         if (mounted) {
           setState(() {
-            _errorMessage = result['message'] ?? 'Failed to load reference forms';
+            _errorMessage = result['message'] ?? 'Failed to load Kaalgyani forms';
             _isLoading = false;
           });
         }
@@ -421,7 +421,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         title: Row(
           children: [
             const Text(
-              'Reference From List',
+              'Kaalgyani Form List',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 20,
@@ -526,7 +526,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              'Loading reference forms...',
+              'Loading Kaalgyani forms...',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey,
@@ -549,7 +549,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search reference forms...',
+                    hintText: 'Search Kaalgyani forms...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -731,7 +731,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              'No reference forms found',
+              'No Kaalgyani forms found',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -740,7 +740,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              'There are no reference forms to display.',
+              'There are no Kaalgyani forms to display.',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey,
@@ -786,7 +786,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
     if (formId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid reference form ID'),
+          content: Text('Invalid Kaalgyani form ID'),
           backgroundColor: Colors.red,
         ),
       );
@@ -799,7 +799,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text(
-            'Delete Reference Form',
+            'Delete Kaalgyani Form',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -810,7 +810,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Are you sure you want to delete the reference form for:',
+                'Are you sure you want to delete the Kaalgyani form for:',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[700],
@@ -916,7 +916,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Reference form deleted successfully'),
+                content: Text(result['message'] ?? 'Kaalgyani form deleted successfully'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 3),
               ),
@@ -932,7 +932,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(result['message'] ?? 'Failed to delete reference form'),
+                content: Text(result['message'] ?? 'Failed to delete Kaalgyani form'),
                 backgroundColor: Colors.red,
                 duration: const Duration(seconds: 3),
               ),
@@ -949,7 +949,7 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting reference form: $e'),
+              content: Text('Error deleting Kaalgyani form: $e'),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 3),
             ),
@@ -1007,12 +1007,12 @@ class _ReferenceFromListScreenState extends State<ReferenceFromListScreen> {
 
             // Use the specific reference form approved template
             const templateId = '68bed8fc7b0353b2a4db5776';
-            print('📧 Using Reference Form Approved template ID: $templateId');
-            print('📧 Note: This template may not populate all variables correctly for reference forms');
+            print('📧 Using Kaalgyani Form Approved template ID: $templateId');
+            print('📧 Note: This template may not populate all variables correctly for Kaalgyani forms');
 
             // Call the bulk email API with tags (matching JavaScript logic)
             print('📧 Calling ActionService.sendBulkEmail...');
-            print('📧 Note: Template variables may be empty since reference forms don\'t have appointment data');
+            print('📧 Note: Template variables may be empty since Kaalgyani forms don\'t have appointment data');
             final result = await ActionService.sendBulkEmail(
               templateId: templateId,
               recipients: selectedFormsData,

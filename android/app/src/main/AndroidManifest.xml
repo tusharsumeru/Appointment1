@@ -36,7 +36,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|locale|layoutDirection|fontScale|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as
@@ -62,14 +62,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            
-        <!-- Support for 16KB memory page sizes (required for Android 15+) -->
+        
+        <!-- Disable WebView camera to prevent CameraX from being stripped -->
         <meta-data
-            android:name="android.app.lib_name"
-            android:value="${android.app.lib_name}" />
-        <meta-data
-            android:name="android.app.lib_name.16kb"
-            android:value="${android.app.lib_name.16kb}" />
+            android:name="android.webkit.WebView.EnableCamera"
+            android:value="false" />
             
         <!-- Firebase Messaging Service -->
         <service

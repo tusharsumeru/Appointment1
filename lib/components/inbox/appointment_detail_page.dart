@@ -2338,6 +2338,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
   }
 
   String _getTeacherStatus() {
+    // For quick appointments, always return "NA"
+    if (_isQuickAppointment()) {
+      return 'NA';
+    }
+    
     // First, check if teacher status was passed from schedule screens
     if (widget.isTeacher != null) {
       return widget.isTeacher == true ? 'Yes' : 'No';
@@ -2760,6 +2765,11 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                 _fetchAppointmentsOverview();
                 Navigator.pop(context);
               },
+              onRemoveFromInbox: () {
+                // Navigate back to inbox screen after scheduling
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.of(context).pushReplacementNamed('/inbox');
+              },
             ),
           ),
         ],
@@ -3121,8 +3131,10 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildMainCardDetailRow('Purpose', _getAppointmentPurpose(), Icons.info),
             _buildMainCardDetailRow('Are you an Art of Living Teacher', _getTeacherStatus(), Icons.school),
             _buildMainCardDetailRow('Are you seeking Online or In-person appointment?', _getMeetingType(), Icons.person),
-            // Show accompanying users names before Assigned Secretary
-            _buildAccompanyingUsersNamesRow(),
+            // Show accompanying users names before Assigned Secretary (hide for quick appointments)
+            if (!_isQuickAppointment()) ...[
+              _buildAccompanyingUsersNamesRow(),
+            ],
             _buildMainCardDetailRow('Assigned Secretary', _getAssignedSecretary(), Icons.person),
             _buildMainCardDetailRow('Program Date', _getProgramDateRange(), Icons.event),
             // Show attachment if exists
@@ -3153,12 +3165,12 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
           // Action Buttons Section
           Row(
             children: [
-              // Edit Button - Half width (disabled for schedule screens)
+              // Edit Button - Half width
               Expanded(
                 child: ElevatedButton(
-                  onPressed: widget.isFromScheduleScreens ? null : _handleEdit,
+                  onPressed: _handleEdit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.isFromScheduleScreens ? Colors.grey[400] : Colors.blue,
+                    backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -3170,7 +3182,7 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: widget.isFromScheduleScreens ? Colors.grey[600] : Colors.white,
+                      color: Colors.white,
                     ),
                   ),
                 ),

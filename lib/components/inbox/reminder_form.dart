@@ -7,6 +7,7 @@ class ReminderForm extends StatefulWidget {
   final VoidCallback? onClose;
   final VoidCallback? onRefresh; // Add refresh callback
   final bool isFromScheduleScreens; // Add parameter to indicate if from schedule screens
+  final VoidCallback? onRemoveFromInbox; // Callback to remove appointment from inbox after scheduling
 
   const ReminderForm({
     Key? key,
@@ -15,6 +16,7 @@ class ReminderForm extends StatefulWidget {
     this.onClose,
     this.onRefresh, // Add refresh callback parameter
     this.isFromScheduleScreens = false, // Default to false
+    this.onRemoveFromInbox, // Add callback to remove from inbox
   }) : super(key: key);
 
   @override
@@ -72,13 +74,27 @@ class _ReminderFormState extends State<ReminderForm> {
   }
 
   String _getAppointmentId() {
-    final appointmentId = widget.appointment['appointmentId']?.toString();
+    // For schedule endpoint, backend updateScheduledAppointment expects MongoDB _id (ObjectId)
+    // Try _id first (this is what the backend updateScheduledAppointment uses)
     final id = widget.appointment['_id']?.toString();
+    if (id != null && id.isNotEmpty) {
+      return id;
+    }
     
-    // Use MongoDB _id instead of appointmentId for backend compatibility
-    final result = id ?? appointmentId ?? '';
+    // Fallback to appointmentId if _id is not available
+    final appointmentId = widget.appointment['appointmentId']?.toString();
+    if (appointmentId != null && appointmentId.isNotEmpty) {
+      return appointmentId;
+    }
     
-    return result;
+    return '';
+  }
+
+  // Helper function to check if a string is a valid MongoDB ObjectId
+  bool _isValidMongoObjectId(String id) {
+    if (id.isEmpty) return false;
+    // MongoDB ObjectId is 24 hexadecimal characters
+    return RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(id);
   }
 
   void _loadVenues() async {
@@ -184,9 +200,9 @@ class _ReminderFormState extends State<ReminderForm> {
     // Load existing schedule data if available
     _loadExistingScheduleData();
     
-    // Set time to 16:30 when TBS is checked by default (only if no existing time and not from schedule screens)
+    // Set time to 18:00 when TBS is checked by default (only if no existing time and not from schedule screens)
     if (_tbsReq && _selectedTime.isEmpty && !widget.isFromScheduleScreens) {
-      _selectedTime = '16:30';
+      _selectedTime = '18:00';
     }
     
     _timeController.text = _selectedTime;
@@ -398,7 +414,7 @@ class _ReminderFormState extends State<ReminderForm> {
 
   // Method to get appropriate save button text
   String _getSaveButtonText() {
-    return _hasExistingSchedule() ? 'Update Schedule' : 'Schedule Appointment';
+    return _hasExistingSchedule() ? 'Update Schedule' : 'Save';
   }
 
   // Method to show validation message at top of form
@@ -451,11 +467,58 @@ class _ReminderFormState extends State<ReminderForm> {
 
   void _saveReminder() async {
     if (_formKey.currentState!.validate()) {
+      // Validate required fields
+      if (_selectedDate.isEmpty || _selectedTime.isEmpty) {
+        if (mounted) {
+          _displayValidationMessage('❌ Please select both date and time for scheduling.');
+        }
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
 
       try {
+        // Get appointment ID - try _id first, then appointmentId
+        String appointmentId = _getAppointmentId();
+        
+        // If we only have appointmentId (string), we need to fetch the MongoDB _id
+        // Backend updateScheduledAppointment expects MongoDB _id (ObjectId)
+        if (appointmentId.isNotEmpty && !_isValidMongoObjectId(appointmentId)) {
+          print('📋 appointmentId is not a MongoDB ObjectId, fetching appointment details to get _id...');
+          
+          // Fetch appointment details to get the MongoDB _id
+          final appointmentDetails = await ActionService.getAppointmentByIdDetailed(appointmentId);
+          
+          if (appointmentDetails['success'] == true && appointmentDetails['data'] != null) {
+            final detailedAppointment = appointmentDetails['data'] as Map<String, dynamic>;
+            final mongoId = detailedAppointment['_id']?.toString();
+            
+            if (mongoId != null && mongoId.isNotEmpty) {
+              print('📋 Found MongoDB _id: $mongoId');
+              appointmentId = mongoId;
+            } else {
+              print('⚠️ Warning: Could not find _id in appointment details');
+            }
+          } else {
+            print('⚠️ Warning: Failed to fetch appointment details: ${appointmentDetails['message']}');
+          }
+        }
+        
+        if (appointmentId.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            _displayValidationMessage('❌ Error: Appointment ID is missing. Cannot schedule appointment.');
+          }
+          return;
+        }
+
+        print('📅 Scheduling appointment with ID: $appointmentId');
+        print('📅 Date: $_selectedDate, Time: $_selectedTime');
+        
         // Prepare options map
         final Map<String, dynamic> options = {
           'tbsRequired': _tbsReq,
@@ -475,7 +538,7 @@ class _ReminderFormState extends State<ReminderForm> {
 
         // Call the ActionService method
         final result = await ActionService.scheduleAppointment(
-          appointmentId: _getAppointmentId(),
+          appointmentId: appointmentId,
           scheduledDate: _selectedDate,
           scheduledTime: _selectedTime,
           options: options,
@@ -487,23 +550,51 @@ class _ReminderFormState extends State<ReminderForm> {
         );
         
         if (result['success']) {
-          final actionText = _hasExistingSchedule() ? 'updated' : 'scheduled';
+          // Store all necessary data before navigation changes
+          final displayAppointmentId = widget.appointment['appointmentId']?.toString() ?? appointmentId;
+          final scheduledDate = _selectedDate;
+          final scheduledTime = _selectedTime;
+          final venueName = _selectedVenueName;
+          final removeCallback = widget.onRemoveFromInbox;
           
-          // Show success message internally
+          print('✅ Schedule success! removeCallback is ${removeCallback != null ? "SET" : "NULL"}');
+          
+          // Call onSave and onRefresh callbacks
+          widget.onSave?.call();
+          widget.onRefresh?.call();
+          
+          // Get the overlay context from the navigator BEFORE closing the form
+          final overlayContext = Navigator.of(context).overlay?.context;
+          
+          // Close the reminder form (bottom sheet) FIRST
           if (mounted) {
-            _displayValidationMessage('✅ ${result['message'] ?? 'Appointment $actionText successfully!'}');
+            Navigator.of(context).pop();
           }
           
-          // Call onSave callback
-          widget.onSave?.call();
-          widget.onRefresh?.call(); // Call onRefresh callback
-          
-          // Close the form after a short delay to show the success message
-          if (mounted) {
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                Navigator.of(context).pop();
-              }
+          // Show the success dialog AFTER the form closes
+          // Use post-frame callback to ensure form is fully closed
+          if (overlayContext != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showDialog(
+                context: overlayContext,
+                barrierDismissible: false,
+                builder: (BuildContext dialogContext) {
+                  return _ScheduleSuccessDialog(
+                    appointmentId: displayAppointmentId,
+                    date: scheduledDate,
+                    time: scheduledTime,
+                    venueName: venueName,
+                    onDismiss: () {
+                      print('🗑️ Dialog onDismiss called!');
+                      // Close the dialog first
+                      Navigator.of(dialogContext).pop();
+                      // Remove the appointment from inbox
+                      print('🗑️ Calling removeCallback...');
+                      removeCallback?.call();
+                    },
+                  );
+                },
+              );
             });
           }
         } else {
@@ -695,9 +786,9 @@ class _ReminderFormState extends State<ReminderForm> {
                       onChanged: _isLoading ? null : (value) {
                         setState(() {
                           _tbsReq = value ?? false;
-                          // When TBS/Req is checked, set time to 16:30
+                          // When TBS/Req is checked, set time to 18:00
                           if (_tbsReq) {
-                            _selectedTime = '16:30';
+                            _selectedTime = '18:00';
                             _timeController.text = _selectedTime;
                           }
                         });
@@ -974,6 +1065,272 @@ class _ReminderFormState extends State<ReminderForm> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Success Dialog Widget that shows appointment details with 8-second auto-close
+class _ScheduleSuccessDialog extends StatefulWidget {
+  final String appointmentId;
+  final String date;
+  final String time;
+  final String venueName;
+  final VoidCallback onDismiss;
+
+  const _ScheduleSuccessDialog({
+    Key? key,
+    required this.appointmentId,
+    required this.date,
+    required this.time,
+    required this.venueName,
+    required this.onDismiss,
+  }) : super(key: key);
+
+  @override
+  State<_ScheduleSuccessDialog> createState() => _ScheduleSuccessDialogState();
+}
+
+class _ScheduleSuccessDialogState extends State<_ScheduleSuccessDialog> {
+  int _remainingSeconds = 8;
+  late final Future<void> _autoCloseTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _autoCloseTimer = Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+      
+      setState(() {
+        _remainingSeconds--;
+      });
+      
+      print('⏱️ Countdown: $_remainingSeconds seconds remaining');
+      
+      if (_remainingSeconds <= 0) {
+        print('⏱️ Timer finished! Calling onDismiss...');
+        widget.onDismiss();
+        return false; // Stop the loop
+      }
+      return true; // Continue the loop
+    });
+  }
+
+  String _formatDate(String date) {
+    try {
+      final parts = date.split('-');
+      if (parts.length == 3) {
+        final year = parts[0];
+        final month = int.parse(parts[1]);
+        final day = parts[2];
+        final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return '$day ${monthNames[month - 1]} $year';
+      }
+    } catch (e) {
+      // Return original if parsing fails
+    }
+    return date;
+  }
+
+  String _formatTime(String time) {
+    try {
+      final parts = time.split(':');
+      if (parts.length >= 2) {
+        int hour = int.parse(parts[0]);
+        final minute = parts[1];
+        final period = hour >= 12 ? 'PM' : 'AM';
+        if (hour > 12) hour -= 12;
+        if (hour == 0) hour = 12;
+        return '$hour:$minute $period';
+      }
+    } catch (e) {
+      // Return original if parsing fails
+    }
+    return time;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Success Icon with animation
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle,
+                color: Colors.green[600],
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Title
+            const Text(
+              'Appointment Scheduled!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Appointment Details Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                children: [
+                  // Appointment ID
+                  _DetailRow(
+                    icon: Icons.confirmation_number_outlined,
+                    label: 'Appointment ID',
+                    value: widget.appointmentId,
+                    valueColor: Colors.blue[700],
+                  ),
+                  const Divider(height: 20),
+                  
+                  // Date
+                  _DetailRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Date',
+                    value: _formatDate(widget.date),
+                  ),
+                  const Divider(height: 20),
+                  
+                  // Time
+                  _DetailRow(
+                    icon: Icons.access_time_outlined,
+                    label: 'Time',
+                    value: _formatTime(widget.time),
+                  ),
+                  const Divider(height: 20),
+                  
+                  // Venue
+                  _DetailRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Venue',
+                    value: widget.venueName,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Okay Button with countdown
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.onDismiss,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Okay ($_remainingSeconds)',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Auto-close hint
+            Text(
+              'Auto-closing in $_remainingSeconds seconds...',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Helper widget for detail rows
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _DetailRow({
+    Key? key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: Colors.grey[600],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 } 

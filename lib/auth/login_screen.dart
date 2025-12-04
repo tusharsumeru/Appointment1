@@ -7,6 +7,7 @@ import '../user/signup_screen.dart';
 import '../user/verify_otp_screen.dart';
 import 'notification_setup_screen.dart';
 import '../user/forgot_password_screen.dart';
+import '../main/reference_from_list_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -192,6 +193,13 @@ class _LoginScreenState extends State<LoginScreen> {
               isNewUser: false,
               userData: userData ?? {},
             ),
+          ),
+        );
+      } else if (userRole == 'ntc') {
+        // NTC role - navigate to reference form list screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const ReferenceFromListScreen(),
           ),
         );
       } else {

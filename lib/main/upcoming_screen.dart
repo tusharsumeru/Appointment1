@@ -49,8 +49,8 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now().add(const Duration(days: 2)), // Start from day after tomorrow
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime(2020), // Allow past dates
+      lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

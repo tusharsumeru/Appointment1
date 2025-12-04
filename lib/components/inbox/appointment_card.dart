@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'appointment_detail_page.dart';
+import 'event_detail_page.dart';
 import 'appointment_schedule_form.dart';
 import 'email_form.dart';
 import 'message_form.dart';
@@ -18,6 +19,7 @@ class AppointmentCard extends StatefulWidget {
   final Function(bool)? onStarToggle;
   final VoidCallback? onRefresh; // Add refresh callback
   final int index; // Add index parameter for alternating colors
+  final VoidCallback? onRemoveFromInbox; // Callback to remove appointment from inbox after scheduling
 
   const AppointmentCard({
     super.key,
@@ -26,6 +28,7 @@ class AppointmentCard extends StatefulWidget {
     this.onStarToggle,
     this.onRefresh, // Add refresh callback parameter
     required this.index, // Add index parameter
+    this.onRemoveFromInbox, // Add callback to remove from inbox
   });
 
   @override
@@ -49,6 +52,10 @@ class _AppointmentCardState extends State<AppointmentCard> {
     final int attendeeCount = _getAttendeeCount();
     final bool isStarred = widget.appointment['starred'] == true;
 
+    // Check if this is an event appointment
+    final eventId = widget.appointment['eventId']?.toString() ?? '';
+    final bool isEventAppointment = appointmentType.toLowerCase() == 'event' || eventId.isNotEmpty;
+
     // Check if this is a guest appointment
     final guestInformation = widget.appointment['guestInformation'];
     final bool isGuestAppointment = appointmentType.toLowerCase() == 'guest' || 
@@ -58,16 +65,31 @@ class _AppointmentCardState extends State<AppointmentCard> {
     final String displayDesignation = isGuestAppointment ? _getGuestDesignationAndCompany() : _getCreatedByDesignationAndCompany();
     final String displayImage = isGuestAppointment ? _getGuestImage() : createdByImage;
 
+    // Determine card color based on appointment type
+    Color cardColor;
+    if (isEventAppointment) {
+      // Light blue color for event appointments
+      cardColor = const Color(0xFFEFF5FF);
+    } else {
+      // Original colors for normal appointments
+      cardColor = widget.index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0); // More orange for odd cards
+    }
+
+    // If this is an event appointment, use special UI
+    if (isEventAppointment) {
+      return _buildEventAppointmentCard();
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      color: widget.index % 2 == 0 ? Colors.white : Color(0xFFFFF3E0), // More orange for odd cards
+      color: cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap:
             widget.onTap ??
             () async {
-              // Get appointment ID
+              // This is a normal appointment - fetch appointment details
               final appointmentId = widget.appointment['appointmentId']?.toString() ?? 
                                   widget.appointment['_id']?.toString() ?? '';
               
@@ -244,55 +266,56 @@ class _AppointmentCardState extends State<AppointmentCard> {
               // Footer section with assigned secretary and people count
               _buildFooterSection(),
 
-              const SizedBox(height: 8),
-
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildActionButton(
-                    icon: Icons.schedule,
-                    label: 'Schedule',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'reminder'),
-                  ),
-                  _buildActionButton(
-                    icon: Icons.email,
-                    label: 'Email',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'email'),
-                  ),
-                  _buildActionButton(
-                    icon: Icons.message,
-                    label: 'Message',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'message'),
-                  ),
-                  _buildActionButton(
-                    icon: Icons.call,
-                    label: 'Call',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'call'),
-                  ),
-                  _buildActionButton(
-                    icon: Icons.assignment_ind,
-                    label: 'Assign',
-                    color: Colors.black,
-                    onTap: () => _showActionBottomSheet(context, 'assign'),
-                  ),
-                  _buildActionButton(
-                    icon: isStarred ? Icons.star : Icons.star_border,
-                    label: 'Starred',
-                    color: Colors.black,
-                    iconColor: isStarred ? Colors.amber : Colors.black,
-                    textColor: Colors.black,
-                    onTap: () async {
-                      // Notify parent to handle the star toggle
-                      widget.onStarToggle?.call(!isStarred);
-                    },
-                  ),
-                ],
-              ),
+              // Action buttons - only show for non-event appointments
+              if (!isEventAppointment) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.schedule,
+                      label: 'Schedule',
+                      color: Colors.black,
+                      onTap: () => _showActionBottomSheet(context, 'reminder'),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.email,
+                      label: 'Email',
+                      color: Colors.black,
+                      onTap: () => _showActionBottomSheet(context, 'email'),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.message,
+                      label: 'Message',
+                      color: Colors.black,
+                      onTap: () => _showActionBottomSheet(context, 'message'),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.call,
+                      label: 'Call',
+                      color: Colors.black,
+                      onTap: () => _showActionBottomSheet(context, 'call'),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.assignment_ind,
+                      label: 'Assign',
+                      color: Colors.black,
+                      onTap: () => _showActionBottomSheet(context, 'assign'),
+                    ),
+                    _buildActionButton(
+                      icon: isStarred ? Icons.star : Icons.star_border,
+                      label: 'Starred',
+                      color: Colors.black,
+                      iconColor: isStarred ? Colors.amber : Colors.black,
+                      textColor: Colors.black,
+                      onTap: () async {
+                        // Notify parent to handle the star toggle
+                        widget.onStarToggle?.call(!isStarred);
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -667,6 +690,7 @@ class _AppointmentCardState extends State<AppointmentCard> {
             child: ReminderForm(
               appointment: widget.appointment,
               onRefresh: widget.onRefresh, // Pass refresh callback
+              onRemoveFromInbox: widget.onRemoveFromInbox, // Pass remove from inbox callback
             ),
           ),
         ],
@@ -1130,6 +1154,334 @@ class _AppointmentCardState extends State<AppointmentCard> {
       return appointmentStatus['status']?.toString() ?? 'Unknown';
     }
     return 'Unknown';
+  }
+
+  // Build event appointment card with special UI
+  Widget _buildEventAppointmentCard() {
+    // Map data from API response structure
+    final eventId = widget.appointment['eventId']?.toString() ?? '';
+    final eventName = widget.appointment['name']?.toString() ?? 
+                     widget.appointment['eventName']?.toString() ?? 
+                     widget.appointment['event']?['name']?.toString() ??
+                     widget.appointment['event']?['eventName']?.toString() ?? 
+                     'Event';
+    final eventLocation = widget.appointment['location']?.toString() ?? 
+                         widget.appointment['eventLocation']?.toString() ?? 
+                         widget.appointment['event']?['location']?.toString() ??
+                         widget.appointment['event']?['eventLocation']?.toString() ?? 
+                         'Location not set';
+    final eventStatus = widget.appointment['status']?.toString() ?? 
+                       widget.appointment['eventStatus']?.toString() ?? 
+                       widget.appointment['event']?['status']?.toString() ??
+                       widget.appointment['event']?['eventStatus']?.toString() ?? 
+                       'pending';
+    final eventCapacity = widget.appointment['eventCapacity'] ?? 
+                         widget.appointment['event']?['eventCapacity'] ?? 0;
+    final eventRegisteredCount = widget.appointment['eventRegisteredCount'] ?? 
+                                widget.appointment['event']?['eventRegisteredCount'] ?? 0;
+    final eventImage = widget.appointment['eventImage']?.toString() ?? 
+                      widget.appointment['event']?['eventImage']?.toString() ?? '';
+    
+    // Get initials from event name
+    String getInitials(String name) {
+      if (name.isEmpty) return 'EV';
+      final words = name.trim().split(' ');
+      if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase();
+      }
+      return name.length >= 2 ? name.substring(0, 2).toUpperCase() : name.toUpperCase();
+    }
+    
+    // Get people count (capacity only)
+    final registeredCount = eventRegisteredCount is int ? eventRegisteredCount : 
+                           (int.tryParse(eventRegisteredCount.toString()) ?? 0);
+    final capacity = eventCapacity is int ? eventCapacity : 
+                    (int.tryParse(eventCapacity.toString()) ?? 0);
+    final attendeeCount = capacity > 0 ? capacity.toString() : registeredCount.toString();
+    
+    // Format from/to date range - always show this when available
+    String formattedDateDisplay = '';
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Check for event date range (from and to dates)
+    final eventFromDateTime = widget.appointment['fromDateTime']?.toString() ?? 
+                             widget.appointment['eventFromDateTime']?.toString() ?? 
+                             widget.appointment['event']?['fromDateTime']?.toString() ??
+                             widget.appointment['event']?['eventFromDateTime']?.toString() ?? '';
+    final eventToDateTime = widget.appointment['toDateTime']?.toString() ?? 
+                           widget.appointment['eventToDateTime']?.toString() ?? 
+                           widget.appointment['event']?['toDateTime']?.toString() ??
+                           widget.appointment['event']?['eventToDateTime']?.toString() ?? '';
+    String formattedFromDate = '';
+    String formattedToDate = '';
+    
+    if (eventFromDateTime.isNotEmpty) {
+      try {
+        final fromDateUtc = DateTime.parse(eventFromDateTime);
+        final fromDate = fromDateUtc.toLocal();
+        formattedFromDate = '${fromDate.day} ${months[fromDate.month - 1]} ${fromDate.year}';
+      } catch (e) {
+        // If parsing fails, use empty string
+      }
+    }
+    
+    if (eventToDateTime.isNotEmpty) {
+      try {
+        final toDateUtc = DateTime.parse(eventToDateTime);
+        final toDate = toDateUtc.toLocal();
+        formattedToDate = '${toDate.day} ${months[toDate.month - 1]} ${toDate.year}';
+      } catch (e) {
+        // If parsing fails, use empty string
+      }
+    }
+    
+    // Combine from and to dates
+    if (formattedFromDate.isNotEmpty && formattedToDate.isNotEmpty) {
+      formattedDateDisplay = '$formattedFromDate to $formattedToDate';
+    } else if (formattedFromDate.isNotEmpty) {
+      formattedDateDisplay = formattedFromDate;
+    } else if (formattedToDate.isNotEmpty) {
+      formattedDateDisplay = formattedToDate;
+    }
+    
+    // Determine card color based on appointment type
+    Color cardColor = const Color(0xFFEFF5FF); // Light blue color for event cards
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      color: cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () async {
+          if (eventId.isNotEmpty) {
+            final eventResult = await ActionService.getEventById(eventId);
+            if (context.mounted) {
+              if (eventResult['success']) {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EventDetailPage(
+                      event: eventResult['data'],
+                      onEventUpdated: widget.onRefresh, // Pass refresh callback
+                    ),
+                  ),
+                );
+                
+                // Refresh the list if event was updated
+                if (result == true && widget.onRefresh != null) {
+                  widget.onRefresh!();
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(eventResult['message'] ?? 'Failed to load event details'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with event info
+              Row(
+                children: [
+                  // Event Avatar (Square Box)
+                  GestureDetector(
+                    onTap: () {
+                      if (eventImage.isNotEmpty) {
+                        ProfilePhotoDialog.showWithErrorHandling(
+                          context,
+                          imageUrl: eventImage,
+                          userName: eventName,
+                          description: "$eventName's event image",
+                        );
+                      }
+                    },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!, width: 1),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: eventImage.isNotEmpty
+                              ? Image.network(
+                                  eventImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: Center(
+                                        child: Text(
+                                          getInitials(eventName),
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  color: Colors.grey[300],
+                                  child: Center(
+                                    child: Text(
+                                      getInitials(eventName),
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Event name and location
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          eventName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 2,
+                          softWrap: true,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (eventLocation.isNotEmpty && eventLocation != 'Location not set') ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            eventLocation,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            softWrap: true,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Event date display (scheduled date if scheduled, otherwise from/to range)
+              if (formattedDateDisplay.isNotEmpty) ...[
+                _buildPreferredDateWidget(formattedDateDisplay),
+                const SizedBox(height: 2),
+              ],
+
+              const SizedBox(height: 4),
+
+              // Footer section with status and people count
+              Container(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    // Event status
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.event,
+                            size: 18,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              eventStatus.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.grey[700],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // People count badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.grey[300]!.withOpacity(0.6),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.people,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$attendeeCount ${capacity > 0 ? (capacity == 1 ? 'Person' : 'People') : (registeredCount == 1 ? 'Person' : 'People')}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
 }

@@ -1241,7 +1241,7 @@ class _ReferenceDetailScreenState extends State<ReferenceDetailScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    action == 'approve' ? 'Approve Reference Form' : 'Reject Reference Form',
+                    action == 'approve' ? 'Approve Kaalgyani Form' : 'Reject Kaalgyani Form',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -1252,7 +1252,7 @@ class _ReferenceDetailScreenState extends State<ReferenceDetailScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Reference form for: $name',
+                'Kaalgyani form for: $name',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
@@ -1462,7 +1462,7 @@ class _ReferenceDetailScreenState extends State<ReferenceDetailScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Reference form ${action}d successfully'),
+              content: Text(result['message'] ?? 'Kaalgyani form ${action}d successfully'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 3),
             ),
@@ -1474,10 +1474,10 @@ class _ReferenceDetailScreenState extends State<ReferenceDetailScreen> {
           Navigator.of(context).pop();
         }
       } else {
-        _showErrorMessage(result['message'] ?? 'Failed to ${action} reference form');
+        _showErrorMessage(result['message'] ?? 'Failed to ${action} Kaalgyani form');
       }
     } catch (e) {
-      _showErrorMessage('Error ${action}ing reference form: $e');
+      _showErrorMessage('Error ${action}ing Kaalgyani form: $e');
     } finally {
       if (mounted) {
         setState(() {

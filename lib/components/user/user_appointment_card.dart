@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
-import '../../user/darshan_photos_results_screen.dart';
-import '../../action/action.dart';
+// COMMENTED OUT: Unused imports after commenting out Darshan Photos feature
+// import '../../user/darshan_photos_results_screen.dart';
+// import '../../action/action.dart';
 
 class UserAppointmentCard extends StatelessWidget {
   final String appointmentId;
@@ -58,6 +59,8 @@ class UserAppointmentCard extends StatelessWidget {
     // Check if this is a guest appointment
     final isGuestAppointment = _isGuestAppointment();
     final guestInfo = _getGuestInfo();
+    // Check if this is an event
+    final isEvent = _isEvent();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -330,98 +333,98 @@ class UserAppointmentCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: [
-                    // View Darshan Photos Section
-                    Container(
-                      width: double.infinity,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.blue.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () async {
-                            try {
-                              // Use the same API method as darshan_pictures_component
-                              final result = await ActionService.getAppointmentByIdWithDarshanPhotos(appointmentId);
-                              
-                              if (result['success'] == true && result['data'] != null) {
-                                final data = result['data'];
-                                
-                                // Extract user pictures from divineApiResponse
-                                final divineApiResponse = data['divineApiResponse'] as Map<String, dynamic>?;
-                                final userPictures = divineApiResponse?['userPictures'] as List<dynamic>? ?? [];
-                                
-                                // Navigate to the darshan photos results page with the fetched data
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DarshanPhotosResultsScreen(
-                                      appointmentId: appointmentId,
-                                      albumData: data['album'],
-                                      userPictures: List<Map<String, dynamic>>.from(userPictures),
-                                      divineApiResponse: divineApiResponse,
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                // Even if the API call fails, navigate to results screen to show "No Photos Found"
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DarshanPhotosResultsScreen(
-                                      appointmentId: appointmentId,
-                                      albumData: null,
-                                      userPictures: [],
-                                      divineApiResponse: null,
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (error) {
-                              // Even if there's an error, navigate to results screen to show "No Photos Found"
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DarshanPhotosResultsScreen(
-                                    appointmentId: appointmentId,
-                                    albumData: null,
-                                    userPictures: [],
-                                    divineApiResponse: null,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.camera_alt,
-                                size: 20,
-                                color: Colors.blue.shade600,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'View Darshan Photos with Gurudev',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.blue.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    // COMMENTED OUT: View Darshan Photos Section
+                    // Container(
+                    //   width: double.infinity,
+                    //   height: 48,
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.blue.shade50,
+                    //     borderRadius: BorderRadius.circular(8),
+                    //     border: Border.all(
+                    //       color: Colors.blue.shade200,
+                    //       width: 1,
+                    //     ),
+                    //   ),
+                    //   child: Material(
+                    //     color: Colors.transparent,
+                    //     child: InkWell(
+                    //       borderRadius: BorderRadius.circular(8),
+                    //       onTap: () async {
+                    //         try {
+                    //           // Use the same API method as darshan_pictures_component
+                    //           final result = await ActionService.getAppointmentByIdWithDarshanPhotos(appointmentId);
+                    //           
+                    //           if (result['success'] == true && result['data'] != null) {
+                    //             final data = result['data'];
+                    //             
+                    //             // Extract user pictures from divineApiResponse
+                    //             final divineApiResponse = data['divineApiResponse'] as Map<String, dynamic>?;
+                    //             final userPictures = divineApiResponse?['userPictures'] as List<dynamic>? ?? [];
+                    //             
+                    //             // Navigate to the darshan photos results page with the fetched data
+                    //             Navigator.push(
+                    //               context,
+                    //               MaterialPageRoute(
+                    //                 builder: (context) => DarshanPhotosResultsScreen(
+                    //                   appointmentId: appointmentId,
+                    //                   albumData: data['album'],
+                    //                   userPictures: List<Map<String, dynamic>>.from(userPictures),
+                    //                   divineApiResponse: divineApiResponse,
+                    //                 ),
+                    //               ),
+                    //             );
+                    //           } else {
+                    //             // Even if the API call fails, navigate to results screen to show "No Photos Found"
+                    //             Navigator.push(
+                    //               context,
+                    //               MaterialPageRoute(
+                    //                 builder: (context) => DarshanPhotosResultsScreen(
+                    //                   appointmentId: appointmentId,
+                    //                   albumData: null,
+                    //                   userPictures: [],
+                    //                   divineApiResponse: null,
+                    //                 ),
+                    //               ),
+                    //             );
+                    //           }
+                    //         } catch (error) {
+                    //           // Even if there's an error, navigate to results screen to show "No Photos Found"
+                    //           Navigator.push(
+                    //             context,
+                    //             MaterialPageRoute(
+                    //               builder: (context) => DarshanPhotosResultsScreen(
+                    //                 appointmentId: appointmentId,
+                    //                 albumData: null,
+                    //                 userPictures: [],
+                    //                 divineApiResponse: null,
+                    //               ),
+                    //             ),
+                    //           );
+                    //         }
+                    //       },
+                    //       child: Row(
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         children: [
+                    //           Icon(
+                    //             Icons.camera_alt,
+                    //             size: 20,
+                    //             color: Colors.blue.shade600,
+                    //           ),
+                    //           const SizedBox(width: 8),
+                    //           Text(
+                    //             'View Darshan Photos with Gurudev',
+                    //             style: TextStyle(
+                    //               fontSize: 14,
+                    //               fontWeight: FontWeight.w500,
+                    //               color: Colors.blue.shade600,
+                    //             ),
+                    //           ),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+                    // const SizedBox(height: 16),
 
                     // Appointment Date
                     _buildDetailRow(
@@ -441,7 +444,7 @@ class UserAppointmentCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 12),
 
-                    // Appointment Attendees
+                    // Appointment/Event Attendees
                     Row(
                       children: [
                         Icon(
@@ -451,134 +454,158 @@ class UserAppointmentCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                          child: isEvent
+                              ? // For events: label and count in one row
                               Row(
-                                children: [
-                                  Text(
-                                    'Appointment Attendees',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w500,
+                                  children: [
+                                    Text(
+                                      'Event Attendees: ',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    '$attendeesCount Person${attendeesCount > 1 ? 's' : ''}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                      fontWeight: FontWeight.w500,
+                                    Text(
+                                      '$attendeesCount Person${attendeesCount > 1 ? 's' : ''}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  if (attendeesCount <= 10)
-                                    Container(
-                                      width: (attendeesCount * 16.0) + 8.0,
-                                      height: 24,
-                                      child: Stack(
-                                        children: List.generate(attendeesCount, (index) {
-                                          final attendeeName = _getAttendeeName(index);
-                                          final hasPhoto = attendeePhotos != null && 
-                                                          index < attendeePhotos!.length && 
-                                                          attendeePhotos![index].isNotEmpty;
-                                          final photoUrl = hasPhoto ? attendeePhotos![index] : null;
-                                          
-                                          return Positioned(
-                                            left: index * 16.0,
-                                              child: GestureDetector(
-                                                onTap: () => hasPhoto 
-                                                    ? _showImageModal(context, photoUrl!, attendeeName)
-                                                    : _showPlaceholderModal(context, attendeeName),
-                                                child: Container(
-                                                  width: 24,
-                                                  height: 24,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: Colors.white,
-                                                      width: 2,
+                                  ],
+                                )
+                              : // For appointments: original layout with circles
+                              Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Appointment Attendees',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade600,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '$attendeesCount Person${attendeesCount > 1 ? 's' : ''}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        // Show circle images for appointments
+                                        if (attendeesCount <= 10)
+                                          Container(
+                                            width: (attendeesCount * 16.0) + 8.0,
+                                            height: 24,
+                                            child: Stack(
+                                              children: List.generate(attendeesCount, (index) {
+                                                final attendeeName = _getAttendeeName(index);
+                                                final hasPhoto = attendeePhotos != null && 
+                                                                index < attendeePhotos!.length && 
+                                                                attendeePhotos![index].isNotEmpty;
+                                                final photoUrl = hasPhoto ? attendeePhotos![index] : null;
+                                                
+                                                return Positioned(
+                                                  left: index * 16.0,
+                                                    child: GestureDetector(
+                                                      onTap: () => hasPhoto 
+                                                          ? _showImageModal(context, photoUrl!, attendeeName)
+                                                          : _showPlaceholderModal(context, attendeeName),
+                                                      child: Container(
+                                                        width: 24,
+                                                        height: 24,
+                                                        decoration: BoxDecoration(
+                                                          shape: BoxShape.circle,
+                                                          border: Border.all(
+                                                            color: Colors.white,
+                                                            width: 2,
+                                                          ),
+                                                        ),
+                                                        child: hasPhoto
+                                                            ? ClipOval(
+                                                                child: Image.network(
+                                                                  photoUrl!,
+                                                                  fit: BoxFit.cover,
+                                                                  errorBuilder: (context, error, stackTrace) {
+                                                                    return _buildPlaceholderCircle(name: attendeeName);
+                                                                  },
+                                                                ),
+                                                              )
+                                                            : _buildPlaceholderCircle(name: attendeeName),
+                                                      ),
+                                                    ),
+                                                );
+                                              }),
+                                            ),
+                                          )
+                                        else if (attendeePhotos != null && attendeePhotos!.isNotEmpty)
+                                          Container(
+                                            width: (attendeePhotos!.length * 16.0) + 8.0,
+                                            height: 24,
+                                            child: Stack(
+                                              children: attendeePhotos!.asMap().entries.map((entry) {
+                                                final index = entry.key;
+                                                final photoUrl = entry.value;
+                                                final attendeeName = _getAttendeeName(index);
+                                                
+                                                return Positioned(
+                                                  left: index * 16.0,
+                                                  child: GestureDetector(
+                                                    onTap: () => _showImageModal(context, photoUrl, attendeeName),
+                                                    child: Container(
+                                                      width: 24,
+                                                      height: 24,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          color: Colors.white,
+                                                          width: 2,
+                                                        ),
+                                                      ),
+                                                      child: ClipOval(
+                                                        child: Image.network(
+                                                          photoUrl,
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            return _buildPlaceholderCircle(name: attendeeName);
+                                                          },
+                                                        ),
+                                                      ),
                                                     ),
                                                   ),
-                                                  child: hasPhoto
-                                                      ? ClipOval(
-                                                          child: Image.network(
-                                                            photoUrl!,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (context, error, stackTrace) {
-                                                              return _buildPlaceholderCircle(name: attendeeName);
-                                                            },
-                                                          ),
-                                                        )
-                                                      : _buildPlaceholderCircle(name: attendeeName),
-                                                ),
-                                              ),
-                                          );
-                                        }),
-                                      ),
-                                    )
-                                  else if (attendeePhotos != null && attendeePhotos!.isNotEmpty)
-                                    Container(
-                                      width: (attendeePhotos!.length * 16.0) + 8.0,
-                                      height: 24,
-                                      child: Stack(
-                                        children: attendeePhotos!.asMap().entries.map((entry) {
-                                          final index = entry.key;
-                                          final photoUrl = entry.value;
-                                          final attendeeName = _getAttendeeName(index);
-                                          
-                                          return Positioned(
-                                            left: index * 16.0,
-                                            child: GestureDetector(
-                                              onTap: () => _showImageModal(context, photoUrl, attendeeName),
-                                              child: Container(
-                                                width: 24,
-                                                height: 24,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: Colors.white,
-                                                    width: 2,
-                                                  ),
-                                                ),
-                                                child: ClipOval(
-                                                  child: Image.network(
-                                                    photoUrl,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (context, error, stackTrace) {
-                                                      return _buildPlaceholderCircle(name: attendeeName);
-                                                    },
-                                                  ),
-                                                ),
+                                                );
+                                              }).toList(),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
                                               ),
                                             ),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: _buildPlaceholderCircle(name: 'User'),
+                                            child: _buildPlaceholderCircle(name: 'User'),
+                                          ),
+                                      ],
                                     ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
@@ -776,16 +803,18 @@ class UserAppointmentCard extends StatelessWidget {
                     const SizedBox(height: 16),
 
                                          // Edit Button
-                     if (onEditPressed != null)
+                     if (onEditPressed != null || isEvent)
                        Padding(
                          padding: const EdgeInsets.only(bottom: 16),
                          child: SizedBox(
                            width: double.infinity,
                            child: ElevatedButton(
-                             onPressed: _isScheduled() ? null : onEditPressed,
+                             onPressed: _isScheduled() 
+                                 ? null  // Disable Edit button if scheduled (for both events and regular appointments)
+                                 : onEditPressed,
                              style: ElevatedButton.styleFrom(
-                               backgroundColor: _isScheduled() 
-                                   ? Colors.grey.shade400 
+                               backgroundColor: _isScheduled()
+                                   ? Colors.grey.shade400
                                    : (headerColor ?? const Color(0xFFF97316)),
                                foregroundColor: Colors.white,
                                padding: const EdgeInsets.symmetric(vertical: 16),
@@ -795,7 +824,7 @@ class UserAppointmentCard extends StatelessWidget {
                                elevation: _isScheduled() ? 0 : 2,
                              ),
                              child: Text(
-                               _isScheduled() ? 'Edit' : 'Edit Details',
+                               isEvent ? 'Edit Details' : (_isScheduled() ? 'Edit' : 'Edit Details'),
                                style: TextStyle(
                                  fontSize: 16,
                                  fontWeight: FontWeight.w600,
@@ -863,6 +892,16 @@ class UserAppointmentCard extends StatelessWidget {
            (appointmentFor != null && appointmentFor['type']?.toString().toLowerCase() == 'guest');
   }
 
+  // Check if this is an event
+  bool _isEvent() {
+    if (appointmentData == null) return false;
+    
+    final type = appointmentData!['type']?.toString().toLowerCase();
+    final eventId = appointmentData!['eventId'];
+    
+    return type == 'event' || eventId != null;
+  }
+
   // Extract guest information from appointment data
   Map<String, String?> _getGuestInfo() {
     if (appointmentData == null) return {};
@@ -886,6 +925,14 @@ class UserAppointmentCard extends StatelessWidget {
   bool _isScheduled() {
     if (appointmentData == null) return false;
     
+    // For events, check scheduledDate field
+    final isEvent = _isEvent();
+    if (isEvent) {
+      final scheduledDate = appointmentData!['scheduledDate']?.toString();
+      return scheduledDate != null && scheduledDate.isNotEmpty && scheduledDate != 'null';
+    }
+    
+    // For regular appointments, check scheduledDateTime
     final scheduledDateTime = appointmentData!['scheduledDateTime'];
     if (scheduledDateTime != null) {
       final scheduledDate = scheduledDateTime['date'];

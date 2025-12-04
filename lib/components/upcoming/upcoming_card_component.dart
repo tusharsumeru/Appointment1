@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../action/action.dart';
 import '../inbox/appointment_detail_page.dart';
+import '../inbox/event_detail_page.dart';
 import '../common/profile_photo_dialog.dart';
 
 class UpcomingCardComponent extends StatefulWidget {
@@ -19,48 +20,13 @@ class UpcomingCardComponent extends StatefulWidget {
 
 class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   List<Map<String, dynamic>> _upcomingAppointments = [];
+  List<Map<String, dynamic>> _upcomingEvents = [];
   bool _isLoading = false;
   String? _error;
   Set<String> _expandedCategories = {};
 
   // Category definitions
   final Map<String, Map<String, dynamic>> _categories = {
-    'morning': {
-      'title': 'Morning',
-      'icon': Icons.wb_sunny,
-      'color': Colors.deepPurple,
-      'timeRange': {'start': 6, 'end': 15}, // 6 AM to 3 PM
-    },
-    'evening': {
-      'title': 'Evening',
-      'icon': Icons.wb_sunny_outlined,
-      'color': Colors.deepPurple,
-      'timeRange': {'start': 15, 'end': 18.5}, // 3 PM to 6:30 PM
-    },
-    'night': {
-      'title': 'Night',
-      'icon': Icons.nightlight_round,
-      'color': Colors.deepPurple,
-      'timeRange': {'start': 20, 'end': 22}, // 8 PM to 10 PM
-    },
-    'tbs_req': {
-      'title': 'TBS/Req',
-      'icon': Icons.pending_actions,
-      'color': Colors.deepPurple,
-      'timeRange': null, // Based on status
-    },
-    'done': {
-      'title': 'Done',
-      'icon': Icons.check_circle,
-      'color': Colors.deepPurple,
-      'timeRange': null, // Based on status
-    },
-    'satsang_backstage': {
-      'title': 'Satsang Backstage',
-      'icon': Icons.music_note,
-      'color': Colors.deepPurple,
-      'timeRange': null, // Based on venue
-    },
     'gurukul': {
       'title': 'Gurukul',
       'icon': Icons.school,
@@ -72,6 +38,42 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
       'icon': Icons.temple_hindu,
       'color': Colors.deepPurple,
       'timeRange': null, // Based on venue
+    },
+    'morning': {
+      'title': 'Morning',
+      'icon': Icons.wb_sunny,
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 6, 'end': 15}, // 6 AM to 3 PM
+    },
+    'evening': {
+      'title': 'Evening',
+      'icon': Icons.wb_sunny_outlined,
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 15, 'end': 20}, // 3 PM to 8 PM
+    },
+    'tbs_req': {
+      'title': 'TBS/Req',
+      'icon': Icons.pending_actions,
+      'color': Colors.deepPurple,
+      'timeRange': null, // Based on status
+    },
+    'satsang_backstage': {
+      'title': 'Satsang Backstage',
+      'icon': Icons.music_note,
+      'color': Colors.deepPurple,
+      'timeRange': null, // Based on venue
+    },
+    'night': {
+      'title': 'Night',
+      'icon': Icons.nightlight_round,
+      'color': Colors.deepPurple,
+      'timeRange': {'start': 20, 'end': 24}, // 8 PM to 11:59 PM (midnight)
+    },
+    'done': {
+      'title': 'Done',
+      'icon': Icons.check_circle,
+      'color': Colors.deepPurple,
+      'timeRange': null, // Based on status
     },
   };
 
@@ -99,34 +101,52 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
       // Get selected date in YYYY-MM-DD format
       final dateString = ActionService.formatDateForAPI(widget.selectedDate);
 
-      final result = await ActionService.getAppointmentsByScheduledDate(
-        date: dateString,
-      );
+      // Use getAppointmentsByScheduledDate which returns both appointments and events merged
+      final result = await ActionService.getAppointmentsByScheduledDate(date: dateString);
 
       if (result['success']) {
-        final List<dynamic> appointmentsData = result['data'] ?? [];
+        final List<dynamic> mergedData = result['data'] ?? [];
 
-        if (appointmentsData.isNotEmpty) {
-          final sortedAppointments = appointmentsData
-              .cast<Map<String, dynamic>>();
+        // Separate appointments and events
+        final List<Map<String, dynamic>> appointments = [];
+        final List<Map<String, dynamic>> events = [];
+
+        for (var item in mergedData) {
+          if (item is Map<String, dynamic>) {
+            if (item['type'] == 'event') {
+              events.add(item);
+            } else {
+              appointments.add(item);
+            }
+          }
+        }
+
+        // Process appointments (EXISTING LOGIC - UNCHANGED)
+        if (appointments.isNotEmpty) {
+          final sortedAppointments = appointments;
           sortedAppointments.sort((a, b) {
-            final timeA = a['scheduledTime']?.toString() ?? '';
-            final timeB = b['scheduledTime']?.toString() ?? '';
+            final timeA = a['scheduledTime']?.toString() ?? 
+                         a['scheduledDateTime']?['time']?.toString() ?? '';
+            final timeB = b['scheduledTime']?.toString() ?? 
+                         b['scheduledDateTime']?['time']?.toString() ?? '';
             return timeA.compareTo(timeB);
           });
-
           _upcomingAppointments = sortedAppointments;
         } else {
           _upcomingAppointments = [];
         }
-        _error = null;
+
+        // Store events (only scheduled ones are already filtered by backend)
+        _upcomingEvents = events;
       } else {
         _error = result['message'] ?? 'Failed to fetch upcoming appointments';
         _upcomingAppointments = [];
+        _upcomingEvents = [];
       }
     } catch (e) {
       _error = 'Network error: $e';
       _upcomingAppointments = [];
+      _upcomingEvents = [];
     } finally {
       setState(() {
         _isLoading = false;
@@ -140,12 +160,138 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     widget.onRefresh?.call();
   }
 
+  List<Map<String, dynamic>> _getEventsForCategory(String categoryKey) {
+    if (_upcomingEvents.isEmpty) return [];
+
+    switch (categoryKey) {
+      case 'morning':
+      case 'night':
+        return _upcomingEvents.where((event) {
+          // Only show scheduled events (backend already filters, but double-check)
+          final status = (event['status']?.toString() ?? 
+                         event['eventStatus']?.toString() ?? '').toLowerCase();
+          if (status != 'scheduled') {
+            return false;
+          }
+
+          // Get scheduledDate and convert to IST (UTC+5:30)
+          final scheduledDate = event['scheduledDate']?.toString();
+          
+          if (scheduledDate == null || scheduledDate.isEmpty || scheduledDate == 'null') {
+            return false;
+          }
+
+          try {
+            // Parse UTC datetime and convert to IST (UTC+5:30)
+            final dateTimeUtc = DateTime.parse(scheduledDate);
+            // Convert to IST by adding 5 hours and 30 minutes
+            final dateTimeIst = dateTimeUtc.add(const Duration(hours: 5, minutes: 30));
+            final hour = dateTimeIst.hour;
+
+            final category = _categories[categoryKey]!;
+            final start = category['timeRange']['start'] as num;
+            final end = category['timeRange']['end'] as num;
+
+            final isInRange = start <= end
+                ? (hour >= start && hour < end)
+                : (hour >= start || hour < end);
+
+            return isInRange;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening_445':
+        return _upcomingEvents.where((event) {
+          final status = (event['status']?.toString() ?? 
+                         event['eventStatus']?.toString() ?? '').toLowerCase();
+          if (status != 'scheduled') {
+            return false;
+          }
+
+          final scheduledDate = event['scheduledDate']?.toString();
+          if (scheduledDate == null || scheduledDate.isEmpty || scheduledDate == 'null') {
+            return false;
+          }
+
+          try {
+            final dateTimeUtc = DateTime.parse(scheduledDate);
+            final dateTimeIst = dateTimeUtc.add(const Duration(hours: 5, minutes: 30));
+            // Check for exactly 4:45 PM (16:45)
+            return dateTimeIst.hour == 16 && dateTimeIst.minute == 15;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening_500':
+        return _upcomingEvents.where((event) {
+          final status = (event['status']?.toString() ?? 
+                         event['eventStatus']?.toString() ?? '').toLowerCase();
+          if (status != 'scheduled') {
+            return false;
+          }
+
+          final scheduledDate = event['scheduledDate']?.toString();
+          if (scheduledDate == null || scheduledDate.isEmpty || scheduledDate == 'null') {
+            return false;
+          }
+
+          try {
+            final dateTimeUtc = DateTime.parse(scheduledDate);
+            final dateTimeIst = dateTimeUtc.add(const Duration(hours: 5, minutes: 30));
+            // Check for exactly 5:00 PM (17:00)
+            return dateTimeIst.hour == 16 && dateTimeIst.minute == 25;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening':
+        return _upcomingEvents.where((event) {
+          final status = (event['status']?.toString() ?? 
+                         event['eventStatus']?.toString() ?? '').toLowerCase();
+          if (status != 'scheduled') {
+            return false;
+          }
+
+          final scheduledDate = event['scheduledDate']?.toString();
+          if (scheduledDate == null || scheduledDate.isEmpty || scheduledDate == 'null') {
+            return false;
+          }
+
+          try {
+            final dateTimeUtc = DateTime.parse(scheduledDate);
+            final dateTimeIst = dateTimeUtc.add(const Duration(hours: 5, minutes: 30));
+            final hour = dateTimeIst.hour;
+            final minute = dateTimeIst.minute;
+
+            // Evening range: 3 PM (15:00) to 8 PM (20:00)
+            // But exclude exactly 4:45 PM and 5:00 PM
+            final isInEveningRange = hour >= 15 && hour < 20;
+            final isNot445 = !(hour == 16 && minute == 45);
+            final isNot500 = !(hour == 17 && minute == 0);
+
+            return isInEveningRange && isNot445 && isNot500;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'tbs_req':
+      case 'done':
+      default:
+        // For other categories, return empty (events only in time-based categories)
+        return [];
+    }
+  }
+
   List<Map<String, dynamic>> _getAppointmentsForCategory(String categoryKey) {
     if (_upcomingAppointments.isEmpty) return [];
 
     switch (categoryKey) {
       case 'morning':
-      case 'evening':
       case 'night':
         return _upcomingAppointments.where((appointment) {
           // First check if appointment is completed/done - if so, exclude it
@@ -223,6 +369,200 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                 : (hour >= start || hour < end);
 
             return isInRange;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening_445':
+        return _upcomingAppointments.where((appointment) {
+          final status = _getAppointmentStatus(appointment).toLowerCase();
+          if (status == 'completed' || status == 'done') {
+            return false;
+          }
+
+          final communicationPreferences = appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any(
+              (pref) => pref.toString() == 'TBS/Req',
+            );
+            if (hasTbsReq) {
+              return false;
+            }
+          }
+
+          final location = _getLocation(appointment).toLowerCase();
+          final isSatsangBackstage =
+              location.contains('satsang') && location.contains('backstage');
+          final isGurukul = location.contains('gurukul');
+          final isPoojaBackstage =
+              location.contains('pooja') && location.contains('backstage');
+          if (isSatsangBackstage || isGurukul || isPoojaBackstage) {
+            return false;
+          }
+
+          String? timeString;
+          final scheduledDateTime = appointment['scheduledDateTime'];
+          if (scheduledDateTime is Map<String, dynamic>) {
+            timeString = scheduledDateTime['time']?.toString();
+          }
+
+          if (timeString == null || timeString.isEmpty) {
+            timeString =
+                appointment['scheduledTime']?.toString() ??
+                appointment['preferredTime']?.toString() ??
+                appointment['createdAt']?.toString();
+          }
+
+          if (timeString == null) {
+            return false;
+          }
+
+          try {
+            int hour, minute;
+            if (timeString.contains(':')) {
+              final parts = timeString.split(':');
+              hour = int.parse(parts[0]);
+              minute = parts.length > 1 ? int.parse(parts[1]) : 0;
+            } else {
+              final time = DateTime.parse(timeString);
+              hour = time.hour;
+              minute = time.minute;
+            }
+
+            // Check for exactly 4:45 PM (16:45)
+            return hour == 16 && minute == 45;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening_500':
+        return _upcomingAppointments.where((appointment) {
+          final status = _getAppointmentStatus(appointment).toLowerCase();
+          if (status == 'completed' || status == 'done') {
+            return false;
+          }
+
+          final communicationPreferences = appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any(
+              (pref) => pref.toString() == 'TBS/Req',
+            );
+            if (hasTbsReq) {
+              return false;
+            }
+          }
+
+          final location = _getLocation(appointment).toLowerCase();
+          final isSatsangBackstage =
+              location.contains('satsang') && location.contains('backstage');
+          final isGurukul = location.contains('gurukul');
+          final isPoojaBackstage =
+              location.contains('pooja') && location.contains('backstage');
+          if (isSatsangBackstage || isGurukul || isPoojaBackstage) {
+            return false;
+          }
+
+          String? timeString;
+          final scheduledDateTime = appointment['scheduledDateTime'];
+          if (scheduledDateTime is Map<String, dynamic>) {
+            timeString = scheduledDateTime['time']?.toString();
+          }
+
+          if (timeString == null || timeString.isEmpty) {
+            timeString =
+                appointment['scheduledTime']?.toString() ??
+                appointment['preferredTime']?.toString() ??
+                appointment['createdAt']?.toString();
+          }
+
+          if (timeString == null) {
+            return false;
+          }
+
+          try {
+            int hour, minute;
+            if (timeString.contains(':')) {
+              final parts = timeString.split(':');
+              hour = int.parse(parts[0]);
+              minute = parts.length > 1 ? int.parse(parts[1]) : 0;
+            } else {
+              final time = DateTime.parse(timeString);
+              hour = time.hour;
+              minute = time.minute;
+            }
+
+            // Check for exactly 5:00 PM (17:00)
+            return hour == 17 && minute == 0;
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+
+      case 'evening':
+        return _upcomingAppointments.where((appointment) {
+          final status = _getAppointmentStatus(appointment).toLowerCase();
+          if (status == 'completed' || status == 'done') {
+            return false;
+          }
+
+          final communicationPreferences = appointment['communicationPreferences'];
+          if (communicationPreferences is List) {
+            final hasTbsReq = communicationPreferences.any(
+              (pref) => pref.toString() == 'TBS/Req',
+            );
+            if (hasTbsReq) {
+              return false;
+            }
+          }
+
+          final location = _getLocation(appointment).toLowerCase();
+          final isSatsangBackstage =
+              location.contains('satsang') && location.contains('backstage');
+          final isGurukul = location.contains('gurukul');
+          final isPoojaBackstage =
+              location.contains('pooja') && location.contains('backstage');
+          if (isSatsangBackstage || isGurukul || isPoojaBackstage) {
+            return false;
+          }
+
+          String? timeString;
+          final scheduledDateTime = appointment['scheduledDateTime'];
+          if (scheduledDateTime is Map<String, dynamic>) {
+            timeString = scheduledDateTime['time']?.toString();
+          }
+
+          if (timeString == null || timeString.isEmpty) {
+            timeString =
+                appointment['scheduledTime']?.toString() ??
+                appointment['preferredTime']?.toString() ??
+                appointment['createdAt']?.toString();
+          }
+
+          if (timeString == null) {
+            return false;
+          }
+
+          try {
+            int hour, minute;
+            if (timeString.contains(':')) {
+              final parts = timeString.split(':');
+              hour = int.parse(parts[0]);
+              minute = parts.length > 1 ? int.parse(parts[1]) : 0;
+            } else {
+              final time = DateTime.parse(timeString);
+              hour = time.hour;
+              minute = time.minute;
+            }
+
+            // Evening range: 3 PM (15:00) to 8 PM (20:00)
+            // But exclude exactly 4:45 PM and 5:00 PM
+            final isInEveningRange = hour >= 15 && hour < 20;
+            final isNot445 = !(hour == 16 && minute == 45);
+            final isNot500 = !(hour == 17 && minute == 0);
+
+            return isInEveningRange && isNot445 && isNot500;
           } catch (e) {
             return false;
           }
@@ -554,9 +894,18 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Total Appointments: ${_upcomingAppointments.length}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  Row(
+                    children: [
+                      Text(
+                        'Total Appointments: ${_upcomingAppointments.length}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Total Events: ${_upcomingEvents.length}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -568,11 +917,26 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
             ..._categories.entries.map((entry) {
               final categoryKey = entry.key;
               final category = entry.value;
-              final appointments = _getAppointmentsForCategory(categoryKey);
+              List<Map<String, dynamic>> appointments;
+              List<Map<String, dynamic>> events;
+              
+              // For evening category, include sub-sections in the count
+              if (categoryKey == 'evening') {
+                appointments = _getAppointmentsForCategory('evening');
+                events = _getEventsForCategory('evening');
+                // Add items from sub-sections
+                appointments.addAll(_getAppointmentsForCategory('evening_445'));
+                appointments.addAll(_getAppointmentsForCategory('evening_500'));
+                events.addAll(_getEventsForCategory('evening_445'));
+                events.addAll(_getEventsForCategory('evening_500'));
+              } else {
+                appointments = _getAppointmentsForCategory(categoryKey);
+                events = _getEventsForCategory(categoryKey);
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: _buildCategoryCard(category, appointments, categoryKey),
+                child: _buildCategoryCard(category, appointments, events, categoryKey),
               );
             }).toList(),
           ],
@@ -584,8 +948,12 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   Widget _buildCategoryCard(
     Map<String, dynamic> category,
     List<Map<String, dynamic>> appointments,
+    List<Map<String, dynamic>> events,
     String categoryKey,
   ) {
+    final totalItems = appointments.length + events.length;
+    final totalPeopleCount =
+        _calculateTotalPeople(appointments) + _calculateTotalEventCapacity(events);
     final isExpanded = _expandedCategories.contains(categoryKey);
 
     return Container(
@@ -647,6 +1015,40 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.grey.shade300,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people,
+                          size: 16,
+                          color: Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$totalPeopleCount',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
@@ -655,7 +1057,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      '${appointments.length}',
+                      '$totalItems',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -686,7 +1088,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                   bottomRight: Radius.circular(12),
                 ),
               ),
-              child: appointments.isEmpty
+              child: totalItems == 0
                   ? Padding(
                       padding: const EdgeInsets.all(16),
                       child: Center(
@@ -699,7 +1101,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'No appointments in this category',
+                              'No appointments or events in this category',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -709,18 +1111,601 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                         ),
                       ),
                     )
+                  : categoryKey == 'evening'
+                      ? _buildEveningWithSubSections(events, appointments, category)
+                      : Column(
+                          children: [
+                            // Display events first
+                            ...events.map(
+                              (event) => _buildEventCard(event),
+                            ),
+                            // Then display appointments (EXISTING LOGIC - UNCHANGED)
+                            ...appointments.map(
+                              (appointment) => _buildAppointmentCard(appointment, category),
+                            ),
+                          ],
+                        ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEveningWithSubSections(
+    List<Map<String, dynamic>> events,
+    List<Map<String, dynamic>> appointments,
+    Map<String, dynamic> category,
+  ) {
+    // Get sub-section items
+    final events445 = _getEventsForCategory('evening_445');
+    final events500 = _getEventsForCategory('evening_500');
+    final appointments445 = _getAppointmentsForCategory('evening_445');
+    final appointments500 = _getAppointmentsForCategory('evening_500');
+    
+    // Get other evening items (excluding 4:45 and 5:00)
+    final otherEvents = events.where((event) {
+      return !events445.contains(event) && !events500.contains(event);
+    }).toList();
+    final otherAppointments = appointments.where((appointment) {
+      return !appointments445.contains(appointment) && !appointments500.contains(appointment);
+    }).toList();
+
+    return Column(
+      children: [
+        // Other evening items (display normally, not in a sub-section) - show first
+        if (otherEvents.isNotEmpty || otherAppointments.isNotEmpty) ...[
+          _buildOtherEveningHeader(otherEvents, otherAppointments),
+          ...otherEvents.map((event) => _buildEventCard(event)),
+          ...otherAppointments.map((appointment) => _buildAppointmentCard(appointment, category)),
+        ],
+        
+        // 4:45 PM sub-section (expandable/collapsible) - always show
+        _buildEveningSubSection(
+          title: '4:45 PM',
+          icon: Icons.access_time,
+          events: events445,
+          appointments: appointments445,
+          category: category,
+          subSectionKey: 'evening_445',
+        ),
+        
+        // 5:00 PM sub-section (expandable/collapsible) - always show
+        _buildEveningSubSection(
+          title: '5:00 PM',
+          icon: Icons.access_time,
+          events: events500,
+          appointments: appointments500,
+          category: category,
+          subSectionKey: 'evening_500',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOtherEveningHeader(
+    List<Map<String, dynamic>> events,
+    List<Map<String, dynamic>> appointments,
+  ) {
+    final totalItems = events.length + appointments.length;
+    final totalPeople = _calculateTotalPeople(appointments);
+    final totalEventCapacity = _calculateTotalEventCapacity(events);
+    final totalPeopleCount = totalPeople + totalEventCapacity;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Title
+          Text(
+            'Other Evening Appointments',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Count badge
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.grey.shade300,
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '$totalItems',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // People count badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.shade300,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.people,
+                  size: 12,
+                  color: Colors.grey.shade700,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$totalPeopleCount',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEveningSubSection({
+    required String title,
+    required IconData icon,
+    required List<Map<String, dynamic>> events,
+    required List<Map<String, dynamic>> appointments,
+    required Map<String, dynamic> category,
+    required String subSectionKey,
+  }) {
+    final totalItems = events.length + appointments.length;
+    final totalPeople = _calculateTotalPeople(appointments);
+    final isExpanded = _expandedCategories.contains(subSectionKey);
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section (clickable)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedCategories.remove(subSectionKey);
+                } else {
+                  _expandedCategories.add(subSectionKey);
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(8),
+                  topRight: const Radius.circular(8),
+                  bottomLeft: isExpanded ? Radius.zero : const Radius.circular(8),
+                  bottomRight: isExpanded ? Radius.zero : const Radius.circular(8),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                  // Total people count badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey.shade300,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people,
+                          size: 14,
+                          color: Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${totalPeople + _calculateTotalEventCapacity(events)}',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // Total items count badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$totalItems',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.orange.shade700,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable content
+          if (isExpanded)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              child: Column(
+                children: [
+                  ...events.map((event) => _buildEventCard(event)),
+                  ...appointments.map((appointment) => _buildAppointmentCard(appointment, category)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventsCategoryCard() {
+    final isExpanded = _expandedCategories.contains('events');
+    final events = _upcomingEvents;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedCategories.remove('events');
+                } else {
+                  _expandedCategories.add('events');
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(12),
+                  topRight: const Radius.circular(12),
+                  bottomLeft: isExpanded ? Radius.zero : const Radius.circular(12),
+                  bottomRight: isExpanded ? Radius.zero : const Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.event, color: Colors.orange, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Events',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${events.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: Colors.orange,
+                    size: 24,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: events.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.event_busy, size: 32, color: Colors.grey[400]),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No events scheduled',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : Column(
-                      children: appointments
-                          .map(
-                            (appointment) =>
-                                _buildAppointmentCard(appointment, category),
-                          )
-                          .toList(),
+                      children: events.map((event) => _buildEventCard(event)).toList(),
                     ),
             ),
         ],
       ),
     );
+  }
+
+  Widget _buildEventCard(Map<String, dynamic> event) {
+    final eventName = event['eventName']?.toString() ?? 'Event';
+    final eventLocation = event['eventLocation']?.toString() ?? 'N/A';
+    final eventStatus = event['eventStatus']?.toString() ?? 'pending';
+    final scheduledDate = event['scheduledDate']?.toString();
+    final eventImage = event['eventImage']?.toString();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF5FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EventDetailPage(
+                event: event,
+                onEventUpdated: () {
+                  _fetchUpcomingAppointments();
+                },
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              if (eventImage != null && eventImage.isNotEmpty)
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      eventImage,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.event, color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.event, color: Colors.grey),
+                ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eventName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            eventLocation,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (scheduledDate != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatEventDate(scheduledDate),
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getEventStatusColor(eventStatus).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _getEventStatusColor(eventStatus), width: 1),
+                ),
+                child: Text(
+                  eventStatus.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: _getEventStatusColor(eventStatus),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getEventStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'approved':
+        return Colors.blue;
+      case 'rejected':
+        return Colors.red;
+      case 'completed':
+        return Colors.grey;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatEventDate(String dateStr) {
+    try {
+      // Parse UTC datetime and convert to IST (UTC+5:30)
+      final dateTimeUtc = DateTime.parse(dateStr);
+      final dateTimeIst = dateTimeUtc.add(const Duration(hours: 5, minutes: 30));
+      
+      // Convert to 12-hour format with AM/PM
+      final hour12 = dateTimeIst.hour == 0 
+          ? 12 
+          : (dateTimeIst.hour > 12 ? dateTimeIst.hour - 12 : dateTimeIst.hour);
+      final amPm = dateTimeIst.hour < 12 ? 'AM' : 'PM';
+      final minute = dateTimeIst.minute.toString().padLeft(2, '0');
+      
+      return '${dateTimeIst.day}/${dateTimeIst.month}/${dateTimeIst.year} $hour12:$minute $amPm';
+    } catch (e) {
+      return dateStr;
+    }
   }
 
   Widget _buildAppointmentCard(
@@ -1431,6 +2416,39 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
       // For other appointment types, add 1 for the main appointee
       return accompanyCount + 1;
     }
+  }
+
+  int _calculateTotalPeople(List<Map<String, dynamic>> appointments) {
+    int total = 0;
+    for (var appointment in appointments) {
+      // Get total number of people from accompanyUsers
+      final accompanyUsers = appointment['accompanyUsers'];
+      if (accompanyUsers is Map<String, dynamic>) {
+        final numberOfUsers = accompanyUsers['numberOfUsers'];
+        if (numberOfUsers != null && numberOfUsers is int) {
+          // numberOfUsers represents accompanying users, so total = numberOfUsers + 1 (main user)
+          total += (numberOfUsers + 1);
+        } else {
+          // If numberOfUsers is not available, default to 1 (main user)
+          total += 1;
+        }
+      } else {
+        // If accompanyUsers is not available, default to 1 (main user)
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  int _calculateTotalEventCapacity(List<Map<String, dynamic>> events) {
+    int total = 0;
+    for (var event in events) {
+      final eventCapacity = event['eventCapacity'] ?? 0;
+      final capacity = eventCapacity is int ? eventCapacity : 
+                      (int.tryParse(eventCapacity.toString()) ?? 0);
+      total += capacity;
+    }
+    return total;
   }
 
   Future<void> _handleMarkAsDone(Map<String, dynamic> appointment) async {

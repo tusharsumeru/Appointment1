@@ -328,6 +328,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
     bool isAdmin = userRole == 'admin' || userRole == 'super-admin';
     bool isSuperAdmin = userRole == 'super-admin';
     bool isUser = userRole == 'user' || userRole == 'client';
+    bool isNtc = userRole == 'ntc';
 
     return Drawer(
       child: Container(
@@ -403,6 +404,22 @@ class _SidebarComponentState extends State<SidebarComponent> {
                 physics: const ClampingScrollPhysics(),
                 padding: EdgeInsets.zero,
                 children: [
+
+          // NTC role - only show reference form list
+          if (isNtc) ...[
+            _buildMenuItem(
+              routeName: 'referenceFormList',
+              icon: Icons.list_alt,
+              title: 'Kaalgyani Form List',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReferenceFromListScreen()),
+                );
+              },
+            ),
+          ],
 
           // Secretary and Super Admin menu items
           if (isSecretary || isSuperAdmin) ...[
@@ -572,39 +589,13 @@ class _SidebarComponentState extends State<SidebarComponent> {
             _buildMenuItem(
               routeName: 'referenceFormList',
               icon: Icons.list_alt,
-              title: 'Reference Form List',
+              title: 'Kaalgyani Form List',
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const ReferenceFromListScreen()),
                 );
-              },
-            ),
-          ],
-
-
-
-          // Admin-specific menu items (to be implemented)
-          if (isAdmin) ...[
-            _buildMenuItem(
-              routeName: 'adminDashboard',
-              icon: Icons.admin_panel_settings,
-              title: 'Admin Dashboard',
-              count: '0',
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Navigate to admin dashboard
-              },
-            ),
-            _buildMenuItem(
-              routeName: 'manageUsers',
-              icon: Icons.people,
-              title: 'Manage Users',
-              count: '0',
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Navigate to user management
               },
             ),
           ],
@@ -691,49 +682,52 @@ class _SidebarComponentState extends State<SidebarComponent> {
           //     );
           //   },
           // ),
-          const Divider(),
+          // Only show account settings section for non-ntc roles
+          if (!isNtc) ...[
+            const Divider(),
 
-          ListTile(
-            leading: const Icon(Icons.account_circle, color: Colors.grey),
-            title: const Text('Account Settings'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AccountSettingsScreen(),
-                ),
-              );
-            },
-          ),
+            ListTile(
+              leading: const Icon(Icons.account_circle, color: Colors.grey),
+              title: const Text('Account Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AccountSettingsScreen(),
+                  ),
+                );
+              },
+            ),
 
-          ListTile(
-            leading: const Icon(Icons.phone_android, color: Colors.grey),
-            title: const Text('Unique Phone Code'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UniquePhoneCodeScreen(),
-                ),
-              );
-            },
-          ),
+            ListTile(
+              leading: const Icon(Icons.phone_android, color: Colors.grey),
+              title: const Text('Unique Phone Code'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const UniquePhoneCodeScreen(),
+                  ),
+                );
+              },
+            ),
 
-          ListTile(
-            leading: const Icon(Icons.lock_reset, color: Colors.grey),
-            title: const Text('Change Password'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ChangePasswordScreen(),
-                ),
-              );
-            },
-          ),
+            ListTile(
+              leading: const Icon(Icons.lock_reset, color: Colors.grey),
+              title: const Text('Change Password'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChangePasswordScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
 
           // Export Data Navigation Item - Commented out
           // ListTile(
@@ -767,6 +761,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
 
 
 
+          // Divider before logout
           const Divider(),
 
           // Logout
@@ -776,21 +771,23 @@ class _SidebarComponentState extends State<SidebarComponent> {
             onTap: _handleLogout,
           ),
 
-          // Build Number
-          ListTile(
-            leading: Icon(Icons.info_outline, color: Colors.grey[600]),
-            title: Text(
-              'Build 5.0.0',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+          // Build Number - only show for non-ntc roles
+          if (!isNtc) ...[
+            ListTile(
+              leading: Icon(Icons.info_outline, color: Colors.grey[600]),
+              title: Text(
+                'Build 6.0.0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+              onTap: () {
+                // Optional: Add any action when build number is tapped
+              },
             ),
-            onTap: () {
-              // Optional: Add any action when build number is tapped
-            },
-          ),
+          ],
                 ],
               ),
             ),

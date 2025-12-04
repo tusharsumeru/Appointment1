@@ -81,11 +81,11 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
       
       // Navigate to appropriate screen based on selected date
       if (pickedOnly.isAtSameMomentAs(todayOnly)) {
-        // Selected today - navigate to today screen
+        // Selected today - navigate to today screen with selected date
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const TodayScreen(),
+            builder: (context) => TodayScreen(selectedDate: picked),
           ),
         );
       } else if (pickedOnly.isAtSameMomentAs(tomorrow)) {
@@ -98,15 +98,15 @@ class _TomorrowScreenState extends State<TomorrowScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const UpcomingScreen(),
+            builder: (context) => UpcomingScreen(),
           ),
         );
       } else {
-        // Selected date in the past - navigate to today screen
+        // Selected date in the past - navigate to today screen with selected date
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const TodayScreen(),
+            builder: (context) => TodayScreen(selectedDate: picked),
           ),
         );
       }

@@ -5,6 +5,7 @@ import '../action/storage_service.dart';
 import '../action/jwt_utils.dart';
 import 'user_sidebar.dart';
 import 'edit_appointment_screen.dart';
+import 'event_appointment_screen.dart';
 
 class UserHistoryScreen extends StatefulWidget {
   const UserHistoryScreen({super.key});
@@ -278,6 +279,98 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
               itemCount: appointments.length,
               itemBuilder: (context, index) {
                 final appointment = appointments[index];
+                
+                // Check if this is an event
+                final isEvent = appointment['type']?.toString().toLowerCase() == 'event' || 
+                               appointment['eventId'] != null;
+                
+                if (isEvent) {
+                  // Map event data
+                  final eventName = appointment['eventName']?.toString() ?? '';
+                  final eventDescription = appointment['eventDescription']?.toString() ?? '';
+                  // Use event description as purpose, or event name if description is not available
+                  final purpose = eventDescription.isNotEmpty ? eventDescription : (eventName.isNotEmpty ? eventName : 'N/A');
+                  
+                  return UserAppointmentCard(
+                    appointmentId: appointment['eventId']?.toString() ?? 'N/A',
+                    status: appointment['eventStatus']?.toString() ?? 'Unknown',
+                    userName: eventName.isNotEmpty ? eventName : 'Event', // Use event name as userName
+                    userTitle: '',
+                    company: '',
+                    profilePhoto: appointment['eventImage'],
+                    appointmentDateRange: _formatEventScheduledDate(appointment),
+                    attendeesCount: _calculateEventAttendees(appointment),
+                    attendeePhotos: null,
+                    purpose: purpose,
+                    assignedTo: 'N/A',
+                    dateRange: _formatEventFromToDateRange(appointment),
+                    daysCount: _calculateEventDaysCount(appointment),
+                    email: appointment['createdBy']?['email'] ?? 'N/A',
+                    phone: _formatEventPhoneNumber(appointment),
+                    location: appointment['eventLocation'] ?? 'N/A',
+                    appointmentData: appointment, // Pass the complete event data
+                    appointmentAttachment: null,
+                    onEditPressed: () async {
+                      // Navigate to event edit screen
+                      final eventId = appointment['eventId']?.toString();
+                      if (eventId != null && eventId.isNotEmpty) {
+                        // Show loading indicator
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                        
+                        final eventResult = await ActionService.getEventById(eventId);
+                        
+                        // Hide loading indicator
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                        }
+                        
+                        if (mounted) {
+                          if (eventResult['success'] == true) {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EventAppointmentScreen(
+                                  eventData: eventResult['data'],
+                                ),
+                              ),
+                            );
+                            
+                            // Refresh the list if event was updated successfully
+                            if (result == true) {
+                              _loadUserAppointments(refresh: true);
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(eventResult['message'] ?? 'Failed to load event details'),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Event ID not found'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  );
+                }
+                
+                // Regular appointment mapping
                 // Debug attachment data
                 final attachmentUrl = appointment['appointmentAttachment'];
                 print('🔄 Appointment ${appointment['appointmentId']} attachment: $attachmentUrl');
@@ -648,6 +741,150 @@ class _UserHistoryScreenState extends State<UserHistoryScreen> {
       return photos.isNotEmpty ? photos : null;
     } catch (e) {
       return null;
+    }
+  }
+
+  // Format scheduled date for "Appointment Date" field
+  String _formatEventScheduledDate(Map<String, dynamic> event) {
+    try {
+      // Check for scheduledDate - show scheduled date
+      final scheduledDate = event['scheduledDate']?.toString();
+      if (scheduledDate != null && scheduledDate.isNotEmpty && scheduledDate != 'null') {
+        try {
+          final dateUtc = DateTime.parse(scheduledDate);
+          final date = dateUtc.toLocal(); // Convert UTC to local time
+          final formattedDate = '${date.day}/${date.month}/${date.year}';
+          return formattedDate;
+        } catch (e) {
+          // If parsing fails, continue to check other conditions
+        }
+      }
+      
+      // Check if event is pending - if no scheduled date and pending, show "Date Not Approved Yet"
+      final eventStatus = event['status']?.toString() ?? 
+                         event['eventStatus']?.toString() ?? 
+                         'pending';
+      final isPending = eventStatus.toLowerCase() == 'pending';
+      
+      if (isPending) {
+        return 'Date Not Approved Yet';
+      }
+      
+      // If not scheduled and not pending, return empty or fallback
+      return 'Not scheduled';
+    } catch (e) {
+      return 'Not scheduled';
+    }
+  }
+  
+  // Format from/to date range for "Date" field
+  String _formatEventFromToDateRange(Map<String, dynamic> event) {
+    try {
+      // Check for event date range (from and to dates)
+      final eventFromDateTime = event['fromDateTime']?.toString() ?? 
+                               event['eventFromDateTime']?.toString();
+      final eventToDateTime = event['toDateTime']?.toString() ?? 
+                             event['eventToDateTime']?.toString();
+      
+      if (eventFromDateTime != null && eventToDateTime != null && 
+          eventFromDateTime.isNotEmpty && eventToDateTime.isNotEmpty) {
+        try {
+          final fromDateUtc = DateTime.parse(eventFromDateTime);
+          final toDateUtc = DateTime.parse(eventToDateTime);
+          final fromDate = fromDateUtc.toLocal(); // Convert UTC to local time
+          final toDate = toDateUtc.toLocal(); // Convert UTC to local time
+          final fromFormatted = '${fromDate.day}/${fromDate.month}/${fromDate.year}';
+          final toFormatted = '${toDate.day}/${toDate.month}/${toDate.year}';
+          return '$fromFormatted to $toFormatted';
+        } catch (e) {
+          // If parsing fails, continue to check other conditions
+        }
+      } else if (eventFromDateTime != null && eventFromDateTime.isNotEmpty) {
+        try {
+          final dateUtc = DateTime.parse(eventFromDateTime);
+          final date = dateUtc.toLocal(); // Convert UTC to local time
+          final formattedDate = '${date.day}/${date.month}/${date.year}';
+          return formattedDate;
+        } catch (e) {
+          // If parsing fails, continue to check other conditions
+        }
+      }
+      
+      // Fallback to createdAt if event dates are not available
+      final createdAt = event['createdAt'];
+      if (createdAt != null) {
+        try {
+          final dateUtc = DateTime.parse(createdAt);
+          final date = dateUtc.toLocal(); // Convert UTC to local time
+          final formattedDate = '${date.day}/${date.month}/${date.year}';
+          return formattedDate;
+        } catch (e) {
+          // If parsing fails, return default message
+        }
+      }
+      return 'Date not available';
+    } catch (e) {
+      return 'Date not available';
+    }
+  }
+  
+  int _calculateEventDaysCount(Map<String, dynamic> event) {
+    try {
+      final eventFromDateTime = event['eventFromDateTime'];
+      final eventToDateTime = event['eventToDateTime'];
+      
+      if (eventFromDateTime != null && eventToDateTime != null) {
+        final fromUtc = DateTime.parse(eventFromDateTime);
+        final toUtc = DateTime.parse(eventToDateTime);
+        final from = fromUtc.toLocal(); // Convert UTC to local time
+        final to = toUtc.toLocal(); // Convert UTC to local time
+        
+        // Calculate the difference in days and add 1 to include both start and end dates
+        final difference = to.difference(from).inDays;
+        final totalDays = difference + 1;
+        
+        return totalDays > 0 ? totalDays : 1;
+      }
+      
+      return 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  
+  String _formatEventPhoneNumber(Map<String, dynamic> event) {
+    try {
+      final createdBy = event['createdBy'];
+      if (createdBy != null && createdBy is Map<String, dynamic>) {
+        final phoneNumber = createdBy['phoneNumber'];
+        if (phoneNumber != null && phoneNumber is Map<String, dynamic>) {
+          final countryCode = phoneNumber['countryCode'] ?? '';
+          final number = phoneNumber['number'] ?? '';
+          if (number.isNotEmpty) {
+            return '$countryCode$number';
+          }
+        }
+      }
+      return 'N/A';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  int _calculateEventAttendees(Map<String, dynamic> event) {
+    try {
+      final registeredCount = event['eventRegisteredCount'] ?? 0;
+      final capacity = event['eventCapacity'] ?? 0;
+      // Return registered count, or capacity if registered count is 0
+      if (registeredCount is int) {
+        return registeredCount > 0 ? registeredCount : (capacity is int ? capacity : 0);
+      }
+      if (registeredCount is num) {
+        return registeredCount.toInt() > 0 ? registeredCount.toInt() : (capacity is num ? capacity.toInt() : 0);
+      }
+      return capacity is int ? capacity : (capacity is num ? capacity.toInt() : 0);
+    } catch (e) {
+      return 0;
     }
   }
 

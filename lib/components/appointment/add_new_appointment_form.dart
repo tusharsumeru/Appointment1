@@ -525,11 +525,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       isValid = false;
       errorMessage = 'Please select time';
     }
-    // Validate venue
-    else if (_selectedVenue.isEmpty) {
-      isValid = false;
-      errorMessage = 'Please select venue';
-    }
+    // Venue is now optional for quick appointments
 
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -576,7 +572,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
               ? '$_selectedCountryCode${_mobileNoController.text}'
               : null,
           designation: _designationController.text,
-          venue: _selectedVenue,
+          venue: _selectedVenue.isNotEmpty ? _selectedVenue : null,
           purpose: _purposeController.text.isNotEmpty
               ? _purposeController.text
               : null,
@@ -1585,18 +1581,18 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   _buildCheckboxOptions(),
                   const SizedBox(height: 16),
 
-                  // Selected Venue
+                  // Selected Venue (Optional)
                   _buildSelectionField(
                     label: 'Selected Venue',
                     selectedValue: _getSelectedVenueName(),
                     placeholder: _isLoadingVenues
                         ? 'Loading venues...'
-                        : 'Select venue',
+                        : 'Select venue (Optional)',
                     onTap: _isLoadingVenues
                         ? null
                         : () => _showVenueBottomSheet(context),
                     icon: Icons.location_on,
-                    isRequired: true,
+                    isRequired: false,
                   ),
                   const SizedBox(height: 24),
 
@@ -1623,15 +1619,54 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                   const SizedBox(height: 16),
 
                   // Number of People
-                  _buildInputField(
-                    label: 'No. of People (Optional)',
-                    controller: _noPeopleController,
-                    placeholder: 'Total number of attendees',
-                    keyboardType: TextInputType.number,
-                    prefixIcon: const Icon(
-                      Icons.people_outline,
-                      color: Colors.grey,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'No. of People (Optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF374151), // gray-700
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Number of people (including Main user and children if any) for the appointment?',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _noPeopleController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Total number of attendees',
+                          prefixIcon: const Icon(
+                            Icons.people_outline,
+                            color: Colors.grey,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFFAFAFA).withOpacity(0.5), // zinc-50/50
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[400]!),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          hintStyle: TextStyle(color: Colors.grey[500]),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 

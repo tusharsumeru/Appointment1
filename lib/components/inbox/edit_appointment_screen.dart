@@ -2387,15 +2387,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final controllers = _guestControllers[i];
       final guestNumber = i + 1;
       
-      // Get phone number with country code
-      final phoneNumber = controllers['phone']?.text ?? '';
+      // Get phone number input
+      final phoneInput = controllers['phone']?.text.trim() ?? '';
       final rawCountryCode = _guestCountries[guestNumber] ?? '+91';
       final countryCode = rawCountryCode.startsWith('+') ? rawCountryCode : '+$rawCountryCode';
       // Age is optional - can be null or empty
       final ageText = controllers['age']?.text?.trim() ?? '';
       final age = ageText.isEmpty ? null : int.tryParse(ageText);
-      final uniquePhoneCode = controllers['uniquePhoneCode']?.text.trim() ?? '';
-      final hasUniquePhoneCode = uniquePhoneCode.isNotEmpty;
+      
+      // Detect if input is a unique code (3 digits) or phone number
+      final isUniqueCode = phoneInput.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneInput);
       
       // Get photo URL from guest images
       final photoUrl = _guestImages[guestNumber] ?? '';
@@ -2405,17 +2406,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         'age': age,
       };
 
-      // Only include phone number if we have one and unique code not used
-      if (phoneNumber.isNotEmpty && !hasUniquePhoneCode) {
+      // If it's a unique code (3 digits), use alternativePhone
+      // Otherwise, use phoneNumber with country code
+      if (isUniqueCode) {
+        userData['alternativePhone'] = phoneInput;
+      } else if (phoneInput.isNotEmpty) {
         userData['phoneNumber'] = {
           'countryCode': countryCode,
-          'number': phoneNumber,
+          'number': phoneInput,
         };
-      }
-
-      // Add unique phone code as alternativePhone if provided
-      if (hasUniquePhoneCode) {
-        userData['alternativePhone'] = uniquePhoneCode;
       }
 
       // Determine if this is a new user based on count
@@ -5606,44 +5605,8 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _buildEditableAgeField('Age (Optional)', controllers['age']!),
               const SizedBox(height: 12),
 
-              // Toggle: Use unique code instead of phone
-              Row(
-                children: [
-                  Checkbox(
-                    value: _guestUniquePhoneCodeEnabled[guestNumber] == true,
-                    onChanged: (_guestUniquePhoneCodeDisabled[guestNumber] == true)
-                        ? null
-                        : (val) {
-                            setState(() {
-                              _guestUniquePhoneCodeEnabled[guestNumber] = val == true;
-                            });
-                          },
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'If you don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Conditionally show phone or unique code based on toggle and age
-              if (!(_guestUniquePhoneCodeEnabled[guestNumber] == true))
-                _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!)
-              else if (age != null && age >= 12 && age <= 59) ...[
-                _buildUniquePhoneCodeField('Unique Phone Code (3 digits)', controllers['uniquePhoneCode']!),
-                // const SizedBox(height: 4),
-                // Text(
-                //   'If you don\'t have the contact number, kindly reach out to the secretariat to proceed with the appointment.',
-                //   style: TextStyle(
-                //     fontSize: 12,
-                //     color: Colors.grey[600],
-                //   ),
-                // ),
-                // const SizedBox(height: 12),
-              ],
+              // Phone field (accepts either phone number or 3-digit unique code)
+              _buildAccompanyingUserPhoneField(guestNumber, controllers['phone']!),
               
               // Photo Section (only show if age >= 12)
               if (isPhotoRequired) ...[
@@ -6088,115 +6051,149 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   // Phone field for accompanying users with country code
   Widget _buildAccompanyingUserPhoneField(int guestNumber, TextEditingController controller) {
-    // Find the guest data to check age and unique phone code
+    // Find the guest data to check age
     final guestIndex = guestNumber - 1;
     // Age is optional - can be null
     final ageText = guestIndex < _guestControllers.length 
         ? _guestControllers[guestIndex]['age']?.text?.trim() ?? ''
         : '';
     final age = ageText.isEmpty ? null : int.tryParse(ageText);
-    // COMMENTED OUT: Unique phone code functionality
-    // final hasUniquePhoneCode = guestIndex < _guestControllers.length 
-    //     ? _guestControllers[guestIndex]['uniquePhoneCode']?.text.isNotEmpty == true
-    //     : false;
-    final hasUniquePhoneCode = false; // Always false since unique code is disabled
+    
+    // Check if input is a unique code (3 digits) or phone number
+    final phoneText = controller.text.trim();
+    final isUniqueCode = phoneText.length == 3 && RegExp(r'^\d{3}$').hasMatch(phoneText);
     
     // Determine if phone is required per rules:
+    // - Age 12-59: require either phone number OR unique code (3 digits)
     // - Age < 12 or > 59: phone optional
-    // - Age 12..59: phone required unless unique code present
     // - No age provided: phone optional
-    // COMMENTED OUT: Phone is now always optional since unique code is disabled
-    // final isPhoneRequired = (age != null && age >= 12 && age <= 59) && !hasUniquePhoneCode;
-    // final phoneLabel = isPhoneRequired ? 'Contact Number *' : 'Contact Number (Optional)';
-    final phoneLabel = 'Contact Number (Optional)'; // Always optional now
+    final isPhoneRequired = (age != null && age >= 12 && age <= 59);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          phoneLabel,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
+        // Label
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: isPhoneRequired 
+                    ? 'Contact Number or Special Code ' 
+                    : 'Contact Number or Special Code (Optional)'
+              ),
+              if (isPhoneRequired)
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        // Hint text about phone number or special code
+        Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Text(
+            '💡 Enter a phone number with country code OR a special 3-digit code provided by the secretariat.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.blue.shade700,
+            ),
+          ),
+        ),
         Row(
           children: [
-            // Country code picker
-            GestureDetector(
-              onTap: () {
-                showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  countryListTheme: CountryListThemeData(
-                    flagSize: 25,
-                    backgroundColor: Colors.white,
-                    textStyle: TextStyle(fontSize: 16, color: Colors.black),
-                    bottomSheetHeight: 500,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20.0),
-                      topRight: Radius.circular(20.0),
-                    ),
-                    inputDecoration: InputDecoration(
-                      labelText: 'Search',
-                      hintText: 'Start typing to search',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: const Color.fromARGB(255, 8, 191, 214),
+            // Country Code Button (only show when not entering unique code)
+            if (!isUniqueCode)
+              GestureDetector(
+                onTap: () {
+                  showCountryPicker(
+                    context: context,
+                    showPhoneCode: true,
+                    countryListTheme: CountryListThemeData(
+                      flagSize: 25,
+                      backgroundColor: Colors.white,
+                      textStyle: TextStyle(fontSize: 16, color: Colors.black),
+                      bottomSheetHeight: 500,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20.0),
+                        topRight: Radius.circular(20.0),
+                      ),
+                      inputDecoration: InputDecoration(
+                        labelText: 'Search',
+                        hintText: 'Start typing to search',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: const Color.fromARGB(255, 8, 191, 214),
+                          ),
                         ),
                       ),
                     ),
+                    onSelect: (Country country) {
+                      setState(() {
+                        _guestCountries[guestNumber] = country.phoneCode;
+                      });
+                    },
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
                   ),
-                  onSelect: (Country country) {
-                    setState(() {
-                      _guestCountries[guestNumber] = country.phoneCode;
-                    });
-                  },
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _guestCountries[guestNumber] ?? '+91',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[800],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _guestCountries[guestNumber] ?? '+91',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[800],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      color: Colors.grey[600],
-                      size: 20,
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
+            if (!isUniqueCode) const SizedBox(width: 8),
+            // Phone Number Field (accepts either phone number or 3-digit unique code)
             Expanded(
               child: TextFormField(
                 controller: controller,
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.number,
+                // Allow up to phone length (which is always >= 3), validation will determine if it's unique code or phone
+                maxLength: 15, // Reasonable max length for phone numbers
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) {
+                  setState(() {
+                    // Trigger rebuild to show/hide country picker and success message
+                  });
+                },
                 decoration: InputDecoration(
-                  hintText: 'Enter phone number',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[400],
-                  ),
                   filled: true,
                   fillColor: Colors.grey[50],
                   border: OutlineInputBorder(
@@ -6215,12 +6212,42 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: Colors.red[300]!),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  hintText: '',
+                  counterText: '', // Hide the character counter
                 ),
               ),
             ),
           ],
         ),
+        // Success message when unique phone code is detected
+        if (isUniqueCode) ...[
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.check_circle,
+                size: 16,
+                color: Colors.green.shade600,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Valid special code detected\nno further contact required',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green.shade600,
+                  ),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

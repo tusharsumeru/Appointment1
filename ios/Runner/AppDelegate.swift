@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import UserNotifications
+import FirebaseCore
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -8,6 +9,10 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // 🔥 CRITICAL: Configure Firebase BEFORE Flutter initialization
+    // This is required for native Firebase frameworks (MLKit, FirebaseCore, etc.)
+    FirebaseApp.configure()
+    
     GeneratedPluginRegistrant.register(with: self)
     
     // 🔥 CRITICAL: Set notification delegate for foreground presentation

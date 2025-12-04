@@ -124,18 +124,11 @@ class _DarshanPhotosResultsScreenState extends State<DarshanPhotosResultsScreen>
           }
         }
         
-        // Auto-select the first user with photos
-        for (var user in _userPictures) {
-          final apiResults = user['apiResults'] as Map<String, dynamic>?;
-          final summary = apiResults?['summary'] as Map<String, dynamic>?;
-          final totalMatches = summary?['total_matches'] as int? ?? 0;
-          
-          if (totalMatches > 0) {
-            _selectedUserId = user['_id'] as String?;
-            _filterPhotosForUser(_selectedUserId!);
-            break;
-          }
-        }
+        // Don't auto-select any user - show all photos by default
+        // This prevents the "No Photos Found" screen from showing initially
+        _selectedUserId = null;
+        _filteredPhotos = _getAllPhotos();
+        _selectedPhotos = List.filled(_filteredPhotos.length, false);
       });
     }
   }
@@ -1203,12 +1196,19 @@ class _DarshanPhotosResultsScreenState extends State<DarshanPhotosResultsScreen>
     }
 
     final currentPagePhotos = _getCurrentPagePhotos();
-    final selectedUser = _userPictures.firstWhere(
-      (user) => user['_id'] == _selectedUserId,
-      orElse: () => _userPictures.first,
-    );
-    final userInfo = selectedUser['userInfo'] as Map<String, dynamic>;
-    final userName = userInfo['fullName'] ?? 'User';
+    
+    // Handle both single user selection and "View All" mode
+    String userName = 'All Users';
+    if (_selectedUserId != null) {
+      final selectedUser = _userPictures.firstWhere(
+        (user) => user['_id'] == _selectedUserId,
+        orElse: () => _userPictures.isNotEmpty ? _userPictures.first : {},
+      );
+      if (selectedUser.isNotEmpty) {
+        final userInfo = selectedUser['userInfo'] as Map<String, dynamic>?;
+        userName = userInfo?['fullName'] ?? 'User';
+      }
+    }
 
     return Container(
       color: const Color(0xFFF9FAFB),
@@ -1457,14 +1457,14 @@ class _DarshanPhotosResultsScreenState extends State<DarshanPhotosResultsScreen>
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Stack(
               children: [
-                Column(
+                  Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '${_albumData?['album_name']} ${index + 1}',
+                        '${_albumData?['album_name'] ?? 'Photo'} ${index + 1}',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -1479,7 +1479,7 @@ class _DarshanPhotosResultsScreenState extends State<DarshanPhotosResultsScreen>
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Album: ${_albumData?['album_id']}',
+                        'Album: ${photo['album_id'] ?? _albumData?['album_id'] ?? 'N/A'}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
@@ -1490,7 +1490,7 @@ class _DarshanPhotosResultsScreenState extends State<DarshanPhotosResultsScreen>
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Date: ${_extractDateFromImageUrl(photo)}',
+                        'Date: ${photo['date'] ?? _extractDateFromImageUrl(photo)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),

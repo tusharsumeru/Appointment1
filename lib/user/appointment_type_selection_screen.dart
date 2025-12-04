@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'user_sidebar.dart';
 import 'request_appointment.dart';
+import 'event_appointment_screen.dart';
+import '../action/action.dart';
 
 class AppointmentTypeSelectionScreen extends StatefulWidget {
   const AppointmentTypeSelectionScreen({super.key});
@@ -11,30 +13,68 @@ class AppointmentTypeSelectionScreen extends StatefulWidget {
 
 class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectionScreen> {
   String? _selectedAppointmentType;
+  bool _isVDSUser = false;
 
-  final List<Map<String, String>> _appointmentTypes = [
-    {
-      'id': 'myself',
-      'title': 'Request appointment for Myself',
-      'description': 'Schedule an appointment for yourself',
-    },
-    {
-      'id': 'guest',
-      'title': 'Request appointment for a Guest',
-      'description': 'Schedule an appointment for someone else',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _checkVDSUser();
+  }
+
+  Future<void> _checkVDSUser() async {
+    final isVDS = await ActionService.isVDSUser();
+    setState(() {
+      _isVDSUser = isVDS;
+    });
+  }
+
+  List<Map<String, String>> get _appointmentTypes {
+    final types = [
+      {
+        'id': 'myself',
+        'title': 'Request appointment for Myself',
+        'description': 'Schedule an appointment for yourself',
+      },
+      {
+        'id': 'guest',
+        'title': 'Request appointment for a Guest',
+        'description': 'Schedule an appointment for someone else',
+      },
+    ];
+
+    // Add event option only for VDS users
+    if (_isVDSUser) {
+      types.add({
+        'id': 'event',
+        'title': 'Request appointment for events',
+        'description': 'Schedule an appointment for events',
+      });
+    }
+
+    return types;
+  }
 
   void _continueToRequestAppointment() {
     if (_selectedAppointmentType != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RequestAppointmentScreen(
-            selectedType: _selectedAppointmentType!,
+      if (_selectedAppointmentType == 'event') {
+        // Navigate to event appointment screen for VDS users
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const EventAppointmentScreen(),
           ),
-        ),
-      );
+        );
+      } else {
+        // Navigate to regular request appointment screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RequestAppointmentScreen(
+              selectedType: _selectedAppointmentType!,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -152,6 +192,12 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
   Widget _buildAppointmentTypeCard(Map<String, String> type) {
     final isSelected = _selectedAppointmentType == type['id'];
     
+    // Use orange theme for all appointment types
+    final selectedColor = Colors.orange;
+    final selectedLightColor = Colors.orange.shade50;
+    final selectedBorderColor = Colors.orange.shade300;
+    final selectedTextColor = Colors.orange.shade800;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
@@ -164,10 +210,10 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.lightGreen.shade50 : Colors.white,
+            color: isSelected ? selectedLightColor : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? Colors.lightGreen.shade300 : Colors.grey.shade300,
+              color: isSelected ? selectedBorderColor : Colors.grey.shade300,
               width: 1,
             ),
           ),
@@ -179,9 +225,9 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
                 height: 20,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected ? Colors.green : Colors.white,
+                  color: isSelected ? selectedColor : Colors.white,
                   border: Border.all(
-                    color: isSelected ? Colors.green : Colors.grey.shade400,
+                    color: isSelected ? selectedColor : Colors.grey.shade400,
                     width: 2,
                   ),
                 ),
@@ -200,10 +246,12 @@ class _AppointmentTypeSelectionScreenState extends State<AppointmentTypeSelectio
                 child: Text(
                   type['title']!,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.normal,
-                    color: isSelected ? Colors.green.shade700 : Colors.black87,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? selectedTextColor : Colors.black87,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

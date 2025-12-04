@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../action/action.dart';
 import 'appointment_details_screen.dart';
 
@@ -11,9 +12,78 @@ class QRScannerScreen extends StatefulWidget {
 }
 
 class _QRScannerScreenState extends State<QRScannerScreen> {
-  MobileScannerController controller = MobileScannerController();
-  bool isScanning = true;
+  MobileScannerController? controller;
+  bool isScanning = false;
   String? scannedData;
+  bool isLoading = true;
+  String? errorMessage;
+  bool hasPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeScanner();
+  }
+
+  Future<void> _initializeScanner() async {
+    try {
+      print('📷 Initializing camera scanner...');
+      
+      // Create the scanner controller
+      // When we try to start it, iOS will automatically show the permission dialog if needed
+      controller = MobileScannerController(
+        detectionSpeed: DetectionSpeed.normal,
+        facing: CameraFacing.back,
+        autoStart: false, // We'll start it manually to handle permission better
+      );
+      
+      if (!mounted) return;
+      
+      // Try to start the camera - this will trigger the iOS permission dialog
+      try {
+        await controller?.start();
+        
+        if (!mounted) return;
+        
+        // If we get here, permission was granted
+        setState(() {
+          hasPermission = true;
+          isLoading = false;
+          isScanning = true;
+        });
+        
+        print('✅ Camera scanner initialized and started successfully');
+      } catch (e) {
+        // Camera failed to start - likely permission denied
+        print('❌ Camera failed to start: $e');
+        
+        if (!mounted) return;
+        
+        // Check permission status
+        final status = await Permission.camera.status;
+        
+        if (status.isPermanentlyDenied || status.isDenied) {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'Camera permission is required to scan QR codes. Please enable camera access in Settings.';
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'Failed to initialize camera: $e';
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error initializing camera controller: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Failed to initialize camera: $e';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,35 +103,131 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           ),
         ),
         foregroundColor: Colors.white,
-        actions: [
+        actions: controller != null ? [
           IconButton(
             icon: Icon(isScanning ? Icons.pause : Icons.play_arrow),
-            onPressed: () {
-              if (isScanning) {
-                controller.stop();
-              } else {
-                controller.start();
+            onPressed: () async {
+              if (controller == null) return;
+              try {
+                if (isScanning) {
+                  await controller!.stop();
+                } else {
+                  await controller!.start();
+                }
+                if (mounted) {
+                  setState(() {
+                    isScanning = !isScanning;
+                  });
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
-              setState(() {
-                isScanning = !isScanning;
-              });
             },
           ),
-        ],
+        ] : null,
       ),
-      body: Stack(
-        children: [
-          // QR Scanner View
-          MobileScanner(
-            controller: controller,
-            onDetect: (capture) {
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Initializing camera...',
+              style: TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                errorMessage!,
+                style: const TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  openAppSettings();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                ),
+                child: const Text('Open Settings'),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    isLoading = true;
+                    errorMessage = null;
+                  });
+                  _initializeScanner();
+                },
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Color(0xFFF97316)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (controller == null) {
+      return const Center(
+        child: Text('Camera controller not initialized'),
+      );
+    }
+
+    return Stack(
+      children: [
+        // QR Scanner View
+        MobileScanner(
+          controller: controller!,
+          onDetect: (BarcodeCapture capture) {
+            if (!mounted || scannedData != null || controller == null) return;
+            
+            try {
               final List<Barcode> barcodes = capture.barcodes;
               for (final barcode in barcodes) {
-                if (barcode.rawValue != null && scannedData == null) {
+                if (barcode.rawValue != null) {
                   setState(() {
                     scannedData = barcode.rawValue;
                   });
-                  controller.stop();
+                  controller!.stop();
                   setState(() {
                     isScanning = false;
                   });
@@ -71,8 +237,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   break;
                 }
               }
-            },
-          ),
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error scanning: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
           
           // Instructions
           Positioned(
@@ -82,7 +258,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -98,17 +274,31 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           ),
           
           // Flashlight Toggle
-          Positioned(
-            bottom: 100,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () async {
-                await controller.toggleTorch();
-              },
-              backgroundColor: const Color(0xFFF97316),
-              child: const Icon(Icons.flash_on, color: Colors.white),
+          if (controller != null)
+            Positioned(
+              bottom: 100,
+              right: 20,
+              child: FloatingActionButton(
+                onPressed: () async {
+                  if (controller != null) {
+                    try {
+                      await controller!.toggleTorch();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error toggling torch: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                },
+                backgroundColor: const Color(0xFFF97316),
+                child: const Icon(Icons.flash_on, color: Colors.white),
+              ),
             ),
-          ),
           
           // Scan Result - Brief Success Message
           if (scannedData != null)
@@ -119,7 +309,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.9),
+                  color: Colors.green.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
@@ -145,8 +335,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               ),
             ),
         ],
-      ),
-    );
+      );
   }
 
   void _handleScannedData(String scannedData) async {
@@ -191,7 +380,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   @override
   void dispose() {
-    controller.dispose();
+    controller?.dispose();
     super.dispose();
   }
 } 
