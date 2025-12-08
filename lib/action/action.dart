@@ -396,6 +396,77 @@ class ActionService {
     }
   }
 
+
+  // Delete account
+  static Future<Map<String, dynamic>> deleteUserAccount() async {
+  try {
+    final userData = await StorageService.getUserData();
+
+    // Extract MongoDB _id safely
+    final mongoId = userData?['userId'] 
+        ?? userData?['data']?['userId']
+        ?? userData?['user']?['userId'];
+
+    if (mongoId == null) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'User ID missing — cannot delete account.',
+      };
+    }
+
+    final token = await StorageService.getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'statusCode': 401,
+        'message': 'No authentication token found. Please login again.',
+      };
+    }
+
+    final url = Uri.parse('$baseUrl/auth/delete')
+        .replace(queryParameters: {'userId': mongoId});
+
+    print("🗑️ [DEBUG] Deleting user → $mongoId");
+
+    final response = await http.delete(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print("🗑️ Status: ${response.statusCode}");
+    print("🗑️ Body: ${response.body}");
+
+    final Map<String, dynamic> json = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      await StorageService.logout();
+      return {
+        'success': true,
+        'statusCode': 200,
+        'message': json['message'] ?? 'User account soft-deleted successfully.',
+      };
+    }
+
+    return {
+      'success': false,
+      'statusCode': response.statusCode,
+      'message': json['message'] ?? 'Failed to delete user account.',
+    };
+  } catch (err) {
+    print("❌ ERROR deleteUserAccount: $err");
+
+    return {
+      'success': false,
+      'statusCode': 500,
+      'message': 'Network error: $err',
+    };
+  }
+}
+
   // Get sub-user face match results by sub-user ID
   static Future<Map<String, dynamic>> getSubUserFaceMatchResultBySubUserId(
     String subUserId, {

@@ -4292,238 +4292,232 @@ class _AdmitRejectBottomSheetState extends State<_AdmitRejectBottomSheet> {
   }
 
   Future<void> _handleAdmitUser(Map<String, dynamic> user) async {
-    try {
-      // Check if this is a quick appointment
-      final apptType = widget.appointment['appt_type']?.toString();
-      final quickApt = widget.appointment['quick_apt'];
-      final isQuickAppointment = apptType == 'quick' && 
-                                quickApt is Map<String, dynamic> && 
-                                quickApt['isQuickAppointment'] == true;
+  try {
+    // Check if this is a quick appointment
+    final apptType = widget.appointment['appt_type']?.toString();
+    final quickApt = widget.appointment['quick_apt'];
+    final isQuickAppointment = apptType == 'quick' && 
+                              quickApt is Map<String, dynamic> && 
+                              quickApt['isQuickAppointment'] == true;
+    
+    final totalUsersCount = _getTotalNumberOfUsers();
+    final usersList = (_checkInStatus['users'] as List<dynamic>);
+    final isLargeGroup = totalUsersCount > 10;
+    
+    // For quick appointments or large groups, use partial admit flow (admit 1 more user)
+    if (isQuickAppointment || isLargeGroup) {
+      final currentlyAdmitted = _getAdmittedUsers();
       
-      final totalUsersCount = _getTotalNumberOfUsers();
-      final usersList = (_checkInStatus['users'] as List<dynamic>);
-      final isLargeGroup = totalUsersCount > 10;
-      
-      // For quick appointments or large groups, use partial admit flow (admit 1 more user)
-      if (isQuickAppointment || isLargeGroup) {
-        final currentlyAdmitted = _getAdmittedUsers();
-        
-        // Don't allow admitting if all users are already admitted
-        if (currentlyAdmitted >= totalUsersCount) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('All users are already admitted'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          return;
-        }
-        
-        // For large groups, if the user is in the array, update them first
-        // Then use partial admit flow to increment the count
-        if (isLargeGroup && !isQuickAppointment) {
-          // Try to find and update the user in the array if they exist
-          final userIndex = usersList.indexWhere((u) => 
-            (u['userId'] != null && u['userId'] == user['userId']) ||
-            (u['fullName'] != null && u['fullName'] == user['fullName'] && 
-             u['userType'] != null && u['userType'] == user['userType'])
-          );
-          
-          if (userIndex != -1) {
-            final currentUser = usersList[userIndex] as Map<String, dynamic>;
-            final currentStatus = currentUser['status']?.toString().toLowerCase() ?? 'not_arrived';
-            
-            // Only update if status is actually changing
-            if (currentStatus != 'checked_in' && currentStatus != 'checked_in_partial') {
-              final updatedUsers = usersList.map((u) => 
-                Map<String, dynamic>.from(u as Map)
-              ).toList();
-              
-              updatedUsers[userIndex] = {
-                ...currentUser,
-                'status': 'checked_in_partial',
-                'checkedInAt': DateTime.now().toIso8601String(),
-              };
-              
-              // Update the checkInStatus locally before calling partial admit
-              setState(() {
-                _checkInStatus = {
-                  ..._checkInStatus,
-                  'users': updatedUsers,
-                };
-              });
-            }
-          }
-        }
-        
-        // Admit 1 more user (additional count = 1)
-        await _admitPartialUsers(1, currentlyAdmitted, totalUsersCount);
+      // Don't allow admitting if all users are already admitted
+      if (currentlyAdmitted >= totalUsersCount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('All users are already admitted'),
+            backgroundColor: Colors.orange,
+          ),
+        );
         return;
       }
       
-      // For normal appointments (≤10 users), use exact same logic as guard side
-      // Create a deep copy of users to preserve all existing fields
-      final updatedUsers = List<Map<String, dynamic>>.from(
-        usersList.map((u) => Map<String, dynamic>.from(u as Map<String, dynamic>))
-      );
-      
-      // Match user by fullName and userType (like guard side), with userId as fallback
-      int userIndex = updatedUsers.indexWhere((u) => 
-        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
-      );
-      
-      // If not found, try matching by userId as fallback
-      if (userIndex == -1 && user['userId'] != null) {
-        userIndex = updatedUsers.indexWhere((u) => 
-          u['userId'] != null && u['userId'] == user['userId']
-        );
-      }
-
-      if (userIndex != -1) {
-        // Update user status exactly like guard side (no status check)
-        updatedUsers[userIndex] = {
-          ...updatedUsers[userIndex],
-          'status': 'checked_in',
-          'checkedInAt': DateTime.now().toIso8601String(),
-          'type': 'vip',
-        };
-
-        // Calculate main status based on all users
-        final mainStatus = _calculateMainStatus(updatedUsers);
-
-        final result = await ActionService.updateCheckInStatus(
-          checkInStatusId: _checkInStatus['_id'],
-          mainStatus: mainStatus,
-          users: updatedUsers,
-          totalUsers: totalUsersCount,
-        );
-
-        if (result['success']) {
-          // Update the checkInStatus with the response data
-          setState(() {
-            final responseData = result['data'] as Map<String, dynamic>;
-            _checkInStatus = Map<String, dynamic>.from(responseData);
-            // Ensure the users array is properly updated from the response
-            if (responseData['users'] != null) {
-              final responseUsers = List<dynamic>.from(responseData['users']);
-              // Find and update the user in the response to ensure status is correct
-              final responseUserIndex = responseUsers.indexWhere((u) => 
-                (u['fullName'] == user['fullName'] && u['userType'] == user['userType']) ||
-                (user['userId'] != null && u['userId'] != null && u['userId'] == user['userId'])
-              );
-              
-              // If user found in response, ensure status is checked_in
-              if (responseUserIndex != -1) {
-                final responseUser = responseUsers[responseUserIndex] as Map<String, dynamic>;
-                responseUsers[responseUserIndex] = {
-                  ...responseUser,
-                  'status': 'checked_in',
-                  'checkedInAt': responseUser['checkedInAt'] ?? DateTime.now().toIso8601String(),
-                };
-              }
-              
-              _checkInStatus['users'] = responseUsers;
-            } else {
-              // If response doesn't have users, use our updated users array
-              _checkInStatus['users'] = updatedUsers;
-            }
-          });
-          widget.onUpdate();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${user['fullName'] ?? 'User'} admitted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to admit user'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      // For large groups, if the user is in the array, update them first
+      // Then use partial admit flow to increment the count
+      if (isLargeGroup && !isQuickAppointment) {
+        // Try to find and update the user in the array using userId
+        final userIndex = usersList.indexWhere((u) => u['userId'] == user['userId']);
+        
+        if (userIndex != -1) {
+          final currentUser = usersList[userIndex] as Map<String, dynamic>;
+          final currentStatus = currentUser['status']?.toString().toLowerCase() ?? 'not_arrived';
+          
+          // Only update if status is actually changing
+          if (currentStatus != 'checked_in' && currentStatus != 'checked_in_partial') {
+            final updatedUsers = usersList.map((u) => 
+              Map<String, dynamic>.from(u as Map)
+            ).toList();
+            
+            updatedUsers[userIndex] = {
+              ...currentUser,
+              'status': 'checked_in_partial',
+              'checkedInAt': DateTime.now().toIso8601String(),
+            };
+            
+            // Update the checkInStatus locally before calling partial admit
+            setState(() {
+              _checkInStatus = {
+                ..._checkInStatus,
+                'users': updatedUsers,
+              };
+            });
+          }
         }
-      } else {
-        // User not found - show error
+      }
+      
+      // Admit 1 more user (additional count = 1)
+      await _admitPartialUsers(1, currentlyAdmitted, totalUsersCount);
+      return;
+    }
+    
+    // For normal appointments (≤10 users), use exact same logic as guard side
+    // Create a deep copy of users to preserve all existing fields
+    final updatedUsers = List<Map<String, dynamic>>.from(
+      usersList.map((u) => Map<String, dynamic>.from(u as Map<String, dynamic>))
+    );
+    
+    // Match user by userId directly (as fallback, but we'll use userId here)
+    int userIndex = updatedUsers.indexWhere((u) => u['userId'] == user['userId']);
+    
+    if (userIndex != -1) {
+      // Update user status exactly like guard side (no status check)
+      updatedUsers[userIndex] = {
+        ...updatedUsers[userIndex],
+        'status': 'checked_in',
+        'checkedInAt': DateTime.now().toIso8601String(),
+        'type': 'vip', // You can remove this line if you don't want to add VIP
+      };
+
+      // Calculate main status based on all users
+      final mainStatus = _calculateMainStatus(updatedUsers);
+
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: _checkInStatus['_id'],
+        mainStatus: mainStatus,
+        users: updatedUsers,
+        totalUsers: totalUsersCount,
+      );
+
+      if (result['success']) {
+        // Update the checkInStatus with the response data
+        setState(() {
+          final responseData = result['data'] as Map<String, dynamic>;
+          _checkInStatus = Map<String, dynamic>.from(responseData);
+          // Ensure the users array is properly updated from the response
+          if (responseData['users'] != null) {
+            final responseUsers = List<dynamic>.from(responseData['users']);
+            // Find and update the user in the response to ensure status is correct
+            final responseUserIndex = responseUsers.indexWhere((u) => u['userId'] == user['userId']);
+            
+            // If user found in response, ensure status is checked_in
+            if (responseUserIndex != -1) {
+              final responseUser = responseUsers[responseUserIndex] as Map<String, dynamic>;
+              responseUsers[responseUserIndex] = {
+                ...responseUser,
+                'status': 'checked_in',
+                'checkedInAt': responseUser['checkedInAt'] ?? DateTime.now().toIso8601String(),
+              };
+            }
+            
+            _checkInStatus['users'] = responseUsers;
+          } else {
+            // If response doesn't have users, use our updated users array
+            _checkInStatus['users'] = updatedUsers;
+          }
+        });
+        widget.onUpdate();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('User not found in the list. Please refresh and try again.'),
+            content: Text('${user['fullName'] ?? 'User'} admitted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to admit user'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
+    } else {
+      // User not found - show error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text('User not found in the list. Please refresh and try again.'),
           backgroundColor: Colors.red,
         ),
       );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 
   Future<void> _handleRejectUser(Map<String, dynamic> user) async {
-    try {
-      // Create a deep copy of users exactly like guard side
-      final updatedUsers = List<Map<String, dynamic>>.from(
-        (_checkInStatus['users'] as List<dynamic>).map((u) => 
-          Map<String, dynamic>.from(u as Map<String, dynamic>)
-        )
+  try {
+    // Create a deep copy of users exactly like guard side
+    final updatedUsers = List<Map<String, dynamic>>.from(
+      (_checkInStatus['users'] as List<dynamic>).map((u) => 
+        Map<String, dynamic>.from(u as Map<String, dynamic>)
+      )
+    );
+    
+    // Match user by userId instead of fullName and userType
+    final userIndex = updatedUsers.indexWhere((u) => 
+      u['userId'] == user['userId']
+    );
+
+    if (userIndex != -1) {
+      // Update user status to 'rejected', add rejection timestamp, and set 'vip' type
+      updatedUsers[userIndex] = {
+        ...updatedUsers[userIndex],
+        'status': 'rejected',
+        'rejectedAt': DateTime.now().toIso8601String(),
+        'type': 'vip',  // Set type as 'vip'
+      };
+
+      // Calculate main status based on all users
+      final mainStatus = _calculateMainStatus(updatedUsers);
+
+      // Call the service to update the check-in status
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: _checkInStatus['_id'],
+        mainStatus: mainStatus,
+        users: updatedUsers,
+        totalUsers: _getTotalNumberOfUsers(),
       );
-      
-      // Match user by fullName and userType (exactly like guard side)
-      final userIndex = updatedUsers.indexWhere((u) => 
-        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
-      );
 
-      if (userIndex != -1) {
-        // Update user status exactly like guard side (no status check)
-        updatedUsers[userIndex] = {
-          ...updatedUsers[userIndex],
-          'status': 'rejected',
-          'rejectedAt': DateTime.now().toIso8601String(),
-          'type': 'vip',
-        };
-
-        // Calculate main status based on all users
-        final mainStatus = _calculateMainStatus(updatedUsers);
-
-        final result = await ActionService.updateCheckInStatus(
-          checkInStatusId: _checkInStatus['_id'],
-          mainStatus: mainStatus,
-          users: updatedUsers,
-          totalUsers: _getTotalNumberOfUsers(),
+      if (result['success']) {
+        setState(() {
+          _checkInStatus = result['data'];
+        });
+        widget.onUpdate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${user['fullName']} rejected successfully'),
+            backgroundColor: Colors.orange,
+          ),
         );
-
-        if (result['success']) {
-          setState(() {
-            _checkInStatus = result['data'];
-          });
-          widget.onUpdate();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${user['fullName']} rejected successfully'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to reject user'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to reject user'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    } catch (e) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text('User not found in the list. Please refresh and try again.'),
           backgroundColor: Colors.red,
         ),
       );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 
   Future<void> _handleAdmitAll() async {
     try {

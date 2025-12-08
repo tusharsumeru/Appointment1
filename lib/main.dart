@@ -25,6 +25,7 @@ import 'user/user_screen.dart';
 import 'auth/notification_setup_screen.dart';
 import 'guard/guard_screen.dart';
 import 'debug/test_notification_screen.dart';
+import 'auth/login_screen.dart';
 
 // Global variables for notification handling
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -364,6 +365,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ),
       home: const SplashScreen(),
       routes: {
+        '/login': (context) => const LoginScreen(),
+
         '/home': (context) => const HomeScreen(),
         '/inbox': (context) => const InboxScreen(),
         '/dashboard': (context) => const DashboardScreen(),

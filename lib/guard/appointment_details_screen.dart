@@ -552,9 +552,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     try {
       final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
-      final userIndex = updatedUsers.indexWhere((u) => 
-        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
-      );
+      final userId = user['userId']; // Get the userId for matching
+
+      final userIndex = updatedUsers.indexWhere((u) => u['userId'] == userId); // Match by userId
 
       if (userIndex != -1) {
         updatedUsers[userIndex] = {
@@ -563,7 +563,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'checkedInAt': DateTime.now().toIso8601String(),
         };
 
-        // Calculate main status based on all users
         final mainStatus = _calculateMainStatus(updatedUsers);
 
         final result = await ActionService.updateCheckInStatus(
@@ -577,39 +576,34 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             appointmentData = result['data'];
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${user['fullName']} admitted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${user['fullName']} admitted successfully'),
+            backgroundColor: Colors.green,
+          ));
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to admit user'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(result['message'] ?? 'Failed to admit user'),
+            backgroundColor: Colors.red,
+          ));
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ));
     }
   }
+
 
   Future<void> _rejectUser(Map<String, dynamic> user) async {
     if (appointmentData == null) return;
 
     try {
       final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
-      final userIndex = updatedUsers.indexWhere((u) => 
-        u['fullName'] == user['fullName'] && u['userType'] == user['userType']
-      );
+      final userId = user['userId']; // Get the userId for matching
+
+      final userIndex = updatedUsers.indexWhere((u) => u['userId'] == userId); // Match by userId
 
       if (userIndex != -1) {
         updatedUsers[userIndex] = {
@@ -618,7 +612,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           'rejectedAt': DateTime.now().toIso8601String(),
         };
 
-        // Calculate main status based on all users
         final mainStatus = _calculateMainStatus(updatedUsers);
 
         final result = await ActionService.updateCheckInStatus(
@@ -632,118 +625,113 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           setState(() {
             appointmentData = result['data'];
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${user['fullName']} rejected successfully'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${user['fullName']} rejected successfully'),
+            backgroundColor: Colors.orange,
+          ));
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to reject user'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(result['message'] ?? 'Failed to reject user'),
+            backgroundColor: Colors.red,
+          ));
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ));
     }
   }
 
   Future<void> _admitAllUsers() async {
-    if (appointmentData == null) return;
+  if (appointmentData == null) return;
 
-    try {
-      final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
-      final totalUsersCount = _getTotalNumberOfUsers();
-      final isLargeGroup = totalUsersCount > 10;
+  try {
+    final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
+    final totalUsersCount = _getTotalNumberOfUsers();
+    final isLargeGroup = totalUsersCount > 10;
 
-      if (isLargeGroup) {
-        // For large groups, only main user is present in array; send directive with totalUsers
-        final mainUser = usersList.isNotEmpty ? usersList.first as Map<String, dynamic> : <String, dynamic>{};
-        final updatedMainUser = {
-          ...mainUser,
+    if (isLargeGroup) {
+      // For large groups, only main user is present in array; send directive with totalUsers
+      final mainUser = usersList.isNotEmpty ? usersList.first as Map<String, dynamic> : <String, dynamic>{};
+      final updatedMainUser = {
+        ...mainUser,
+        'status': 'checked_in',
+        'checkedInAt': DateTime.now().toIso8601String(),
+      };
+
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: appointmentData!['_id'],
+        mainStatus: 'checked_in',
+        users: [updatedMainUser],
+        totalUsers: totalUsersCount,
+      );
+
+      if (result['success']) {
+        setState(() {
+          appointmentData = result['data'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('All $totalUsersCount users admitted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to admit all users'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      // Small group: process entire list
+      final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
+        final Map<String, dynamic> userMap = user as Map<String, dynamic>;
+        return {
+          ...userMap,
           'status': 'checked_in',
           'checkedInAt': DateTime.now().toIso8601String(),
         };
+      }).toList();
 
-        final result = await ActionService.updateCheckInStatus(
-          checkInStatusId: appointmentData!['_id'],
-          mainStatus: 'checked_in',
-          users: [updatedMainUser],
-          totalUsers: totalUsersCount,
-        );
-
-        if (result['success']) {
-          setState(() {
-            appointmentData = result['data'];
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('All $totalUsersCount users admitted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to admit all users'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        // Small group: process entire list
-        final updatedUsers = usersList.map<Map<String, dynamic>>((user) {
-          final Map<String, dynamic> userMap = user as Map<String, dynamic>;
-          return {
-            ...userMap,
-            'status': 'checked_in',
-            'checkedInAt': DateTime.now().toIso8601String(),
-          };
-        }).toList();
-
-        final result = await ActionService.updateCheckInStatus(
-          checkInStatusId: appointmentData!['_id'],
-          mainStatus: 'checked_in',
-          users: updatedUsers,
-        );
-
-        if (result['success']) {
-          setState(() {
-            appointmentData = result['data'];
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('All users admitted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Failed to admit all users'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+      final result = await ActionService.updateCheckInStatus(
+        checkInStatusId: appointmentData!['_id'],
+        mainStatus: 'checked_in',
+        users: updatedUsers, // Pass the entire updated users array here
       );
+
+      if (result['success']) {
+        setState(() {
+          appointmentData = result['data'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All users admitted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to admit all users'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 
   Future<void> _rejectAllUsers() async {
     if (appointmentData == null) return;
