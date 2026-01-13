@@ -98,6 +98,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   // Appointment purpose validation
   String? _appointmentPurposeError;
   
+  // Meeting purpose categories
+  final List<String> _meetingPurposeCategories = [
+    "Need Blessings / Guidance",
+    "Life Event (Marriage, Anniversary, Birthday etc.)",
+    "Invitation",
+    "Project Proposal",
+    "Project / Seva Update",
+    "Donation",
+    "Other"
+  ];
+  final Set<String> _selectedMeetingPurposeCategories = {};
+  String? _meetingPurposeCategoriesError;
+  
   // Flag to prevent unnecessary scrolling during focus transitions
   bool _isTransitioningFocus = false;
 
@@ -666,6 +679,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _validateForm() {
+    // Validate meeting purpose categories
+    if (_selectedMeetingPurposeCategories.isEmpty) {
+      _meetingPurposeCategoriesError = 'At least one meeting purpose category must be selected';
+    } else {
+      _meetingPurposeCategoriesError = null;
+    }
+
     // Validate appointment purpose
     String purposeText = _appointmentPurposeController.text.trim();
     if (purposeText.isEmpty) {
@@ -679,6 +699,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
 
     bool basicFormValid =
+        _meetingPurposeCategoriesError == null &&
         _appointmentPurposeError == null &&
         _preferredFromDateController.text.isNotEmpty &&
         _preferredToDateController.text.isNotEmpty;
@@ -1548,6 +1569,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         'userCurrentDesignation':
             widget.personalInfo['designation'] ??
             '', // Changed from 'Office Operations Specialist'
+        'meetingPurposeCategories': _selectedMeetingPurposeCategories.toList(),
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'appointmentLocation':
@@ -2668,6 +2690,10 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                   const SizedBox(height: 32),
 
+                  // Meeting Purpose Categories
+                  _buildMeetingPurposeCategoriesField(),
+                  const SizedBox(height: 20),
+
                   // Appointment Purpose
                   _buildTextArea(
                     label: 'Purpose of Meeting',
@@ -3481,6 +3507,107 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           const SizedBox(height: 4),
           Text(
             errorMessage,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMeetingPurposeCategoriesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              const TextSpan(text: 'Meeting Purpose Categories '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _meetingPurposeCategoriesError != null
+                  ? Colors.red
+                  : Colors.grey[300]!,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: _meetingPurposeCategories.map((category) {
+              final isSelected = _selectedMeetingPurposeCategories.contains(category);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedMeetingPurposeCategories.remove(category);
+                    } else {
+                      _selectedMeetingPurposeCategories.add(category);
+                    }
+                    _validateForm();
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.green : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.green
+                                : Colors.grey[400]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (_meetingPurposeCategoriesError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _meetingPurposeCategoriesError!,
             style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],

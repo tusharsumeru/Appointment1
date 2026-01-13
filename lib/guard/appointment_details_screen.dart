@@ -19,6 +19,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   bool isLoading = true;
   String? errorMessage;
   
+  // Loading states for admit/reject operations
+  Map<int, bool> admitLoading = {}; // Track loading state per user index
+  Map<int, bool> rejectLoading = {}; // Track loading state per user index
+  bool admitAllLoading = false;
+  bool rejectAllLoading = false;
+  bool admitPartialLoading = false;
+  
+  // Helper to check if any operation is in progress
+  bool get isAnyOperationLoading {
+    return admitAllLoading || 
+           rejectAllLoading || 
+           admitPartialLoading ||
+           admitLoading.values.any((loading) => loading) ||
+           rejectLoading.values.any((loading) => loading);
+  }
 
 
   @override
@@ -239,6 +254,56 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       print('DEBUG: Error getting scheduled venue: $e');
       return 'N/A';
     }
+  }
+
+  // Determine if this appointment is marked as external (E-VM badge)
+  bool _isExternalAppointment() {
+    try {
+      if (detailedAppointmentData == null) return false;
+      final scheduled = detailedAppointmentData!['scheduledDateTime'];
+      if (scheduled is Map<String, dynamic>) {
+        return scheduled['isExternal'] == true;
+      }
+    } catch (_) {
+      // ignore and treat as non-external
+    }
+    return false;
+  }
+
+  // Secretary initials for E-XX badge using detailed appointment data
+  String _getSecretaryInitials() {
+    if (detailedAppointmentData == null) return 'VM';
+
+    // Try assignedSecretary.fullName first
+    final assignedSecretary = detailedAppointmentData!['assignedSecretary'];
+    if (assignedSecretary is Map<String, dynamic>) {
+      final fullName = assignedSecretary['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        final parts = fullName.split(' ');
+        if (parts.length >= 2) {
+          return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+        } else if (parts.length == 1) {
+          return parts[0][0].toUpperCase();
+        }
+      }
+    }
+
+    // Fallback to other secretary fields if present
+    final secretaryName =
+        detailedAppointmentData!['secretaryName']?.toString() ??
+        detailedAppointmentData!['assignedTo']?.toString() ??
+        detailedAppointmentData!['secretary']?.toString() ??
+        'VM';
+
+    if (secretaryName == 'VM') return 'VM';
+
+    final parts = secretaryName.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return 'VM';
   }
 
   bool _isQuickAppointment() {
@@ -547,18 +612,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
 
   // Admit/Reject functionality
-  Future<void> _admitUser(Map<String, dynamic> user) async {
-    if (appointmentData == null) return;
+  Future<void> _admitUser(int index) async {
+    if (appointmentData == null || isAnyOperationLoading) return;
+
+    setState(() {
+      admitLoading[index] = true;
+    });
 
     try {
       final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
-      final userId = user['userId']; // Get the userId for matching
-
-      final userIndex = updatedUsers.indexWhere((u) => u['userId'] == userId); // Match by userId
-
-      if (userIndex != -1) {
-        updatedUsers[userIndex] = {
-          ...updatedUsers[userIndex],
+      
+      // Use index-based matching instead of userId
+      if (index >= 0 && index < updatedUsers.length) {
+        final user = updatedUsers[index];
+        updatedUsers[index] = {
+          ...user,
           'status': 'checked_in',
           'checkedInAt': DateTime.now().toIso8601String(),
         };
@@ -575,12 +643,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         if (result['success']) {
           setState(() {
             appointmentData = result['data'];
+            admitLoading[index] = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('${user['fullName']} admitted successfully'),
             backgroundColor: Colors.green,
           ));
         } else {
+          setState(() {
+            admitLoading[index] = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(result['message'] ?? 'Failed to admit user'),
             backgroundColor: Colors.red,
@@ -588,6 +660,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         }
       }
     } catch (e) {
+      setState(() {
+        admitLoading[index] = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error: $e'),
         backgroundColor: Colors.red,
@@ -596,18 +671,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
 
-  Future<void> _rejectUser(Map<String, dynamic> user) async {
-    if (appointmentData == null) return;
+  Future<void> _rejectUser(int index) async {
+    if (appointmentData == null || isAnyOperationLoading) return;
+
+    setState(() {
+      rejectLoading[index] = true;
+    });
 
     try {
       final updatedUsers = List<Map<String, dynamic>>.from(appointmentData!['users']);
-      final userId = user['userId']; // Get the userId for matching
-
-      final userIndex = updatedUsers.indexWhere((u) => u['userId'] == userId); // Match by userId
-
-      if (userIndex != -1) {
-        updatedUsers[userIndex] = {
-          ...updatedUsers[userIndex],
+      
+      // Use index-based matching instead of userId
+      if (index >= 0 && index < updatedUsers.length) {
+        final user = updatedUsers[index];
+        updatedUsers[index] = {
+          ...user,
           'status': 'rejected',
           'rejectedAt': DateTime.now().toIso8601String(),
         };
@@ -624,12 +702,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         if (result['success']) {
           setState(() {
             appointmentData = result['data'];
+            rejectLoading[index] = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('${user['fullName']} rejected successfully'),
             backgroundColor: Colors.orange,
           ));
         } else {
+          setState(() {
+            rejectLoading[index] = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(result['message'] ?? 'Failed to reject user'),
             backgroundColor: Colors.red,
@@ -637,6 +719,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         }
       }
     } catch (e) {
+      setState(() {
+        rejectLoading[index] = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error: $e'),
         backgroundColor: Colors.red,
@@ -645,7 +730,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   Future<void> _admitAllUsers() async {
-  if (appointmentData == null) return;
+  if (appointmentData == null || isAnyOperationLoading) return;
+
+  setState(() {
+    admitAllLoading = true;
+  });
 
   try {
     final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
@@ -671,6 +760,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         setState(() {
           appointmentData = result['data'];
+          admitAllLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -679,6 +769,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         );
       } else {
+        setState(() {
+          admitAllLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to admit all users'),
@@ -706,6 +799,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         setState(() {
           appointmentData = result['data'];
+          admitAllLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -714,6 +808,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         );
       } else {
+        setState(() {
+          admitAllLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to admit all users'),
@@ -723,6 +820,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       }
     }
   } catch (e) {
+    setState(() {
+      admitAllLoading = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Error: $e'),
@@ -734,7 +834,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
 
   Future<void> _rejectAllUsers() async {
-    if (appointmentData == null) return;
+    if (appointmentData == null || isAnyOperationLoading) return;
+
+    setState(() {
+      rejectAllLoading = true;
+    });
 
     try {
       final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
@@ -759,6 +863,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         if (result['success']) {
           setState(() {
             appointmentData = result['data'];
+            rejectAllLoading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -767,6 +872,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           );
         } else {
+          setState(() {
+            rejectAllLoading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Failed to reject all users'),
@@ -793,6 +901,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         if (result['success']) {
           setState(() {
             appointmentData = result['data'];
+            rejectAllLoading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -801,6 +910,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ),
           );
         } else {
+          setState(() {
+            rejectAllLoading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Failed to reject all users'),
@@ -810,6 +922,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         }
       }
     } catch (e) {
+      setState(() {
+        rejectAllLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -820,7 +935,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   Future<void> _admitPartialUsers(int partialUsersCount) async {
-    if (appointmentData == null) return;
+    if (appointmentData == null || isAnyOperationLoading) return;
+
+    setState(() {
+      admitPartialLoading = true;
+    });
 
     try {
       final List<dynamic> usersList = appointmentData!['users'] as List<dynamic>;
@@ -845,6 +964,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       if (result['success']) {
         setState(() {
           appointmentData = result['data'];
+          admitPartialLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -853,6 +973,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
         );
       } else {
+        setState(() {
+          admitPartialLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to partially admit users'),
@@ -861,6 +984,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         );
       }
     } catch (e) {
+      setState(() {
+        admitPartialLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -903,11 +1029,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   void _showPartialAdmissionDialog() {
+    if (isAnyOperationLoading) return; // Don't show dialog if any operation is in progress
+    
     final TextEditingController countController = TextEditingController();
     final totalUsers = _getTotalNumberOfUsers();
     
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Partial Admission'),
@@ -1330,11 +1459,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _admitUser(user),
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text('Admit'),
+                    onPressed: isAnyOperationLoading ? null : () => _admitUser(index),
+                    icon: admitLoading[index] == true
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.check, size: 16),
+                    label: Text(admitLoading[index] == true ? 'Processing...' : 'Admit'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.green,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -1344,11 +1482,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _rejectUser(user),
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Reject'),
+                    onPressed: isAnyOperationLoading ? null : () => _rejectUser(index),
+                    icon: rejectLoading[index] == true
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.close, size: 16),
+                    label: Text(rejectLoading[index] == true ? 'Processing...' : 'Reject'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.red,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -1459,19 +1606,48 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(8),
+                                // Show E-<initials> badge when appointment is external,
+                                // otherwise show the original calendar icon.
+                                if (_isExternalAppointment()) ...[
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.9),
+                                        width: 2,
+                                      ),
+                                      color: Colors.white,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'E-${_getSecretaryInitials()}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.orange,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.calendar_today,
-                                    color: Colors.white,
-                                    size: 24,
+                                  const SizedBox(width: 12),
+                                ] else ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.calendar_today,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
+                                  const SizedBox(width: 12),
+                                ],
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1689,11 +1865,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _showPartialAdmissionDialog,
-                              icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('Partially Admit'),
+                              onPressed: isAnyOperationLoading ? null : _showPartialAdmissionDialog,
+                              icon: admitPartialLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle_outline),
+                              label: Text(admitPartialLoading ? 'Processing...' : 'Partially Admit'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
+                                backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.orange,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -1705,11 +1890,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _showPartialAdmissionDialog,
-                              icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('Partially Admitted'),
+                              onPressed: isAnyOperationLoading ? null : _showPartialAdmissionDialog,
+                              icon: admitPartialLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle_outline),
+                              label: Text(admitPartialLoading ? 'Processing...' : 'Partially Admitted'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
+                                backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.orange,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -1722,11 +1916,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             children: [
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: _admitAllUsers,
-                                  icon: const Icon(Icons.check_circle),
-                                  label: const Text('Admit All'),
+                                  onPressed: isAnyOperationLoading ? null : _admitAllUsers,
+                                  icon: admitAllLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(Icons.check_circle),
+                                  label: Text(admitAllLoading ? 'Processing...' : 'Admit All'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
+                                    backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.green,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -1736,11 +1939,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: _rejectAllUsers,
-                                  icon: const Icon(Icons.cancel),
-                                  label: const Text('Reject All'),
+                                  onPressed: isAnyOperationLoading ? null : _rejectAllUsers,
+                                  icon: rejectAllLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(Icons.cancel),
+                                  label: Text(rejectAllLoading ? 'Processing...' : 'Reject All'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
+                                    backgroundColor: isAnyOperationLoading ? Colors.grey : Colors.red,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

@@ -18,11 +18,11 @@ class ActionService {
   static Future<void> initializeBaseUrl() async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://artofliving.io/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://artofliving.io/api/v3/baseurl'),
+        Uri.parse('https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -64,11 +64,11 @@ class ActionService {
   static Future<String> get _oldBaseUrl async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://artofliving.io/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://artofliving.io/api/v3/baseurl'),
+        Uri.parse('https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -80,7 +80,7 @@ class ActionService {
           '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
         );
         // Fallback to hardcoded URL if API fails
-        return 'https://artofliving.io/api/v3';
+        return 'https://orthoptic-karan-leftward.ngrok-free.dev/api/v3';
       }
 
       final data = jsonDecode(response.body);
@@ -93,7 +93,7 @@ class ActionService {
     } catch (error) {
       print('❌ [ERROR] Failed to fetch base URL: $error');
       // Fallback to hardcoded URL if there's an error
-      return 'https://artofliving.io/api/v3';
+      return 'https://orthoptic-karan-leftward.ngrok-free.dev/api/v3'; 
     }
   }
 
@@ -1388,238 +1388,190 @@ class ActionService {
   }
 
   // Schedule appointment with all options
-  static Future<Map<String, dynamic>> scheduleAppointment({
-    required String appointmentId,
-    required String scheduledDate,
-    required String scheduledTime,
-    Map<String, dynamic>? options,
-    String? meetingType,
-    String? venueId, // Changed from venue to venueId
-    String? venueLabel, // Added venueLabel parameter
-    String? arrivalTime,
-    Map<String, dynamic>? scheduleConfirmation,
-    String? userId, // Added userId for notification
-  }) async {
-    try {
-      // Get token from storage
-      final token = await StorageService.getToken();
-      if (token == null) {
-        return {
-          'success': false,
-          'statusCode': 401,
-          'message': 'No authentication token found. Please login again.',
-        };
-      }
-
-      // Validate appointmentId
-      // Note: Backend expects appointmentId (string field), not MongoDB _id (ObjectId)
-      if (appointmentId.isEmpty) {
-        return {
-          'success': false,
-          'statusCode': 400,
-          'message': 'Invalid appointmentId',
-        };
-      }
-
-      // Validate required fields
-      if (scheduledDate.isEmpty || scheduledTime.isEmpty) {
-        return {
-          'success': false,
-          'statusCode': 400,
-          'message': 'Scheduled date and time are required',
-        };
-      }
-
-      // Validate date and time format
-      try {
-        final scheduledDateTime = DateTime.parse(
-          '${scheduledDate}T${scheduledTime}',
-        );
-        if (scheduledDateTime.isBefore(DateTime.now())) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'message': 'Scheduled time must be in the future',
-          };
-        }
-      } catch (e) {
-        return {
-          'success': false,
-          'statusCode': 400,
-          'message': 'Invalid date or time format',
-        };
-      }
-
-      // Prepare request body
-      final Map<String, dynamic> requestBody = {
-        'scheduledDate': scheduledDate,
-        'scheduledTime': scheduledTime,
-        'options':
-            options ??
-            {
-              'tbsRequired': false,
-              'dontSendNotifications': false,
-              'sendArrivalTime': false,
-              'scheduleEmailSmsConfirmation': false,
-              'sendVdsEmail': false,
-              'stayAvailable': false,
-            },
+ static Future<Map<String, dynamic>> scheduleAppointment({
+  required String appointmentId,
+  required String scheduledDate,
+  required String scheduledTime,
+  Map<String, dynamic>? options,
+  String? meetingType,
+  String? venueId,
+  String? venueLabel,
+  String? arrivalTime,
+  Map<String, dynamic>? scheduleConfirmation,
+  String? userId,
+  bool? isExternal, // ✅ NEW
+}) async {
+  try {
+    // 🔐 Get token
+    final token = await StorageService.getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'statusCode': 401,
+        'message': 'No authentication token found. Please login again.',
       };
+    }
 
-      // Add optional fields if provided
-      if (meetingType != null) {
-        requestBody['meetingType'] = meetingType;
-      }
-      if (venueId != null) {
-        requestBody['venue'] = venueId; // Send venue ID
-        if (venueLabel != null) {
-          requestBody['venueLabel'] = venueLabel; // Send venue label
-        }
-      }
-      if (arrivalTime != null) {
-        requestBody['arrivalTime'] = arrivalTime;
-      }
+    // 🧪 Validate appointmentId
+    if (appointmentId.isEmpty) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'Invalid appointmentId',
+      };
+    }
 
-      // Handle schedule confirmation - map to sc_date and sc_time
-      if (scheduleConfirmation != null) {
-        final date = scheduleConfirmation['date'];
-        final time = scheduleConfirmation['time'];
-        if (date != null) {
-          requestBody['sc_date'] = date;
-        }
-        if (time != null) {
-          requestBody['sc_time'] = time;
-        }
-      }
+    // 🧪 Validate required fields
+    if (scheduledDate.isEmpty || scheduledTime.isEmpty) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'Scheduled date and time are required',
+      };
+    }
 
-      // Make API call - Changed from POST to PUT
-      print(
-        '🌐 [API] Making PUT request to: $baseUrl/appointment/$appointmentId/schedule',
-      );
-      print('📦 [API] Request body: ${jsonEncode(requestBody)}');
-
-      final response = await http.put(
-        Uri.parse('$baseUrl/appointment/$appointmentId/schedule'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(requestBody),
-      );
-
-      print('📡 [API] Response status: ${response.statusCode}');
-      print('📄 [API] Response body: ${response.body}');
-
-      // Parse response
-      Map<String, dynamic> responseData;
-      try {
-        responseData = jsonDecode(response.body);
-      } catch (e) {
-        return {
-          'success': false,
-          'statusCode': 500,
-          'message': 'Server error: Invalid response format',
-        };
-      }
-
-      if (response.statusCode == 200) {
-        // Success - now send notification to the user
-        if (responseData['data']?['userId'] != null) {
-          try {
-            // Prepare notification content
-            final notificationTitle = 'Appointment Scheduled! ✅';
-            final notificationBody =
-                'Your appointment has been scheduled for $scheduledDate at $scheduledTime${venueLabel != null ? ' at $venueLabel' : ''}.';
-
-            // Prepare notification data
-            final notificationData = {
-              'type': 'appointment_scheduled',
-              'appointmentId': appointmentId,
-              'userId': responseData['data']['userId'],
-              'timestamp': DateTime.now().toIso8601String(),
-              'action': 'view_appointment',
-              'screen': 'appointment_details',
-              'meetingType': meetingType,
-              'venueId': venueId,
-              'venueLabel': venueLabel,
-            };
-
-            // Send notification using NotificationService
-            await NotificationService.sendToDevice(
-              token: responseData['data']['fcmToken'] ?? '',
-              title: notificationTitle,
-              body: notificationBody,
-              data: notificationData,
-            );
-
-            print(
-              '✅ [NOTIFICATION] Sent appointment schedule notification to user',
-            );
-          } catch (notificationError) {
-            print(
-              '⚠️ [NOTIFICATION] Failed to send notification: $notificationError',
-            );
-            // Don't fail the whole operation if notification fails
-          }
-        }
-
-        return {
-          'success': true,
-          'statusCode': 200,
-          'data': responseData['data'],
-          'message':
-              responseData['message'] ?? 'Appointment scheduled successfully',
-        };
-      } else if (response.statusCode == 400) {
-        // Bad request - validation errors
+    // 🕒 Validate date & time format
+    try {
+      final scheduledDateTime =
+          DateTime.parse('$scheduledDate $scheduledTime');
+      if (scheduledDateTime.isBefore(DateTime.now())) {
         return {
           'success': false,
           'statusCode': 400,
-          'message': responseData['message'] ?? 'Invalid request parameters',
-          'error': responseData['error'],
-        };
-      } else if (response.statusCode == 401) {
-        // Token expired or invalid
-        await StorageService.logout(); // Clear stored data
-        return {
-          'success': false,
-          'statusCode': 401,
-          'message': 'Session expired. Please login again.',
-        };
-      } else if (response.statusCode == 404) {
-        // Appointment not found
-        return {
-          'success': false,
-          'statusCode': 404,
-          'message': responseData['message'] ?? 'Appointment not found',
-        };
-      } else if (response.statusCode == 500) {
-        // Server error
-        return {
-          'success': false,
-          'statusCode': 500,
-          'message':
-              responseData['message'] ??
-              'Server error. Please try again later.',
-        };
-      } else {
-        // Other error
-        return {
-          'success': false,
-          'statusCode': response.statusCode,
-          'message':
-              responseData['message'] ?? 'Failed to schedule appointment',
-          'error': responseData['error'],
+          'message': 'Scheduled time must be in the future',
         };
       }
-    } catch (error) {
+    } catch (_) {
+      return {
+        'success': false,
+        'statusCode': 400,
+        'message': 'Invalid date or time format',
+      };
+    }
+
+    // 📦 Prepare request body
+    final Map<String, dynamic> requestBody = {
+      'scheduledDate': scheduledDate,
+      'scheduledTime': scheduledTime,
+      'options': options ??
+          {
+            'tbsRequired': false,
+            'dontSendNotifications': false,
+            'sendArrivalTime': false,
+            'scheduleEmailSmsConfirmation': false,
+            'sendVdsEmail': false,
+            'stayAvailable': false,
+          },
+    };
+
+    // ➕ Optional fields
+    if (meetingType != null) {
+      requestBody['meetingType'] = meetingType;
+    }
+
+    if (venueId != null) {
+      requestBody['venue'] = venueId;
+      if (venueLabel != null) {
+        requestBody['venueLabel'] = venueLabel;
+      }
+    }
+
+    if (arrivalTime != null) {
+      requestBody['arrivalTime'] = arrivalTime;
+    }
+
+    if (scheduleConfirmation != null) {
+      if (scheduleConfirmation['date'] != null) {
+        requestBody['sc_date'] = scheduleConfirmation['date'];
+      }
+      if (scheduleConfirmation['time'] != null) {
+        requestBody['sc_time'] = scheduleConfirmation['time'];
+      }
+    }
+
+    // 🚀 isExternal support
+    if (isExternal != null) {
+      requestBody['isExternal'] = isExternal;
+    }
+
+    // 🌐 API Call
+    final url = '$baseUrl/appointment/$appointmentId/schedule';
+
+    print('🌐 PUT $url');
+    print('📦 Body: ${jsonEncode(requestBody)}');
+
+    final response = await http.put(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(requestBody),
+    );
+
+    print('📡 Status: ${response.statusCode}');
+    print('📄 Response: ${response.body}');
+
+    // 🧠 Parse response
+    late final Map<String, dynamic> responseData;
+    try {
+      responseData = jsonDecode(response.body);
+    } catch (_) {
       return {
         'success': false,
         'statusCode': 500,
-        'message': 'Network error. Please check your connection and try again.',
+        'message': 'Invalid server response',
       };
     }
+
+    // ✅ Success
+    if (response.statusCode == 200) {
+      return {
+        'success': true,
+        'statusCode': 200,
+        'message':
+            responseData['message'] ?? 'Appointment scheduled successfully',
+        'data': responseData['data'],
+      };
+    }
+
+    // ⚠️ Known errors
+    if (response.statusCode == 400 ||
+        response.statusCode == 404 ||
+        response.statusCode == 500) {
+      return {
+        'success': false,
+        'statusCode': response.statusCode,
+        'message': responseData['message'] ?? 'Request failed',
+        'error': responseData['error'],
+      };
+    }
+
+    // 🔒 Unauthorized
+    if (response.statusCode == 401) {
+      await StorageService.logout();
+      return {
+        'success': false,
+        'statusCode': 401,
+        'message': 'Session expired. Please login again.',
+      };
+    }
+
+    // ❌ Fallback
+    return {
+      'success': false,
+      'statusCode': response.statusCode,
+      'message': 'Failed to schedule appointment',
+    };
+  } catch (e) {
+    print('❌ Network error: $e');
+    return {
+      'success': false,
+      'statusCode': 500,
+      'message': 'Network error. Please try again.',
+    };
   }
+}
 
   // Get appointments by scheduled date (including quick appointments)
   static Future<Map<String, dynamic>> getAppointmentsByScheduledDate({

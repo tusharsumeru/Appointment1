@@ -2129,6 +2129,30 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                   ),
                   child: Row(
                     children: [
+                      // External badge (E-<secretary initials>) when scheduled as external
+                      if ((appointment['scheduledDateTime'] is Map<String, dynamic>) &&
+                          (appointment['scheduledDateTime']['isExternal'] == true)) ...[
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.orange, width: 2),
+                            color: Colors.white,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'E-${_getSecretaryInitials(appointment)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       // Patient image
                       GestureDetector(
                         onTap: () {
@@ -2200,7 +2224,7 @@ class _TomorrowCardComponentState extends State<TomorrowCardComponent> {
                                     ),
                             ),
                           ),
-                                                 ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       // Patient details

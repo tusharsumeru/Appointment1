@@ -60,14 +60,14 @@ class HelpSupportScreen extends StatelessWidget {
   // ----------------------------
   // DELETE ACCOUNT FUNCTION
   // ----------------------------
-  Future<void> _deleteAccount(BuildContext context) async {
-    try {
-      final result = await ActionService.deleteUserAccount();
+Future<void> _deleteAccount(BuildContext context) async {
+  try {
+    final result = await ActionService.deleteUserAccount();
 
-      if (!context.mounted) return;
+    if (!context.mounted) return;
 
-      if (result['success'] == true) {
-        print("🔥 API success → Logging out and redirecting.");
+    if (result['success'] == true) {
+      print("🔥 API success → Logging out and redirecting.");
         await StorageService.logout();
         if (!context.mounted) return;
         Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
@@ -92,10 +92,10 @@ class HelpSupportScreen extends StatelessWidget {
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
-    } catch (e) {
-      if (!context.mounted) return;
+  } catch (e) {
+    if (!context.mounted) return;
       // On unexpected errors, still logout for safety
-      ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error deleting account: $e")),
       );
       await StorageService.logout();
@@ -103,9 +103,9 @@ class HelpSupportScreen extends StatelessWidget {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
-      );
-    }
+    );
   }
+}
 
 
 

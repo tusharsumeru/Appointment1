@@ -48,6 +48,7 @@ class _ReminderFormState extends State<ReminderForm> {
   bool _dontSendEmailSms = false;
   bool _sendArrivalTime = false;
   bool _scheduleEmailSms = false;
+  bool _isExternal = false; // Mark as External checkbox
   
   // Visibility states
   bool _showArrivalTime = false;
@@ -283,6 +284,12 @@ class _ReminderFormState extends State<ReminderForm> {
       final existingMeetingType = scheduledDateTime['meetingType']?.toString();
       if (existingMeetingType != null && existingMeetingType.isNotEmpty) {
         _selectedMeetingType = existingMeetingType;
+      }
+
+      // Load isExternal flag so checkbox reflects current value
+      final existingIsExternal = scheduledDateTime['isExternal'];
+      if (existingIsExternal != null) {
+        _isExternal = existingIsExternal == true;
       }
       
       // Load arrival time if available
@@ -547,6 +554,7 @@ class _ReminderFormState extends State<ReminderForm> {
           venueLabel: _selectedVenueName, // Pass venue label
           arrivalTime: _sendArrivalTime ? _selectedArrivalTime : null,
           scheduleConfirmation: scheduleConfirmation,
+          isExternal: _isExternal,
         );
         
         if (result['success']) {
@@ -1029,24 +1037,75 @@ class _ReminderFormState extends State<ReminderForm> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Row(
               children: [
+                // Mark as External checkbox
                 Expanded(
-                  child: TextButton(
-                    onPressed: _isLoading ? null : () {
-                      widget.onClose?.call();
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Close'),
+                  child: Container(
+                    height: 36, // Match button height
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isLoading ? null : () {
+                          setState(() {
+                            _isExternal = !_isExternal;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Checkbox(
+                                value: _isExternal,
+                                onChanged: _isLoading ? null : (value) {
+                                  setState(() {
+                                    _isExternal = value ?? false;
+                                  });
+                                },
+                                activeColor: Colors.white,
+                                checkColor: Colors.red,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Mark as \'External\'',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+                const SizedBox(width: 12),
+                // Save button
+                SizedBox(
+                  height: 36, // Fixed height to match other buttons
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : () {
                       _saveReminder();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Colors.blue[600],
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                      minimumSize: const Size(0, 36),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
                     child: _isLoading
                         ? const SizedBox(

@@ -113,6 +113,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String? _guestPhoneError;
   Map<int, String?> _guestPhoneErrors = {};
 
+  // Meeting purpose categories
+  final List<String> _meetingPurposeCategories = [
+    "Need Blessings / Guidance",
+    "Life Event (Marriage, Anniversary, Birthday etc.)",
+    "Invitation",
+    "Project Proposal",
+    "Project / Seva Update",
+    "Donation",
+    "Other"
+  ];
+  final Set<String> _selectedMeetingPurposeCategories = {};
+  String? _meetingPurposeCategoriesError;
+
   // Country picker data for guest phone
   Country _selectedCountry = Country(
     phoneCode: '91',
@@ -234,6 +247,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           appointment['appointmentPurpose']?.toString() ??
           appointment['appointmentSubject']?.toString() ??
           '';
+
+      // Load meeting purpose categories
+      final meetingPurposeCategories = appointment['meetingPurposeCategories'];
+      if (meetingPurposeCategories is List) {
+        _selectedMeetingPurposeCategories.clear();
+        _selectedMeetingPurposeCategories.addAll(
+          meetingPurposeCategories.map((e) => e.toString()).whereType<String>(),
+        );
+      }
 
       // Load preferred date range
       final preferredDateRange = appointment['preferredDateRange'];
@@ -1196,7 +1218,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   }
 
   void _validateForm() {
+    // Validate meeting purpose categories
+    if (_selectedMeetingPurposeCategories.isEmpty) {
+      _meetingPurposeCategoriesError = 'At least one meeting purpose category must be selected';
+    } else {
+      _meetingPurposeCategoriesError = null;
+    }
+
     bool basicFormValid =
+        _meetingPurposeCategoriesError == null &&
         _appointmentPurposeController.text.isNotEmpty &&
         _preferredFromDateController.text.isNotEmpty &&
         _preferredToDateController.text.isNotEmpty;
@@ -1312,6 +1342,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     try {
       // Prepare update data
       Map<String, dynamic> updateData = {
+        'meetingPurposeCategories': _selectedMeetingPurposeCategories.toList(),
         'appointmentPurpose': _appointmentPurposeController.text.trim(),
         'appointmentSubject': _appointmentPurposeController.text.trim(),
         'appointmentLocation': _selectedLocationMongoId,
@@ -1863,6 +1894,107 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           ),
           onChanged: onChanged,
         ),
+      ],
+    );
+  }
+
+  Widget _buildMeetingPurposeCategoriesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: [
+              const TextSpan(text: 'Meeting Purpose Categories '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _meetingPurposeCategoriesError != null
+                  ? Colors.red
+                  : Colors.grey[300]!,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: _meetingPurposeCategories.map((category) {
+              final isSelected = _selectedMeetingPurposeCategories.contains(category);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedMeetingPurposeCategories.remove(category);
+                    } else {
+                      _selectedMeetingPurposeCategories.add(category);
+                    }
+                    _validateForm();
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.green : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.green
+                                : Colors.grey[400]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (_meetingPurposeCategoriesError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _meetingPurposeCategoriesError!,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
@@ -4434,6 +4566,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           style: TextStyle(fontSize: 16, color: Colors.black54),
                         ),
                         const SizedBox(height: 32),
+
+                        // Meeting Purpose Categories
+                        _buildMeetingPurposeCategoriesField(),
+                        const SizedBox(height: 20),
 
                         // Appointment Purpose
                         _buildTextArea(

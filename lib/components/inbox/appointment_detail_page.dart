@@ -3858,6 +3858,9 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
             _buildDetailRow('Purpose of appointment', widget.appointment['appointmentPurpose']?.toString() ?? 'Not specified', Icons.info),
           ],
           
+          // Meeting Purpose Categories
+          _buildMeetingPurposeCategoriesSection(),
+          
           // Tags (hide for guest appointments)
           if (!_isGuestAppointment()) _buildUserTagsRow(),
         ],
@@ -4066,6 +4069,105 @@ class _AppointmentDetailPageState extends State<AppointmentDetailPage> {
               ),
               overflow: TextOverflow.ellipsis,
               softWrap: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeetingPurposeCategoriesSection() {
+    // Extract meeting purpose categories from appointment data
+    final meetingPurposeCategories = widget.appointment['meetingPurposeCategories'];
+    
+    // Return empty container if no categories exist
+    if (meetingPurposeCategories == null || 
+        (meetingPurposeCategories is List && meetingPurposeCategories.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+
+    // Convert to list of strings
+    List<String> categories = [];
+    if (meetingPurposeCategories is List) {
+      categories = meetingPurposeCategories.map((e) => e.toString()).whereType<String>().toList();
+    }
+
+    if (categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue.shade50.withOpacity(0.5),
+            Colors.indigo.shade50.withOpacity(0.3),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.blue.shade100.withOpacity(0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            margin: const EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.label_outline,
+              size: 20,
+              color: Colors.blue.shade600,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Meeting Purpose Category',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blue.shade800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categories.map((category) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.blue.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        category,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.blue.shade800,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
         ],

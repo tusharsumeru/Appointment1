@@ -8,6 +8,7 @@ import '../../main/dashboard_screen.dart';
 import '../../main/assigned_to_me_screen.dart';
 import '../../main/starred_screen.dart';
 import '../../main/add_new_screen.dart';
+import '../../main/add_event_screen.dart';
 import '../../main/reference_from_list_screen.dart';
 import '../../main/change_password_screen.dart';
 import '../../main/account_settings_screen.dart';
@@ -16,8 +17,6 @@ import '../../main/account_settings_screen.dart';
 import '../../main/deleted_appointments_screen.dart';
 import '../../main/global_search_screen.dart';
 import '../../main/unique_phone_code_screen.dart';
-import '../../main/create_desk_user_screen.dart';
-import '../../user/user_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../action/action.dart';
 import '../../action/storage_service.dart';
@@ -37,11 +36,20 @@ class _SidebarComponentState extends State<SidebarComponent> {
   bool _isLoading = true;
   bool _isLoadingCounts = true;
 
+  // STEP 1: Add state for expansion
+  bool _isAddNewExpanded = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadSidebarCounts();
+
+    // Optional: auto-expand "Add New" menu if on add routes
+    final addRoutes = ['addAppointment', 'addEvent'];
+    if (addRoutes.contains(widget.currentRoute)) {
+      _isAddNewExpanded = true;
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -496,17 +504,59 @@ class _SidebarComponentState extends State<SidebarComponent> {
               ),
             ],
 
-            _buildMenuItem(
-              routeName: 'addNew',
-              icon: Icons.add_circle_outline,
-              title: 'Add New',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddNewScreen()),
-                );
-              },
+            // STEP 2/3: REMOVE old menu, ADD expandable Add New
+            Container(
+              decoration: _getActiveTileDecoration('addNew'),
+              child: ExpansionTile(
+                leading: Icon(
+                  Icons.add_circle_outline,
+                  color: _getIconColor('addNew'),
+                ),
+                title: Text(
+                  'Add New',
+                  style: TextStyle(
+                    color: _getTextColor('addNew'),
+                    fontWeight: _getTextWeight('addNew'),
+                  ),
+                ),
+                initiallyExpanded: _isAddNewExpanded,
+                onExpansionChanged: (expanded) {
+                  setState(() {
+                    _isAddNewExpanded = expanded;
+                  });
+                },
+                childrenPadding: const EdgeInsets.only(left: 16),
+                children: [
+                  // ➕ Add Appointment
+                  ListTile(
+                    leading: const Icon(Icons.event_available, color: Colors.deepOrange),
+                    title: const Text('Add Appointment'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddNewScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  // 📅 Add Event
+                  ListTile(
+                    leading: const Icon(Icons.calendar_month, color: Colors.deepOrange),
+                    title: const Text('Add Event'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddEventScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
 
             _buildMenuItem(

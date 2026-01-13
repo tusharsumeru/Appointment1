@@ -58,6 +58,19 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String? _selectedLocation;
   String? _selectedSecretary;
   String _teacherStatus = 'no';
+
+  // Meeting purpose categories
+  final List<String> _meetingPurposeCategories = [
+    "Need Blessings / Guidance",
+    "Life Event (Marriage, Anniversary, Birthday etc.)",
+    "Invitation",
+    "Project Proposal",
+    "Project / Seva Update",
+    "Donation",
+    "Other"
+  ];
+  final Set<String> _selectedMeetingPurposeCategories = {};
+  String? _meetingPurposeCategoriesError;
   
   // Secretary data (same as assign_form.dart)
   List<Map<String, dynamic>> _availableAssignees = [];
@@ -133,6 +146,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     _purposeController = TextEditingController(
       text: widget.appointment['appointmentPurpose']?.toString() ?? '',
     );
+    
+    // Load meeting purpose categories
+    final meetingPurposeCategories = widget.appointment['meetingPurposeCategories'];
+    if (meetingPurposeCategories is List) {
+      _selectedMeetingPurposeCategories.clear();
+      _selectedMeetingPurposeCategories.addAll(
+        meetingPurposeCategories.map((e) => e.toString()).whereType<String>(),
+      );
+    }
     
     _companyController.text = _getCreatedByCompany();
     _designationController.text = _getCreatedByDesignation();
@@ -2247,6 +2269,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       final updateData = {
         'userCurrentCompany': _companyController.text.trim(),
         'userCurrentDesignation': _designationController.text.trim(),
+        'meetingPurposeCategories': _selectedMeetingPurposeCategories.toList(),
         'appointmentPurpose': _purposeController.text.trim(),
         'appointmentSubject': _purposeController.text.trim(),
         'preferredDateRange': {
@@ -2764,6 +2787,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                     
                     // Secretary Selection Field
                     _buildSecretarySelectionField(),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Meeting Purpose Categories
+                    _buildMeetingPurposeCategoriesField(),
                     
                     const SizedBox(height: 16),
                     
@@ -3533,6 +3561,106 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildMeetingPurposeCategoriesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+            children: [
+              const TextSpan(text: 'Meeting Purpose Categories '),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _meetingPurposeCategoriesError != null
+                  ? Colors.red
+                  : Colors.grey[300]!,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: _meetingPurposeCategories.map((category) {
+              final isSelected = _selectedMeetingPurposeCategories.contains(category);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedMeetingPurposeCategories.remove(category);
+                    } else {
+                      _selectedMeetingPurposeCategories.add(category);
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.green : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.green
+                                : Colors.grey[400]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (_meetingPurposeCategoriesError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _meetingPurposeCategoriesError!,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
