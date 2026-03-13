@@ -777,61 +777,102 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           _isMainGuestPhotoUploading = true;
         });
 
-        // First check for duplicate photos with submit_type=accompanyuser
+        // First check for duplicate photos
         try {
-          final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
-            _mainGuestPhotoFile!,
-            submitType: 'accompanyuser',
+          Map<String, dynamic> duplicateCheckResult;
 
-          );
+          if (_isGuestAppointment) {
+            // For guest appointments, check against accompany users' photos
+            // Note: Main user's profile photo is automatically added by the backend
+            final accompanyUserUrls =
+                _guestImages.values.whereType<String>().toList();
 
-          // Check if duplicates were found (similar to web version logic)
-          final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
-          
+            duplicateCheckResult =
+                await ActionService.validateDuplicatePhotos(
+              photoFiles: [_mainGuestPhotoFile!],
+              referencePhotoUrls: accompanyUserUrls,
+              submitType: 'accompanyuser',
+            );
+          } else {
+            // For regular appointments, check against main user's existing profile photo
+            duplicateCheckResult = await ActionService.validateDuplicatePhoto(
+              _mainGuestPhotoFile!,
+              submitType: 'subuser',
+            );
+          }
+
+          // Check if the duplicate check API call was successful
+          if (duplicateCheckResult['success'] != true) {
+            setState(() {
+              _isMainGuestPhotoUploading = false;
+            });
+            _validateForm();
+
+            final errorMessage = duplicateCheckResult['message'] ??
+                'Failed to check for duplicate photos';
+            _showPhotoValidationErrorDialog(
+              'Main guest: $errorMessage',
+              () {
+                setState(() {
+                  _mainGuestPhotoFile = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
+            return;
+          }
+
+          // Check if duplicates were found
+          final duplicatesFound =
+              duplicateCheckResult['data']?['duplicates_found'] == true;
+
           if (!duplicatesFound) {
             // No duplicates found, proceed with upload and validation
-            final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
+            final uploadResult =
+                await ActionService.uploadAndValidateProfilePhoto(
               _mainGuestPhotoFile!,
             );
 
             if (uploadResult['success'] == true) {
-              final s3Url = uploadResult['data']['s3Url'];
+              // Newer upload API shape returns data.s3Url, older returns s3Url at top level
+              final s3Url =
+                  uploadResult['data']?['s3Url'] ?? uploadResult['s3Url'];
               print('✅ Main guest photo uploaded successfully!');
               print('📸 S3 URL received: $s3Url');
-              
-              // Photo uploaded and validated successfully
+
               setState(() {
                 _mainGuestPhotoUrl = s3Url;
                 _isMainGuestPhotoUploading = false;
               });
               _validateForm();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Main guest photo duplicate check passed, uploaded, and validated successfully!',
-                  ),
-                  backgroundColor: Colors.green,
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Main guest photo duplicate check passed, uploaded, and validated successfully!',
                 ),
-              );
+                backgroundColor: Colors.green,
+              ),
+            );
             } else {
               setState(() {
                 _isMainGuestPhotoUploading = false;
               });
 
-              // Show backend error message in dialog
-              final errorMessage =
-                  uploadResult['error'] ??
+              final errorMessage = uploadResult['error'] ??
                   uploadResult['message'] ??
                   'Photo validation failed';
-              _showPhotoValidationErrorDialog(errorMessage, () {
-                // Clear any previous state and allow user to pick again
-                setState(() {
-                  _mainGuestPhotoFile = null;
-                  _mainGuestPhotoUrl = null;
-                  _isMainGuestPhotoUploading = false;
-                });
-              });
+              _showPhotoValidationErrorDialog(
+                'Main guest: $errorMessage',
+                () {
+                  setState(() {
+                    _mainGuestPhotoFile = null;
+                    _mainGuestPhotoUrl = null;
+                    _isMainGuestPhotoUploading = false;
+                  });
+                },
+              );
             }
           } else {
             // Duplicates found - show error and clear photo
@@ -839,30 +880,31 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               _isMainGuestPhotoUploading = false;
             });
 
-            // Update form validation
             _validateForm();
 
-            // Show duplicate photo error message (similar to web version)
-            final errorMessage = "Duplicate photo detected — This image matches an existing photo.";
-            _showPhotoValidationErrorDialog(errorMessage, () {
-              // Clear any previous state and allow user to pick again
-              setState(() {
-                _mainGuestPhotoFile = null;
-                _mainGuestPhotoUrl = null;
-                _isMainGuestPhotoUploading = false;
-              });
-            });
+            final errorMessage =
+                "Main guest: Duplicate photo detected — This image matches an existing photo.";
+            _showPhotoValidationErrorDialog(
+              errorMessage,
+              () {
+                setState(() {
+                  _mainGuestPhotoFile = null;
+                  _mainGuestPhotoUrl = null;
+                  _isMainGuestPhotoUploading = false;
+                });
+              },
+            );
           }
         } catch (e) {
           setState(() {
             _isMainGuestPhotoUploading = false;
           });
 
-          // Show error message in dialog
+          _validateForm();
+
           _showPhotoValidationErrorDialog(
-            'Error uploading photo: ${e.toString()}',
+            'Main guest: Error uploading photo: ${e.toString()}',
             () {
-              // Clear any previous state and allow user to pick again
               setState(() {
                 _mainGuestPhotoFile = null;
                 _mainGuestPhotoUrl = null;
@@ -1398,9 +1440,10 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
       }
 
       // Add accompanyUsers if there are additional users
-      // Use the actual number of guest controllers (accompanying users) + reference-as-accompany if applicable
-      // Note: Main user is NOT included in accompanyUsers count
-      final accompanyUsersCount = _guestControllers.length + (_referenceAsAccompanyUser ? 1 : 0);
+      // Note: Main guest is NOT included in accompanyUsers.users
+      // We mirror the create flow: users array comes only from visible guest cards,
+      // and numberOfUsers represents "total people - 1 (main guest)".
+      final accompanyUsersCount = _guestControllers.length;
       if (accompanyUsersCount > 0) {
         List<Map<String, dynamic>> accompanyUsers = [];
         for (int i = 0; i < _guestControllers.length; i++) {
@@ -1439,31 +1482,16 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           accompanyUsers.add(guestData);
         }
 
-        // Add reference-as-accompany user to the array if applicable
-        // Check if reference user is not already in the array (to avoid duplicates)
-        if (_referenceAsAccompanyUser && !accompanyUsers.any((user) => user['referenceAsAccompanyUser'] == true)) {
-          final referenceUser = {
-            'userId': 'REF-${DateTime.now().millisecondsSinceEpoch}',
-            'fullName': _referenceNameController.text.trim(),
-            'referenceAsAccompanyUser': true,
-            'age': null,
-            'alternatePhoneNumber': null,
-            'phoneNumber': {
-              'countryCode': _referencePhoneController.text.isNotEmpty ? '+91' : null,
-              'number': _referencePhoneController.text.trim(),
-            },
-            'profilePhotoUrl': null,
-            'admissionStatus': 'pending',
-            'admittedBy': null,
-            'relationshipToApplicant': null,
-            'admittedAt': null,
-          };
-          accompanyUsers.add(referenceUser);
-        }
+        // numberOfUsers should be "total people - 1 (exclude main guest)",
+        // just like in the create (appointment_details) flow.
+        final selectedTotal =
+            int.tryParse(_numberOfUsersController.text) ?? 1;
+        final accompanyUsersTotal =
+            (selectedTotal - 1).clamp(0, 1000000);
 
         updateData['accompanyUsers'] = {
-          'numberOfUsers': accompanyUsers.length, // Use actual array length instead of calculated count
-          'users': accompanyUsersCount > 9 ? [] : accompanyUsers,
+          'numberOfUsers': accompanyUsersTotal,
+          'users': accompanyUsersTotal > 9 ? [] : accompanyUsers,
         };
         // Include the reference-as-accompany flag for backend logic
         updateData['referenceAsAccompanyUser'] = _referenceAsAccompanyUser;
@@ -1491,15 +1519,28 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
         };
       }
 
+      // Handle attachment: if no new file selected but existing URL exists, preserve it
+      // Backend expects updateData.appointmentAttachment when req.file is not present
+      if (_selectedAttachment == null && _existingAttachmentUrl != null && _existingAttachmentUrl!.isNotEmpty) {
+        updateData['appointmentAttachment'] = _existingAttachmentUrl;
+        print('📎 Preserving existing attachment URL: $_existingAttachmentUrl');
+      }
+
       // Call API to update appointment
       final appointmentId =
           widget.appointmentData?['appointmentId'] ??
           widget.appointmentData?['_id'] ??
           '';
 
+      // Pass attachment file directly (File object) - same as creation flow
+      if (_selectedAttachment != null) {
+        print('📎 Sending new attachment file: ${_selectedAttachment!.path}');
+      }
+
       final result = await ActionService.updateAppointmentEnhanced(
         appointmentId: appointmentId,
         updateData: updateData,
+        attachmentFile: _selectedAttachment, // Pass File directly, same as createAppointment
       );
 
       if (result['success'] == true) {
@@ -2406,24 +2447,68 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
       try {
         // First check for duplicate photos with submit_type=accompanyuser
-        final duplicateCheckResult = await ActionService.validateDuplicatePhoto(
-          File(pickedFile.path),
+        // Ensure this guest's photo does not match main guest or any other accompany user's photo
+        final currentFile = File(pickedFile.path);
+
+        // Collect other guests' photo URLs (exclude this guest)
+        final otherGuestUrls = _guestImages.entries
+            .where((e) => e.key != guestNumber)
+            .map((e) => e.value)
+            .whereType<String>()
+            .toList();
+
+        // Build list of all reference photo URLs:
+        // - main guest photo (if any)
+        // - all other accompany users' photos
+        final allUrlsToCheck = <String>[];
+        if (_mainGuestPhotoUrl != null && _mainGuestPhotoUrl!.isNotEmpty) {
+          allUrlsToCheck.add(_mainGuestPhotoUrl!);
+        }
+        allUrlsToCheck.addAll(otherGuestUrls);
+
+        final duplicateCheckResult =
+            await ActionService.validateDuplicatePhotos(
+          photoFiles: [currentFile],
+          referencePhotoUrls: allUrlsToCheck,
           submitType: 'accompanyuser',
         );
 
-        // Check if duplicates were found (similar to web version logic)
-        final duplicatesFound = duplicateCheckResult['data']?['duplicates_found'] == true;
-        
+        // Check if the duplicate check API call was successful
+        if (duplicateCheckResult['success'] != true) {
+          setState(() {
+            _guestUploading[guestNumber] = false;
+          });
+
+          final errorMessage = duplicateCheckResult['message'] ??
+              'Failed to check for duplicate photos';
+          _showPhotoValidationErrorDialog(
+            'Guest ${_getDisplayPersonNumber(guestNumber)}: $errorMessage',
+            () {
+              setState(() {
+                _guestImages.remove(guestNumber);
+                _guestUploading[guestNumber] = false;
+              });
+            },
+          );
+          return;
+        }
+
+        // Check if duplicates were found
+        final duplicatesFound =
+            duplicateCheckResult['data']?['duplicates_found'] == true;
+
         if (!duplicatesFound) {
           // No duplicates found, proceed with upload and validation
-          final uploadResult = await ActionService.uploadAndValidateProfilePhoto(
-            File(pickedFile.path),
+          final uploadResult =
+              await ActionService.uploadAndValidateProfilePhoto(
+            currentFile,
           );
 
           if (uploadResult['success']) {
-            final s3Url = uploadResult['s3Url'];
-            
-            // Photo uploaded and validated successfully
+            // Newer upload API shape returns data.s3Url, older returns s3Url at top level
+            final s3Url =
+                uploadResult['data']?['s3Url'] ?? uploadResult['s3Url'];
+
             setState(() {
               _guestImages[guestNumber] = s3Url;
               _guestUploading[guestNumber] = false;
@@ -2448,13 +2533,12 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               '❌ Guest ${guestNumber + 1} photo upload failed: ${uploadResult['message']}',
             );
 
-            // Show backend error message in dialog
-            final errorMessage =
-                uploadResult['error'] ?? uploadResult['message'] ?? 'Photo validation failed';
+            final errorMessage = uploadResult['error'] ??
+                uploadResult['message'] ??
+                'Photo validation failed';
             _showPhotoValidationErrorDialog(
               'Guest ${guestNumber + 1}: $errorMessage',
               () {
-                // Clear any previous state and allow user to pick again
                 setState(() {
                   _guestImages.remove(guestNumber);
                   _guestUploading[guestNumber] = false;
@@ -2468,12 +2552,11 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
             _guestUploading[guestNumber] = false;
           });
 
-          // Show duplicate photo error message (similar to web version)
-          final errorMessage = "Guest ${guestNumber + 1}: Duplicate photo detected — This image matches an existing photo.";
+          final errorMessage =
+              "Guest ${guestNumber + 1}: Duplicate photo detected — This image matches an existing photo.";
           _showPhotoValidationErrorDialog(
             errorMessage,
             () {
-              // Clear any previous state and allow user to pick again
               setState(() {
                 _guestImages.remove(guestNumber);
                 _guestUploading[guestNumber] = false;
@@ -2488,11 +2571,9 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
         print('❌ Error uploading guest ${guestNumber + 1} photo: $e');
 
-        // Show error message in dialog
         _showPhotoValidationErrorDialog(
           'Guest ${guestNumber + 1}: Error uploading photo: ${e.toString()}',
           () {
-            // Clear any previous state and allow user to pick again
             setState(() {
               _guestImages.remove(guestNumber);
               _guestUploading[guestNumber] = false;

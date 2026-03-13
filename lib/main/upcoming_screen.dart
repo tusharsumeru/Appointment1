@@ -13,6 +13,8 @@ class UpcomingScreen extends StatefulWidget {
 class _UpcomingScreenState extends State<UpcomingScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 2)); // Default to day after tomorrow
   int _refreshCounter = 0;
+  int _selectionUpdateCounter = 0; // Counter to force rebuild when selection changes
+  final GlobalKey<State<UpcomingCardComponent>> _upcomingCardKey = GlobalKey<State<UpcomingCardComponent>>();
 
   String _getFormattedDate(DateTime date) {
     final months = [
@@ -128,12 +130,16 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
             // Header with refresh button and calendar icon
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // First line: Calendar and Refresh
+                  Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Date selector button on the left
@@ -220,6 +226,97 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
                         ],
                       ),
                     ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Second line: Select All and Bulk Cancel
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Select All checkbox on the left
+                      Builder(
+                        builder: (context) {
+                          // Use _selectionUpdateCounter to force rebuild
+                          final _ = _selectionUpdateCounter;
+                          final state = _upcomingCardKey.currentState as dynamic;
+                          final isAllSelected = state?.isAllSelected ?? false;
+                          
+                          return Row(
+                            children: [
+                              Checkbox(
+                                value: isAllSelected,
+                                onChanged: (value) {
+                                  final state = _upcomingCardKey.currentState as dynamic;
+                                  if (state != null) {
+                                    if (value == true) {
+                                      state.selectAll();
+                                    } else {
+                                      state.deselectAll();
+                                    }
+                                    setState(() {}); // Trigger rebuild to update UI
+                                  }
+                                },
+                              ),
+                              const Text(
+                                'Select All',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      // Bulk Cancel button on the right
+                      Builder(
+                        builder: (context) {
+                          // Use _selectionUpdateCounter to force rebuild
+                          final _ = _selectionUpdateCounter;
+                          final state = _upcomingCardKey.currentState as dynamic;
+                          final hasSelected = state?.hasSelectedAppointments ?? false;
+                          final selectedCount = state?.selectedCount ?? 0;
+                          
+                          return hasSelected
+                              ? ElevatedButton.icon(
+                                  onPressed: () {
+                                    final state = _upcomingCardKey.currentState as dynamic;
+                                    state?.showBulkCancel();
+                                  },
+                                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Bulk Cancel'),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '($selectedCount)',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    minimumSize: const Size(0, 36),
+                                  ),
+                                )
+                              : const SizedBox.shrink();
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -230,11 +327,17 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
               height: MediaQuery.of(context).size.height - 200, // Adjust height for scrollable content
               color: Colors.white,
               child: UpcomingCardComponent(
-                key: ValueKey(_refreshCounter),
+                key: _upcomingCardKey,
                 selectedDate: _selectedDate,
                 onRefresh: () {
                   setState(() {
-                    // Trigger refresh if needed
+                    _refreshCounter++;
+                  });
+                },
+                onSelectionChanged: () {
+                  // Force rebuild of header when selection changes
+                  setState(() {
+                    _selectionUpdateCounter++;
                   });
                 },
               ),

@@ -58,7 +58,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   String? _selectedLocation;
   String? _selectedSecretary;
   String _teacherStatus = 'no';
-
+  
   // Meeting purpose categories
   final List<String> _meetingPurposeCategories = [
     "Need Blessings / Guidance",

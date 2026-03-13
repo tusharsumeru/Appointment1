@@ -3,15 +3,18 @@ import '../../action/action.dart';
 import '../inbox/appointment_detail_page.dart';
 import '../inbox/event_detail_page.dart';
 import '../common/profile_photo_dialog.dart';
+import '../common/bulk_cancel_dialog.dart';
 
 class UpcomingCardComponent extends StatefulWidget {
   final DateTime selectedDate;
   final VoidCallback? onRefresh;
+  final VoidCallback? onSelectionChanged;
 
   const UpcomingCardComponent({
     super.key, 
     required this.selectedDate,
     this.onRefresh,
+    this.onSelectionChanged,
   });
 
   @override
@@ -24,6 +27,8 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
   bool _isLoading = false;
   String? _error;
   Set<String> _expandedCategories = {};
+  Set<String> _selectedAppointmentIds = {};
+  bool _selectAllMode = false;
 
   // Category definitions
   final Map<String, Map<String, dynamic>> _categories = {
@@ -1152,13 +1157,6 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
 
     return Column(
       children: [
-        // Other evening items (display normally, not in a sub-section) - show first
-        if (otherEvents.isNotEmpty || otherAppointments.isNotEmpty) ...[
-          _buildOtherEveningHeader(otherEvents, otherAppointments),
-          ...otherEvents.map((event) => _buildEventCard(event)),
-          ...otherAppointments.map((appointment) => _buildAppointmentCard(appointment, category)),
-        ],
-        
         // 4:45 PM sub-section (expandable/collapsible) - always show
         _buildEveningSubSection(
           title: '4:45 PM',
@@ -1178,92 +1176,22 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
           category: category,
           subSectionKey: 'evening_500',
         ),
+        
+        // Other evening items (expandable/collapsible) - show last
+        if (otherEvents.isNotEmpty || otherAppointments.isNotEmpty)
+          _buildEveningSubSection(
+            title: 'Other Evening Appointments',
+            icon: Icons.access_time,
+            events: otherEvents,
+            appointments: otherAppointments,
+            category: category,
+            subSectionKey: 'evening_other',
+            useOrangeColors: false,
+          ),
       ],
     );
   }
 
-  Widget _buildOtherEveningHeader(
-    List<Map<String, dynamic>> events,
-    List<Map<String, dynamic>> appointments,
-  ) {
-    final totalItems = events.length + appointments.length;
-    final totalPeople = _calculateTotalPeople(appointments);
-    final totalEventCapacity = _calculateTotalEventCapacity(events);
-    final totalPeopleCount = totalPeople + totalEventCapacity;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          // Title
-          Text(
-            'Other Evening Appointments',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Count badge
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.grey.shade300,
-                width: 1,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                '$totalItems',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // People count badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.grey.shade300,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.people,
-                  size: 12,
-                  color: Colors.grey.shade700,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$totalPeopleCount',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildEveningSubSection({
     required String title,
@@ -1272,17 +1200,26 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     required List<Map<String, dynamic>> appointments,
     required Map<String, dynamic> category,
     required String subSectionKey,
+    bool useOrangeColors = true,
   }) {
     final totalItems = events.length + appointments.length;
     final totalPeople = _calculateTotalPeople(appointments);
     final isExpanded = _expandedCategories.contains(subSectionKey);
+
+    // Choose colors based on useOrangeColors parameter
+    final borderColor = useOrangeColors ? Colors.orange.shade200 : Colors.grey.shade300;
+    final headerBgColor = useOrangeColors ? Colors.orange.shade50 : Colors.grey.shade50;
+    final iconColor = useOrangeColors ? Colors.orange.shade700 : Colors.grey.shade700;
+    final textColor = useOrangeColors ? Colors.orange.shade700 : Colors.grey.shade700;
+    final badgeBgColor = useOrangeColors ? Colors.orange.shade200 : Colors.grey.shade200;
+    final badgeTextColor = useOrangeColors ? Colors.orange.shade900 : Colors.grey.shade900;
 
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -1308,7 +1245,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: headerBgColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(8),
                   topRight: const Radius.circular(8),
@@ -1318,7 +1255,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
               ),
               child: Row(
                 children: [
-                  Icon(icon, color: Colors.orange.shade700, size: 20),
+                  Icon(icon, color: iconColor, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1326,7 +1263,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade700,
+                        color: textColor,
                       ),
                     ),
                   ),
@@ -1372,13 +1309,13 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade200,
+                      color: badgeBgColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '$totalItems',
                       style: TextStyle(
-                        color: Colors.orange.shade900,
+                        color: badgeTextColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -1389,7 +1326,7 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
                     isExpanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    color: Colors.orange.shade700,
+                    color: iconColor,
                     size: 20,
                   ),
                 ],
@@ -1727,27 +1664,29 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
             ),
           ],
         ),
-      child: Column(
+      child: Stack(
         children: [
-          // Main content row
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // First line - Patient profile
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade100, width: 1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // External badge (E-<secretary initials>) when scheduled as external
-                      if ((appointment['scheduledDateTime'] is Map<String, dynamic>) &&
-                          (appointment['scheduledDateTime']['isExternal'] == true)) ...[
+          Column(
+            children: [
+              // Main content row
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // First line - Patient profile
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.grey.shade100, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // External badge (E-<secretary initials>) when scheduled as external
+                          if ((appointment['scheduledDateTime'] is Map<String, dynamic>) &&
+                              (appointment['scheduledDateTime']['isExternal'] == true)) ...[
                         Container(
                           width: 32,
                           height: 32,
@@ -2069,6 +2008,31 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
               ),
             ),
             child: _buildActionButton(appointment),
+          ),
+        ],
+      ),
+          // Checkbox positioned in top right corner
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Checkbox(
+              value: _selectedAppointmentIds.contains(_getAppointmentId(appointment)),
+              onChanged: (value) {
+                setState(() {
+                  final appointmentId = _getAppointmentId(appointment);
+                  if (value == true) {
+                    _selectedAppointmentIds.add(appointmentId);
+                  } else {
+                    _selectedAppointmentIds.remove(appointmentId);
+                  }
+                  if (_selectedAppointmentIds.isEmpty) {
+                    _selectAllMode = false;
+                  }
+                });
+                // Notify parent of selection change
+                widget.onSelectionChanged?.call();
+              },
+            ),
           ),
         ],
       ),
@@ -2780,5 +2744,72 @@ class _UpcomingCardComponentState extends State<UpcomingCardComponent> {
     }
   }
 
+  // Helper method to get appointment ID
+  String _getAppointmentId(Map<String, dynamic> appointment) {
+    return appointment['appointmentId']?.toString() ??
+        appointment['_id']?.toString() ??
+        '';
+  }
+
+  // Get all selectable appointment IDs
+  Set<String> _getAllSelectableAppointmentIds() {
+    final Set<String> ids = {};
+    for (final appointment in _upcomingAppointments) {
+      final id = _getAppointmentId(appointment);
+      if (id.isNotEmpty) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  }
+
+  // Show bulk cancel dialog
+  void _showBulkCancelDialog() {
+    if (_selectedAppointmentIds.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => BulkCancelDialog(
+        appointmentIds: _selectedAppointmentIds.toList(),
+        type: 'cancellation',
+        onSuccess: () {
+          setState(() {
+            _selectedAppointmentIds.clear();
+            _selectAllMode = false;
+          });
+          // Notify parent of selection change to update header
+          widget.onSelectionChanged?.call();
+          _fetchUpcomingAppointments();
+        },
+      ),
+    );
+  }
+
+  // Public methods for parent screen access
+  Set<String> get selectedAppointmentIds => _selectedAppointmentIds;
+  bool get hasSelectedAppointments => _selectedAppointmentIds.isNotEmpty;
+  int get selectedCount => _selectedAppointmentIds.length;
+  bool get isAllSelected => _selectedAppointmentIds.length == _getAllSelectableAppointmentIds().length && _getAllSelectableAppointmentIds().isNotEmpty;
+
+  void selectAll() {
+    setState(() {
+      _selectedAppointmentIds = _getAllSelectableAppointmentIds().toSet();
+    });
+    // Notify parent of selection change
+    widget.onSelectionChanged?.call();
+  }
+
+  void deselectAll() {
+    setState(() {
+      _selectedAppointmentIds.clear();
+      _selectAllMode = false;
+    });
+    // Notify parent of selection change
+    widget.onSelectionChanged?.call();
+  }
+
+  void showBulkCancel() {
+    _showBulkCancelDialog();
+  }
 
 }

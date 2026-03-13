@@ -228,14 +228,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  /// Change: time is now formatted in 12-hour format with AM/PM suffix
   String _formatScheduledTime() {
     if (detailedAppointmentData == null || detailedAppointmentData!['scheduledDateTime'] == null) return 'N/A';
     
     try {
       final scheduledData = detailedAppointmentData!['scheduledDateTime'] as Map<String, dynamic>;
       final timeStr = scheduledData['time'];
-      
-      return timeStr ?? 'N/A';
+      if (timeStr == null || timeStr == '') return 'N/A';
+
+      // Parse the HH:mm string and reformat into 12 hour with AM/PM
+      final parts = timeStr.split(":");
+      if (parts.length != 2) return timeStr;
+      int hour = int.tryParse(parts[0]) ?? 0;
+      int minute = int.tryParse(parts[1]) ?? 0;
+      String ampm = (hour >= 12) ? "PM" : "AM";
+      int hour12 = hour % 12 == 0 ? 12 : hour % 12;
+      String formattedTime = "${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $ampm";
+      return formattedTime;
     } catch (e) {
       print('DEBUG: Error formatting scheduled time: $e');
       return 'N/A';
@@ -243,48 +253,81 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   String _getScheduledVenue() {
-    if (detailedAppointmentData == null || detailedAppointmentData!['scheduledDateTime'] == null) return 'N/A';
-    
+    if (detailedAppointmentData == null) return 'N/A';
     try {
-      final scheduledData = detailedAppointmentData!['scheduledDateTime'] as Map<String, dynamic>;
-      final venueLabel = scheduledData['venueLabel'];
-      
-      return venueLabel ?? 'N/A';
+      // Prefer top-level venueLabel (from detailed API)
+      final topLevel = detailedAppointmentData!['venueLabel']?.toString();
+      if (topLevel != null && topLevel.isNotEmpty) return topLevel;
+      final scheduledData = detailedAppointmentData!['scheduledDateTime'];
+      if (scheduledData is Map<String, dynamic>) {
+        final venueLabel = scheduledData['venueLabel']?.toString();
+        return venueLabel ?? 'N/A';
+      }
     } catch (e) {
       print('DEBUG: Error getting scheduled venue: $e');
-      return 'N/A';
     }
+    return 'N/A';
   }
 
-  // Determine if this appointment is marked as external (E-VM badge)
+  String _getSubvenue() {
+    if (detailedAppointmentData == null) return '';
+    try {
+      final topLevel = detailedAppointmentData!['subvenue']?.toString();
+      if (topLevel != null && topLevel.isNotEmpty) return topLevel;
+      final scheduledData = detailedAppointmentData!['scheduledDateTime'];
+      if (scheduledData is Map<String, dynamic>) {
+        final subvenue = scheduledData['subvenue']?.toString();
+        return subvenue ?? '';
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  // Determine if this appointment is marked as external (E badge)
   bool _isExternalAppointment() {
     try {
       if (detailedAppointmentData == null) return false;
+      if (detailedAppointmentData!['isExternal'] == true) return true;
       final scheduled = detailedAppointmentData!['scheduledDateTime'];
       if (scheduled is Map<String, dynamic>) {
         return scheduled['isExternal'] == true;
       }
-    } catch (_) {
-      // ignore and treat as non-external
-    }
+    } catch (_) {}
     return false;
   }
 
-  // Secretary initials for E-XX badge using detailed appointment data
+  // Determine if this appointment is private (P badge)
+  bool _isPrivateAppointment() {
+    try {
+      if (detailedAppointmentData == null) return false;
+      if (detailedAppointmentData!['isPrivate'] == true) return true;
+      final scheduled = detailedAppointmentData!['scheduledDateTime'];
+      if (scheduled is Map<String, dynamic>) {
+        return scheduled['isPrivate'] == true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // Secretary initials for badge using detailed appointment data
   String _getSecretaryInitials() {
-    if (detailedAppointmentData == null) return 'VM';
+    if (detailedAppointmentData == null) return '—';
 
     // Try assignedSecretary.fullName first
     final assignedSecretary = detailedAppointmentData!['assignedSecretary'];
     if (assignedSecretary is Map<String, dynamic>) {
       final fullName = assignedSecretary['fullName']?.toString();
       if (fullName != null && fullName.isNotEmpty) {
-        final parts = fullName.split(' ');
-        if (parts.length >= 2) {
-          return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-        } else if (parts.length == 1) {
-          return parts[0][0].toUpperCase();
-        }
+        return _initialsFromName(fullName);
+      }
+    }
+
+    // Try scheduledBy when populated as object (e.g. { _id, fullName })
+    final scheduledBy = detailedAppointmentData!['scheduledBy'];
+    if (scheduledBy is Map<String, dynamic>) {
+      final fullName = scheduledBy['fullName']?.toString();
+      if (fullName != null && fullName.isNotEmpty) {
+        return _initialsFromName(fullName);
       }
     }
 
@@ -292,18 +335,50 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final secretaryName =
         detailedAppointmentData!['secretaryName']?.toString() ??
         detailedAppointmentData!['assignedTo']?.toString() ??
-        detailedAppointmentData!['secretary']?.toString() ??
-        'VM';
+        detailedAppointmentData!['secretary']?.toString();
 
-    if (secretaryName == 'VM') return 'VM';
+    if (secretaryName != null && secretaryName.isNotEmpty) {
+      return _initialsFromName(secretaryName);
+    }
+    return '—';
+  }
 
-    final parts = secretaryName.split(' ');
+  String _initialsFromName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    } else if (parts.length == 1) {
+    }
+    if (parts.length == 1 && parts[0].isNotEmpty) {
       return parts[0][0].toUpperCase();
     }
-    return 'VM';
+    return '—';
+  }
+
+  Widget _buildBadgeCircle({
+    required String label,
+    required Color bgColor,
+    required Color borderColor,
+    required Color textColor,
+  }) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: bgColor,
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
   }
 
   bool _isQuickAppointment() {
@@ -1605,49 +1680,39 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Show E-<initials> badge when appointment is external,
-                                // otherwise show the original calendar icon.
-                                if (_isExternalAppointment()) ...[
-                                  Container(
-                                    width: 50,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.9),
-                                        width: 2,
+                                // Left: badges column — External (E), Private (P), Secretary initials
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_isExternalAppointment()) ...[
+                                      _buildBadgeCircle(
+                                        label: 'E',
+                                        bgColor: Colors.white,
+                                        borderColor: Colors.white,
+                                        textColor: const Color(0xFFF97316),
                                       ),
-                                      color: Colors.white,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'E-${_getSecretaryInitials()}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.orange,
-                                          letterSpacing: 0.5,
-                                        ),
+                                      const SizedBox(height: 6),
+                                    ],
+                                    if (_isPrivateAppointment()) ...[
+                                      _buildBadgeCircle(
+                                        label: 'P',
+                                        bgColor: Colors.red,
+                                        borderColor: Colors.white,
+                                        textColor: Colors.white,
                                       ),
+                                      const SizedBox(height: 6),
+                                    ],
+                                    _buildBadgeCircle(
+                                      label: _getSecretaryInitials(),
+                                      bgColor: Colors.lightBlue.shade100,
+                                      borderColor: Colors.white,
+                                      textColor: Colors.blue.shade800,
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                ] else ...[
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.calendar_today,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                ],
+                                  ],
+                                ),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1696,6 +1761,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Icon(
                                             Icons.location_on,
@@ -1703,12 +1769,37 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                             size: 16,
                                           ),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            _getScheduledVenue(),
-                                            style: TextStyle(
-                                              color: Colors.white.withOpacity(0.9),
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w500,
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _getScheduledVenue(),
+                                                  style: TextStyle(
+                                                    color: Colors.white.withOpacity(0.9),
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                                if (_getSubvenue().isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white.withOpacity(0.95),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      _getSubvenue(),
+                                                      style: const TextStyle(
+                                                        color: Color(0xFFF97316),
+                                                        fontSize: 15,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ),
                                         ],

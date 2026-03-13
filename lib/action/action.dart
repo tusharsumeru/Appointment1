@@ -14,39 +14,112 @@ class ActionService {
   // Global base URL variable
   static String? _baseUrl;
 
-  // Initialize base URL (call this once at app startup)
-  static Future<void> initializeBaseUrl() async {
-    try {
-      print(
-        '🌐 [DEBUG] Fetching base URL from: https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl',
-      );
+  static const String _fallbackBaseUrl =
+      'https://f039-203-192-241-145.ngrok-free.app/api/v3';
 
+  /// App version for middleware. Set from main() via PackageInfo.fromPlatform(); no default.
+  static String appVersion = '';
+  static String get _platform =>
+      Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'unknown');
+
+  static Map<String, String> _versionHeaders() => {
+        'x-app-version': appVersion,
+        'x-platform': _platform,
+      };
+
+  static Future<http.Response> getUrl(Uri url,
+      {Map<String, String>? headers}) async {
+    final allHeaders = {...?headers, ..._versionHeaders()};
+    return await http.get(url, headers: allHeaders);
+  }
+
+  /// Set when base URL returns 426. App must block until user updates (splash won't proceed).
+  static bool _forceUpdateRequired = false;
+  static bool get forceUpdateRequired => _forceUpdateRequired;
+
+  static void Function(String storeUrl, [String? latestVersion])? onForceUpdate;
+  static bool _updateDialogShowing = false;
+  static void clearUpdateDialogShowing() {
+    _updateDialogShowing = false;
+  }
+
+  static String? _pendingForceUpdateStoreUrl;
+  static String? _pendingForceUpdateLatestVersion;
+  static void clearPendingForceUpdate() {
+    _pendingForceUpdateStoreUrl = null;
+    _pendingForceUpdateLatestVersion = null;
+  }
+
+  static void showPendingForceUpdateIfAny() {
+    if (_pendingForceUpdateStoreUrl == null) return;
+    _updateDialogShowing = true;
+    final storeUrl = _pendingForceUpdateStoreUrl ?? '';
+    final latestVersion = _pendingForceUpdateLatestVersion;
+    clearPendingForceUpdate();
+    onForceUpdate?.call(storeUrl, latestVersion);
+  }
+
+  static const String updateRequiredCode = 'UPDATE_REQUIRED';
+
+  // 1) Load base URL first (no version headers) so both iOS and Android get the URL.
+  // 2) Then run version check (with version headers); if 426, set pending so main shows update card.
+  static Future<void> initializeBaseUrl() async {
+    const baseUrlEndpoint =
+        'https://f039-203-192-241-145.ngrok-free.app/api/v3/baseurl';
+
+    // —— Step 1: Fetch base URL (no version headers) ——
+    try {
+      print('🌐 [DEBUG] Step 1: Fetching base URL from: $baseUrlEndpoint');
       final response = await http.get(
-        Uri.parse('https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl'),
+        Uri.parse(baseUrlEndpoint),
         headers: {'Content-Type': 'application/json'},
       );
-
       print('🌐 [DEBUG] Base URL API Status Code: ${response.statusCode}');
-      print('🌐 [DEBUG] Base URL API Response: ${response.body}');
 
-      if (response.statusCode != 200) {
-        print(
-          '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
-        );
-        throw Exception(
-          'Failed to fetch base URL: HTTP ${response.statusCode}',
-        );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>?;
+        final url = data?['url']?.toString().trim();
+        if (url != null && url.isNotEmpty && url != 'null') {
+          _baseUrl = url.endsWith('/') ? '${url}api/v3' : '$url/api/v3';
+          print('✅ [DEBUG] Base URL set: $_baseUrl');
+        } else {
+          _baseUrl = _fallbackBaseUrl;
+          print('⚠️ [DEBUG] No valid url in response, using fallback');
+        }
+      } else {
+        _baseUrl = _fallbackBaseUrl;
+        print('⚠️ [DEBUG] Base URL API returned ${response.statusCode}, using fallback');
       }
-
-      final data = jsonDecode(response.body);
-      final baseUrl = data['url'];
-      _baseUrl = '$baseUrl/api/v3';
-
-      print('✅ [DEBUG] Retrieved base URL: $baseUrl');
-      print('✅ [DEBUG] Full API URL: $_baseUrl');
     } catch (error) {
       print('❌ [ERROR] Failed to fetch base URL: $error');
-      throw Exception('Failed to fetch base URL: $error');
+      _baseUrl = _fallbackBaseUrl;
+      print('⚠️ Using fallback base URL: $_baseUrl');
+    }
+
+    // —— Step 2: Version check (with version headers); if 426, show update card later ——
+    try {
+      print('🌐 [DEBUG] Step 2: Version check (with x-app-version, x-platform)');
+      final versionResponse = await getUrl(
+        Uri.parse(baseUrlEndpoint),
+        headers: {'Content-Type': 'application/json'},
+      );
+      print('🌐 [DEBUG] Version check Status Code: ${versionResponse.statusCode}');
+
+      if (versionResponse.statusCode == 426) {
+        try {
+          final data =
+              jsonDecode(versionResponse.body) as Map<String, dynamic>?;
+          _pendingForceUpdateStoreUrl = data?['store_url']?.toString() ?? '';
+          _pendingForceUpdateLatestVersion =
+              data?['latest_version']?.toString();
+        } catch (_) {}
+        _forceUpdateRequired = true;
+        print('📲 [DEBUG] Update required (426); update card will be shown.');
+      }
+      // If 200 or anything else, do nothing — no update required.
+    } catch (error) {
+      print('⚠️ [DEBUG] Version check request failed (non-blocking): $error');
+      // Don't block app; base URL is already set.
     }
   }
 
@@ -64,11 +137,11 @@ class ActionService {
   static Future<String> get _oldBaseUrl async {
     try {
       print(
-        '🌐 [DEBUG] Fetching base URL from: https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl',
+        '🌐 [DEBUG] Fetching base URL from: https://f039-203-192-241-145.ngrok-free.app/api/v3/baseurl',
       );
 
       final response = await http.get(
-        Uri.parse('https://orthoptic-karan-leftward.ngrok-free.dev/api/v3/baseurl'),
+        Uri.parse('https://f039-203-192-241-145.ngrok-free.app/api/v3/baseurl'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -80,7 +153,7 @@ class ActionService {
           '❌ [ERROR] Base URL API failed with status: ${response.statusCode}',
         );
         // Fallback to hardcoded URL if API fails
-        return 'https://orthoptic-karan-leftward.ngrok-free.dev/api/v3';
+        return 'https://f039-203-192-241-145.ngrok-free.app/api/v3';
       }
 
       final data = jsonDecode(response.body);
@@ -93,7 +166,7 @@ class ActionService {
     } catch (error) {
       print('❌ [ERROR] Failed to fetch base URL: $error');
       // Fallback to hardcoded URL if there's an error
-      return 'https://orthoptic-karan-leftward.ngrok-free.dev/api/v3'; 
+      return 'https://f039-203-192-241-145.ngrok-free.app/api/v3'; 
     }
   }
 
@@ -4476,7 +4549,7 @@ class ActionService {
   static Future<Map<String, dynamic>> updateAppointmentEnhanced({
     required String appointmentId,
     required Map<String, dynamic> updateData,
-    PlatformFile? attachmentFile,
+    File? attachmentFile,
   }) async {
     try {
       final token = await StorageService.getToken();
@@ -4506,14 +4579,15 @@ class ActionService {
 
       print('DEBUG API: Clean update data: $cleanUpdateData');
       print('DEBUG API: Has attachment file: ${attachmentFile != null}');
-      print('DEBUG API: Attachment file name: ${attachmentFile?.name}');
-      print('DEBUG API: Attachment file path: ${attachmentFile?.path}');
-      print('DEBUG API: Attachment file size: ${attachmentFile?.size}');
+      if (attachmentFile != null) {
+        print('DEBUG API: Attachment file path: ${attachmentFile.path}');
+        print('DEBUG API: Attachment file exists: ${await attachmentFile.exists()}');
+      }
 
       final uri = Uri.parse('$baseUrl/appointment/$appointmentId/enhanced');
 
-      // If there's an attachment file, use multipart request
-      if (attachmentFile != null && attachmentFile.path != null) {
+      // If there's an attachment file, use multipart request (same approach as createAppointment)
+      if (attachmentFile != null && await attachmentFile.exists()) {
         print('DEBUG API: Using multipart request with attachment');
 
         // Create multipart request
@@ -4522,26 +4596,60 @@ class ActionService {
         // Add authorization header
         request.headers['Authorization'] = 'Bearer $token';
 
+        // Check if user has VDS role for bypassing image validation
+        final isVDS = await isVDSUser();
+        if (isVDS) {
+          request.fields['userrole'] = 'VDS';
+          print('🔓 VDS role detected - image validation will be bypassed');
+        }
+
         // Add JSON data fields directly
         cleanUpdateData.forEach((key, value) {
-          if (value is Map || value is List) {
-            request.fields[key] = jsonEncode(value);
-          } else {
-            request.fields[key] = value.toString();
+          if (value != null) {
+            if (value is Map || value is List) {
+              request.fields[key] = jsonEncode(value);
+            } else {
+              request.fields[key] = value.toString();
+            }
           }
         });
 
-        // Add file - use the field name that multer expects
-        final file = await http.MultipartFile.fromPath(
-          'appointmentAttachment', // This should match the multer field name
-          attachmentFile.path!,
-          filename: attachmentFile.name,
-        );
-        request.files.add(file);
+        // Add the attachment file (same approach as createAppointment)
+        try {
+          print('📎 Adding attachment file to request: ${attachmentFile.path}');
+          final fileStream = http.ByteStream(attachmentFile.openRead());
+          final fileLength = await attachmentFile.length();
+          print('📎 File size: ${fileLength} bytes');
 
-        print(
-          'DEBUG API: Sending multipart request with file: ${attachmentFile.name}',
-        );
+          // Get file extension and name
+          final fileName = attachmentFile.path.split('/').last;
+          final fileExtension = fileName.contains('.')
+              ? fileName.split('.').last
+              : 'pdf';
+          final mimeType = _getMimeType(fileExtension);
+
+          final fileMultipart = http.MultipartFile(
+            'appointmentAttachment', // Field name expected by the backend
+            fileStream,
+            fileLength,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(fileMultipart);
+          print('📎 Attachment file added successfully to multipart request');
+        } catch (fileError) {
+          print('❌ Error adding attachment file: $fileError');
+          return {
+            'success': false,
+            'statusCode': 400,
+            'message':
+                'Error processing attachment file: ${fileError.toString()}',
+          };
+        }
+
+        print('📤 Sending multipart request to: ${request.url}');
+        print('📤 Request headers: ${request.headers}');
+        print('📤 Total files being sent: ${request.files.length}');
         print('DEBUG API: File field name: appointmentAttachment');
         print('DEBUG API: Form fields: ${request.fields}');
 
@@ -6021,8 +6129,13 @@ class ActionService {
         request.fields['company'] = company.trim();
       }
       // Handle full_address as JSON string
+      // Backend stores full_address as an object. Many user-side screens read
+      // full_address.street for display, so we mirror the same value into both
+      // display_name and street to keep things consistent.
+      final trimmedAddress = full_address.trim();
       request.fields['full_address'] = jsonEncode({
-        'display_name': full_address.trim(),
+        'display_name': trimmedAddress,
+        'street': trimmedAddress,
       });
       // Handle userTags as array - send as both userTags and additionalRoles
       // Always send userTags field, even when empty, to clear existing roles if needed
@@ -10383,6 +10496,133 @@ class ActionService {
         'success': false,
         'statusCode': 500,
         'message': 'Internal server error',
+        'error': error.toString(),
+      };
+    }
+  }
+
+  // Bulk cancel appointments
+  static Future<Map<String, dynamic>> bulkCancelAppointments({
+    required List<String> appointmentIds,
+    required String reason,
+    String type = 'cancellation', // 'cancellation' or 'deletion'
+  }) async {
+    try {
+      final token = await StorageService.getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'statusCode': 401,
+          'message': 'No authentication token found. Please login again.',
+        };
+      }
+
+      // Validate input
+      if (appointmentIds.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': 'At least one appointment ID is required',
+        };
+      }
+
+      if (reason.trim().isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': '${type == 'deletion' ? 'Deletion' : 'Cancellation'} reason is required',
+        };
+      }
+
+      if (type != 'cancellation' && type != 'deletion') {
+        return {
+          'success': false,
+          'statusCode': 400,
+          'message': "Type must be either 'cancellation' or 'deletion'",
+        };
+      }
+
+      // Process each appointment cancellation
+      final List<Map<String, dynamic>> results = [];
+      final List<String> errors = [];
+
+      for (final appointmentId in appointmentIds) {
+        try {
+          // Prepare request body
+          final Map<String, dynamic> requestBody = {
+            'appointmentId': appointmentId,
+            'reason': reason.trim(),
+            'type': type,
+          };
+
+          // Make API call
+          final response = await http.post(
+            Uri.parse('$baseUrl/appointment/send-cancellation-email'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(requestBody),
+          );
+
+          // Parse response
+          Map<String, dynamic> responseData;
+          try {
+            responseData = jsonDecode(response.body);
+          } catch (e) {
+            errors.add('Failed to parse response for appointment $appointmentId');
+            continue;
+          }
+
+          if (response.statusCode == 200) {
+            results.add({
+              'appointmentId': appointmentId,
+              'success': true,
+              'message': responseData['message'] ?? 'Cancelled successfully',
+            });
+          } else {
+            errors.add(
+              'Appointment $appointmentId: ${responseData['message'] ?? 'Failed to cancel'}',
+            );
+          }
+        } catch (e) {
+          errors.add('Error cancelling appointment $appointmentId: $e');
+        }
+      }
+
+      // Return summary
+      if (results.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': 500,
+          'message': 'Failed to cancel all appointments',
+          'errors': errors,
+        };
+      } else if (errors.isNotEmpty) {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'message': 'Some appointments were cancelled successfully',
+          'data': {
+            'successful': results,
+            'failed': errors,
+          },
+        };
+      } else {
+        return {
+          'success': true,
+          'statusCode': 200,
+          'message': 'All appointments cancelled successfully',
+          'data': {
+            'successful': results,
+          },
+        };
+      }
+    } catch (error) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': 'Network error. Please check your connection and try again.',
         'error': error.toString(),
       };
     }

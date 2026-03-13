@@ -9,6 +9,9 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">divinepicrecognition.sumerudigital.com</domain>
     </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">f039-203-192-241-145.ngrok-free.app</domain>
+    </domain-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>

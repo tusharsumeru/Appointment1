@@ -826,7 +826,7 @@ class _SidebarComponentState extends State<SidebarComponent> {
             ListTile(
               leading: Icon(Icons.info_outline, color: Colors.grey[600]),
               title: Text(
-                'Build 6.0.0',
+                'Build 7.0.0',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],

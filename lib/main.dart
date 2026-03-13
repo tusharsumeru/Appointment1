@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io' show Platform;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -45,16 +48,32 @@ void main() async {
   
   print('🚀 Starting app initialization...');
   print('📱 Platform: ${Platform.operatingSystem}');
-  
-  // Initialize base URL
+
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    ActionService.appVersion = packageInfo.version.isNotEmpty
+        ? packageInfo.version
+        : '';
+    print('📦 App version: ${ActionService.appVersion.isEmpty ? "(not set)" : ActionService.appVersion}');
+  } catch (e) {
+    ActionService.appVersion = '';
+    print('⚠️ Package version not available: $e');
+  }
+
+  // Initialize base URL (version check only here – if 426, app still starts and shows update dialog)
   print('🌐 Initializing base URL...');
   try {
     await ActionService.initializeBaseUrl();
     print('✅ Base URL initialized successfully');
   } catch (e) {
-    print('❌ Base URL initialization failed: $e');
-    print('🚨 App cannot start without base URL. Please check your network connection.');
-    return; // Stop app initialization if base URL fails
+    final msg = e.toString();
+    if (msg.contains(ActionService.updateRequiredCode)) {
+      print('📲 Update required: app will start and show update dialog until they update.');
+    } else {
+      print('❌ Base URL initialization failed: $e');
+      print('🚨 App cannot start without base URL. Please check your network connection.');
+      return;
+    }
   }
   
   try {
@@ -318,10 +337,133 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _registerVersionHandlers());
+  }
+
+  void _registerVersionHandlers() {
+    ActionService.onForceUpdate = (storeUrl, [latestVersion]) {
+      void showIt() {
+        final ctx = _navigatorKey.currentContext;
+        if (ctx == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => showIt());
+          return;
+        }
+        final currentVersion = ActionService.appVersion;
+        showDialog(
+          context: ctx,
+          barrierDismissible: false,
+          builder: (context) => PopScope(
+            canPop: false,
+            child: Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 340),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Logo
+                    SvgPicture.asset(
+                      'image/aol-logo-color.svg',
+                      width: 140,
+                      height: 70,
+                      fit: BoxFit.contain,
+                      placeholderBuilder: (context) => Icon(
+                        Icons.system_update_alt,
+                        size: 56,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Title
+                    Text(
+                      'Update required',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    // Message
+                    Text(
+                      'A new version of the app is available. Please update to continue using the app.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                            height: 1.4,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (latestVersion != null && latestVersion.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Current: $currentVersion',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              'Latest: $latestVersion',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    // Update button – prominent, full width
+                    if (storeUrl.isNotEmpty)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () async {
+                            final uri = Uri.tryParse(storeUrl);
+                            if (uri != null) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                            textStyle: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          child: const Text('Update now'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      showIt();
+    };
+    ActionService.showPendingForceUpdateIfAny();
   }
 
   @override
@@ -358,6 +500,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Appointment App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

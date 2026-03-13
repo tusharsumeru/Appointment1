@@ -510,11 +510,11 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
       isValid = false;
       errorMessage = 'Please enter name';
     }
-    // Validate designation
-    else if (_designationController.text.trim().isEmpty) {
-      isValid = false;
-      errorMessage = 'Please enter designation';
-    }
+    // Designation is now optional, so we REMOVE this check:
+    // else if (_designationController.text.trim().isEmpty) {
+    //   isValid = false;
+    //   errorMessage = 'Please enter designation';
+    // }
     // Validate date
     else if (_dateController.text.trim().isEmpty) {
       isValid = false;
@@ -571,7 +571,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
           phoneNumber: _mobileNoController.text.isNotEmpty
               ? '$_selectedCountryCode${_mobileNoController.text}'
               : null,
-          designation: _designationController.text,
+          designation: _designationController.text, // Passes as is (can be empty)
           venue: _selectedVenue.isNotEmpty ? _selectedVenue : null,
           purpose: _purposeController.text.isNotEmpty
               ? _purposeController.text
@@ -1563,13 +1563,7 @@ class _AddNewAppointmentFormState extends State<AddNewAppointmentForm> {
                       Icons.work_outline,
                       color: Colors.grey,
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter designation';
-                      }
-                      return null;
-                    },
-                    isRequired: true,
+                    // validator removed for optional field
                   ),
                   const SizedBox(height: 16),
 

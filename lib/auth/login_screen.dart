@@ -3,8 +3,8 @@ import '../main/inbox_screen.dart';
 import '../action/action.dart';
 import '../action/storage_service.dart';
 import '../guard/guard_screen.dart';
-import '../user/signup_screen.dart';
-import '../user/verify_otp_screen.dart';
+// import '../user/signup_screen.dart'; // Create Account commented out
+import 'website_only_screen.dart';
 import 'notification_setup_screen.dart';
 import '../user/forgot_password_screen.dart';
 import '../main/reference_from_list_screen.dart';
@@ -61,14 +61,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                  data?['requiresOtpVerification'] == true;
           
           if (isMigratedUser) {
-            // For migrated users, redirect to OTP verification screen
+            // Migrated users: show website-only screen (services paused for app, use website)
             if (mounted) {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => VerifyOtpScreen(
-                    email: _emailController.text.trim(),
-                    isMigratedUser: true,
-                  ),
+                  builder: (context) => const WebsiteOnlyScreen(showBackToLogin: true),
                 ),
               );
             }
@@ -146,19 +143,13 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
 
-    // 🔒 CRITICAL: Check if user is migrated and block access
+    // Migrated users: show website-only screen (services paused for app, use website)
     final isMigratedUser = userData?['migratedUser'] == true;
     if (isMigratedUser) {
-      final userEmail = userData?['email'] ?? '';
-      
-      // Migrated users always go through OTP verification
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => VerifyOtpScreen(
-              email: userEmail,
-              isMigratedUser: true,
-            ),
+            builder: (context) => const WebsiteOnlyScreen(showBackToLogin: true),
           ),
         );
       }
@@ -166,6 +157,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     String? userRole = userData?['role']?.toString().toLowerCase();
+
+    // User / VDS (and client): show website-only screen only — after login and when they come back
+    if (userRole == 'user' || userRole == 'vds' || userRole == 'client') {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const WebsiteOnlyScreen(showBackToLogin: true),
+          ),
+        );
+      }
+      return;
+    }
 
     if (mounted) {
       if (userRole == 'secretary' ||
@@ -182,17 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const GuardScreen(),
-          ),
-        );
-      } else if (userRole == 'user' || userRole == 'client' || userRole == 'vds') {
-        // Regular user/client role - always show notification setup for now
-        // TODO: Check from backend if user has FCM tokens stored
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => NotificationSetupScreen(
-              isNewUser: false,
-              userData: userData ?? {},
-            ),
           ),
         );
       } else if (userRole == 'ntc') {
@@ -471,34 +463,34 @@ class _LoginScreenState extends State<LoginScreen> {
                        ),
                       const SizedBox(height: 16),
 
-                      // Create Account Text
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            "Don't have an account? ",
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const SignupScreen(),
-                                ),
-                              );
-                            },
-                                                         child: const Text(
-                               'Create Account',
-                                                               style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFE65100),
-                                  decoration: TextDecoration.underline,
-                                ),
-                             ),
-                          ),
-                        ],
-                      ),
+                      // Create Account link - commented out (services paused)
+                      // Row(
+                      //   mainAxisAlignment: MainAxisAlignment.center,
+                      //   children: [
+                      //     const Text(
+                      //       "Don't have an account? ",
+                      //       style: TextStyle(fontSize: 14, color: Colors.grey),
+                      //     ),
+                      //     GestureDetector(
+                      //       onTap: () {
+                      //         Navigator.of(context).push(
+                      //           MaterialPageRoute(
+                      //             builder: (context) => const SignupScreen(),
+                      //           ),
+                      //         );
+                      //       },
+                      //       child: const Text(
+                      //         'Create Account',
+                      //         style: TextStyle(
+                      //           fontSize: 14,
+                      //           fontWeight: FontWeight.w600,
+                      //           color: Color(0xFFE65100),
+                      //           decoration: TextDecoration.underline,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                     ],
                   ),
                 ),

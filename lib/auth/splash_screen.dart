@@ -10,7 +10,7 @@ import '../guard/guard_screen.dart';
 import '../user/user_screen.dart';
 import '../user/appointment_type_selection_screen.dart';
 import '../user/signup_screen.dart';
-import '../user/verify_otp_screen.dart';
+import 'website_only_screen.dart';
 import '../main/reference_from_list_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -76,6 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(seconds: 4));
 
     if (mounted) {
+      if (ActionService.forceUpdateRequired) return;
       try {
         // Check if user is logged in
         final isLoggedIn = await StorageService.isLoggedIn();
@@ -189,20 +190,14 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
 
-      // 🔒 CRITICAL: Check if user is migrated and block access
+      // Migrated users: show website-only screen (services paused for app, use website)
       final isMigratedUser = userData['migratedUser'] == true;
       if (isMigratedUser) {
-        final userEmail = userData['email'] ?? '';
-        
-        // Migrated users always go through OTP verification
         if (mounted) {
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  VerifyOtpScreen(
-                    email: userEmail,
-                    isMigratedUser: true,
-                  ),
+                  const WebsiteOnlyScreen(showBackToLogin: false),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);
@@ -243,12 +238,12 @@ class _SplashScreenState extends State<SplashScreen>
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
-        } else if (userRole == 'user' || userRole == 'client' || userRole == 'vds') {
-          // Regular user/client/VDS role - navigate to appointment type selection
+        } else if (userRole == 'user' || userRole == 'vds' || userRole == 'client') {
+          // User / VDS / client: only show website-only screen when they come back
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  const AppointmentTypeSelectionScreen(),
+                  const WebsiteOnlyScreen(showBackToLogin: false),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);
